@@ -11,7 +11,7 @@ import numpy as np
 import jax
 import jax.numpy as jnp
 
-from configuration.param_extraction import FitSettings
+from configuration.param_extraction import FitMode
 from tools.data.preprocessing       import ProfilePreprocessor
 from tools.monitoring.logger        import Logger
 
@@ -22,42 +22,51 @@ from .selection   import BestKSelector, KernelBackendSelector
 class SigmaFittingExtractor:
     def __init__(
         self,
-        fit_settings        : FitSettings,
         logger              : Logger,
+        modes               : list,
+        lambda_values       : list,
+        k_max               : int                 = 5,
+        threshold_factor    : float               = 0.25,
+        truncation_index    : int                 = 170,
+        prominence_frac     : float               = 0.05,
+        sigma_init_divisor  : float               = 1.0,
+        activity_threshold  : float               = 1e-3,
         range_batch_size    : int                 = 256,
         adam_steps          : int                 = 2000,
         adam_lr             : float               = 1e-2,
         adam_b1             : float               = 0.9,
         adam_b2             : float               = 0.999,
-        k_max               : int                 = 5,
-        lambda_k            : float               = 3e-3,
-        prominence_frac     : float               = 0.05,
-        sigma_init_divisor  : float               = 1.0,
         gpu_pixel_batch_size: int                 = 8192,
         init_workers        : Optional[int]       = None,
         peak_initialiser    : Optional[PeakInitialiser] = None,
+        kernel_backend      : Optional[tuple]     = None,
     ) -> None:
 
-        self.fit_settings         = fit_settings
         self.logger               = logger
+        self.modes                = list(modes)
+        self.lambda_values        = [float(lambda_k) for lambda_k in lambda_values]
+        self.k_max                = k_max
+        self.threshold_factor     = threshold_factor
+        self.truncation_index     = truncation_index
+        self.prominence_frac      = prominence_frac
+        self.sigma_init_divisor   = sigma_init_divisor
+        self.activity_threshold   = activity_threshold
         self.range_batch_size     = range_batch_size
         self.adam_steps           = adam_steps
         self.adam_lr              = adam_lr
         self.adam_b1              = adam_b1
         self.adam_b2              = adam_b2
-        self.k_max                = k_max
-        self.lambda_k             = lambda_k
-        self.prominence_frac      = prominence_frac
-        self.sigma_init_divisor   = sigma_init_divisor
         self.gpu_pixel_batch_size = gpu_pixel_batch_size
-        self.activity_threshold   = fit_settings.fit_config.activity_threshold
-        self.fit_sigma            = bool(fit_settings.fit_config.fit_sigma)
-        self.fit_amplitude        = bool(fit_settings.fit_config.fit_amplitude)
-        self.fit_mean             = bool(fit_settings.fit_config.fit_mean)
-        self.amp_mask             = jnp.float32(1.0 if self.fit_amplitude else 0.0)
-        self.mu_mask              = jnp.float32(1.0 if self.fit_mean      else 0.0)
-        self.sigma_mask           = jnp.float32(1.0 if self.fit_sigma     else 0.0)
         self._init_workers        = min(32, os.cpu_count() or 8) if init_workers is None else init_workers
+
+        self.mode_masks = {}
+        for mode in self.modes:
+            fit_sigma, fit_amplitude, fit_mean = FitMode.free_flags(mode)
+            self.mode_masks[mode] = (
+                jnp.float32(1.0 if fit_amplitude else 0.0),
+                jnp.float32(1.0 if fit_mean      else 0.0),
+                jnp.float32(1.0 if fit_sigma     else 0.0),
+            )
 
         if peak_initialiser is not None:
             self._peak_initialiser = peak_initialiser
@@ -66,9 +75,14 @@ class SigmaFittingExtractor:
             self._peak_initialiser = PeakInitialiser(n_workers=self._init_workers)
             self._owns_initialiser = True
 
-        self._best_k_selector  = BestKSelector(k_max=k_max, lambda_k=lambda_k, logger=logger)
+        self._best_k_selector = BestKSelector(k_max=k_max, logger=logger)
 
-        kernel, n_devices, backend, active_devices = KernelBackendSelector().select()
+        if kernel_backend is not None:
+            kernel, n_devices, backend, active_devices = kernel_backend
+            self._owns_kernel                          = False
+        else:
+            kernel, n_devices, backend, active_devices = KernelBackendSelector().select()
+            self._owns_kernel                          = True
 
         self._kernel    = kernel
         self._n_devices = n_devices
@@ -81,12 +95,10 @@ class SigmaFittingExtractor:
         self.logger.subsection(f"adam_steps         : {adam_steps}")
         self.logger.subsection(f"adam_lr            : {adam_lr}")
         self.logger.subsection(f"k_max              : {k_max}")
-        self.logger.subsection(f"lambda_k           : {lambda_k}")
+        self.logger.subsection(f"lambda_values      : {self.lambda_values}")
+        self.logger.subsection(f"fit modes          : {self.modes}")
         self.logger.subsection(f"sigma_init_divisor : {sigma_init_divisor}")
         self.logger.subsection(f"activity_threshold : {self.activity_threshold}")
-        self.logger.subsection(f"fit_sigma          : {self.fit_sigma}")
-        self.logger.subsection(f"fit_amplitude      : {self.fit_amplitude}")
-        self.logger.subsection(f"fit_mean           : {self.fit_mean}")
         self.logger.subsection(f"init_workers       : {self._init_workers}")
         self.logger.subsection(f"n_devices          : {self._n_devices}")
 
@@ -96,7 +108,6 @@ class SigmaFittingExtractor:
         height_range  : Tuple[float, float],
     ) -> tuple:
 
-        fit_cfg      = self.fit_settings.fit_config
         n_params_out = 3 * self.k_max
 
         tomogram_mmap = np.load(str(tomogram_path), mmap_mode="r", allow_pickle=False)
@@ -113,9 +124,6 @@ class SigmaFittingExtractor:
         mu_lower_j = jnp.float32(height_axis[0])
         mu_upper_j = jnp.float32(height_axis[-1])
 
-        threshold_factor = float(fit_cfg.threshold_factor)
-        truncation_index = int(  fit_cfg.truncation_index)
-
         self.logger.section("[Data Preparation]")
         self.logger.subsection(f"H            : {H}")
         self.logger.subsection(f"Az           : {Az}")
@@ -130,7 +138,6 @@ class SigmaFittingExtractor:
             sigma_lower_j, sigma_upper_j,
             mu_lower_j, mu_upper_j,
             n_params_out,
-            threshold_factor, truncation_index,
         )
 
     def _warmup_kernel(
@@ -143,10 +150,8 @@ class SigmaFittingExtractor:
         mu_upper_j    : jnp.ndarray,
     ) -> None:
 
-        free = "+".join(self.fit_settings.free_parameters)
-
         self.logger.section("[Kernel Compilation]")
-        self.logger.subsection(f"Compiling JAX kernel (free: {free}) for K={self.k_max}")
+        self.logger.subsection(f"Compiling JAX kernel (modes: {', '.join(self.modes)}) for K={self.k_max}")
 
         B = self.gpu_pixel_batch_size
         K = self.k_max
@@ -156,25 +161,24 @@ class SigmaFittingExtractor:
         dummy_a = jnp.ones((B, K),  dtype=jnp.float32) * 0.5
         dummy_m = jnp.zeros((B, K), dtype=jnp.float32)
 
-        self._kernel(dummy_a, dummy_m, dummy_s, height_ax_j, dummy_p, self.amp_mask, self.mu_mask, self.sigma_mask, mu_lower_j, mu_upper_j, sigma_lower_j, sigma_upper_j, self.adam_steps, self.adam_lr, self.adam_b1, self.adam_b2)
+        amp_mask, mu_mask, sigma_mask = self.mode_masks[self.modes[0]]
+        self._kernel(dummy_a, dummy_m, dummy_s, height_ax_j, dummy_p, amp_mask, mu_mask, sigma_mask, mu_lower_j, mu_upper_j, sigma_lower_j, sigma_upper_j, self.adam_steps, self.adam_lr, self.adam_b1, self.adam_b2)
 
         self.logger.subsection(f"Kernel compiled (K={K}, batch={B}, n_steps={self.adam_steps})")
 
     def _load_batch(
         self,
-        tomogram_mmap    : np.ndarray,
-        r_start          : int,
-        R                : int,
-        Az               : int,
-        H                : int,
-        threshold_factor : float,
-        truncation_index : int,
+        tomogram_mmap : np.ndarray,
+        r_start       : int,
+        R             : int,
+        Az            : int,
+        H             : int,
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, int]:
 
         r_end = min(r_start + self.range_batch_size, R)
         r_c   = r_end - r_start
         raw   = np.abs(np.array(tomogram_mmap[:, :, r_start:r_end])).astype(np.float32)
-        raw   = ProfilePreprocessor.apply(raw, threshold_factor, truncation_index)
+        raw   = ProfilePreprocessor.apply(raw, self.threshold_factor, self.truncation_index)
 
         pf     = raw.transpose(2, 1, 0).reshape(r_c * Az, H).copy()
         active = pf.max(axis=1) > self.activity_threshold
@@ -204,13 +208,15 @@ class SigmaFittingExtractor:
         mu_lower_j    : jnp.ndarray,
         mu_upper_j    : jnp.ndarray,
         N_act         : int,
+        mode          : str,
         batch_tag     : str,
     ) -> dict:
 
-        gpu_results = {}
-        B           = self.gpu_pixel_batch_size
+        gpu_results                   = {}
+        B                             = self.gpu_pixel_batch_size
+        amp_mask, mu_mask, sigma_mask = self.mode_masks[mode]
 
-        self.logger.section(f"[{batch_tag} | Phase 2 — GPU Fitting ({'+'.join(self.fit_settings.free_parameters)})]")
+        self.logger.section(f"[{batch_tag} | Phase 2 — GPU Fitting (mode {mode})]")
 
         for K in range(1, self.k_max + 1):
             amps_raw, mus, sigs_init = inits[K]
@@ -228,9 +234,9 @@ class SigmaFittingExtractor:
                     jnp.array(self._pad_rows(sigs_init    [i_start:i_end], B)),
                     height_ax_j,
                     jnp.array(self._pad_rows(prof_norm_all[i_start:i_end], B)),
-                    self.amp_mask,
-                    self.mu_mask,
-                    self.sigma_mask,
+                    amp_mask,
+                    mu_mask,
+                    sigma_mask,
                     mu_lower_j,
                     mu_upper_j,
                     sigma_lower_j,
@@ -267,17 +273,21 @@ class SigmaFittingExtractor:
         mu_upper_j    : jnp.ndarray,
         n_params_out  : int,
         batch_tag     : str,
-    ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    ) -> Dict[tuple, Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]]:
 
         N          = profiles_flat.shape[0]
-        output     = np.zeros((N, n_params_out),    dtype=np.float32)
-        mse_out    = np.full ((N, self.k_max), np.nan, dtype=np.float32)
-        pen_out    = np.full ((N, self.k_max), np.nan, dtype=np.float32)
-        best_k_out = np.zeros(N,                    dtype=np.int16)
         active_idx = np.where(active)[0]
 
+        def _empty():
+            return (
+                np.zeros((N, n_params_out),            dtype=np.float32),
+                np.full ((N, self.k_max), np.nan,      dtype=np.float32),
+                np.full ((N, self.k_max), np.nan,      dtype=np.float32),
+                np.zeros(N,                            dtype=np.int16),
+            )
+
         if len(active_idx) == 0:
-            return output, mse_out, pen_out, best_k_out
+            return {(mode, lambda_k): _empty() for mode in self.modes for lambda_k in self.lambda_values}
 
         prof_raw_all  = profiles_flat[active_idx]
         prof_norm_all = profiles_norm[active_idx].astype(np.float32)
@@ -293,38 +303,43 @@ class SigmaFittingExtractor:
         amps_km, mus_km, sigs_km = self._peak_initialiser.run(prof_raw_all, height_axis, self.k_max, self.prominence_frac, self.sigma_init_divisor)
         inits = {K: (amps_km[:, :K].copy(), mus_km[:, :K].copy(), sigs_km[:, :K].copy()) for K in range(1, self.k_max + 1)}
 
-        self.logger.subsection(f"Init shared for all {self.k_max} K values")
+        self.logger.subsection(f"Init shared for all {self.k_max} K values and {len(self.modes)} modes")
 
-        gpu_results = self._fit_all_K(inits, prof_norm_all, scale_all, height_ax_j, sigma_lower_j, sigma_upper_j, mu_lower_j, mu_upper_j, N_act, batch_tag)
+        batch_results = {}
+        for mode in self.modes:
+            gpu_results = self._fit_all_K(inits, prof_norm_all, scale_all, height_ax_j, sigma_lower_j, sigma_upper_j, mu_lower_j, mu_upper_j, N_act, mode, batch_tag)
+            mse_all     = self._best_k_selector.score(gpu_results, prof_norm_all, height_axis, batch_tag=f"{batch_tag} | mode {mode}")
 
-        best_params, mse_act, pen_act, best_idx_act = self._best_k_selector.select(gpu_results, prof_norm_all, scale_all, height_axis, n_params_out, batch_tag=batch_tag)
+            for lambda_k in self.lambda_values:
+                best_params, mse_act, pen_act, best_idx_act = self._best_k_selector.select(gpu_results, mse_all, scale_all, lambda_k, n_params_out, batch_tag=f"{batch_tag} | mode {mode}")
 
-        output    [active_idx] = best_params
-        mse_out   [active_idx] = mse_act
-        pen_out   [active_idx] = pen_act
-        best_k_out[active_idx] = best_idx_act + 1
+                output, mse_out, pen_out, best_k_out = _empty()
+                output    [active_idx] = best_params
+                mse_out   [active_idx] = mse_act
+                pen_out   [active_idx] = pen_act
+                best_k_out[active_idx] = best_idx_act + 1
 
-        return output, mse_out, pen_out, best_k_out
+                batch_results[(mode, lambda_k)] = (output, mse_out, pen_out, best_k_out)
+
+            del gpu_results, mse_all
+            gc.collect()
+
+        return batch_results
 
     def _run_fitting(
         self,
-        tomogram_mmap    : np.ndarray,
-        height_axis      : np.ndarray,
-        height_ax_j      : jnp.ndarray,
-        sigma_lower_j    : jnp.ndarray,
-        sigma_upper_j    : jnp.ndarray,
-        mu_lower_j       : jnp.ndarray,
-        mu_upper_j       : jnp.ndarray,
-        threshold_factor : float,
-        truncation_index : int,
-        Az               : int,
-        R                : int,
-        H                : int,
-        n_params_out     : int,
-        output           : np.ndarray,
-        mse_maps         : np.ndarray,
-        penalised_maps   : np.ndarray,
-        best_k_map       : np.ndarray,
+        tomogram_mmap : np.ndarray,
+        height_axis   : np.ndarray,
+        height_ax_j   : jnp.ndarray,
+        sigma_lower_j : jnp.ndarray,
+        sigma_upper_j : jnp.ndarray,
+        mu_lower_j    : jnp.ndarray,
+        mu_upper_j    : jnp.ndarray,
+        Az            : int,
+        R             : int,
+        H             : int,
+        n_params_out  : int,
+        outputs       : Dict[tuple, dict],
     ) -> int:
 
         n_batches = -(-R // self.range_batch_size)
@@ -341,7 +356,7 @@ class SigmaFittingExtractor:
             with ThreadPoolExecutor(max_workers=2) as pool:
                 r               = 0
                 batch_index     = 0
-                prefetch_future = pool.submit(self._load_batch, tomogram_mmap, r, R, Az, H, threshold_factor, truncation_index,)
+                prefetch_future = pool.submit(self._load_batch, tomogram_mmap, r, R, Az, H)
 
                 try:
                     while r < R:
@@ -353,11 +368,11 @@ class SigmaFittingExtractor:
                         batch_tag    = f"Batch {batch_index}/{n_batches}"
 
                         if r_end < R:
-                            prefetch_future = pool.submit(self._load_batch, tomogram_mmap, r_end, R, Az, H, threshold_factor, truncation_index)
+                            prefetch_future = pool.submit(self._load_batch, tomogram_mmap, r_end, R, Az, H)
 
                         total_attempted += int(active.sum())
 
-                        fitted, mse_batch, pen_batch, best_k_batch = self._fit_batch(
+                        batch_results = self._fit_batch(
                             profiles_flat, profiles_norm,
                             active, safe_scale,
                             height_axis, height_ax_j,
@@ -367,12 +382,14 @@ class SigmaFittingExtractor:
                             batch_tag,
                         )
 
-                        output        [:, :, r_start:r_end] = fitted.reshape(r_count, Az, n_params_out).transpose(2, 1, 0)
-                        mse_maps      [:, :, r_start:r_end] = mse_batch.reshape(r_count, Az, self.k_max).transpose(2, 1, 0)
-                        penalised_maps[:, :, r_start:r_end] = pen_batch.reshape(r_count, Az, self.k_max).transpose(2, 1, 0)
-                        best_k_map    [:,    r_start:r_end] = best_k_batch.reshape(r_count, Az).T
+                        for key, (fitted, mse_batch, pen_batch, best_k_batch) in batch_results.items():
+                            maps = outputs[key]
+                            maps["params"][:, :, r_start:r_end] = fitted.reshape(r_count, Az, n_params_out).transpose(2, 1, 0)
+                            maps["mse"   ][:, :, r_start:r_end] = mse_batch.reshape(r_count, Az, self.k_max).transpose(2, 1, 0)
+                            maps["pen"   ][:, :, r_start:r_end] = pen_batch.reshape(r_count, Az, self.k_max).transpose(2, 1, 0)
+                            maps["best_k"][:,    r_start:r_end] = best_k_batch.reshape(r_count, Az).T
 
-                        del profiles_flat, profiles_norm, safe_scale, active, fitted, mse_batch, pen_batch, best_k_batch
+                        del profiles_flat, profiles_norm, safe_scale, active, batch_results
                         gc.collect()
 
                         self.logger.subsection(f"{batch_tag} complete — range bins {r_start}-{r_end} of {R}")
@@ -393,7 +410,7 @@ class SigmaFittingExtractor:
         self,
         tomogram_path : Path,
         height_range  : Tuple[float, float],
-    ) -> Tuple[np.ndarray, Dict[str, np.ndarray]]:
+    ) -> Dict[tuple, Tuple[np.ndarray, Dict[str, np.ndarray]]]:
 
         (
             tomogram_mmap, H, Az, R,
@@ -401,39 +418,47 @@ class SigmaFittingExtractor:
             sigma_lower_j, sigma_upper_j,
             mu_lower_j, mu_upper_j,
             n_params_out,
-            threshold_factor, truncation_index,
         ) = self._prepare_data(tomogram_path, height_range)
 
         self._warmup_kernel(height_ax_j, H, sigma_lower_j, sigma_upper_j, mu_lower_j, mu_upper_j)
 
-        output         = np.zeros((n_params_out, Az, R),        dtype=np.float32)
-        mse_maps       = np.full ((self.k_max, Az, R), np.nan,  dtype=np.float32)
-        penalised_maps = np.full ((self.k_max, Az, R), np.nan,  dtype=np.float32)
-        best_k_map     = np.zeros((Az, R),                      dtype=np.int16)
+        outputs = {}
+        for mode in self.modes:
+            for lambda_k in self.lambda_values:
+                outputs[(mode, lambda_k)] = {
+                    "params" : np.zeros((n_params_out, Az, R),        dtype=np.float32),
+                    "mse"    : np.full ((self.k_max, Az, R), np.nan,  dtype=np.float32),
+                    "pen"    : np.full ((self.k_max, Az, R), np.nan,  dtype=np.float32),
+                    "best_k" : np.zeros((Az, R),                      dtype=np.int16),
+                }
 
         try:
             total_attempted = self._run_fitting(
                 tomogram_mmap, height_axis, height_ax_j,
                 sigma_lower_j, sigma_upper_j,
                 mu_lower_j, mu_upper_j,
-                threshold_factor, truncation_index,
-                Az, R, H, n_params_out, output,
-                mse_maps, penalised_maps, best_k_map,
+                Az, R, H, n_params_out, outputs,
             )
         finally:
             if self._owns_initialiser:
                 self._peak_initialiser.close()
-            jax.clear_caches()
+            if self._owns_kernel:
+                jax.clear_caches()
             gc.collect()
 
         self.logger.section("[Results]")
         self.logger.subsection(f"Active pixels fitted : {total_attempted:,} / {R * Az:,}")
+        self.logger.subsection(f"Permutations fitted  : {len(outputs)} ({len(self.modes)} modes x {len(self.lambda_values)} lambdas)")
 
-        diagnostics = {
-            "mse_per_k"       : mse_maps,
-            "penalised_per_k" : penalised_maps,
-            "best_k_map"      : best_k_map,
-            "lambda_k"        : np.float32(self.lambda_k),
-        }
+        results = {}
+        for key, maps in outputs.items():
+            mode, lambda_k = key
+            diagnostics    = {
+                "mse_per_k"       : maps["mse"],
+                "penalised_per_k" : maps["pen"],
+                "best_k_map"      : maps["best_k"],
+                "lambda_k"        : np.float32(lambda_k),
+            }
+            results[key] = (maps["params"], diagnostics)
 
-        return output, diagnostics
+        return results

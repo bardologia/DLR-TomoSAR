@@ -20,14 +20,17 @@ def main() -> None:
     from pipelines.processing.param_extraction.pipeline           import ParamExtractionPipeline
     from pipelines.processing.param_extraction.queue              import ExtractionPlanResolver
     from pipelines.processing.param_extraction.sigma.initialiser  import PeakInitialiser
+    from pipelines.processing.param_extraction.sigma.selection    import KernelBackendSelector
     from pipelines.shared.dataset.dataset_queue                   import DatasetQueueResolver
 
     logger       = Logger(log_dir="logs", name="extract_params")
     base_path    = Path(config.dataset_base_path)
     dataset_dirs = DatasetQueueResolver(base_path, config.dataset_filter).resolve()
-    plans        = ExtractionPlanResolver(config, dataset_dirs).resolve()
+    groups       = ExtractionPlanResolver(config, dataset_dirs).resolve()
+    permutations = sum(len(group.configs) for group in groups)
 
     peak_initialiser = PeakInitialiser(n_workers=config.parameter_workers)
+    kernel_backend   = KernelBackendSelector().select()
 
     logger.section("Extraction queue")
     logger.kv_table({
@@ -36,20 +39,22 @@ def main() -> None:
         "K values"      : config.fit_k_values,
         "Lambda values" : config.fit_lambda_values,
         "Fit modes"     : config.fit_modes,
-        "Permutations"  : len(plans),
+        "Groups"        : len(groups),
+        "Permutations"  : permutations,
         "Base path"     : str(base_path),
         "Filter"        : config.dataset_filter or "all dataset directories",
         "GPUs"          : config.gpu_device_ids,
     }, title="Configuration")
 
     try:
-        for index, extraction_config in enumerate(plans):
-            logger.section(f"[Run {index + 1}/{len(plans)}] {extraction_config.processed_data_path.name} :: {extraction_config.output_subdir_name}")
+        for index, group in enumerate(groups):
+            logger.section(f"[Group {index + 1}/{len(groups)}] {group.processed_data_path.name} :: k{group.k_max} ({len(group.configs)} permutations, one shared load + init)")
 
-            pipeline = ParamExtractionPipeline(extraction_config, peak_initialiser=peak_initialiser)
-            outputs  = pipeline.run()
+            pipeline = ParamExtractionPipeline(group, peak_initialiser=peak_initialiser, kernel_backend=kernel_backend)
+            saved    = pipeline.run()
 
-            logger.kv_table({name: str(path) for name, path in outputs.items()}, title="Outputs")
+            for key, outputs in saved.items():
+                logger.kv_table({name: str(path) for name, path in outputs.items()}, title=f"Outputs {group.configs[key].output_subdir_name}")
     finally:
         peak_initialiser.close()
 

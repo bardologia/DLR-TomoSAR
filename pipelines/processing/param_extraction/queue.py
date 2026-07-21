@@ -1,8 +1,22 @@
 from __future__ import annotations
 
-from pathlib import Path
+from dataclasses import dataclass
+from pathlib     import Path
 
 from configuration.param_extraction import ExtractionConfig, FitConfig, FitMode, FitSettings
+
+
+@dataclass
+class ExtractionGroup:
+    processed_data_path : Path
+    k_max               : int
+    modes               : list
+    lambda_values       : list
+    configs             : dict
+
+    @property
+    def shared(self) -> ExtractionConfig:
+        return next(iter(self.configs.values()))
 
 
 class ExtractionPlanResolver:
@@ -54,14 +68,26 @@ class ExtractionPlanResolver:
             parameter_workers    = self.entry_config.parameter_workers,
         )
 
-    def resolve(self) -> list[ExtractionConfig]:
+    def _build_group(self, processed_data_path: Path, k_max) -> ExtractionGroup:
+        configs = {}
+        for lambda_k in self.entry_config.fit_lambda_values:
+            for mode in self.entry_config.fit_modes:
+                configs[(mode, float(lambda_k))] = self._build_plan(processed_data_path, k_max, lambda_k, mode)
+
+        return ExtractionGroup(
+            processed_data_path = Path(processed_data_path),
+            k_max               = int(k_max),
+            modes               = list(self.entry_config.fit_modes),
+            lambda_values       = [float(lambda_k) for lambda_k in self.entry_config.fit_lambda_values],
+            configs             = configs,
+        )
+
+    def resolve(self) -> list[ExtractionGroup]:
         self._validate()
 
-        plans = []
+        groups = []
         for processed_data_path in self.dataset_dirs:
             for k_max in self.entry_config.fit_k_values:
-                for lambda_k in self.entry_config.fit_lambda_values:
-                    for mode in self.entry_config.fit_modes:
-                        plans.append(self._build_plan(processed_data_path, k_max, lambda_k, mode))
+                groups.append(self._build_group(processed_data_path, k_max))
 
-        return plans
+        return groups

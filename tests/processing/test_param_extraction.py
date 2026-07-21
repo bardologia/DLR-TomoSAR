@@ -12,7 +12,7 @@ import pytest
 
 from pathlib import Path
 
-from configuration.param_extraction import ExtractParamsEntryConfig, FitConfig, FitSettings
+from configuration.param_extraction import ExtractParamsEntryConfig
 from pipelines.processing.param_extraction.metrics import (
     FittingMetricsCalculator,
     KSelectionDiagnostics,
@@ -37,7 +37,7 @@ ACTIVITY_THRESH  = 0.001
 _HAS_JAX = importlib.util.find_spec("jax") is not None
 
 
-def test_plan_resolver_expands_full_product():
+def test_plan_resolver_expands_dataset_k_groups():
     entry = ExtractParamsEntryConfig(
         fit_k_values      = [3, 5],
         fit_lambda_values = [1e-2, 1e-1],
@@ -45,19 +45,34 @@ def test_plan_resolver_expands_full_product():
     )
     dataset_dirs = [Path("/data/a"), Path("/data/b")]
 
-    plans = ExtractionPlanResolver(entry, dataset_dirs).resolve()
+    groups = ExtractionPlanResolver(entry, dataset_dirs).resolve()
 
-    assert len(plans) == 2 * 2 * 2 * 3
+    assert len(groups) == 2 * 2
+    assert all(len(group.configs) == 2 * 3 for group in groups)
 
-    subdirs = {plan.output_subdir_name for plan in plans}
+    configs = [config for group in groups for config in group.configs.values()]
+    assert len(configs) == 2 * 2 * 2 * 3
+
+    subdirs = {config.output_subdir_name for config in configs}
     assert len(subdirs) == 2 * 2 * 3
+
+
+def test_plan_resolver_group_carries_modes_and_lambdas():
+    entry = ExtractParamsEntryConfig(fit_k_values=[4], fit_lambda_values=[1e-2, 1e-1], fit_modes=["sigma", "amp_mu"])
+
+    group = ExtractionPlanResolver(entry, [Path("/data/a")]).resolve()[0]
+
+    assert group.k_max         == 4
+    assert group.modes         == ["sigma", "amp_mu"]
+    assert group.lambda_values == [1e-2, 1e-1]
+    assert set(group.configs)  == {("sigma", 1e-2), ("amp_mu", 1e-2), ("sigma", 1e-1), ("amp_mu", 1e-1)}
 
 
 def test_plan_resolver_maps_modes_to_free_flags():
     entry = ExtractParamsEntryConfig(fit_k_values=[4], fit_lambda_values=[1e-2], fit_modes=["sigma", "amp_mu", "sigma_amp_mu"])
 
-    plans  = ExtractionPlanResolver(entry, [Path("/data/a")]).resolve()
-    flags  = [(p.fit_settings.fit_config.fit_sigma, p.fit_settings.fit_config.fit_amplitude, p.fit_settings.fit_config.fit_mean) for p in plans]
+    group = ExtractionPlanResolver(entry, [Path("/data/a")]).resolve()[0]
+    flags = [(c.fit_settings.fit_config.fit_sigma, c.fit_settings.fit_config.fit_amplitude, c.fit_settings.fit_config.fit_mean) for c in (group.configs[(mode, 1e-2)] for mode in group.modes)]
 
     assert flags == [(True, False, False), (False, True, True), (True, True, True)]
 
@@ -78,7 +93,7 @@ def test_plan_resolver_passes_fit_constants_and_adam_settings():
         gpu_pixel_batch_size   = 4096,
     )
 
-    plan    = ExtractionPlanResolver(entry, [Path("/data/a")]).resolve()[0]
+    plan    = ExtractionPlanResolver(entry, [Path("/data/a")]).resolve()[0].shared
     fit_cfg = plan.fit_settings.fit_config
 
     assert fit_cfg.threshold_factor   == 0.4
@@ -111,10 +126,11 @@ def test_plan_resolver_rejects_fixed_suffix_for_multi_permutation():
 
 
 def test_plan_resolver_allows_fixed_suffix_for_single_permutation():
-    entry = ExtractParamsEntryConfig(fit_k_values=[5], fit_lambda_values=[1e-2], fit_modes=["sigma"], output_suffix="fixed")
-    plans = ExtractionPlanResolver(entry, [Path("/data/a")]).resolve()
-    assert len(plans) == 1
-    assert plans[0].output_suffix_value == "fixed"
+    entry  = ExtractParamsEntryConfig(fit_k_values=[5], fit_lambda_values=[1e-2], fit_modes=["sigma"], output_suffix="fixed")
+    groups = ExtractionPlanResolver(entry, [Path("/data/a")]).resolve()
+    assert len(groups) == 1
+    assert len(groups[0].configs) == 1
+    assert groups[0].shared.output_suffix_value == "fixed"
 
 
 @pytest.mark.skipif(not _HAS_JAX, reason="jax not installed in this environment")
@@ -158,6 +174,52 @@ def test_kernel_masks_freeze_parameter_groups():
     assert np.allclose(a_f, amps)
     assert np.allclose(s_f, sigs)
     assert not np.allclose(m_f, mus)
+
+
+@pytest.mark.skipif(not _HAS_JAX, reason="jax not installed in this environment")
+def test_group_extractor_shares_fits_across_modes_and_lambdas(logger, tmp_path):
+    rng      = np.random.default_rng(0)
+    H, Az, R = 40, 6, 4
+    height   = np.linspace(-10.0, 30.0, H, dtype=np.float32)
+    layer    = np.exp(-((height - 8.0) ** 2) / (2.0 * 3.0 ** 2)).astype(np.float32)
+    amps     = rng.uniform(0.5, 1.0, size=(Az, R)).astype(np.float32)
+    tomo     = layer[:, None, None] * amps[None, :, :]
+
+    tomo_path = tmp_path / "tomo.npy"
+    np.save(tomo_path, tomo)
+
+    extractor = ParameterExtractor(
+        logger               = logger,
+        modes                = ["sigma", "sigma_amp"],
+        lambda_values        = [1e-2, 1e-1],
+        k_max                = 2,
+        threshold_factor     = 0.0,
+        truncation_index     = H,
+        prominence_frac      = 0.05,
+        sigma_init_divisor   = 4.0,
+        activity_threshold   = ACTIVITY_THRESH,
+        range_batch_size     = 2,
+        adam_steps           = 40,
+        adam_lr              = 0.1,
+        gpu_pixel_batch_size = 64,
+        init_workers         = 1,
+    )
+    results = extractor.run(tomo_path, (-10.0, 30.0))
+
+    assert set(results) == {("sigma", 1e-2), ("sigma", 1e-1), ("sigma_amp", 1e-2), ("sigma_amp", 1e-1)}
+    assert all(params.shape == (6, Az, R) for params, _ in results.values())
+
+    for mode in ("sigma", "sigma_amp"):
+        lo = results[(mode, 1e-2)][1]
+        hi = results[(mode, 1e-1)][1]
+
+        assert np.allclose(lo["mse_per_k"], hi["mse_per_k"], equal_nan=True)
+        assert not np.allclose(lo["penalised_per_k"], hi["penalised_per_k"], equal_nan=True)
+        assert float(lo["lambda_k"]) == pytest.approx(1e-2)
+        assert float(hi["lambda_k"]) == pytest.approx(1e-1)
+
+    sigma_only, sigma_amp = results[("sigma", 1e-2)][1], results[("sigma_amp", 1e-2)][1]
+    assert not np.allclose(sigma_only["mse_per_k"], sigma_amp["mse_per_k"], equal_nan=True)
 
 
 @pytest.fixture(scope="module")
@@ -508,12 +570,16 @@ def test_rerun_extractor_reproduces_best_k(tomogram_full, fit_diagnostics, logge
     tomo_path = tmp_path / "tomo.npy"
     np.save(tomo_path, np.array(tomogram_full[:, a0:a1, r0:r1]))
 
-    fit_cfg  = FitConfig(k_max=K_MAX, lambda_k=LAMBDA_K, sigma_init_divisor=4.0)
-    settings = FitSettings(fit_config=fit_cfg)
-
     extractor = ParameterExtractor(
-        parameter_extraction = settings,
         logger               = logger,
+        modes                = ["sigma"],
+        lambda_values        = [LAMBDA_K],
+        k_max                = K_MAX,
+        threshold_factor     = THRESHOLD_FACTOR,
+        truncation_index     = TRUNCATION_INDEX,
+        prominence_frac      = 0.05,
+        sigma_init_divisor   = 4.0,
+        activity_threshold   = ACTIVITY_THRESH,
         range_batch_size     = 256,
         adam_steps           = 3000,
         adam_lr              = 2e-1,
@@ -522,7 +588,7 @@ def test_rerun_extractor_reproduces_best_k(tomogram_full, fit_diagnostics, logge
         gpu_pixel_batch_size = 8192,
         init_workers         = 4,
     )
-    out, diag = extractor.run(tomo_path, HEIGHT_RANGE)
+    out, diag = extractor.run(tomo_path, HEIGHT_RANGE)[("sigma", LAMBDA_K)]
 
     assert out.shape  == (3 * K_MAX, a1 - a0, r1 - r0)
     assert diag["best_k_map"].min() >= 0

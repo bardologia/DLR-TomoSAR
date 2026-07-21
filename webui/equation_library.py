@@ -251,7 +251,7 @@ class EquationLibrary:
                 {
                     "title" : "Width scale, initial guess, and minimum distance",
                     "tex"   : r"\sigma_{\mathrm{base}} = \max\!\left(2\,\Delta\xi,\ \frac{x_{\max}-x_{\min}}{8K}\right), \qquad \sigma_{\mathrm{guess}} = \frac{\sigma_{\mathrm{base}}}{\max(D_\sigma,\,10^{-6})}, \qquad d_{\min} = \max\!\left(1,\ \left\lfloor \sigma_{\mathrm{base}}/\Delta\xi \right\rfloor\right)",
-                    "note"  : "Initialisation is run once at K = k_max: a span-derived width scale sets the peak-separation distance and every slot receives the same initial width (that scale divided by sigma_init_divisor, itself floored at 1e-6 to avoid division by zero). Each candidate model order then reuses the first K of these shared components rather than re-initialising per K (sigma/initialiser.py PeakInitialiser.run, sliced in sigma/extractor.py _fit_batch).",
+                    "note"  : "Initialisation is run once at K = k_max: a span-derived width scale sets the peak-separation distance and every slot receives the same initial width (that scale divided by sigma_init_divisor, itself floored at 1e-6 to avoid division by zero). Each candidate model order then reuses the first K of these shared components rather than re-initialising per K, and the same initialisation is shared by every fit mode of the sweep group (sigma/initialiser.py PeakInitialiser.run, sliced in sigma/extractor.py _fit_batch).",
                     "vars"  : [
                         {"sym": r"\sigma_{\mathrm{base}}",  "desc": "span-derived width scale (m)"},
                         {"sym": r"\sigma_{\mathrm{guess}}", "desc": "initial spread assigned to every slot (m)"},
@@ -357,7 +357,7 @@ class EquationLibrary:
                 {
                     "title" : "Phase 3 — penalised score per K",
                     "tex"   : r"\mathrm{MSE}_K = \frac{1}{H}\sum_{h}\left(\hat{\gamma}_K(x_h) - \tilde{\gamma}(x_h)\right)^2, \qquad \mathrm{pen}_K = \mathrm{MSE}_K + \lambda_K \cdot K",
-                    "note"  : "Each extra component must buy at least lambda_k of normalised MSE, so the budget is spent only when the profile is genuinely multi-layered; MSE is scored with GaussianMixture.evaluate_batch on the normalised profile (sigma/selection.py BestKSelector._score_K).",
+                    "note"  : "Each extra component must buy at least lambda_k of normalised MSE, so the budget is spent only when the profile is genuinely multi-layered; MSE is scored once per fit mode with GaussianMixture.evaluate_batch on the normalised profile (sigma/selection.py BestKSelector._mse_K) and the lambda_k*K penalty is applied per lambda value in BestKSelector.select, so a lambda sweep reuses the same fits.",
                     "vars"  : [
                         {"sym": r"\mathrm{MSE}_K",      "desc": "fit error of the K-component model"},
                         {"sym": r"\hat{\gamma}_K(x_h)", "desc": "K-component reconstruction at sample x_h"},
