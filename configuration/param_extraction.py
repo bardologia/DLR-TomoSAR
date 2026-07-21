@@ -152,10 +152,18 @@ class ExtractParamsEntryConfig:
     fit_lambda_values      : list  = field(default_factory=lambda: [1e-2])
     fit_modes              : list  = field(default_factory=lambda: ["sigma", "sigma_amp", "sigma_amp_mu"])
     fit_sigma_init_divisor : float = 4.0
+    fit_threshold_factor   : float = 0.25
+    fit_truncation_index   : int   = 170
+    fit_prominence_frac    : float = 0.05
+    fit_activity_threshold : float = 1e-3
 
-    gpu_device_ids    : list = field(default_factory=lambda: [0, 1, 2, 3])
-    range_batch_size  : int  = 3500
-    parameter_workers : int  = field(default_factory=lambda: min(64, os.cpu_count() or 16))
+    adam_steps : int   = 3000
+    adam_lr    : float = 2e-1
+
+    gpu_device_ids       : list = field(default_factory=lambda: [0, 1, 2, 3])
+    range_batch_size     : int  = 3500
+    gpu_pixel_batch_size : int  = 24576
+    parameter_workers    : int  = field(default_factory=lambda: min(64, os.cpu_count() or 16))
 
 
 @dataclass

@@ -62,6 +62,36 @@ def test_plan_resolver_maps_modes_to_free_flags():
     assert flags == [(True, False, False), (False, True, True), (True, True, True)]
 
 
+def test_plan_resolver_passes_fit_constants_and_adam_settings():
+    entry = ExtractParamsEntryConfig(
+        fit_k_values           = [3],
+        fit_lambda_values      = [1e-2],
+        fit_modes              = ["sigma"],
+        fit_threshold_factor   = 0.4,
+        fit_truncation_index   = 120,
+        fit_prominence_frac    = 0.1,
+        fit_activity_threshold = 5e-3,
+        fit_sigma_init_divisor = 2.0,
+        adam_steps             = 500,
+        adam_lr                = 0.05,
+        range_batch_size       = 100,
+        gpu_pixel_batch_size   = 4096,
+    )
+
+    plan    = ExtractionPlanResolver(entry, [Path("/data/a")]).resolve()[0]
+    fit_cfg = plan.fit_settings.fit_config
+
+    assert fit_cfg.threshold_factor   == 0.4
+    assert fit_cfg.truncation_index   == 120
+    assert fit_cfg.prominence_frac    == 0.1
+    assert fit_cfg.activity_threshold == 5e-3
+    assert fit_cfg.sigma_init_divisor == 2.0
+    assert plan.adam_steps            == 500
+    assert plan.adam_lr               == 0.05
+    assert plan.range_batch_size      == 100
+    assert plan.gpu_pixel_batch_size  == 4096
+
+
 def test_plan_resolver_rejects_unknown_mode():
     entry = ExtractParamsEntryConfig(fit_k_values=[4], fit_lambda_values=[1e-2], fit_modes=["sigma", "quartic"])
     with pytest.raises(ValueError):

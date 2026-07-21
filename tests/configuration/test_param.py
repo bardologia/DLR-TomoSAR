@@ -205,6 +205,22 @@ def test_extract_params_entry_defaults():
     assert isinstance(cfg.dataset_filter, list)
 
 
+def test_extract_params_entry_fit_constants_match_fit_config_defaults():
+    entry = ExtractParamsEntryConfig()
+    fit   = FitConfig()
+    ext   = ExtractionConfig(processed_data_path=Path("/tmp/run"))
+
+    assert entry.fit_threshold_factor   == fit.threshold_factor
+    assert entry.fit_truncation_index   == fit.truncation_index
+    assert entry.fit_prominence_frac    == fit.prominence_frac
+    assert entry.fit_activity_threshold == fit.activity_threshold
+    assert entry.fit_sigma_init_divisor == fit.sigma_init_divisor
+    assert entry.adam_steps             == ext.adam_steps
+    assert entry.adam_lr                == ext.adam_lr
+    assert entry.gpu_pixel_batch_size   == ext.gpu_pixel_batch_size
+    assert entry.range_batch_size       == ext.range_batch_size
+
+
 def test_extract_params_entry_default_lists_independent():
     a = ExtractParamsEntryConfig()
     b = ExtractParamsEntryConfig()

@@ -175,8 +175,15 @@
         "fit_lambda_values": "list of component-count regularization strengths (lambda_k) to sweep, one extraction plan per value",
         "fit_modes": "fit modes to sweep, each an underscore-joined composition of free parameters from sigma, amp, mu (e.g. sigma, amp_mu, sigma_amp_mu); every non-empty composition is valid",
         "fit_sigma_init_divisor": "divisor shrinking the height-span-derived base width (h_span/(8*k_max), floored at 2 bin spacings) into each Gaussian's initial sigma guess, shared across the sweep",
+        "fit_threshold_factor": "profile preprocessing floor shared across the sweep: samples below this fraction of the per-pixel profile maximum are zeroed before fitting",
+        "fit_truncation_index": "profile preprocessing cut shared across the sweep: height-axis samples at or above this index are zeroed before fitting",
+        "fit_prominence_frac": "peak prominence threshold for the CPU initialiser as a fraction of the per-pixel profile maximum, shared across the sweep",
+        "fit_activity_threshold": "per-pixel profile maximum below which the pixel is considered inactive and skipped by the fit, shared across the sweep",
+        "adam_steps": "number of Adam optimizer steps run per pixel batch during Gaussian curve fitting, shared across the sweep",
+        "adam_lr": "Adam learning rate for the per-pixel Gaussian curve-fitting optimizer, shared across the sweep",
         "gpu_device_ids": "GPU indices pinned via EnvironmentPinner.gpus before extraction runs",
         "range_batch_size": "number of range bins loaded and fit together per batch, shared across the sweep",
+        "gpu_pixel_batch_size": "fixed number of pixels per GPU batch the JAX Adam-fit kernel is compiled and iterated over, shared across the sweep",
         "parameter_workers": "CPU worker count for the shared PeakInitialiser pool, defaulting to min(64, cpu_count)"
       }
     },

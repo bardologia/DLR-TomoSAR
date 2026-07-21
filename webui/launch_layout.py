@@ -461,9 +461,18 @@ class LaunchLayout:
                             {"path": "fit_modes", "widget": MULTI_FIT_MODES},
                             "fit_sigma_init_divisor",
                         ]},
+                        {"title": "Fit constants", "fields": [
+                            "fit_threshold_factor",
+                            "fit_truncation_index",
+                            "fit_prominence_frac",
+                            "fit_activity_threshold",
+                            "adam_steps",
+                            "adam_lr",
+                        ]},
                         {"title": "Execution", "fields": [
                             {"path": "gpu_device_ids", "widget": GPU_MANY},
                             "range_batch_size",
+                            "gpu_pixel_batch_size",
                             {"path": "parameter_workers", "widget": NUM_WORKERS},
                         ]},
                     ]},

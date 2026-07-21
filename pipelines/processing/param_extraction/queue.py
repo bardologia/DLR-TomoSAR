@@ -24,9 +24,13 @@ class ExtractionPlanResolver:
         fit_sigma, fit_amplitude, fit_mean = FitMode.free_flags(mode)
 
         fit_config = FitConfig(
+            threshold_factor   = self.entry_config.fit_threshold_factor,
+            truncation_index   = self.entry_config.fit_truncation_index,
             k_max              = int(k_max),
             lambda_k           = float(lambda_k),
+            prominence_frac    = self.entry_config.fit_prominence_frac,
             sigma_init_divisor = self.entry_config.fit_sigma_init_divisor,
+            activity_threshold = self.entry_config.fit_activity_threshold,
             fit_sigma          = fit_sigma,
             fit_amplitude      = fit_amplitude,
             fit_mean           = fit_mean,
@@ -43,8 +47,11 @@ class ExtractionPlanResolver:
 
             fit_settings = FitSettings(fit_config=fit_config),
 
-            range_batch_size  = self.entry_config.range_batch_size,
-            parameter_workers = self.entry_config.parameter_workers,
+            range_batch_size     = self.entry_config.range_batch_size,
+            gpu_pixel_batch_size = self.entry_config.gpu_pixel_batch_size,
+            adam_steps           = self.entry_config.adam_steps,
+            adam_lr              = self.entry_config.adam_lr,
+            parameter_workers    = self.entry_config.parameter_workers,
         )
 
     def resolve(self) -> list[ExtractionConfig]:
