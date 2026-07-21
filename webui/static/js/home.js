@@ -342,7 +342,7 @@ class StatusBoard {
       `<section class="sboard sboard--users" aria-label="Active users">` +
       `<header class="sboard__cap"><span>active users</span><span class="sboard__n" id="sb-users-n">--</span></header>` +
       `<div class="utable">` +
-      `<div class="utable__row utable__row--head"><span>user</span><span title="summed over all the user's processes; 100% = one full core">cpu%</span><span title="resident memory summed over the user's processes (shared pages counted once per process)">ram</span><span title="share of total system RAM">ram%</span><span class="utable__gpu" title="GPU memory the user has allocated across all CUDA devices">gpu mem</span><span title="CUDA devices the user holds memory on">gpus</span><span title="processes owned by the user">procs</span><span title="open login sessions">ssh</span></div>` +
+      `<div class="utable__row utable__row--head"><span>user</span><span title="summed over all the user's processes; 100% = one full core">cpu%</span><span title="memory attributed to the user: proportional set size for your own processes, private resident for other users, so shared pages are not double-counted">ram</span><span title="share of used RAM (total minus available), same base as the neighbour impact panel">ram%</span><span class="utable__gpu" title="GPU memory the user has allocated across all CUDA devices">gpu mem</span><span title="CUDA devices the user holds memory on">gpus</span><span title="processes owned by the user">procs</span><span title="open login sessions">ssh</span></div>` +
       `<div class="utable__body" id="sb-users"></div>` +
       `</div>` +
       `</section>` +
@@ -748,7 +748,7 @@ class StatusBoard {
     const top = sig.top;
     const topEl = document.getElementById("sb-impact-top");
     if (topEl) {
-      topEl.innerHTML = top ? `<b>${this._esc(top.user)}</b> &middot; ${(top.rss_gb || 0).toFixed(1)}G` : "--";
+      topEl.innerHTML = top ? `<b>${this._esc(top.user)}</b> &middot; ${(top.mem_gb || 0).toFixed(1)}G` : "--";
       topEl.classList.toggle("is-other", !!(top && !top.is_mine));
     }
 
@@ -768,7 +768,7 @@ class StatusBoard {
           ? "No contention yet, but a process of yours is steadily accumulating RAM — see below."
           : others.length
             ? (top && !top.is_mine
-                ? `The server is contended, but not by you — dominant consumer is ${top.user} (${(top.rss_gb || 0).toFixed(0)} GB, ${top.nproc} procs).`
+                ? `The server is contended, but not by you — dominant consumer is ${top.user} (${(top.mem_gb || 0).toFixed(0)} GB, ${top.nproc} procs).`
                 : "The server is contended, but your jobs are not the dominant cause.")
             : "No contention: other users are not being slowed by your jobs.";
     }

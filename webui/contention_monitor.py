@@ -245,7 +245,7 @@ class ContentionMonitor:
         nproc      = 0
         per_mem    = {}
         per_comm   = {}
-        user_rss   = {}
+        user_mem   = {}
         user_n     = {}
         top        = (0, None, "", self.uid)
 
@@ -267,14 +267,15 @@ class ContentionMonitor:
             except (ValueError, IndexError):
                 continue
 
-            user_rss[uid] = user_rss.get(uid, 0) + proc_rss
+            attributed = ProcStats.attributed(pid)
+            proc_mem   = attributed if attributed is not None else proc_rss
+
+            user_mem[uid] = user_mem.get(uid, 0) + proc_mem
             user_n  [uid] = user_n.get(uid, 0) + 1
-            if proc_rss > top[0]:
-                top = (proc_rss, pid, comm, uid)
+            if proc_mem > top[0]:
+                top = (proc_mem, pid, comm, uid)
 
             if uid == self.uid:
-                proc_pss      = ProcStats.pss(pid)
-                proc_mem      = proc_pss if proc_pss is not None else proc_rss
                 jiffies      += j
                 mine_mem     += proc_mem
                 nproc        += 1
@@ -293,24 +294,24 @@ class ContentionMonitor:
 
         leak = self._growth_candidate(now, per_mem, per_comm)
 
-        return {"nproc": nproc, "mem_gb": mine_mem / (1024.0 ** 3), "cpu_pct": cpu_pct, "io_mbs": io_mbs, "leak": leak, "top": self._top_consumer(user_rss, user_n, top)}
+        return {"nproc": nproc, "mem_gb": mine_mem / (1024.0 ** 3), "cpu_pct": cpu_pct, "io_mbs": io_mbs, "leak": leak, "top": self._top_consumer(user_mem, user_n, top)}
 
-    def _top_consumer(self, user_rss: dict, user_n: dict, top: tuple) -> dict | None:
-        if not user_rss:
+    def _top_consumer(self, user_mem: dict, user_n: dict, top: tuple) -> dict | None:
+        if not user_mem:
             return None
 
-        lead_uid             = max(user_rss, key=user_rss.get)
-        top_rss, top_pid, top_comm, top_uid = top
+        lead_uid             = max(user_mem, key=user_mem.get)
+        top_mem, top_pid, top_comm, top_uid = top
 
         return {
             "user"        : ProcStats.username(lead_uid),
-            "rss_gb"      : user_rss[lead_uid] / (1024.0 ** 3),
+            "mem_gb"      : user_mem[lead_uid] / (1024.0 ** 3),
             "nproc"       : user_n[lead_uid],
             "is_mine"     : lead_uid == self.uid,
             "proc_pid"    : top_pid,
             "proc_user"   : ProcStats.username(top_uid),
             "proc_comm"   : top_comm,
-            "proc_rss_gb" : top_rss / (1024.0 ** 3),
+            "proc_mem_gb" : top_mem / (1024.0 ** 3),
         }
 
     def _growth_candidate(self, now: float, per_mem: dict, per_comm: dict) -> dict | None:
@@ -369,7 +370,7 @@ class ContentionMonitor:
         mem_mine   = mem["mine_share"] >= self.SHARE
         mem_level  = "danger" if (psi["mem"]["full"] >= self.MEM_PSI_FULL or swap["out_mbs"] >= self.SWAP_OUT_MBS) else "warn"
         swap_note  = f", swapping out {swap['out_mbs']:.1f} MB/s" if swap["out_mbs"] >= self.SWAP_OUT_MBS else ""
-        culprit    = f"; dominant consumer is {top['user']} ({top['rss_gb']:.0f} GB across {top['nproc']} procs, biggest pid {top['proc_pid']} {top['proc_comm']} {top['proc_rss_gb']:.0f} GB)" if (top and not mem_mine and not top["is_mine"]) else ""
+        culprit    = f"; dominant consumer is {top['user']} ({top['mem_gb']:.0f} GB across {top['nproc']} procs, biggest pid {top['proc_pid']} {top['proc_comm']} {top['proc_mem_gb']:.0f} GB)" if (top and not mem_mine and not top["is_mine"]) else ""
         self._track("mem", mem_level, mem_breach, mem_clear, mem_mine,
                     f"memory contention: tasks stalled {psi['mem']['some']:.0f}% of the time{swap_note}; "
                     f"you hold {mem['mine_share']:.0%} of used RAM ({mem['mine_gb']:.1f} GB){culprit}")

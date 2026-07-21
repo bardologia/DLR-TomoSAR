@@ -11,6 +11,9 @@ WEBUI_ROOT = REPO_ROOT / "webui"
 if str(WEBUI_ROOT) not in sys.path:
     sys.path.insert(0, str(WEBUI_ROOT))
 
+import os
+
+from proc_stats     import ProcStats
 from system_monitor import ActiveUsers, SystemHistory, SystemMonitor
 
 
@@ -91,6 +94,32 @@ def test_rows_sorted_by_cpu_then_gpu_then_mem(users):
     rows = users._rows(table, 1.0, {}, gpu)
 
     assert [r["uid"] for r in rows] == [65003, 65002, 65001]
+
+
+def test_attributed_memory_never_exceeds_rss(users):
+    pid      = os.getpid()
+    page     = os.sysconf("SC_PAGE_SIZE")
+    resident = int(open(f"/proc/{pid}/statm").read().split()[1]) * page
+
+    attributed = ProcStats.attributed(pid)
+    assert attributed is not None
+    assert 0 < attributed <= resident
+
+
+def test_mem_share_is_fraction_of_used_ram(users, monkeypatch):
+    gib = 1 << 30
+    monkeypatch.setattr(users.monitor, "_memory", lambda: {"total": 100 * gib, "available": 50 * gib})
+
+    rows = users._rows({65001: {"nproc": 1, "mem": 25 * gib, "jdelta": 0}}, 1.0, {}, {})
+    assert rows[0]["mem_share"] == 50.0
+
+
+def test_mem_share_is_clamped_to_hundred(users, monkeypatch):
+    gib = 1 << 30
+    monkeypatch.setattr(users.monitor, "_memory", lambda: {"total": 100 * gib, "available": 50 * gib})
+
+    rows = users._rows({65001: {"nproc": 1, "mem": 60 * gib, "jdelta": 0}}, 1.0, {}, {})
+    assert rows[0]["mem_share"] == 100.0
 
 
 def test_state_returns_copies(users):

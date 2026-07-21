@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import os
 import pwd
 
 
 class ProcStats:
+
+    PAGE = os.sysconf("SC_PAGE_SIZE")
 
     @staticmethod
     def username(uid: int) -> str:
@@ -21,6 +24,23 @@ class ProcStats:
         except (OSError, ValueError, IndexError):
             return None
         return None
+
+    @staticmethod
+    def private(pid: int) -> int | None:
+        try:
+            parts    = open(f"/proc/{pid}/statm").read().split()
+            resident = int(parts[1])
+            shared   = int(parts[2])
+        except (OSError, ValueError, IndexError):
+            return None
+        return max(0, resident - shared) * ProcStats.PAGE
+
+    @staticmethod
+    def attributed(pid: int) -> int | None:
+        pss = ProcStats.pss(pid)
+        if pss is not None:
+            return pss
+        return ProcStats.private(pid)
 
     @staticmethod
     def ppid(pid: int) -> int:

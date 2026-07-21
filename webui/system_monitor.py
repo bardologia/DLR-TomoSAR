@@ -454,7 +454,6 @@ class ActiveUsers:
             try:
                 fields = stat[stat.rindex(")") + 2 :].split()
                 jiff   = int(fields[11]) + int(fields[12])
-                rss    = int(fields[21]) * self.monitor.page
             except (ValueError, IndexError):
                 continue
 
@@ -462,7 +461,7 @@ class ActiveUsers:
             agg      = users.setdefault(uid, {"nproc": 0, "mem": 0, "jdelta": 0})
 
             agg["nproc"] += 1
-            agg["mem"]   += rss
+            agg["mem"]   += ProcStats.attributed(pid) or 0
             if pid in prev:
                 agg["jdelta"] += max(0, jiff - prev[pid])
 
@@ -498,8 +497,9 @@ class ActiveUsers:
         return usage
 
     def _rows(self, users: dict, dt: float, sessions: dict, gpu: dict) -> list[dict]:
-        mem_total = self.monitor._memory().get("total", 0)
-        rows      = []
+        memory   = self.monitor._memory()
+        mem_used = max(0, memory.get("total", 0) - memory.get("available", 0))
+        rows     = []
 
         for uid, agg in users.items():
             name = ProcStats.username(uid)
@@ -518,7 +518,7 @@ class ActiveUsers:
                 "nproc"     : agg["nproc"],
                 "cpu"       : cpu,
                 "mem"       : agg["mem"],
-                "mem_share" : round(100.0 * agg["mem"] / mem_total, 1) if mem_total else 0.0,
+                "mem_share" : min(100.0, round(100.0 * agg["mem"] / mem_used, 1)) if mem_used else 0.0,
                 "gpu_mem"   : held["mem"],
                 "gpus"      : sorted(held["gpus"]),
             })
