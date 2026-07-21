@@ -1652,7 +1652,7 @@ class EquationLibrary:
                         {"sym": r"\mathbf{s}^{l}",     "desc": "profile estimate after layer l"},
                         {"sym": r"\alpha_l",           "desc": "learned step size of layer l (softplus of a raw parameter)"},
                         {"sym": r"\theta_l",           "desc": "learned soft-threshold of layer l"},
-                        {"sym": r"\mathcal{P}_l",      "desc": "learned prox of layer l: residual Conv1d -> act -> Conv1d along elevation"},
+                        {"sym": r"\mathcal{P}_l",      "desc": "learned prox of layer l: residual half-resolution bottleneck along elevation (strided window GEMM -> act -> Conv1d, linearly upsampled)"},
                         {"sym": r"L_{\mathrm{lip}}",   "desc": "Lipschitz normaliser of the gradient (next card)"},
                     ],
                 },

@@ -33,19 +33,28 @@ class TomoOperator:
 class ProfileProx(nn.Module):
     def __init__(self, hidden: int, kernel_size: int, activation: str):
         super().__init__()
-        padding = kernel_size // 2
+        self.kernel_size = kernel_size
+        self.padding     = kernel_size // 2
 
-        self.refine = nn.Sequential(
-            nn.Conv1d(1, hidden, kernel_size=kernel_size, padding=padding),
-            build_activation(activation),
-            nn.Conv1d(hidden, 1, kernel_size=kernel_size, padding=padding),
-        )
+        self.down       = nn.Conv1d(kernel_size, hidden, kernel_size=1)
+        self.activation = build_activation(activation)
+        self.up         = nn.Conv1d(hidden, 1, kernel_size=kernel_size, padding=self.padding)
+
+    def _strided_windows(self, flat: torch.Tensor) -> torch.Tensor:
+        pixels, _, length = flat.shape
+
+        padded      = functional.pad(flat, (self.padding, self.padding))
+        width       = length + 2 * self.padding
+        half_length = (width - self.kernel_size) // 2 + 1
+
+        return padded.as_strided((pixels, self.kernel_size, half_length), (width, 1, 2))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         B, N, H, W = x.shape
 
-        flat    = x.permute(0, 2, 3, 1).reshape(B * H * W, 1, N)
-        refined = flat + self.refine(flat)
+        flat       = x.permute(0, 2, 3, 1).reshape(B * H * W, 1, N)
+        correction = self.up(self.activation(self.down(self._strided_windows(flat))))
+        refined    = flat + functional.interpolate(correction, size=N, mode="linear", align_corners=False)
 
         return refined.reshape(B, H, W, N).permute(0, 3, 1, 2)
 

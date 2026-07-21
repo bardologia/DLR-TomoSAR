@@ -39,7 +39,7 @@ The gradient is normalised by $T N \, dz^2$. Note the code applies the adjoint *
 | $\mathbf{y}$ | Complex coherence measurements over $T$ tracks (per pixel) |
 | $\mathbf{A}$ | Per-pixel steering operator, $A_{tn} = e^{i k_{z,t} z_n}\, dz$ |
 | $\alpha_l, \theta_l$ | Learned step size and soft-threshold of iteration $l$ |
-| $\mathcal{P}_l$ | Learned prox of iteration $l$: residual 1D conv block along $z$ |
+| $\mathcal{P}_l$ | Learned prox of iteration $l$: residual half-resolution conv bottleneck along $z$ |
 | $L_{\text{lip}}$ | Gradient normaliser $T N \, dz^2$ (see Summary: bounds the true-adjoint operator; the implemented $dz$-less adjoint retains a $\le 1/dz$ residual factor) |
 | $K_z$ | Per-pixel vertical wavenumber map (from the [[TomoSAR track acquisition parameters|geometry field]]) |
 
@@ -55,7 +55,7 @@ $$
 \end{aligned}
 $$
 
-The nonnegative soft-threshold replaces the signed soft-threshold of ISTA because reflectivity power is nonnegative; the prox $\mathcal{P}_l$ (Conv1d → act → Conv1d, residual) is the learned prior over profile shape, applied identically at every pixel — the physics-native counterpart of the [[PixelMLP]] no-spatial-context philosophy.
+The nonnegative soft-threshold replaces the signed soft-threshold of ISTA because reflectivity power is nonnegative; the prox $\mathcal{P}_l$ is the learned prior over profile shape, applied identically at every pixel: a residual half-resolution bottleneck (stride-2 windows projected by a pointwise conv, i.e. a GEMM, → act → Conv1d at half resolution → linear upsample back). The window-GEMM form exists because cuDNN's deterministic algorithms make the equivalent strided Conv1d ~1.7× slower, and the half-resolution hidden field halves the dominant activation traffic; a full-stride ConvTranspose1d variant was rejected for failing the 60-step overfit contract (peak error 32 m) — the physics-native counterpart of the [[PixelMLP]] no-spatial-context philosophy.
 
 ---
 
