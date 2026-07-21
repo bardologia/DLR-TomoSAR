@@ -69,7 +69,7 @@ class ExtractionConfig:
     fit_settings        : FitSettings                   = field(default_factory=FitSettings)
     parameter_workers   : int                           = 20
 
-    range_batch_size     : int   = 3500
+    range_batch_size     : int   = 500
     gpu_pixel_batch_size : int   = 24576
     adam_steps           : int   = 3000
     adam_lr              : float = 2e-1
@@ -161,7 +161,7 @@ class ExtractParamsEntryConfig:
     adam_lr    : float = 2e-1
 
     gpu_device_ids       : list = field(default_factory=lambda: [0, 1, 2, 3])
-    range_batch_size     : int  = 3500
+    range_batch_size     : int  = 500
     gpu_pixel_batch_size : int  = 24576
     parameter_workers    : int  = field(default_factory=lambda: min(64, os.cpu_count() or 16))
 
