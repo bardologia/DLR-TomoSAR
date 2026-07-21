@@ -300,8 +300,8 @@ class FitLabView {
     const rect = this.refs.mapImg.getBoundingClientRect();
     const fx   = (ev.clientX - rect.left) / rect.width;
     const fy   = (ev.clientY - rect.top) / rect.height;
-    const az   = Math.min(this.meta.az - 1, Math.max(0, Math.round(fy * this.meta.az - 0.5)));
-    const rg   = Math.min(this.meta.rg - 1, Math.max(0, Math.round(fx * this.meta.rg - 0.5)));
+    const az   = Math.min(this.meta.az - 1, Math.max(0, Math.round(fx * this.meta.az - 0.5)));
+    const rg   = Math.min(this.meta.rg - 1, Math.max(0, Math.round(fy * this.meta.rg - 0.5)));
     return { az, rg };
   }
 
@@ -351,8 +351,8 @@ class FitLabView {
     this.pixels.forEach((p, i) => {
       const mark = document.createElement("i");
       mark.className   = "fl-mark";
-      mark.style.left  = `${((p.rg + 0.5) / this.meta.rg) * 100}%`;
-      mark.style.top   = `${((p.az + 0.5) / this.meta.az) * 100}%`;
+      mark.style.left  = `${((p.az + 0.5) / this.meta.az) * 100}%`;
+      mark.style.top   = `${((p.rg + 0.5) / this.meta.rg) * 100}%`;
       mark.title       = `az ${p.az} · rg ${p.rg}`;
       mark.addEventListener("click", (ev) => { ev.stopPropagation(); this._addPixel(p.az, p.rg); });
       this.refs.marks.appendChild(mark);

@@ -316,12 +316,13 @@ main { margin-left: var(--navw); }
 .sboard--mem    { grid-column: span 4; }
 .sboard--disk   { grid-column: span 4; }
 .sboard--impact { grid-column: span 4; }
+.sboard--users  { grid-column: span 12; }
 .sboard--procs  { grid-column: span 8; }
 .sboard--jobs   { grid-column: span 4; }
 .sboard--gpuguard { grid-column: span 12; }
 
 @media (max-width: 980px) {
-  .sboard--impact, .sboard--procs, .sboard--jobs, .sboard--gpuguard { grid-column: 1 / -1; }
+  .sboard--impact, .sboard--users, .sboard--procs, .sboard--jobs, .sboard--gpuguard { grid-column: 1 / -1; }
   .sboard--mem, .sboard--disk { grid-column: span 6; }
 }
 @media (max-width: 640px) {
@@ -439,6 +440,44 @@ main { margin-left: var(--navw); }
 .ptable__thr { color: var(--dk-dim); }
 .ptable__state { color: var(--dk-faint); }
 .ptable__cmd { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--dk-ink); }
+
+/* active users table */
+.utable { font-family: var(--mono); font-size: 11.5px; }
+.utable__row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1.3fr) 64px 74px 58px 74px minmax(64px, 1fr) 56px 44px;
+  gap: 12px;
+  align-items: baseline;
+  padding: 4px 8px;
+  border-radius: 2px;
+  color: var(--dk-dim);
+}
+.utable__row--head {
+  letter-spacing: 0.12em; text-transform: uppercase; font-size: 10px;
+  color: var(--dk-faint);
+  border-bottom: 1px solid var(--dk-line);
+  border-radius: 0;
+  padding-bottom: 7px; margin-bottom: 5px;
+}
+.utable__body { display: flex; flex-direction: column; gap: 1px; max-height: 300px; overflow-y: auto; scrollbar-color: rgba(180, 195, 205, 0.25) transparent; }
+.utable__body .utable__row:hover { background: rgba(111, 155, 255, 0.06); }
+.utable__body .utable__row.is-me { background: rgba(111, 155, 255, 0.05); }
+.utable__user { color: var(--dk-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.utable__me {
+  font-style: normal; font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--dk-acc);
+  border: 1px solid rgba(111, 155, 255, 0.45);
+  border-radius: 2px;
+  padding: 0 4px;
+  margin-left: 8px;
+}
+.utable__cpu { color: var(--dk-dim); }
+.utable__cpu.is-mid { color: var(--dk-ink); }
+.utable__cpu.is-hot { color: var(--dk-warn); }
+.utable__share { color: var(--dk-faint); }
+.utable__body .utable__gpu { color: var(--dk-acc2); }
+.utable__gpus { color: var(--dk-acc); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.utable__sess { color: var(--dk-faint); }
 
 /* processor panel */
 .sboard--cpu { display: flex; flex-direction: column; }
@@ -3881,13 +3920,13 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .fl-dataset.is-active { color: var(--accent-deep); border-color: var(--accent); background: rgba(29, 79, 216, 0.06); }
 
 .fl-stage[hidden], .fl-results[hidden] { display: none; }
-.fl-deck { display: grid; grid-template-columns: minmax(300px, 420px) minmax(320px, 1fr); gap: 18px; align-items: start; }
+.fl-deck { display: flex; flex-direction: column; gap: 18px; }
 .fl-map, .fl-config { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card); padding: 14px; }
 .fl-map__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
 .fl-map__frame { display: grid; grid-template-columns: auto 1fr; gap: 4px; align-items: center; }
 .fl-map__frame .cube-axis--x { grid-column: 2; }
-.fl-map__wrap { position: relative; grid-column: 2; }
-.fl-map__wrap img { display: block; width: 100%; height: auto; cursor: crosshair; image-rendering: pixelated; }
+.fl-map__wrap { position: relative; grid-column: 2; width: fit-content; max-width: 100%; margin: 0 auto; }
+.fl-map__wrap img { display: block; width: auto; height: auto; max-width: 100%; max-height: 46vh; cursor: crosshair; image-rendering: pixelated; }
 .fl-marks { position: absolute; inset: 0; pointer-events: none; }
 .fl-mark {
   position: absolute; width: 11px; height: 11px; transform: translate(-50%, -50%);
@@ -3940,6 +3979,5 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .fl-legend__params { color: var(--ink-dim); word-break: break-word; }
 
 @media (max-width: 980px) {
-  .fl-deck { grid-template-columns: 1fr; }
   .fl-cards { grid-template-columns: 1fr; }
 }

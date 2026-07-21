@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import struct
 import sys
 import time
 from pathlib import Path
@@ -103,8 +104,10 @@ def test_load_meta_and_maps(tmp_path):
     assert meta["h"] == H and meta["az"] == AZ and meta["rg"] == RG
     assert meta["height_range"] == list(HEIGHT_RANGE)
 
-    assert lab.map_png("slc").startswith(b"\x89PNG")
-    assert lab.map_png("peak").startswith(b"\x89PNG")
+    for src in ("slc", "peak"):
+        png = lab.map_png(src)
+        assert png.startswith(b"\x89PNG")
+        assert struct.unpack(">II", png[16:24]) == (AZ, RG)
     assert lab.map_png("nope") is None
 
 

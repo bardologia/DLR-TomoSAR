@@ -127,7 +127,7 @@ class FitLab:
         cmap       = "gray" if src == "slc" else "viridis"
 
         buf = io.BytesIO()
-        plt.imsave(buf, image, cmap=cmap, vmin=float(vmin), vmax=float(vmax), format="png")
+        plt.imsave(buf, image.T, cmap=cmap, vmin=float(vmin), vmax=float(vmax), format="png")
         return buf.getvalue()
 
     def start_fit(self, body: dict) -> dict:
