@@ -4,6 +4,7 @@ import gc
 import os
 from concurrent.futures import ThreadPoolExecutor
 from pathlib            import Path
+from time               import perf_counter
 from typing             import Dict, Optional, Tuple
 
 import numpy as np
@@ -218,6 +219,7 @@ class SigmaFittingExtractor:
         gpu_results                   = {}
         B                             = self.gpu_pixel_batch_size
         amp_mask, mu_mask, sigma_mask = self.mode_masks[mode]
+        t_mode                        = perf_counter()
 
         self.logger.section(f"[{batch_tag} | Phase 2 — GPU Fitting (mode {mode})]")
 
@@ -227,11 +229,12 @@ class SigmaFittingExtractor:
             final_amps = np.empty((N_act, K), dtype=np.float32)
             final_mus  = np.empty((N_act, K), dtype=np.float32)
             final_sigs = np.empty((N_act, K), dtype=np.float32)
+            final_mse  = np.empty(N_act,      dtype=np.float32)
 
             pending = None
             for i_start in range(0, N_act, B):
                 i_end = min(i_start + B, N_act)
-                out_a, out_m, out_s = self._kernel(
+                out_a, out_m, out_s, out_e = self._kernel(
                     jnp.array(self._pad_rows(amps_norm    [i_start:i_end], B)),
                     jnp.array(self._pad_rows(mus          [i_start:i_end], B)),
                     jnp.array(self._pad_rows(sigs_init    [i_start:i_end], B)),
@@ -251,27 +254,30 @@ class SigmaFittingExtractor:
                 )
 
                 if pending is not None:
-                    self._materialize_chunk(pending, final_amps, final_mus, final_sigs)
-                pending = (out_a, out_m, out_s, i_start, i_end)
+                    self._materialize_chunk(pending, final_amps, final_mus, final_sigs, final_mse)
+                pending = (out_a, out_m, out_s, out_e, i_start, i_end)
 
             if pending is not None:
-                self._materialize_chunk(pending, final_amps, final_mus, final_sigs)
+                self._materialize_chunk(pending, final_amps, final_mus, final_sigs, final_mse)
 
-            gpu_results[K] = (final_amps, final_mus, final_sigs)
+            gpu_results[K] = (final_amps, final_mus, final_sigs, final_mse)
             self.logger.subsection(f"K={K} done")
 
         gc.collect()
 
+        self.logger.subsection(f"Mode {mode} GPU fit elapsed : {perf_counter() - t_mode:.1f}s")
+
         return gpu_results
 
     @staticmethod
-    def _materialize_chunk(pending : tuple, final_amps : np.ndarray, final_mus : np.ndarray, final_sigs : np.ndarray) -> None:
-        out_a, out_m, out_s, i_start, i_end = pending
+    def _materialize_chunk(pending : tuple, final_amps : np.ndarray, final_mus : np.ndarray, final_sigs : np.ndarray, final_mse : np.ndarray) -> None:
+        out_a, out_m, out_s, out_e, i_start, i_end = pending
         n_chunk = i_end - i_start
 
         final_amps[i_start:i_end] = np.array(out_a[:n_chunk], dtype=np.float32)
         final_mus [i_start:i_end] = np.array(out_m[:n_chunk], dtype=np.float32)
         final_sigs[i_start:i_end] = np.array(out_s[:n_chunk], dtype=np.float32)
+        final_mse [i_start:i_end] = np.array(out_e[:n_chunk], dtype=np.float32)
 
     def _init_batch(
         self,
@@ -299,10 +305,12 @@ class SigmaFittingExtractor:
         self.logger.subsection(f"K             : {self.k_max} (shared init)")
         self.logger.subsection(f"Workers       : {self._init_workers} / {n_cpus} logical CPUs")
 
+        t_init                   = perf_counter()
         amps_km, mus_km, sigs_km = self._peak_initialiser.run(prof_raw_all, height_axis, self.k_max, self.prominence_frac, self.sigma_init_divisor)
         inits = {K: (amps_km[:, :K].copy(), mus_km[:, :K].copy(), sigs_km[:, :K].copy()) for K in range(1, self.k_max + 1)}
 
         self.logger.subsection(f"Init shared for all {self.k_max} K values and {len(self.modes)} modes")
+        self.logger.subsection(f"Init elapsed : {perf_counter() - t_init:.1f}s")
 
         return inits, prof_norm_all, scale_all, active_idx, N_act
 
@@ -310,11 +318,9 @@ class SigmaFittingExtractor:
         self,
         mode          : str,
         gpu_results   : dict,
-        prof_norm_all : np.ndarray,
         scale_all     : np.ndarray,
         active_idx    : np.ndarray,
         n_total       : int,
-        height_axis   : np.ndarray,
         n_params_out  : int,
         outputs       : Dict[tuple, dict],
         r_start       : int,
@@ -323,8 +329,9 @@ class SigmaFittingExtractor:
         batch_tag     : str,
     ) -> None:
 
+        t_score = perf_counter()
         r_count = r_end - r_start
-        mse_all = self._best_k_selector.score(gpu_results, prof_norm_all, height_axis, batch_tag=f"{batch_tag} | mode {mode}")
+        mse_all = self._best_k_selector.score(gpu_results, batch_tag=f"{batch_tag} | mode {mode}")
 
         for lambda_k in self.lambda_values:
             best_params, mse_act, pen_act, best_idx_act = self._best_k_selector.select(gpu_results, mse_all, scale_all, lambda_k, n_params_out, batch_tag=f"{batch_tag} | mode {mode}")
@@ -344,6 +351,8 @@ class SigmaFittingExtractor:
             maps["mse"   ][:, :, r_start:r_end] = mse_out.reshape(r_count, Az, self.k_max).transpose(2, 1, 0)
             maps["pen"   ][:, :, r_start:r_end] = pen_out.reshape(r_count, Az, self.k_max).transpose(2, 1, 0)
             maps["best_k"][:,    r_start:r_end] = best_k_out.reshape(r_count, Az).T
+
+        self.logger.subsection(f"{batch_tag} | mode {mode} select+store elapsed : {perf_counter() - t_score:.1f}s")
 
     @staticmethod
     def _throttle_scorings(futures : list, max_pending : int) -> None:
@@ -387,7 +396,9 @@ class SigmaFittingExtractor:
 
                 try:
                     while r < R:
+                        t_wait = perf_counter()
                         profiles_flat, profiles_norm, safe_scale, active, r_end = prefetch_future.result()
+                        self.logger.subsection(f"Load wait : {perf_counter() - t_wait:.1f}s")
 
                         r_start = r
                         r_count = r_end - r
@@ -408,8 +419,12 @@ class SigmaFittingExtractor:
                             for mode in self.modes:
                                 gpu_results = self._fit_all_K(inits, prof_norm_all, scale_all, height_ax_j, sigma_lower_j, sigma_upper_j, mu_lower_j, mu_upper_j, N_act, mode, batch_tag)
 
+                                t_throttle = perf_counter()
                                 self._throttle_scorings(score_futures, self.MAX_PENDING_SCORINGS)
-                                score_futures.append(score_pool.submit(self._score_and_store, mode, gpu_results, prof_norm_all, scale_all, active_idx, n_total, height_axis, n_params_out, outputs, r_start, r_end, Az, batch_tag))
+                                throttle_wait = perf_counter() - t_throttle
+                                if throttle_wait > 1.0:
+                                    self.logger.subsection(f"{batch_tag} | mode {mode} GPU idle on scoring backlog : {throttle_wait:.1f}s")
+                                score_futures.append(score_pool.submit(self._score_and_store, mode, gpu_results, scale_all, active_idx, n_total, n_params_out, outputs, r_start, r_end, Az, batch_tag))
 
                         del profiles_flat, profiles_norm, safe_scale, active, batch
                         gc.collect()

@@ -20,6 +20,7 @@ class SigmaScan:
     @staticmethod
     def adam_scan(
         batched_vg  ,
+        batched_loss,
         amps_init    : jnp.ndarray,
         mus_init     : jnp.ndarray,
         sigmas_init  : jnp.ndarray,
@@ -83,17 +84,19 @@ class SigmaScan:
 
         carry0                 = (a, u, s, m_a, v_a, m_u, v_u, m_s, v_s)
         (a_f, u_f, s_f, *_), _ = jax.lax.scan(_step, carry0, jnp.arange(n_steps))
+        mse_f                  = batched_loss(a_f, u_f, s_f, height_axis, profiles)
 
-        return a_f, u_f, s_f
+        return a_f, u_f, s_f, mse_f
 
 
 class SigmaAdamKernel:
     def __init__(self) -> None:
-        batched_vg = jax.vmap(jax.value_and_grad(SigmaScan.per_pixel_loss, argnums=(0, 1, 2)), in_axes=(0, 0, 0, None, 0))
-        self._run  = self._build(batched_vg)
+        batched_vg   = jax.vmap(jax.value_and_grad(SigmaScan.per_pixel_loss, argnums=(0, 1, 2)), in_axes=(0, 0, 0, None, 0))
+        batched_loss = jax.vmap(SigmaScan.per_pixel_loss, in_axes=(0, 0, 0, None, 0))
+        self._run    = self._build(batched_vg, batched_loss)
 
     @staticmethod
-    def _build(batched_vg):
+    def _build(batched_vg, batched_loss):
         @partial(jax.jit, static_argnames=("n_steps", "lr", "b1", "b2"))
         def _run(
             amps_init   : jnp.ndarray,
@@ -113,7 +116,7 @@ class SigmaAdamKernel:
             b1          : float = 0.9,
             b2          : float = 0.999,
         ) -> tuple:
-            return SigmaScan.adam_scan(batched_vg, amps_init, mus_init, sigmas_init, height_axis, profiles, amp_mask, mu_mask, sigma_mask, mu_lower, mu_upper, sigma_lower, sigma_upper, n_steps, lr, b1, b2)
+            return SigmaScan.adam_scan(batched_vg, batched_loss, amps_init, mus_init, sigmas_init, height_axis, profiles, amp_mask, mu_mask, sigma_mask, mu_lower, mu_upper, sigma_lower, sigma_upper, n_steps, lr, b1, b2)
         return _run
 
     def __call__(
@@ -133,10 +136,11 @@ class PmapSigmaAdamKernel:
     def __init__(self, devices: list) -> None:
         self._n_devices = len(devices)
         batched_vg      = jax.vmap(jax.value_and_grad(SigmaScan.per_pixel_loss, argnums=(0, 1, 2)), in_axes=(0, 0, 0, None, 0))
-        self._run       = self._build(batched_vg, devices)
+        batched_loss    = jax.vmap(SigmaScan.per_pixel_loss, in_axes=(0, 0, 0, None, 0))
+        self._run       = self._build(batched_vg, batched_loss, devices)
 
     @staticmethod
-    def _build(batched_vg, devices):
+    def _build(batched_vg, batched_loss, devices):
         def _run_on_device(
             amps_init   : jnp.ndarray,
             mus_init    : jnp.ndarray,
@@ -155,7 +159,7 @@ class PmapSigmaAdamKernel:
             b1          : float = 0.9,
             b2          : float = 0.999,
         ) -> tuple:
-            return SigmaScan.adam_scan(batched_vg, amps_init, mus_init, sigmas_init, height_axis, profiles, amp_mask, mu_mask, sigma_mask, mu_lower, mu_upper, sigma_lower, sigma_upper, n_steps, lr, b1, b2)
+            return SigmaScan.adam_scan(batched_vg, batched_loss, amps_init, mus_init, sigmas_init, height_axis, profiles, amp_mask, mu_mask, sigma_mask, mu_lower, mu_upper, sigma_lower, sigma_upper, n_steps, lr, b1, b2)
 
         return jax.pmap(
             _run_on_device,
@@ -186,7 +190,7 @@ class PmapSigmaAdamKernel:
         n_pad = n + pad
         shard = n_pad // D
 
-        out_a, out_u, out_s = self._run(
+        out_a, out_u, out_s, out_e = self._run(
             amps_init  .reshape(D, shard, K),
             mus_init   .reshape(D, shard, K),
             sigmas_init.reshape(D, shard, K),
@@ -205,5 +209,6 @@ class PmapSigmaAdamKernel:
         out_a = out_a.reshape(n_pad, K)[:n]
         out_u = out_u.reshape(n_pad, K)[:n]
         out_s = out_s.reshape(n_pad, K)[:n]
+        out_e = out_e.reshape(n_pad)[:n]
 
-        return out_a, out_u, out_s
+        return out_a, out_u, out_s, out_e

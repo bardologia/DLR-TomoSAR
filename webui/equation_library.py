@@ -291,7 +291,7 @@ class EquationLibrary:
                 {
                     "title" : "Discrete mixture (shared forward model)",
                     "tex"   : r"\hat{\gamma}(x_h) = \sum_{k=1}^{K} a_k\,\exp\!\left(-\frac{(x_h-\mu_k)^2}{2\sigma_k^2}\right)",
-                    "note"  : "The single reconciled convention in tools/data/gaussians.py (GaussianMixture): best-K scoring calls evaluate_batch and the R2 map calls evaluate_slice, while the JAX fitting kernel (sigma/kernels.py SigmaScan.per_pixel_loss) is a separate reimplementation with the identical guards. Guards: sigma floored at 1e-6, exponent clipped to [-100, 0].",
+                    "note"  : "The single reconciled convention in tools/data/gaussians.py (GaussianMixture): the R2 map calls evaluate_slice, while the JAX fitting kernel (sigma/kernels.py SigmaScan.per_pixel_loss) is a separate reimplementation with the identical guards and also produces the per-pixel best-K MSE on the GPU. Guards: sigma floored at 1e-6, exponent clipped to [-100, 0].",
                     "vars"  : [
                         {"sym": r"\hat{\gamma}(x_h)", "desc": "reconstructed mixture at sample x_h"},
                         {"sym": r"x_h",               "desc": "h-th elevation sample (m)"},
@@ -357,7 +357,7 @@ class EquationLibrary:
                 {
                     "title" : "Phase 3 — penalised score per K",
                     "tex"   : r"\mathrm{MSE}_K = \frac{1}{H}\sum_{h}\left(\hat{\gamma}_K(x_h) - \tilde{\gamma}(x_h)\right)^2, \qquad \mathrm{pen}_K = \mathrm{MSE}_K + \lambda_K \cdot K",
-                    "note"  : "Each extra component must buy at least lambda_k of normalised MSE, so the budget is spent only when the profile is genuinely multi-layered; MSE is scored once per fit mode with GaussianMixture.evaluate_batch on the normalised profile (sigma/selection.py BestKSelector._mse_K) and the lambda_k*K penalty is applied per lambda value in BestKSelector.select, so a lambda sweep reuses the same fits.",
+                    "note"  : "Each extra component must buy at least lambda_k of normalised MSE, so the budget is spent only when the profile is genuinely multi-layered; the per-pixel MSE comes straight from the GPU fit kernel (sigma/kernels.py SigmaScan.adam_scan final forward pass), BestKSelector.score assembles it per K, and the lambda_k*K penalty is applied per lambda value in BestKSelector.select, so a lambda sweep reuses the same fits.",
                     "vars"  : [
                         {"sym": r"\mathrm{MSE}_K",      "desc": "fit error of the K-component model"},
                         {"sym": r"\hat{\gamma}_K(x_h)", "desc": "K-component reconstruction at sample x_h"},

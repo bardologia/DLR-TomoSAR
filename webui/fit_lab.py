@@ -260,7 +260,7 @@ class FitLab:
                     self._set_fit(0.15 + 0.8 * (K - 1) / k_max, f"fitting K={K}/{k_max}")
 
                     amps_norm = amps_km[:, :K] / scale_act[:, None]
-                    out_a, out_m, out_s = self._kernel(
+                    out_a, out_m, out_s, out_e = self._kernel(
                         jnp.array(self._pad_rows(amps_norm, self.BATCH_ROWS)),
                         jnp.array(self._pad_rows(mus_km[:, :K], self.BATCH_ROWS)),
                         jnp.array(self._pad_rows(sigs_km[:, :K], self.BATCH_ROWS)),
@@ -282,9 +282,7 @@ class FitLab:
                     fit_a = np.array(out_a[:n_act], dtype=np.float32)
                     fit_m = np.array(out_m[:n_act], dtype=np.float32)
                     fit_s = np.array(out_s[:n_act], dtype=np.float32)
-
-                    pred = GaussianMixture.evaluate_batch(height_axis, fit_a, fit_m, fit_s)
-                    mse  = ((pred - prof_norm_act) ** 2).mean(axis=1)
+                    mse   = np.array(out_e[:n_act], dtype=np.float32)
 
                     per_k_out[K] = (fit_a, fit_m, fit_s, mse, mse + config["lambda_k"] * K)
 

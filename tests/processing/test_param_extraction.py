@@ -160,17 +160,19 @@ def test_kernel_masks_freeze_parameter_groups():
         )
         return [np.array(o) for o in out]
 
-    a_f, m_f, s_f = run(1.0, 1.0, 0.0)
+    a_f, m_f, s_f, e_f = run(1.0, 1.0, 0.0)
     assert np.allclose(s_f, sigs)
     assert not np.allclose(a_f, amps)
     assert not np.allclose(m_f, mus)
+    assert e_f.shape == (4,)
+    assert np.all(np.isfinite(e_f))
 
-    a_f, m_f, s_f = run(0.0, 0.0, 1.0)
+    a_f, m_f, s_f, e_f = run(0.0, 0.0, 1.0)
     assert np.allclose(a_f, amps)
     assert np.allclose(m_f, mus)
     assert not np.allclose(s_f, sigs)
 
-    a_f, m_f, s_f = run(0.0, 1.0, 0.0)
+    a_f, m_f, s_f, e_f = run(0.0, 1.0, 0.0)
     assert np.allclose(a_f, amps)
     assert np.allclose(s_f, sigs)
     assert not np.allclose(m_f, mus)

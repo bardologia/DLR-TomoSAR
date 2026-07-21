@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor
-from typing             import Dict, Tuple
+from typing import Dict, Tuple
 
 import numpy as np
 
 import jax
 
-from tools.data.gaussians    import GaussianMixture
 from tools.monitoring.logger import Logger
 
 from .kernels import PmapSigmaAdamKernel, SigmaAdamKernel
@@ -18,24 +16,12 @@ class BestKSelector:
         self.k_max  = k_max
         self.logger = logger
 
-    def _mse_K(self, K : int, gpu_results : Dict[int, tuple], prof_norm_all : np.ndarray, height_axis : np.ndarray) -> Tuple[int, np.ndarray]:
-        amps_norm, mus, final_sigs = gpu_results[K]
-        pred = GaussianMixture.evaluate_batch(height_axis, amps_norm, mus, final_sigs)
-        mse  = ((pred - prof_norm_all) ** 2).mean(axis=1)
+    def score(self, gpu_results : Dict[int, tuple], batch_tag : str = "") -> np.ndarray:
+        tag = f"{batch_tag} | " if batch_tag else ""
 
-        return K, mse
+        self.logger.section(f"[{tag}Phase 3 — Best-K Selection]")
 
-    def score(self, gpu_results : Dict[int, tuple], prof_norm_all : np.ndarray, height_axis : np.ndarray, batch_tag : str = "") -> np.ndarray:
-        N_act = prof_norm_all.shape[0]
-        tag   = f"{batch_tag} | " if batch_tag else ""
-
-        self.logger.section(f"[{tag}Phase 3 — MSE Scoring]")
-
-        mse_all = np.empty((N_act, self.k_max), dtype=np.float64)
-
-        with ThreadPoolExecutor(max_workers=self.k_max) as tpool:
-            for K, mse in tpool.map(lambda K: self._mse_K(K, gpu_results, prof_norm_all, height_axis), range(1, self.k_max + 1)):
-                mse_all[:, K - 1] = mse
+        mse_all = np.stack([gpu_results[K][3] for K in range(1, self.k_max + 1)], axis=1).astype(np.float64)
 
         return mse_all
 
@@ -62,7 +48,7 @@ class BestKSelector:
             if not mask.any():
                 continue
 
-            amps_norm, mus, final_sigs = gpu_results[K]
+            amps_norm, mus, final_sigs, _ = gpu_results[K]
             amps_out = amps_norm * scale_all[:, None]
             idx      = np.where(mask)[0]
 
