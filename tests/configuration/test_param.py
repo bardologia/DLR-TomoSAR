@@ -15,76 +15,105 @@ from configuration.param_extraction import (
 )
 
 
-def test_fit_config_alias_points_to_sigma_only():
-    assert FitConfig is FitMode.SigmaOnly
-
-
-def test_sigma_only_defaults_sane():
-    cfg = FitMode.SigmaOnly()
+def test_fit_config_defaults_sane():
+    cfg = FitConfig()
     assert cfg.k_max > 0
     assert cfg.sigma_init_divisor > 0
     assert cfg.lambda_k > 0
     assert 0.0 < cfg.threshold_factor < 1.0
 
 
-def test_sigma_only_asdict_round_trips():
-    cfg     = FitMode.SigmaOnly()
+def test_fit_config_asdict_round_trips():
+    cfg     = FitConfig()
     payload = dataclasses.asdict(cfg)
-    assert FitMode.SigmaOnly(**payload) == cfg
+    assert FitConfig(**payload) == cfg
 
 
 def test_fit_settings_parameters_per_profile():
     cfg = FitSettings()
     assert cfg.parameters_per_profile == 3 * cfg.fit_config.k_max
-    assert cfg.fitting_method == "sigma_only_adam"
+    assert cfg.fitting_method == "sigma_adam"
     assert cfg.max_fit_iterations > 0
 
 
-def test_sigma_only_free_flags_default_off():
-    cfg = FitMode.SigmaOnly()
+def test_fit_config_default_toggles():
+    cfg = FitConfig()
+    assert cfg.fit_sigma     is True
     assert cfg.fit_amplitude is False
     assert cfg.fit_mean      is False
 
 
-def test_free_parameters_default_is_sigma_only():
+def test_free_parameters_default_is_sigma():
     cfg = FitSettings()
     assert cfg.free_parameters == ("sigma",)
-    assert cfg.fitting_method  == "sigma_only_adam"
+    assert cfg.fitting_method  == "sigma_adam"
 
 
-def test_free_parameters_amplitude_and_mean():
-    cfg = FitSettings(fit_config=FitMode.SigmaOnly(fit_amplitude=True, fit_mean=True))
-    assert cfg.free_parameters == ("amp", "mu", "sigma")
-    assert cfg.fitting_method  == "amp_mu_sigma_adam"
+def test_free_parameters_all_free():
+    cfg = FitSettings(fit_config=FitConfig(fit_amplitude=True, fit_mean=True))
+    assert cfg.free_parameters == ("sigma", "amp", "mu")
+    assert cfg.fitting_method  == "sigma_amp_mu_adam"
 
 
-def test_free_parameters_amplitude_only():
-    cfg = FitSettings(fit_config=FitMode.SigmaOnly(fit_amplitude=True))
-    assert cfg.free_parameters == ("amp", "sigma")
-    assert cfg.fitting_method  == "amp_sigma_adam"
+def test_free_parameters_sigma_amplitude():
+    cfg = FitSettings(fit_config=FitConfig(fit_amplitude=True))
+    assert cfg.free_parameters == ("sigma", "amp")
+    assert cfg.fitting_method  == "sigma_amp_adam"
 
 
-def test_free_parameters_mean_only():
-    cfg = FitSettings(fit_config=FitMode.SigmaOnly(fit_mean=True))
-    assert cfg.free_parameters == ("mu", "sigma")
-    assert cfg.fitting_method  == "mu_sigma_adam"
+def test_free_parameters_sigma_mean():
+    cfg = FitSettings(fit_config=FitConfig(fit_mean=True))
+    assert cfg.free_parameters == ("sigma", "mu")
+    assert cfg.fitting_method  == "sigma_mu_adam"
+
+
+def test_free_parameters_without_sigma():
+    amp_only = FitSettings(fit_config=FitConfig(fit_sigma=False, fit_amplitude=True))
+    mu_only  = FitSettings(fit_config=FitConfig(fit_sigma=False, fit_mean=True))
+    amp_mu   = FitSettings(fit_config=FitConfig(fit_sigma=False, fit_amplitude=True, fit_mean=True))
+
+    assert amp_only.free_parameters == ("amp",)
+    assert amp_only.fitting_method  == "amp_adam"
+    assert mu_only.free_parameters  == ("mu",)
+    assert mu_only.fitting_method   == "mu_adam"
+    assert amp_mu.free_parameters   == ("amp", "mu")
+    assert amp_mu.fitting_method    == "amp_mu_adam"
+
+
+def test_free_parameters_none_free_raises():
+    cfg = FitSettings(fit_config=FitConfig(fit_sigma=False))
+    with pytest.raises(ValueError):
+        cfg.free_parameters
+    with pytest.raises(ValueError):
+        cfg.fitting_method
 
 
 def test_entry_config_fit_modes_default_sweep():
     cfg = ExtractParamsEntryConfig()
     assert cfg.fit_modes == ["sigma", "sigma_amp", "sigma_amp_mu"]
-    assert all(mode in FitMode.MODE_PRESETS for mode in cfg.fit_modes)
+    for mode in cfg.fit_modes:
+        FitMode.free_flags(mode)
 
 
-def test_fit_mode_free_flags_mapping():
-    assert FitMode.free_flags("sigma")        == (False, False)
-    assert FitMode.free_flags("sigma_amp")    == (True,  False)
-    assert FitMode.free_flags("sigma_amp_mu") == (True,  True)
+def test_fit_mode_free_flags_all_compositions():
+    assert FitMode.free_flags("sigma")        == (True,  False, False)
+    assert FitMode.free_flags("amp")          == (False, True,  False)
+    assert FitMode.free_flags("mu")           == (False, False, True)
+    assert FitMode.free_flags("sigma_amp")    == (True,  True,  False)
+    assert FitMode.free_flags("sigma_mu")     == (True,  False, True)
+    assert FitMode.free_flags("amp_mu")       == (False, True,  True)
+    assert FitMode.free_flags("sigma_amp_mu") == (True,  True,  True)
 
 
-def test_fit_mode_free_flags_rejects_unknown():
-    with pytest.raises(ValueError):
-        FitMode.free_flags("quartic")
+def test_fit_mode_free_flags_order_insensitive():
+    assert FitMode.free_flags("mu_amp")       == FitMode.free_flags("amp_mu")
+    assert FitMode.free_flags("mu_amp_sigma") == FitMode.free_flags("sigma_amp_mu")
+
+
+def test_fit_mode_free_flags_rejects_invalid():
+    for mode in ("quartic", "", "sigma_sigma", "sigma_quartic", "sigma+amp"):
+        with pytest.raises(ValueError):
+            FitMode.free_flags(mode)
 
 
 def test_fit_settings_default_factory_independent():
@@ -110,11 +139,13 @@ def test_extraction_config_default_suffix_encodes_fit():
 
 
 def test_extraction_config_suffix_encodes_free_parameters():
-    sigma_amp    = ExtractionConfig(processed_data_path=Path("/tmp/run"), fit_settings=FitSettings(fit_config=FitMode.SigmaOnly(k_max=2, lambda_k=1e-2, sigma_init_divisor=4.0, fit_amplitude=True)))
-    sigma_amp_mu = ExtractionConfig(processed_data_path=Path("/tmp/run"), fit_settings=FitSettings(fit_config=FitMode.SigmaOnly(k_max=2, lambda_k=1e-2, sigma_init_divisor=4.0, fit_amplitude=True, fit_mean=True)))
+    sigma_amp    = ExtractionConfig(processed_data_path=Path("/tmp/run"), fit_settings=FitSettings(fit_config=FitConfig(k_max=2, lambda_k=1e-2, sigma_init_divisor=4.0, fit_amplitude=True)))
+    sigma_amp_mu = ExtractionConfig(processed_data_path=Path("/tmp/run"), fit_settings=FitSettings(fit_config=FitConfig(k_max=2, lambda_k=1e-2, sigma_init_divisor=4.0, fit_amplitude=True, fit_mean=True)))
+    amp_mu       = ExtractionConfig(processed_data_path=Path("/tmp/run"), fit_settings=FitSettings(fit_config=FitConfig(k_max=2, lambda_k=1e-2, sigma_init_divisor=4.0, fit_sigma=False, fit_amplitude=True, fit_mean=True)))
 
     assert sigma_amp.output_subdir_name    == "params_k2_lam0.01_sig4_sigma_amp"
-    assert sigma_amp_mu.output_subdir_name == "params_k2_lam0.01_sig4_sigma_mu_amp"
+    assert sigma_amp_mu.output_subdir_name == "params_k2_lam0.01_sig4_sigma_amp_mu"
+    assert amp_mu.output_subdir_name       == "params_k2_lam0.01_sig4_amp_mu"
 
 
 def test_extraction_config_explicit_suffix_used():
@@ -132,7 +163,7 @@ def test_extraction_config_output_directory_layout():
 def test_extraction_config_matches_param_extraction_meta_suffix(param_extraction_meta):
     cfg = ExtractionConfig(
         processed_data_path = Path("/tmp/run"),
-        fit_settings        = FitSettings(fit_config=FitMode.SigmaOnly(k_max=5, sigma_init_divisor=4.0, lambda_k=1e-2)),
+        fit_settings        = FitSettings(fit_config=FitConfig(k_max=5, sigma_init_divisor=4.0, lambda_k=1e-2)),
     )
     assert cfg.output_subdir_name == "params_k5_lam0.01_sig4_sigma"
 

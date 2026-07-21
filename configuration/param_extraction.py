@@ -7,39 +7,37 @@ from pathlib     import Path
 from typing      import Optional, Tuple
 
 
-class FitMode:
-    @dataclass
-    class SigmaOnly:
-        threshold_factor   : float = 0.25
-        truncation_index   : int   = 170
-        k_max              : int   = 5
-        lambda_k           : float = 1e-2
-        prominence_frac    : float = 0.05
-        sigma_init_divisor : float = 4.0
-        activity_threshold : float = 1e-3
-        fit_amplitude      : bool  = False
-        fit_mean           : bool  = False
+@dataclass
+class FitConfig:
+    threshold_factor   : float = 0.25
+    truncation_index   : int   = 170
+    k_max              : int   = 5
+    lambda_k           : float = 1e-2
+    prominence_frac    : float = 0.05
+    sigma_init_divisor : float = 4.0
+    activity_threshold : float = 1e-3
+    fit_sigma          : bool  = True
+    fit_amplitude      : bool  = False
+    fit_mean           : bool  = False
 
-    MODE_PRESETS = {
-        "sigma"        : (False, False),
-        "sigma_amp"    : (True,  False),
-        "sigma_amp_mu" : (True,  True),
-    }
+
+class FitMode:
+    COMPONENTS = ("sigma", "amp", "mu")
 
     @classmethod
-    def free_flags(cls, mode: str) -> Tuple[bool, bool]:
-        if mode not in cls.MODE_PRESETS:
-            raise ValueError(f"Unknown fit mode '{mode}'. Known modes: {', '.join(cls.MODE_PRESETS)}")
-        return cls.MODE_PRESETS[mode]
+    def free_flags(cls, mode: str) -> Tuple[bool, bool, bool]:
+        parts = mode.split("_") if mode else []
 
+        if not parts or len(set(parts)) != len(parts) or any(part not in cls.COMPONENTS for part in parts):
+            raise ValueError(f"Unknown fit mode '{mode}'. A mode joins distinct components from {', '.join(cls.COMPONENTS)} with '_', e.g. 'sigma', 'amp_mu', 'sigma_amp_mu'")
 
-FitConfig = FitMode.SigmaOnly
+        return tuple(component in parts for component in cls.COMPONENTS)
 
 
 @dataclass
 class FitSettings:
     max_fit_iterations : int       = 5000
-    fit_config         : FitConfig = field(default_factory=FitMode.SigmaOnly)
+    fit_config         : FitConfig = field(default_factory=FitConfig)
 
     @property
     def parameters_per_profile(self) -> int:
@@ -48,24 +46,17 @@ class FitSettings:
     @property
     def free_parameters(self) -> Tuple[str, ...]:
         cfg   = self.fit_config
-        names = []
+        flags = {"sigma": cfg.fit_sigma, "amp": cfg.fit_amplitude, "mu": cfg.fit_mean}
+        names = tuple(name for name in FitMode.COMPONENTS if flags[name])
 
-        if cfg.fit_amplitude:
-            names.append("amp")
-        if cfg.fit_mean:
-            names.append("mu")
-        names.append("sigma")
+        if not names:
+            raise ValueError("No free parameters: enable at least one of fit_sigma, fit_amplitude, fit_mean")
 
-        return tuple(names)
+        return names
 
     @property
     def fitting_method(self) -> str:
-        free = self.free_parameters
-
-        if free == ("sigma",):
-            return "sigma_only_adam"
-
-        return "_".join(free) + "_adam"
+        return "_".join(self.free_parameters) + "_adam"
 
 
 @dataclass
@@ -102,14 +93,9 @@ class ExtractionConfig:
         cfg     = self.fit_settings.fit_config
         lam_tag = f"{cfg.lambda_k:g}"
         div_tag = f"{cfg.sigma_init_divisor:g}"
+        free    = "_".join(self.fit_settings.free_parameters)
 
-        free = ["sigma"]
-        if cfg.fit_mean:
-            free.append("mu")
-        if cfg.fit_amplitude:
-            free.append("amp")
-
-        return f"k{cfg.k_max}_lam{lam_tag}_sig{div_tag}_{'_'.join(free)}"
+        return f"k{cfg.k_max}_lam{lam_tag}_sig{div_tag}_{free}"
 
     @property
     def output_subdir_name(self) -> str:

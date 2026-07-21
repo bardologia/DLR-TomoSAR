@@ -35,6 +35,7 @@ class ExtractionMetadataManager:
             "activity_threshold"  : ext.fit_config.activity_threshold,
             "threshold_factor"    : ext.fit_config.threshold_factor,
             "truncation_index"    : ext.fit_config.truncation_index,
+            "fit_sigma"           : ext.fit_config.fit_sigma,
             "fit_amplitude"       : ext.fit_config.fit_amplitude,
             "fit_mean"            : ext.fit_config.fit_mean,
             "fitting_method"      : ext.fitting_method,

@@ -52,7 +52,11 @@ class LaunchLayout:
 
     MULTI_FIT_MODES = {"kind": "multi", "empty": "select at least one fit mode", "choices": [
         {"value": "sigma",        "label": "sigma only"},
+        {"value": "amp",          "label": "amplitude only"},
+        {"value": "mu",           "label": "mean only"},
         {"value": "sigma_amp",    "label": "sigma + amplitude"},
+        {"value": "sigma_mu",     "label": "sigma + mean"},
+        {"value": "amp_mu",       "label": "amplitude + mean"},
         {"value": "sigma_amp_mu", "label": "sigma + amplitude + mean"},
     ]}
 

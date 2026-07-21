@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from configuration.param_extraction import ExtractionConfig, FitMode, FitSettings
+from configuration.param_extraction import ExtractionConfig, FitConfig, FitMode, FitSettings
 
 
 class ExtractionPlanResolver:
@@ -21,12 +21,13 @@ class ExtractionPlanResolver:
             raise ValueError(f"output_suffix is a fixed name but the sweep expands to {permutations} permutations that would all collide on it; leave output_suffix unset so each permutation gets its auto-encoded name")
 
     def _build_plan(self, processed_data_path: Path, k_max, lambda_k, mode: str) -> ExtractionConfig:
-        fit_amplitude, fit_mean = FitMode.free_flags(mode)
+        fit_sigma, fit_amplitude, fit_mean = FitMode.free_flags(mode)
 
-        fit_config = FitMode.SigmaOnly(
+        fit_config = FitConfig(
             k_max              = int(k_max),
             lambda_k           = float(lambda_k),
             sigma_init_divisor = self.entry_config.fit_sigma_init_divisor,
+            fit_sigma          = fit_sigma,
             fit_amplitude      = fit_amplitude,
             fit_mean           = fit_mean,
         )

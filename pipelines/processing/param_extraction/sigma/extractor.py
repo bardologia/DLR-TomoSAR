@@ -51,10 +51,12 @@ class SigmaFittingExtractor:
         self.sigma_init_divisor   = sigma_init_divisor
         self.gpu_pixel_batch_size = gpu_pixel_batch_size
         self.activity_threshold   = fit_settings.fit_config.activity_threshold
+        self.fit_sigma            = bool(fit_settings.fit_config.fit_sigma)
         self.fit_amplitude        = bool(fit_settings.fit_config.fit_amplitude)
         self.fit_mean             = bool(fit_settings.fit_config.fit_mean)
         self.amp_mask             = jnp.float32(1.0 if self.fit_amplitude else 0.0)
         self.mu_mask              = jnp.float32(1.0 if self.fit_mean      else 0.0)
+        self.sigma_mask           = jnp.float32(1.0 if self.fit_sigma     else 0.0)
         self._init_workers        = min(32, os.cpu_count() or 8) if init_workers is None else init_workers
 
         if peak_initialiser is not None:
@@ -82,6 +84,7 @@ class SigmaFittingExtractor:
         self.logger.subsection(f"lambda_k           : {lambda_k}")
         self.logger.subsection(f"sigma_init_divisor : {sigma_init_divisor}")
         self.logger.subsection(f"activity_threshold : {self.activity_threshold}")
+        self.logger.subsection(f"fit_sigma          : {self.fit_sigma}")
         self.logger.subsection(f"fit_amplitude      : {self.fit_amplitude}")
         self.logger.subsection(f"fit_mean           : {self.fit_mean}")
         self.logger.subsection(f"init_workers       : {self._init_workers}")
@@ -153,7 +156,7 @@ class SigmaFittingExtractor:
         dummy_a = jnp.ones((B, K),  dtype=jnp.float32) * 0.5
         dummy_m = jnp.zeros((B, K), dtype=jnp.float32)
 
-        self._kernel(dummy_a, dummy_m, dummy_s, height_ax_j, dummy_p, self.amp_mask, self.mu_mask, mu_lower_j, mu_upper_j, sigma_lower_j, sigma_upper_j, self.adam_steps, self.adam_lr, self.adam_b1, self.adam_b2)
+        self._kernel(dummy_a, dummy_m, dummy_s, height_ax_j, dummy_p, self.amp_mask, self.mu_mask, self.sigma_mask, mu_lower_j, mu_upper_j, sigma_lower_j, sigma_upper_j, self.adam_steps, self.adam_lr, self.adam_b1, self.adam_b2)
 
         self.logger.subsection(f"Kernel compiled (K={K}, batch={B}, n_steps={self.adam_steps})")
 
@@ -227,6 +230,7 @@ class SigmaFittingExtractor:
                     jnp.array(self._pad_rows(prof_norm_all[i_start:i_end], B)),
                     self.amp_mask,
                     self.mu_mask,
+                    self.sigma_mask,
                     mu_lower_j,
                     mu_upper_j,
                     sigma_lower_j,

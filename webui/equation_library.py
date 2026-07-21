@@ -314,10 +314,10 @@ class EquationLibrary:
                 {
                     "title" : "Phase 2 — fitting objective",
                     "tex"   : r"\mathcal{L} = \frac{1}{H}\sum_{h=1}^{H}\left(\sum_{k=1}^{K} a_k\,\exp\!\left(-\frac{(x_h-\mu_k)^2}{2\sigma_k^2}\right) - \tilde{\gamma}(x_h)\right)^2, \qquad (g_a, g_\mu, g_\sigma) = \nabla_{(a,\mu,\sigma)}\mathcal{L}",
-                    "note"  : "Per-pixel mean squared error between the mixture and the normalised profile, vectorised over pixels with jax.vmap and differentiated w.r.t. amplitudes, means and widths by jax.value_and_grad(argnums=(0,1,2)); the amplitude and mean gradients are then multiplied by the fit_amplitude / fit_mean masks, so by default (both off) only the widths move. The optional modes sigma_amp and sigma_amp_mu free those masks (sigma/kernels.py SigmaScan).",
+                    "note"  : "Per-pixel mean squared error between the mixture and the normalised profile, vectorised over pixels with jax.vmap and differentiated w.r.t. amplitudes, means and widths by jax.value_and_grad(argnums=(0,1,2)); each gradient is then multiplied by its fit_amplitude / fit_mean / fit_sigma mask, so any composition of the three parameter groups can be fitted. The default composition frees only the widths (sigma/kernels.py SigmaScan).",
                     "vars"  : [
                         {"sym": r"\mathcal{L}",         "desc": "per-pixel mean squared fit error"},
-                        {"sym": r"\sigma",              "desc": "the K widths (always free)"},
+                        {"sym": r"\sigma",              "desc": "width of component k (free only when fit_sigma on, the default)"},
                         {"sym": r"a_k",                 "desc": "amplitude of component k (free only when fit_amplitude on)"},
                         {"sym": r"\mu_k",               "desc": "mean elevation of component k (free only when fit_mean on)"},
                         {"sym": r"x_h",                 "desc": "h-th elevation sample (m)"},
@@ -329,13 +329,13 @@ class EquationLibrary:
                 {
                     "title" : "Adam moment estimates (parameter fit)",
                     "tex"   : r"m_t = \beta_1 m_{t-1} + (1-\beta_1)\,g_t, \qquad v_t = \beta_2 v_{t-1} + (1-\beta_2)\,g_t^2, \qquad g_t = \mathbf{1}_\theta \cdot \nabla_{\theta}\mathcal{L}",
-                    "note"  : "Independent first and second moment estimates are kept for each of amplitudes, means and widths and updated every step; the amplitude and mean gradients are pre-masked so their moments stay zero in sigma-only mode. The whole optimisation is a jax.lax.scan over T steps compiled into a single XLA computation (sigma/kernels.py SigmaScan).",
+                    "note"  : "Independent first and second moment estimates are kept for each of amplitudes, means and widths and updated every step; every gradient is pre-masked by its fit toggle, so the moments of frozen parameter groups stay zero. The whole optimisation is a jax.lax.scan over T steps compiled into a single XLA computation (sigma/kernels.py SigmaScan).",
                     "vars"  : [
                         {"sym": r"m_t",               "desc": "first moment estimate at step t"},
                         {"sym": r"v_t",               "desc": "second moment estimate at step t"},
                         {"sym": r"g_t",               "desc": "masked gradient of the fit loss w.r.t. the free parameter"},
                         {"sym": r"\theta",            "desc": "a free parameter (amplitude, mean or width)"},
-                        {"sym": r"\mathbf{1}_\theta", "desc": "fit mask (1 for sigma always, 0 or 1 for amp/mu)"},
+                        {"sym": r"\mathbf{1}_\theta", "desc": "per-group fit mask (0 or 1 for each of sigma, amp, mu)"},
                         {"sym": r"t",                 "desc": "optimisation step, 1 to T"},
                         {"sym": r"\beta_1",           "desc": "adam_b1 = 0.95"},
                         {"sym": r"\beta_2",           "desc": "adam_b2 = 0.999"},

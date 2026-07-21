@@ -27,6 +27,7 @@ class SigmaScan:
         profiles     : jnp.ndarray,
         amp_mask     : jnp.ndarray,
         mu_mask      : jnp.ndarray,
+        sigma_mask   : jnp.ndarray,
         mu_lower     : jnp.ndarray,
         mu_upper     : jnp.ndarray,
         sigma_lower  : jnp.ndarray,
@@ -36,12 +37,13 @@ class SigmaScan:
         b1           : float,
         b2           : float,
     ) -> tuple:
-        b1_       = jnp.float32(b1)
-        b2_       = jnp.float32(b2)
-        eps       = jnp.float32(1e-8)
-        lr_       = jnp.float32(lr)
-        amp_mask_ = jnp.float32(amp_mask)
-        mu_mask_  = jnp.float32(mu_mask)
+        b1_         = jnp.float32(b1)
+        b2_         = jnp.float32(b2)
+        eps         = jnp.float32(1e-8)
+        lr_         = jnp.float32(lr)
+        amp_mask_   = jnp.float32(amp_mask)
+        mu_mask_    = jnp.float32(mu_mask)
+        sigma_mask_ = jnp.float32(sigma_mask)
 
         a = jnp.maximum(amps_init.astype(jnp.float32),   0.0)
         u = jnp.clip(   mus_init.astype(jnp.float32),    mu_lower,    mu_upper)
@@ -66,6 +68,7 @@ class SigmaScan:
 
             g_a = g_a * amp_mask_
             g_u = g_u * mu_mask_
+            g_s = g_s * sigma_mask_
             tf  = t.astype(jnp.float32) + 1.0
 
             a_, m_a_, v_a_ = _adam(a_, m_a_, v_a_, g_a, tf)
@@ -100,6 +103,7 @@ class SigmaAdamKernel:
             profiles    : jnp.ndarray,
             amp_mask    : jnp.ndarray,
             mu_mask     : jnp.ndarray,
+            sigma_mask  : jnp.ndarray,
             mu_lower    : jnp.ndarray,
             mu_upper    : jnp.ndarray,
             sigma_lower : jnp.ndarray,
@@ -109,18 +113,18 @@ class SigmaAdamKernel:
             b1          : float = 0.9,
             b2          : float = 0.999,
         ) -> tuple:
-            return SigmaScan.adam_scan(batched_vg, amps_init, mus_init, sigmas_init, height_axis, profiles, amp_mask, mu_mask, mu_lower, mu_upper, sigma_lower, sigma_upper, n_steps, lr, b1, b2)
+            return SigmaScan.adam_scan(batched_vg, amps_init, mus_init, sigmas_init, height_axis, profiles, amp_mask, mu_mask, sigma_mask, mu_lower, mu_upper, sigma_lower, sigma_upper, n_steps, lr, b1, b2)
         return _run
 
     def __call__(
         self,
         amps_init, mus_init, sigmas_init, height_axis, profiles,
-        amp_mask, mu_mask, mu_lower, mu_upper, sigma_lower, sigma_upper,
+        amp_mask, mu_mask, sigma_mask, mu_lower, mu_upper, sigma_lower, sigma_upper,
         n_steps=2000, lr=1e-2, b1=0.9, b2=0.999,
     ):
         return self._run(
             amps_init, mus_init, sigmas_init, height_axis, profiles,
-            amp_mask, mu_mask, mu_lower, mu_upper, sigma_lower, sigma_upper,
+            amp_mask, mu_mask, sigma_mask, mu_lower, mu_upper, sigma_lower, sigma_upper,
             n_steps, lr, b1, b2,
         )
 
@@ -141,6 +145,7 @@ class PmapSigmaAdamKernel:
             profiles    : jnp.ndarray,
             amp_mask    : jnp.ndarray,
             mu_mask     : jnp.ndarray,
+            sigma_mask  : jnp.ndarray,
             mu_lower    : jnp.ndarray,
             mu_upper    : jnp.ndarray,
             sigma_lower : jnp.ndarray,
@@ -150,19 +155,19 @@ class PmapSigmaAdamKernel:
             b1          : float = 0.9,
             b2          : float = 0.999,
         ) -> tuple:
-            return SigmaScan.adam_scan(batched_vg, amps_init, mus_init, sigmas_init, height_axis, profiles, amp_mask, mu_mask, mu_lower, mu_upper, sigma_lower, sigma_upper, n_steps, lr, b1, b2)
+            return SigmaScan.adam_scan(batched_vg, amps_init, mus_init, sigmas_init, height_axis, profiles, amp_mask, mu_mask, sigma_mask, mu_lower, mu_upper, sigma_lower, sigma_upper, n_steps, lr, b1, b2)
 
         return jax.pmap(
             _run_on_device,
-            in_axes                    = (0, 0, 0, None, 0, None, None, None, None, None, None),
-            static_broadcasted_argnums = (11, 12, 13, 14),
+            in_axes                    = (0, 0, 0, None, 0, None, None, None, None, None, None, None),
+            static_broadcasted_argnums = (12, 13, 14, 15),
             devices                    = devices,
         )
 
     def __call__(
         self,
         amps_init, mus_init, sigmas_init, height_axis, profiles,
-        amp_mask, mu_mask, mu_lower, mu_upper, sigma_lower, sigma_upper,
+        amp_mask, mu_mask, sigma_mask, mu_lower, mu_upper, sigma_lower, sigma_upper,
         n_steps=2000, lr=1e-2, b1=0.9, b2=0.999,
     ):
         n, K = sigmas_init.shape
@@ -189,6 +194,7 @@ class PmapSigmaAdamKernel:
             profiles   .reshape(D, shard, H),
             amp_mask,
             mu_mask,
+            sigma_mask,
             mu_lower,
             mu_upper,
             sigma_lower,

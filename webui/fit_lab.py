@@ -238,14 +238,16 @@ class FitLab:
                 if self._kernel is None:
                     self._kernel = SigmaAdamKernel()
 
-                fit_amplitude, fit_mean = FitMode.free_flags(config["mode"])
-                amp_mask                = jnp.float32(1.0 if fit_amplitude else 0.0)
-                mu_mask                 = jnp.float32(1.0 if fit_mean else 0.0)
-                mu_lower_j              = jnp.float32(height_axis[0])
-                mu_upper_j              = jnp.float32(height_axis[-1])
-                sigma_lower_j           = jnp.float32(dh)
-                sigma_upper_j           = jnp.float32(h_span / 2.0)
-                height_ax_j             = jnp.array(height_axis)
+                fit_sigma, fit_amplitude, fit_mean = FitMode.free_flags(config["mode"])
+
+                amp_mask      = jnp.float32(1.0 if fit_amplitude else 0.0)
+                mu_mask       = jnp.float32(1.0 if fit_mean else 0.0)
+                sigma_mask    = jnp.float32(1.0 if fit_sigma else 0.0)
+                mu_lower_j    = jnp.float32(height_axis[0])
+                mu_upper_j    = jnp.float32(height_axis[-1])
+                sigma_lower_j = jnp.float32(dh)
+                sigma_upper_j = jnp.float32(h_span / 2.0)
+                height_ax_j   = jnp.array(height_axis)
 
                 prof_raw_act  = pf[active_idx]
                 prof_norm_act = norm[active_idx].astype(np.float32)
@@ -266,6 +268,7 @@ class FitLab:
                         jnp.array(self._pad_rows(prof_norm_act, self.BATCH_ROWS)),
                         amp_mask,
                         mu_mask,
+                        sigma_mask,
                         mu_lower_j,
                         mu_upper_j,
                         sigma_lower_j,

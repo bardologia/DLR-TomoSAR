@@ -12,7 +12,7 @@ import pytest
 
 from pathlib import Path
 
-from configuration.param_extraction import ExtractParamsEntryConfig, FitSettings, FitMode
+from configuration.param_extraction import ExtractParamsEntryConfig, FitConfig, FitSettings
 from pipelines.processing.param_extraction.metrics import (
     FittingMetricsCalculator,
     KSelectionDiagnostics,
@@ -54,12 +54,18 @@ def test_plan_resolver_expands_full_product():
 
 
 def test_plan_resolver_maps_modes_to_free_flags():
-    entry = ExtractParamsEntryConfig(fit_k_values=[4], fit_lambda_values=[1e-2], fit_modes=["sigma", "sigma_amp", "sigma_amp_mu"])
+    entry = ExtractParamsEntryConfig(fit_k_values=[4], fit_lambda_values=[1e-2], fit_modes=["sigma", "amp_mu", "sigma_amp_mu"])
 
     plans  = ExtractionPlanResolver(entry, [Path("/data/a")]).resolve()
-    flags  = [(p.fit_settings.fit_config.fit_amplitude, p.fit_settings.fit_config.fit_mean) for p in plans]
+    flags  = [(p.fit_settings.fit_config.fit_sigma, p.fit_settings.fit_config.fit_amplitude, p.fit_settings.fit_config.fit_mean) for p in plans]
 
-    assert flags == [(False, False), (True, False), (True, True)]
+    assert flags == [(True, False, False), (False, True, True), (True, True, True)]
+
+
+def test_plan_resolver_rejects_unknown_mode():
+    entry = ExtractParamsEntryConfig(fit_k_values=[4], fit_lambda_values=[1e-2], fit_modes=["sigma", "quartic"])
+    with pytest.raises(ValueError):
+        ExtractionPlanResolver(entry, [Path("/data/a")]).resolve()
 
 
 def test_plan_resolver_rejects_empty_axis():
@@ -79,6 +85,49 @@ def test_plan_resolver_allows_fixed_suffix_for_single_permutation():
     plans = ExtractionPlanResolver(entry, [Path("/data/a")]).resolve()
     assert len(plans) == 1
     assert plans[0].output_suffix_value == "fixed"
+
+
+@pytest.mark.skipif(not _HAS_JAX, reason="jax not installed in this environment")
+def test_kernel_masks_freeze_parameter_groups():
+    import jax.numpy as jnp
+    from pipelines.processing.param_extraction.sigma.kernels import SigmaAdamKernel
+
+    H      = 60
+    height = np.linspace(-10.0, 30.0, H, dtype=np.float32)
+    target = np.exp(-((height - 5.0) ** 2) / (2.0 * 4.0 ** 2)).astype(np.float32)
+    prof   = np.tile(target[None, :], (4, 1))
+
+    amps = np.full((4, 1), 0.6, dtype=np.float32)
+    mus  = np.full((4, 1), 2.0, dtype=np.float32)
+    sigs = np.full((4, 1), 6.0, dtype=np.float32)
+
+    kernel = SigmaAdamKernel()
+
+    def run(amp_on, mu_on, sigma_on):
+        out = kernel(
+            jnp.array(amps), jnp.array(mus), jnp.array(sigs),
+            jnp.array(height), jnp.array(prof),
+            jnp.float32(amp_on), jnp.float32(mu_on), jnp.float32(sigma_on),
+            jnp.float32(height[0]), jnp.float32(height[-1]),
+            jnp.float32(0.5), jnp.float32(20.0),
+            50, 0.05, 0.9, 0.999,
+        )
+        return [np.array(o) for o in out]
+
+    a_f, m_f, s_f = run(1.0, 1.0, 0.0)
+    assert np.allclose(s_f, sigs)
+    assert not np.allclose(a_f, amps)
+    assert not np.allclose(m_f, mus)
+
+    a_f, m_f, s_f = run(0.0, 0.0, 1.0)
+    assert np.allclose(a_f, amps)
+    assert np.allclose(m_f, mus)
+    assert not np.allclose(s_f, sigs)
+
+    a_f, m_f, s_f = run(0.0, 1.0, 0.0)
+    assert np.allclose(a_f, amps)
+    assert np.allclose(s_f, sigs)
+    assert not np.allclose(m_f, mus)
 
 
 @pytest.fixture(scope="module")
@@ -429,7 +478,7 @@ def test_rerun_extractor_reproduces_best_k(tomogram_full, fit_diagnostics, logge
     tomo_path = tmp_path / "tomo.npy"
     np.save(tomo_path, np.array(tomogram_full[:, a0:a1, r0:r1]))
 
-    fit_cfg  = FitMode.SigmaOnly(k_max=K_MAX, lambda_k=LAMBDA_K, sigma_init_divisor=4.0)
+    fit_cfg  = FitConfig(k_max=K_MAX, lambda_k=LAMBDA_K, sigma_init_divisor=4.0)
     settings = FitSettings(fit_config=fit_cfg)
 
     extractor = ParameterExtractor(

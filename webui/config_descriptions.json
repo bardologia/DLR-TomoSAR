@@ -122,11 +122,26 @@
         "run_tags": "List of run-folder names to render plots for; empty auto-discovers every run under runs_dir with a dataset.json"
       }
     },
+    "param_extraction::FitConfig": {
+      "summary": "Gaussian-fit hyperparameters and per-parameter free/frozen toggles for one profile-fitting run",
+      "fields": {
+        "threshold_factor": "profile preprocessing floor: samples below this fraction of the per-pixel profile maximum are zeroed before fitting",
+        "truncation_index": "profile preprocessing cut: height-axis samples at or above this index are zeroed before fitting",
+        "k_max": "maximum number of Gaussian components; every K from 1 to k_max is fitted and the penalised best is kept",
+        "lambda_k": "component-count regularization strength added as lambda_k * K to each K's MSE for best-K selection",
+        "prominence_frac": "peak prominence threshold for the CPU initialiser as a fraction of the per-pixel profile maximum",
+        "sigma_init_divisor": "divisor shrinking the height-span-derived base width (h_span/(8*k_max), floored at 2 bin spacings) into each Gaussian's initial sigma guess",
+        "activity_threshold": "per-pixel profile maximum below which the pixel is considered inactive and skipped by the fit",
+        "fit_sigma": "toggle freeing the Gaussian widths during the Adam fit; off masks their gradients so they stay at the initial guess",
+        "fit_amplitude": "toggle freeing the Gaussian amplitudes during the Adam fit; off masks their gradients so they stay at the initial guess",
+        "fit_mean": "toggle freeing the Gaussian mean elevations during the Adam fit; off masks their gradients so they stay at the initial guess"
+      }
+    },
     "param_extraction::FitSettings": {
       "summary": "Optimizer iteration cap and Gaussian-fit hyperparameters for one profile-fitting run",
       "fields": {
         "max_fit_iterations": "nominal iteration cap for the profile fit; not read by the Adam extractor, which uses adam_steps instead",
-        "fit_config": "FitMode.SigmaOnly sub-config with k_max, lambda_k, sigma_init_divisor, thresholds, and free-parameter flags for the fit"
+        "fit_config": "FitConfig sub-config with k_max, lambda_k, sigma_init_divisor, thresholds, and the fit_sigma/fit_amplitude/fit_mean free-parameter toggles"
       }
     },
     "param_extraction::ExtractionConfig": {
@@ -158,7 +173,7 @@
         "height_range": "reconstruction height-axis extent in meters as (min, max) applied to every plan; None reads it per-dataset from metadata",
         "fit_k_values": "list of maximum Gaussian-component counts (k_max) to sweep, one extraction plan per value",
         "fit_lambda_values": "list of component-count regularization strengths (lambda_k) to sweep, one extraction plan per value",
-        "fit_modes": "fit modes to sweep, each selecting which parameters stay free: sigma, sigma_amp, or sigma_amp_mu",
+        "fit_modes": "fit modes to sweep, each an underscore-joined composition of free parameters from sigma, amp, mu (e.g. sigma, amp_mu, sigma_amp_mu); every non-empty composition is valid",
         "fit_sigma_init_divisor": "divisor shrinking the height-span-derived base width (h_span/(8*k_max), floored at 2 bin spacings) into each Gaussian's initial sigma guess, shared across the sweep",
         "gpu_device_ids": "GPU indices pinned via EnvironmentPinner.gpus before extraction runs",
         "range_batch_size": "number of range bins loaded and fit together per batch, shared across the sweep",

@@ -699,9 +699,9 @@
         <aside class="fl-config">
           <h3 class="cube-panel-title">Fit configuration</h3>
           <div class="fl-modes" id="fl-mode" role="group" aria-label="Free parameters">
-            <button type="button" data-mode="sigma" class="is-active">&sigma; only</button>
-            <button type="button" data-mode="sigma_amp">&sigma; + amp</button>
-            <button type="button" data-mode="sigma_amp_mu">&sigma; + amp + &mu;</button>
+            <button type="button" data-comp="sigma" class="is-active" aria-pressed="true">&sigma; width</button>
+            <button type="button" data-comp="amp" aria-pressed="false">A amplitude</button>
+            <button type="button" data-comp="mu" aria-pressed="false">&mu; mean</button>
           </div>
           <div class="fl-fields">
             <label>K max<input id="fl-kmax" type="number" min="1" max="8" step="1" value="5" /></label>

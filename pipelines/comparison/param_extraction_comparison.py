@@ -23,6 +23,7 @@ class ParamTrial:
     k_max               : int
     lambda_k            : float
     sigma_init_divisor  : float
+    fit_sigma           : bool
     fit_amplitude       : bool
     fit_mean            : bool
     dataset             : str = ""
@@ -30,7 +31,7 @@ class ParamTrial:
 
     @property
     def free_per_gaussian(self) -> int:
-        return 1 + int(self.fit_amplitude) + int(self.fit_mean)
+        return int(self.fit_sigma) + int(self.fit_amplitude) + int(self.fit_mean)
 
     @property
     def label(self) -> str:
@@ -73,6 +74,7 @@ class ParamTrialCollector:
             k_max              = int(meta["k_max"]),
             lambda_k           = float(meta["lambda_k"]),
             sigma_init_divisor = float(meta["sigma_init_divisor"]),
+            fit_sigma          = bool(meta["fit_sigma"]),
             fit_amplitude      = bool(meta["fit_amplitude"]),
             fit_mean           = bool(meta["fit_mean"]),
             dataset            = self._dataset_of(tag),
@@ -253,6 +255,7 @@ class ParamComparisonReport(ComparisonReportBase):
         ("k_max",              "K"),
         ("lambda_k",           "lambda"),
         ("sigma_init_divisor", "sigma init"),
+        ("fit_sigma",          "fit sigma"),
         ("fit_amplitude",      "fit amp"),
         ("fit_mean",           "fit mean"),
     ]

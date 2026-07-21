@@ -136,6 +136,8 @@ def test_fit_request_validation(tmp_path):
     assert "outside"   in lab.start_fit({"pixels": [{"az": AZ, "rg": 0}], "config": BASE_CONFIG})["error"]
     assert "missing"   in lab.start_fit({"pixels": [{"az": 0, "rg": 0}], "config": {"k_max": 2}})["error"]
     assert "mode"      in lab.start_fit({"pixels": [{"az": 0, "rg": 0}], "config": {**BASE_CONFIG, "mode": "nope"}})["error"]
+    assert "mode"      in lab.start_fit({"pixels": [{"az": 0, "rg": 0}], "config": {**BASE_CONFIG, "mode": ""}})["error"]
+    assert "mode"      in lab.start_fit({"pixels": [{"az": 0, "rg": 0}], "config": {**BASE_CONFIG, "mode": "sigma_sigma"}})["error"]
     assert "k_max"     in lab.start_fit({"pixels": [{"az": 0, "rg": 0}], "config": {**BASE_CONFIG, "k_max": 99}})["error"]
 
     too_many = [{"az": 0, "rg": i % RG} for i in range(FitLab.MAX_PIXELS + 1)] + [{"az": 1, "rg": i % RG} for i in range(RG)]
@@ -186,3 +188,23 @@ def test_fit_modes_share_kernel(tmp_path):
     mse_sigma = sigma_only["pixels"][0]["per_k"][0]["mse"]
     mse_free  = all_free["pixels"][0]["per_k"][0]["mse"]
     assert mse_free <= mse_sigma + 1e-6
+
+
+@pytest.mark.skipif(not _HAS_JAX, reason="jax not installed in this environment")
+def test_fit_composition_freezes_sigma(tmp_path):
+    dataset = _make_dataset(tmp_path)
+    lab     = FitLab(ProjectPaths(), WebLogger())
+
+    _load(lab, dataset)
+    result = _fit(lab, {"pixels": [{"az": 3, "rg": 7}], "config": {**BASE_CONFIG, "mode": "amp_mu"}})
+
+    assert result["config"]["mode"] == "amp_mu"
+
+    h_span     = HEIGHT_RANGE[1] - HEIGHT_RANGE[0]
+    dh         = h_span / (H - 1)
+    sigma_base = max(2.0 * dh, h_span / (8.0 * BASE_CONFIG["k_max"]))
+    sigma_init = float(np.clip(sigma_base / BASE_CONFIG["sigma_init_divisor"], dh, h_span / 2.0))
+
+    for row in result["pixels"][0]["per_k"]:
+        for params in row["params"]:
+            assert params["sigma"] == pytest.approx(sigma_init, abs=1e-5)

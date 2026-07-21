@@ -146,6 +146,7 @@ class FitLabChart {
 class FitLabView {
   static DEFAULT_BASE = "/ste/rnd/User/vice_vi/Dataset";
   static MAX_PIXELS   = 24;
+  static COMPONENTS   = ["sigma", "amp", "mu"];
   static PALETTE      = ["#1d4fd8", "#b91c1c", "#0f766e", "#7c3aed", "#b45309", "#0e7490", "#be185d", "#4d7c0f"];
 
   constructor(refs) {
@@ -173,7 +174,8 @@ class FitLabView {
     });
     refs.modeWrap.querySelectorAll("button").forEach((btn) => {
       btn.addEventListener("click", () => {
-        refs.modeWrap.querySelectorAll("button").forEach((b) => b.classList.toggle("is-active", b === btn));
+        const on = btn.classList.toggle("is-active");
+        btn.setAttribute("aria-pressed", on ? "true" : "false");
       });
     });
     refs.compsWrap.querySelectorAll(".cube-space").forEach((btn) => {
@@ -375,6 +377,12 @@ class FitLabView {
     setTimeout(() => { if (this.refs.runMsg.textContent === message) this.refs.runMsg.textContent = ""; }, 4000);
   }
 
+  _readMode() {
+    const comps = FitLabView.COMPONENTS.filter((comp) => this.refs.modeWrap.querySelector(`button[data-comp="${comp}"]`).classList.contains("is-active"));
+    if (!comps.length) throw new Error("free at least one parameter");
+    return comps.join("_");
+  }
+
   _readConfig() {
     const num = (input, name, integer) => {
       const v = Number(input.value);
@@ -385,7 +393,7 @@ class FitLabView {
     return {
       k_max              : num(this.refs.kmaxInput, "K max", true),
       lambda_k           : num(this.refs.lambdaInput, "lambda"),
-      mode               : this.refs.modeWrap.querySelector("button.is-active").dataset.mode,
+      mode               : this._readMode(),
       threshold_factor   : num(this.refs.thresholdInput, "threshold factor"),
       truncation_index   : num(this.refs.truncationInput, "truncation index", true),
       prominence_frac    : num(this.refs.prominenceInput, "prominence frac"),
@@ -397,7 +405,8 @@ class FitLabView {
   }
 
   _label(config) {
-    const mode = { sigma: "σ", sigma_amp: "σ+A", sigma_amp_mu: "σ+A+μ" }[config.mode];
+    const symbols = { sigma: "σ", amp: "A", mu: "μ" };
+    const mode    = config.mode.split("_").map((comp) => symbols[comp]).join("+");
     return `K${config.k_max} λ${config.lambda_k} ${mode} thr${config.threshold_factor} σ÷${config.sigma_init_divisor} s${config.adam_steps} lr${config.adam_lr}`;
   }
 
