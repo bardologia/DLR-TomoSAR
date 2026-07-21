@@ -335,8 +335,9 @@ class StatusBoard {
       `<div><dt id="sb-impact-mine">--</dt><dd>your procs</dd></div>` +
       `<div><dt id="sb-impact-top">--</dt><dd>top ram user</dd></div>` +
       `</dl>` +
-      `<div class="impact__alarms" id="sb-impact-alarms"></div>` +
       `</section>` +
+
+      `<section class="sboard sboard--impactlog" id="sb-impact-log" aria-label="Neighbour impact alarms" hidden></section>` +
 
       `<section class="sboard sboard--users" aria-label="Active users">` +
       `<header class="sboard__cap"><span>active users</span><span class="sboard__n" id="sb-users-n">--</span></header>` +
@@ -772,8 +773,8 @@ class StatusBoard {
             : "No contention: other users are not being slowed by your jobs.";
     }
 
-    const alarmBox = document.getElementById("sb-impact-alarms");
-    if (alarmBox) {
+    const logBox = document.getElementById("sb-impact-log");
+    if (logBox) {
       const cards = active.map((a) =>
         `<div class="impact__alarm impact__alarm--${a.level === "danger" ? "danger" : "warn"}${a.mine ? " is-mine" : ""}">` +
         `<span class="impact__alarm-tag">${a.mine ? "you" : "others"} &middot; ${this._esc(a.kind)}</span>` +
@@ -784,7 +785,11 @@ class StatusBoard {
         `<span class="impact__alarm-tag">${this._esc(e.time.replace("T", " "))} &middot; ${this._esc(e.kind)}</span>` +
         `<span class="impact__alarm-msg">${this._esc(e.message)}</span></div>`
       ).join("");
-      alarmBox.innerHTML = cards + events;
+      const content = cards + events;
+      logBox.hidden = !content;
+      logBox.innerHTML = content
+        ? `<header class="sboard__cap"><span>neighbour impact &middot; alarms &amp; history</span><span class="sboard__n">${active.length} active</span></header><div class="impact__alarmgrid">${content}</div>`
+        : "";
     }
 
     const banner = document.getElementById("sb-impact-banner");

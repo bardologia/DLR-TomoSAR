@@ -322,7 +322,7 @@ main { margin-left: var(--navw); }
 .sboard--gpuguard { grid-column: span 12; }
 
 @media (max-width: 980px) {
-  .sboard--impact, .sboard--users, .sboard--procs, .sboard--jobs, .sboard--gpuguard { grid-column: 1 / -1; }
+  .sboard--impact, .sboard--impactlog, .sboard--users, .sboard--procs, .sboard--jobs, .sboard--gpuguard { grid-column: 1 / -1; }
   .sboard--mem, .sboard--disk { grid-column: span 6; }
 }
 @media (max-width: 640px) {
@@ -792,8 +792,8 @@ main { margin-left: var(--navw); }
 .impact__stats dt b { font-weight: 600; }
 .impact__stats dd { margin: 2px 0 0; font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dk-faint); }
 
-.impact__alarms { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
-.impact__alarms:empty { display: none; }
+.sboard--impactlog { grid-column: span 12; }
+.impact__alarmgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 8px; }
 .impact__alarm {
   display: flex; flex-direction: column; gap: 3px;
   font-family: var(--mono); font-size: 11px; line-height: 1.45;
