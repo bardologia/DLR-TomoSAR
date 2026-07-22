@@ -46,6 +46,8 @@ class InferenceQueueConfig:
     save_cubes      : bool = False
     stitch_window   : str  = "hann"
 
+    compute_reduced : bool = True
+
     n_best_profiles   : int = 12
     n_worst_profiles  : int = 12
     n_random_profiles : int = 12

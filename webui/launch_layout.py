@@ -306,6 +306,7 @@ class LaunchLayout:
                 {"path": "cpu_workers", "widget": NUM_WORKERS},
             ]},
             {"title": "Artifacts", "fields": ["save_plots", "save_animations", "save_cubes", "stitch_window"]},
+            {"title": "Reduced baseline", "fields": ["compute_reduced"]},
             {"title": "Profile picks", "fields": ["n_best_profiles", "n_worst_profiles", "n_random_profiles"]},
             {"title": "Slices", "fields": ["n_range_slices", "n_azimuth_slices", "n_elevation_slices"]},
             {"title": "GIFs", "fields": ["gif_axes", "gif_fps", "gif_max_frames"]},
