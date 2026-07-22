@@ -78,10 +78,10 @@ def _trainer_config(test_data_dir, params_dir, tmp_path) -> BackboneTrainerConfi
 def _model_config():
     config = DUAL_CONFIG_REGISTRY["dual_resunet"]()
 
-    config.params_features    = [8, 16]
-    config.existence_features = [8]
-    config.bottleneck_factor  = 1
-    config.dropout            = 0.0
+    config.params_features     = [8, 16]
+    config.existence_features  = [8]
+    config.params_overrides    = {"bottleneck_factor": 1, "dropout": 0.0}
+    config.existence_overrides = {"bottleneck_factor": 1, "dropout": 0.0}
 
     return config
 

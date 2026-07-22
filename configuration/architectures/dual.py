@@ -19,12 +19,9 @@ class DualResUNetConfig:
     existence_channels  : tuple     = (5, 6, 7, 8)
     params_features     : list[int] = field(default_factory=lambda: [64, 128, 256])
     existence_features  : list[int] = field(default_factory=lambda: [64, 128])
-    bottleneck_factor   : int       = 2
-    dropout             : float     = 0.15
-    activation          : str       = "relu"
-    normalization       : str       = "batch"
-    upsample_mode       : str       = "convtranspose"
-    conv_bias           : bool      = False
+    params_overrides    : dict      = field(default_factory=dict)
+    existence_overrides : dict      = field(default_factory=dict)
+    head_activation     : str       = "relu"
     init_mode           : str       = "default"
 
     params_trunk_lr    : float = 3e-4
@@ -50,7 +47,6 @@ class DualResUNetConfig:
             "params_trunk_wd"    : {"type": "float", "low": 1e-6, "high": 1e-1, "log": True},
             "existence_trunk_wd" : {"type": "float", "low": 1e-6, "high": 1e-1, "log": True},
             "output_head_wd"     : {"type": "float", "low": 1e-6, "high": 1e-1, "log": True},
-            "dropout"            : {"type": "float", "low": 0.0, "high": 0.5},
         }
 
     @classmethod
@@ -60,10 +56,6 @@ class DualResUNetConfig:
             "existence_backbone" : {"type": "categorical",         "choices": ["resunet", "unet_skip", "unet"]},
             "params_features"    : {"type": "indexed_categorical", "choices": [[32, 64, 128], [64, 128, 256], [48, 96, 192]]},
             "existence_features" : {"type": "indexed_categorical", "choices": [[32, 64], [64, 128], [48, 96]]},
-            "bottleneck_factor" : {"type": "categorical",         "choices": [1, 2, 4]},
-            "activation"        : {"type": "categorical",         "choices": ["relu", "leaky_relu", "gelu", "silu"]},
-            "normalization"     : {"type": "categorical",         "choices": ["batch", "instance", "group"]},
-            "upsample_mode"     : {"type": "categorical",         "choices": ["convtranspose", "bilinear"]},
         }
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:

@@ -4,6 +4,7 @@ from configuration.architectures import DualResUNetConfig
 from models.dual import get_dual
 from pipelines.backbone.training.pipeline       import TrainingPipeline
 from pipelines.shared.config.config_persistence import DualModelConfigIO
+from pipelines.shared.model.model_builder       import ModelBuilder
 
 
 class TrunkChannelMap:
@@ -45,9 +46,11 @@ class DualTrainingPipeline(TrainingPipeline):
         if input_config.use_dem:
             raise ValueError("The dual model never uses the DEM channel; disable input.use_dem")
 
-        overrides                       = super()._model_overrides(in_channels, out_channels)
-        overrides["params_channels"]    = TrunkChannelMap.resolve(input_config, in_channels, model_config.params_input)
-        overrides["existence_channels"] = TrunkChannelMap.resolve(input_config, in_channels, model_config.existence_input)
+        overrides                        = super()._model_overrides(in_channels, out_channels)
+        overrides["params_channels"]     = TrunkChannelMap.resolve(input_config, in_channels, model_config.params_input)
+        overrides["existence_channels"]  = TrunkChannelMap.resolve(input_config, in_channels, model_config.existence_input)
+        overrides["params_overrides"]    = {**model_config.params_overrides,    **ModelBuilder.image_size_override(model_config.params_backbone,    self.patch_size)}
+        overrides["existence_overrides"] = {**model_config.existence_overrides, **ModelBuilder.image_size_override(model_config.existence_backbone, self.patch_size)}
 
         return overrides
 

@@ -3,15 +3,14 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.architectures import DualResUNetConfig, ResUNetConfig
-from ..backbone.resunet          import ResUNetBackbone
-from ..backbone.unet             import UNetBackbone
+from configuration.architectures import DualResUNetConfig
+from ..backbone                  import BACKBONE_CONFIG_REGISTRY, BACKBONE_MODEL_REGISTRY
 from ..blocks                    import OutputHeadsMixin, PixelMLP, initialize_weights
 
 
 class DualResUNet(nn.Module, OutputHeadsMixin):
 
-    TRUNKS = ("resunet", "unet_skip", "unet")
+    RESERVED_TRUNK_FIELDS = ("in_channels", "out_channels", "params_per_gaussian", "head", "init_mode", "features")
 
     def __init__(self, config: DualResUNetConfig | None = None):
         super().__init__()
@@ -19,8 +18,8 @@ class DualResUNet(nn.Module, OutputHeadsMixin):
 
         self._validate()
 
-        self.trunk_params    = self._build_trunk(self.config.params_backbone,    self.config.params_channels,    self.config.params_features)
-        self.trunk_existence = self._build_trunk(self.config.existence_backbone, self.config.existence_channels, self.config.existence_features)
+        self.trunk_params    = self._build_trunk("params_backbone",    self.config.params_backbone,    self.config.params_channels,    self.config.params_features,    self.config.params_overrides)
+        self.trunk_existence = self._build_trunk("existence_backbone", self.config.existence_backbone, self.config.existence_channels, self.config.existence_features, self.config.existence_overrides)
 
         self.embedding_channels = self.trunk_params.embedding_channels
         self._build_output_head()
@@ -37,8 +36,8 @@ class DualResUNet(nn.Module, OutputHeadsMixin):
             raise ValueError(f"DualResUNet only supports the set_pred head; got '{config.head}'")
 
         for name, backbone in (("params_backbone", config.params_backbone), ("existence_backbone", config.existence_backbone)):
-            if backbone not in self.TRUNKS:
-                raise ValueError(f"Unknown {name} '{backbone}'. Available: {list(self.TRUNKS)}")
+            if backbone not in BACKBONE_MODEL_REGISTRY:
+                raise ValueError(f"Unknown {name} '{backbone}'. Available: {list(BACKBONE_MODEL_REGISTRY)}")
 
         for name, channels in (("params_channels", config.params_channels), ("existence_channels", config.existence_channels)):
             if len(channels) == 0:
@@ -46,29 +45,31 @@ class DualResUNet(nn.Module, OutputHeadsMixin):
             if any(index < 0 or index >= config.in_channels for index in channels):
                 raise ValueError(f"{name} {tuple(channels)} out of range for in_channels={config.in_channels}")
 
-    def _build_trunk(self, backbone: str, channels: tuple, features: list[int]):
-        trunk_config = self._trunk_config(len(channels), features)
-
-        if backbone == "unet":
-            return UNetBackbone(trunk_config)
-
-        return ResUNetBackbone(trunk_config, downsample="stride" if backbone == "resunet" else "maxpool")
-
-    def _trunk_config(self, in_channels: int, features: list[int]) -> ResUNetConfig:
-        return ResUNetConfig(
-            in_channels         = in_channels,
+    def _build_trunk(self, arm: str, backbone: str, channels: tuple, features: list[int], overrides: dict):
+        trunk_config = BACKBONE_CONFIG_REGISTRY[backbone](
+            in_channels         = len(channels),
             out_channels        = self.config.out_channels,
             params_per_gaussian = self.config.params_per_gaussian,
-            head                = self.config.head,
-            features            = list(features),
-            bottleneck_factor   = self.config.bottleneck_factor,
-            dropout             = self.config.dropout,
-            activation          = self.config.activation,
-            normalization       = self.config.normalization,
-            upsample_mode       = self.config.upsample_mode,
-            conv_bias           = self.config.conv_bias,
+            head                = "none",
             init_mode           = self.config.init_mode,
         )
+
+        if features:
+            if not hasattr(trunk_config, "features"):
+                raise ValueError(f"{arm} '{backbone}' has no 'features' ladder; clear the {arm.replace('_backbone', '_features')} list ([]) and size the trunk via its overrides instead")
+            trunk_config.features = list(features)
+
+        for attribute, value in overrides.items():
+            if attribute in self.RESERVED_TRUNK_FIELDS:
+                raise ValueError(f"Trunk override '{attribute}' for {arm} is set by the dual model itself; use the dedicated dual config fields")
+            if not hasattr(trunk_config, attribute):
+                raise AttributeError(f"Unknown trunk override '{attribute}' for {type(trunk_config).__name__}")
+            setattr(trunk_config, attribute, value)
+
+        return BACKBONE_MODEL_REGISTRY[backbone](trunk_config)
+
+    def _head_activation(self) -> str:
+        return self.config.head_activation
 
     def _build_set_prediction_heads(self) -> None:
         self._build_per_gaussian_heads()

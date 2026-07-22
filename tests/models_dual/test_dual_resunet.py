@@ -3,6 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
+from models.backbone.nafnet  import NAFNet
 from models.backbone.resunet import ResUNetBackbone
 from models.backbone.unet    import UNetBackbone
 from models.dual import DUAL_MODEL_REGISTRY, get_dual
@@ -12,13 +13,13 @@ WINDOW = 32
 BATCH  = 2
 
 OVERRIDES = {
-    "in_channels"        : 5,
-    "params_channels"    : (0, 1, 2, 3, 4),
-    "existence_channels" : (3, 4),
-    "params_features"    : [8, 16],
-    "existence_features" : [8],
-    "bottleneck_factor"  : 1,
-    "dropout"            : 0.0,
+    "in_channels"         : 5,
+    "params_channels"     : (0, 1, 2, 3, 4),
+    "existence_channels"  : (3, 4),
+    "params_features"     : [8, 16],
+    "existence_features"  : [8],
+    "params_overrides"    : {"bottleneck_factor": 1, "dropout": 0.0},
+    "existence_overrides" : {"bottleneck_factor": 1, "dropout": 0.0},
 }
 
 
@@ -197,9 +198,46 @@ def test_param_groups_cover_every_parameter_exactly_once():
     assert set(grouped) == set(every)
 
 
+def test_any_zoo_backbone_is_a_valid_trunk():
+    small_nafnet = {"width": 8, "enc_blocks": [1, 1], "middle_blocks": 1, "dec_blocks": [1, 1]}
+    model, config = _build(existence_backbone="nafnet", existence_features=[], existence_overrides=small_nafnet)
+
+    assert isinstance(model.trunk_existence, NAFNet)
+    assert model.trunk_existence.embedding_channels == 8
+
+    with torch.no_grad():
+        out = model(torch.randn(BATCH, config.in_channels, WINDOW, WINDOW))
+
+    assert out.shape == (BATCH, config.out_channels, WINDOW, WINDOW)
+
+
+def test_zoo_trunks_carry_no_head_parameters():
+    model, _ = _build()
+
+    trunk_keys = [name for name, _ in model.trunk_params.named_parameters()]
+
+    assert all(not key.startswith(("output_head", "gaussian_heads", "existence_head", "head_")) for key in trunk_keys)
+    assert model.trunk_params.head_parameters() == []
+
+
+def test_featureless_trunk_rejects_a_features_ladder():
+    with pytest.raises(ValueError, match="no 'features' ladder"):
+        _build(existence_backbone="nafnet", existence_features=[8])
+
+
+def test_reserved_trunk_override_rejected():
+    with pytest.raises(ValueError, match="set by the dual model itself"):
+        _build(params_overrides={"features": [8, 16]})
+
+
+def test_unknown_trunk_override_rejected():
+    with pytest.raises(AttributeError, match="Unknown trunk override"):
+        _build(params_overrides={"bottleneck_factor": 1, "no_such_field": 1})
+
+
 def test_unknown_trunk_backbone_rejected():
     with pytest.raises(ValueError, match="params_backbone"):
-        _build(params_backbone="swin_unet")
+        _build(params_backbone="resnet_trunk")
 
 
 def test_empty_trunk_channels_rejected():

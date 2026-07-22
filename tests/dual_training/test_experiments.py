@@ -74,8 +74,8 @@ def test_dual_input_planner_fixes_half_width_trunks_on_every_trial():
 
 
 def test_dual_input_planner_merges_entry_model_overrides():
-    for _, overrides in _planner(model_overrides={"dropout": 0.3}).plan():
-        assert overrides["model_overrides"]["dropout"]         == 0.3
+    for _, overrides in _planner(model_overrides={"head_activation": "gelu"}).plan():
+        assert overrides["model_overrides"]["head_activation"] == "gelu"
         assert overrides["model_overrides"]["params_features"] == PARITY_FEATURES
 
 
@@ -157,9 +157,9 @@ def test_dual_ratio_planner_emits_ladder_overrides_and_leaves_inputs_alone():
 
 
 def test_dual_ratio_planner_merges_entry_model_overrides():
-    _, overrides = _ratio_planner(model_overrides={"dropout": 0.3}).plan()[0]
+    _, overrides = _ratio_planner(model_overrides={"head_activation": "gelu"}).plan()[0]
 
-    assert overrides["model_overrides"]["dropout"]         == 0.3
+    assert overrides["model_overrides"]["head_activation"] == "gelu"
     assert overrides["model_overrides"]["params_features"] == TINY_LADDER
 
 
@@ -243,6 +243,30 @@ def test_dual_ratio_default_catalog_holds_the_parity_budget_at_every_split():
     for spec in _default_dual_ratio_trials().values():
         assert len(spec["params"])    == 4
         assert len(spec["existence"]) == 4
+
+
+def test_dual_single_runner_builds_the_model_config_with_trunk_fields():
+    config                     = DualEntryConfig()
+    config.params_backbone     = "nafnet"
+    config.params_overrides    = {"width": 8}
+    config.existence_overrides = {"dropout": 0.1}
+    config.model_overrides     = {"params_features": [], "head_activation": "gelu"}
+
+    model_config = dual_launcher.DualSingleTrainRunner(config)._model_config()
+
+    assert model_config.params_backbone     == "nafnet"
+    assert model_config.params_overrides    == {"width": 8}
+    assert model_config.existence_overrides == {"dropout": 0.1}
+    assert model_config.params_features     == []
+    assert model_config.head_activation     == "gelu"
+
+
+def test_dual_single_runner_rejects_trunk_fields_in_model_overrides():
+    config                 = DualEntryConfig()
+    config.model_overrides = {"params_overrides": {"width": 8}}
+
+    with pytest.raises(ValueError, match="dedicated entry fields"):
+        dual_launcher.DualSingleTrainRunner(config)._model_config()
 
 
 def test_dual_scheduler_houses_runs_in_input_dir(tmp_path):

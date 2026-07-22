@@ -29,10 +29,12 @@ class DualSingleTrainRunner(SingleTrainRunner):
 
     def _model_config(self):
         trunk_overrides = {
-            "params_backbone"    : self.config.params_backbone,
-            "existence_backbone" : self.config.existence_backbone,
-            "params_input"       : tuple(self.config.params_input),
-            "existence_input"    : tuple(self.config.existence_input),
+            "params_backbone"     : self.config.params_backbone,
+            "existence_backbone"  : self.config.existence_backbone,
+            "params_input"        : tuple(self.config.params_input),
+            "existence_input"     : tuple(self.config.existence_input),
+            "params_overrides"    : dict(self.config.params_overrides),
+            "existence_overrides" : dict(self.config.existence_overrides),
         }
 
         duplicated = [key for key in trunk_overrides if key in self.config.model_overrides]
@@ -87,7 +89,7 @@ class DualTrainingLauncher:
     def run(self, argv: list[str] | None = None) -> None:
         argv = list(sys.argv[1:] if argv is None else argv)
 
-        cli    = ConfigCli(DualEntryConfig(), description="Train the dual-input ResUNet set-prediction model (a full-stack trunk feeds the gaussian heads while an interferogram-only trunk feeds the existence gate), or fan out trunk-input trials across GPUs")
+        cli    = ConfigCli(DualEntryConfig(), description="Train the dual-trunk set-prediction model (a full-stack trunk feeds the gaussian heads while an interferogram-only trunk feeds the existence gate; each trunk is any backbone-zoo architecture), or fan out trunk trials across GPUs")
         config = cli.apply(argv)
 
         CurriculumInheritance(config.curriculum, dual_curriculum(), cli.overrides).apply()

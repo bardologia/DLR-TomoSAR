@@ -13,12 +13,12 @@ from pipelines.shared.config.config_persistence import DualModelConfigIO
 WINDOW = 32
 
 SMALL_OVERRIDES = {
-    "params_features"    : [8, 16],
-    "existence_features" : [8],
-    "bottleneck_factor"  : 1,
-    "dropout"            : 0.0,
-    "params_channels"    : (0, 1, 2, 3, 4),
-    "existence_channels" : (3, 4),
+    "params_features"     : [8, 16],
+    "existence_features"  : [8],
+    "params_overrides"    : {"bottleneck_factor": 1, "dropout": 0.0},
+    "existence_overrides" : {"bottleneck_factor": 1, "dropout": 0.0},
+    "params_channels"     : (0, 1, 2, 3, 4),
+    "existence_channels"  : (3, 4),
 }
 
 

@@ -77,10 +77,12 @@ class DualEntryConfig:
     logdir          : Path       = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/dual")
     model_overrides : dict       = field(default_factory=dict)
 
-    params_backbone    : str       = "resunet"
-    existence_backbone : str       = "resunet"
-    params_input       : list[str] = field(default_factory=lambda: ["pass", "ifg"])
-    existence_input    : list[str] = field(default_factory=lambda: ["ifg"])
+    params_backbone     : str       = "resunet"
+    existence_backbone  : str       = "resunet"
+    params_input        : list[str] = field(default_factory=lambda: ["pass", "ifg"])
+    existence_input     : list[str] = field(default_factory=lambda: ["ifg"])
+    params_overrides    : dict      = field(default_factory=dict)
+    existence_overrides : dict      = field(default_factory=dict)
 
     paths         : TrainingPathsConfig  = field(default_factory=TrainingPathsConfig)
     training      : TrainingQueueConfig  = field(default_factory=TrainingQueueConfig)
