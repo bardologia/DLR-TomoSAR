@@ -2269,7 +2269,7 @@
       "fields": {
         "run_name": "Optional suffix appended to the canonical run name; every run directory is named model_head_matching_loss with this label (or a timestamp) appended",
         "resume": "Reuse this run directory when it already holds a completed run (complete.json marker stamped only at successful completion), rerunning inference only if it is missing; an unfinished run directory is deleted and restarted from scratch. Lets interrupted trials sweeps and seed sweeps continue without retraining finished units (distinct from training.resume, which continues one run mid-training from its last.pt and suppresses the delete)",
-        "model_name": "Dual-family model key looked up in the dual registry, default dual_resunet",
+        "model_name": "Dual-family model key looked up in the dual registry; the registry holds only dual_resunet, so the field stays at its default and is not shown on the launch page (the trunk backbones are the architecture selection)",
         "gpu": "Primary GPU device index on which a single run executes",
         "seed": "Base random seed for a single training run, controlling weight init, shuffling, and augmentation",
         "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested as seed<N> inside the base run directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",

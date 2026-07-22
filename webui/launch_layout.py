@@ -649,7 +649,7 @@ class LaunchLayout:
             "sections": [
                 {"key": "model", "title": "Model", "panels": [
                     {"kind": "fields", "groups": [
-                        {"title": "Dual model", "fields": ["model_name", "model_overrides"]},
+                        {"title": "Architecture overrides", "fields": ["model_overrides"]},
                         {"title": "Parameter trunk (gaussian heads)", "fields": [
                             {"path": "params_backbone", "widget": CH_TRUNK},
                             {"path": "params_input",    "widget": MULTI_TRUNK_INPUT},
@@ -661,6 +661,7 @@ class LaunchLayout:
                             "existence_overrides",
                         ]},
                     ]},
+                    {"kind": "hidden", "fields": ["model_name"]},
                 ]},
                 {"key": "data", "title": "Data", "panels": [
                     {"kind": "fields", "title": "Paths", "template": "paths_train", "at": "paths"},
