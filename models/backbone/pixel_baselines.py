@@ -31,8 +31,11 @@ class PixelMLPNet(nn.Module, OutputHeadsMixin):
 
         initialize_weights(module=self, mode=self.config.init_mode)
 
+    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
+        return self.trunk(x)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self._head_forward(self.trunk(x))
+        return self._head_forward(self.encode_decode(x))
 
 
 class LocalCNN(nn.Module, OutputHeadsMixin):
@@ -69,5 +72,8 @@ class LocalCNN(nn.Module, OutputHeadsMixin):
 
         initialize_weights(module=self, mode=self.config.init_mode)
 
+    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
+        return self.trunk(x)
+
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self._head_forward(self.trunk(x))
+        return self._head_forward(self.encode_decode(x))

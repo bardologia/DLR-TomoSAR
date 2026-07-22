@@ -131,7 +131,7 @@ class DeepLabV3Plus(nn.Module, OutputHeadsMixin):
 
         initialize_weights(module=self, mode=config.init_mode)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
         input_size = x.shape[2:]
 
         x         = self.stem(x)
@@ -149,6 +149,7 @@ class DeepLabV3Plus(nn.Module, OutputHeadsMixin):
 
         x = torch.cat([x, low_level], dim=1)
         x = self.decoder_blocks(x)
-        x = functional.interpolate(x, size=input_size, mode="bilinear", align_corners=False)
+        return functional.interpolate(x, size=input_size, mode="bilinear", align_corners=False)
 
-        return self._head_forward(x)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self._head_forward(self.encode_decode(x))

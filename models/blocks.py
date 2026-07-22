@@ -300,7 +300,7 @@ class PixelMLP(nn.Module):
 
 
 class OutputHeadsMixin:
-    HEADS                 : tuple = ("conv", "multihead", "per_gaussian", "set_pred")
+    HEADS                 : tuple = ("none", "conv", "multihead", "per_gaussian", "set_pred")
     conv_head_kernel_size : int   = 1
 
     def _resolve_gaussian_layout(self) -> None:
@@ -372,6 +372,9 @@ class OutputHeadsMixin:
         if head not in self.HEADS:
             raise ValueError(f"Unknown head '{head}'. Available: {list(self.HEADS)}")
 
+        if head == "none":
+            return
+
         self.hidden_channels = max(self.embedding_channels // 2, 16)
 
         if head == "conv":
@@ -388,6 +391,8 @@ class OutputHeadsMixin:
 
     def _head_forward(self, embedding: torch.Tensor) -> torch.Tensor:
         head = self.config.head
+        if head == "none":
+            return embedding
         if head == "conv":
             return self.output_head(embedding)
         if head == "multihead":
@@ -398,6 +403,8 @@ class OutputHeadsMixin:
 
     def head_parameters(self) -> list:
         head = self.config.head
+        if head == "none":
+            return []
         if head == "conv":
             return list(self.output_head.parameters())
         if head == "multihead":

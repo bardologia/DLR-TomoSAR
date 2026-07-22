@@ -102,7 +102,7 @@ class DenseUNet(nn.Module, OutputHeadsMixin):
 
         initialize_weights(module=self, mode=config.init_mode)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
         x = self.stem(x)
 
         skip_connections: list[torch.Tensor] = []
@@ -120,4 +120,7 @@ class DenseUNet(nn.Module, OutputHeadsMixin):
             x = torch.cat([x, skip], dim=1)
             x = block(x)
 
-        return self._head_forward(x)
+        return x
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self._head_forward(self.encode_decode(x))

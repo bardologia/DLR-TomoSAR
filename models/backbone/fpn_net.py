@@ -89,7 +89,7 @@ class FPNNet(nn.Module, OutputHeadsMixin):
 
         initialize_weights(module=self, mode=config.init_mode)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
         encoder_outputs = []
         for downsample, encoder_block in zip(self.downsample_layers, self.encoder_blocks):
             x = downsample(x)
@@ -114,5 +114,7 @@ class FPNNet(nn.Module, OutputHeadsMixin):
 
             fused = out if fused is None else fused + out
 
-        x = self.fuse_block(fused)
-        return self._head_forward(x)
+        return self.fuse_block(fused)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self._head_forward(self.encode_decode(x))

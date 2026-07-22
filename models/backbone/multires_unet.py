@@ -111,7 +111,7 @@ class MultiResUNet(nn.Module, OutputHeadsMixin):
 
         initialize_weights(module=self, mode=config.init_mode)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
         skip_connections: list[torch.Tensor] = []
         for encoder_block, downsample, res_path in zip(self.encoder_blocks, self.downsample_layers, self.res_paths):
             x = encoder_block(x)
@@ -126,4 +126,7 @@ class MultiResUNet(nn.Module, OutputHeadsMixin):
             x = torch.cat([skip, x], dim=1)
             x = decoder_block(x)
 
-        return self._head_forward(x)
+        return x
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self._head_forward(self.encode_decode(x))

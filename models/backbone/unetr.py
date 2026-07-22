@@ -190,7 +190,7 @@ class UNETR(nn.Module, OutputHeadsMixin):
 
         initialize_weights(module=self, mode=config.init_mode)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
         original_input = x
 
         tokens, grid_height, grid_width = self.patch_embedding(x)
@@ -223,7 +223,8 @@ class UNETR(nn.Module, OutputHeadsMixin):
             x = torch.cat([x, skip], dim=1)
             x = self.decoder_blocks[index](x)
 
-        x   = self.final_upsample(x)
-        x   = match_spatial_size(source=x, reference=original_input)
-        out = self._head_forward(x)
-        return out
+        x = self.final_upsample(x)
+        return match_spatial_size(source=x, reference=original_input)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self._head_forward(self.encode_decode(x))

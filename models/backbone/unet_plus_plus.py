@@ -66,7 +66,7 @@ class UNetPlusPlus(nn.Module, OutputHeadsMixin):
             upsampled = self.upsample(source)
         return match_spatial_size(source=upsampled, reference=reference)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
         node_0_0 = self.encoder_0_0(x)
         node_1_0 = self.encoder_1_0(self.pool(node_0_0))
         node_2_0 = self.encoder_2_0(self.pool(node_1_0))
@@ -97,5 +97,7 @@ class UNetPlusPlus(nn.Module, OutputHeadsMixin):
         up_1_3   = self._upsample_and_match(source=node_1_3, reference=node_0_0)
         node_0_4 = self.dense_0_4(torch.cat([node_0_0, node_0_1, node_0_2, node_0_3, up_1_3], dim=1))
 
-        out = self._head_forward(node_0_4)
-        return out
+        return node_0_4
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self._head_forward(self.encode_decode(x))

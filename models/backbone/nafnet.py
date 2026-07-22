@@ -109,7 +109,7 @@ class NAFNet(nn.Module, OutputHeadsMixin):
     def _stage(self, channels: int, n_blocks: int) -> nn.Sequential:
         return nn.Sequential(*[NAFBlock(channels, self.config.dw_expand, self.config.ffn_expand, self.config.dropout) for _ in range(n_blocks)])
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
         x = self.intro(x)
 
         skip_connections = []
@@ -126,4 +126,7 @@ class NAFNet(nn.Module, OutputHeadsMixin):
             x = x + skip
             x = stage(x)
 
-        return self._head_forward(x)
+        return x
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self._head_forward(self.encode_decode(x))

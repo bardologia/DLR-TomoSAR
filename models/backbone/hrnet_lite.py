@@ -129,7 +129,7 @@ class HRNetLite(nn.Module, OutputHeadsMixin):
 
         initialize_weights(module=self, mode=config.init_mode)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
         branches = [self.stem(x)]
 
         for transition, branch_blocks, fusion in zip(self.transition_modules, self.stage_modules, self.fuse_modules):
@@ -142,5 +142,7 @@ class HRNetLite(nn.Module, OutputHeadsMixin):
         for branch in branches[1:]:
             upsampled.append(functional.interpolate(branch, size=target_size, mode="bilinear", align_corners=False))
 
-        x = self.final_fuse(torch.cat(upsampled, dim=1))
-        return self._head_forward(x)
+        return self.final_fuse(torch.cat(upsampled, dim=1))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self._head_forward(self.encode_decode(x))

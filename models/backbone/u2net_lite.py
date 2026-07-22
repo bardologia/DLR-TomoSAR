@@ -136,7 +136,7 @@ class U2NetLite(nn.Module, OutputHeadsMixin):
 
         initialize_weights(module=self, mode=config.init_mode)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
         encoder_outputs = []
         for stage in self.encoder_stages:
             x = stage(x)
@@ -149,5 +149,7 @@ class U2NetLite(nn.Module, OutputHeadsMixin):
             x = functional.interpolate(x, size=skip.shape[2:], mode="bilinear", align_corners=False)
             x = stage(torch.cat([x, skip], dim=1))
 
-        x = self.dropout(x)
-        return self._head_forward(x)
+        return self.dropout(x)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self._head_forward(self.encode_decode(x))

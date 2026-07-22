@@ -387,7 +387,7 @@ class SwinUNet(nn.Module, OutputHeadsMixin):
     def _head_activation(self) -> str:
         return self.config.ffn_activation
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
         original_input = x
         x = self.patch_embed(x)
         batch_size, channels, grid_height, grid_width = x.shape
@@ -425,6 +425,7 @@ class SwinUNet(nn.Module, OutputHeadsMixin):
 
         feature_map = tokens_to_feature_map(x, height, width)
         feature_map = self.final_upsample(feature_map)
-        feature_map = match_spatial_size(source=feature_map, reference=original_input)
-        out         = self._head_forward(feature_map)
-        return out
+        return match_spatial_size(source=feature_map, reference=original_input)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self._head_forward(self.encode_decode(x))

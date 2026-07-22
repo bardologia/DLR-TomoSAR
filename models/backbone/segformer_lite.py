@@ -160,9 +160,7 @@ class SegFormerLite(nn.Module, OutputHeadsMixin):
     def _head_activation(self) -> str:
         return self.config.ffn_activation
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        input_size = x.shape[2:]
-
+    def _fused_embedding(self, x: torch.Tensor) -> torch.Tensor:
         stage_outputs = []
         for patch_embedding, stage in zip(self.patch_embeddings, self.encoder_stages):
             x, h, w = patch_embedding(x)
@@ -178,8 +176,14 @@ class SegFormerLite(nn.Module, OutputHeadsMixin):
                 features = functional.interpolate(features, size=target_size, mode="bilinear", align_corners=False)
             fused.append(features)
 
-        x = self.fuse(torch.cat(fused, dim=1))
-        x = self._head_forward(x)
-        x = functional.interpolate(x, size=input_size, mode="bilinear", align_corners=False)
+        return self.fuse(torch.cat(fused, dim=1))
 
-        return x
+    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
+        input_size = x.shape[2:]
+        embedding  = self._fused_embedding(x)
+        return functional.interpolate(embedding, size=input_size, mode="bilinear", align_corners=False)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        input_size = x.shape[2:]
+        out        = self._head_forward(self._fused_embedding(x))
+        return functional.interpolate(out, size=input_size, mode="bilinear", align_corners=False)

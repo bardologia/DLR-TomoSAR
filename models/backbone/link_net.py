@@ -177,7 +177,7 @@ class LinkNet(nn.Module, OutputHeadsMixin):
 
         initialize_weights(module=self, mode=config.init_mode)
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
         original_input = x
         x = self.initial_conv(x)
 
@@ -198,6 +198,7 @@ class LinkNet(nn.Module, OutputHeadsMixin):
             else:
                 x = decoded
 
-        x   = match_spatial_size(source=x, reference=original_input)
-        out = self._head_forward(x)
-        return out
+        return match_spatial_size(source=x, reference=original_input)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self._head_forward(self.encode_decode(x))

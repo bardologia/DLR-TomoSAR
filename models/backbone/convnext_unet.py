@@ -79,7 +79,7 @@ class ConvNeXtUNet(nn.Module, OutputHeadsMixin):
     def _head_activation(self) -> str:
         return self.config.ffn_activation
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def encode_decode(self, x: torch.Tensor) -> torch.Tensor:
         x = self.stem(x)
 
         skip_connections: list[torch.Tensor] = []
@@ -96,4 +96,7 @@ class ConvNeXtUNet(nn.Module, OutputHeadsMixin):
             x = torch.cat([skip, x], dim=1)
             x = stage(x)
 
-        return self._head_forward(x)
+        return x
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self._head_forward(self.encode_decode(x))
