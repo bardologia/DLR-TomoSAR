@@ -869,26 +869,23 @@
       }
     },
     "architectures/dual::DualResUNetConfig": {
-      "summary": "Dual-input ResUNet with a split set-prediction head: a full-stack ResUNet trunk feeds the per-gaussian parameter heads while a second trunk that sees only the interferogram channels feeds the sigmoid existence gate, so component presence is judged from interferometric phase alone",
+      "summary": "Dual-trunk set-prediction model: a full-stack trunk feeds the per-gaussian parameter heads while a second trunk that sees only its selected channel groups feeds the sigmoid existence gate; each trunk is any headless encode-decode architecture from the backbone zoo, configured through its own config class",
       "fields": {
         "in_channels": "Number of input feature-map channels fed to the parameter trunk, overridden at build time by the dataset's assembled channel count (primary + secondaries + interferograms + DEM)",
         "out_channels": "Number of output channels, equal to n_gaussians x params_per_gaussian and required to be divisible by params_per_gaussian",
         "params_per_gaussian": "Number of predicted parameters per Gaussian component (amplitude, mean, sigma = 3); out_channels must be an exact multiple of it",
         "head": "Fixed to set_pred: the model exists to split the set-prediction head across two trunks and rejects any other head",
-        "params_backbone": "Trunk architecture of the full-input parameter branch: resunet (strided residual), unet_skip (maxpool residual), or unet (classic conv encoder-decoder); all three are headless encode-decode trunks from the backbone zoo",
-        "existence_backbone": "Trunk architecture of the existence branch: resunet (strided residual), unet_skip (maxpool residual), or unet (classic conv encoder-decoder)",
+        "params_backbone": "Trunk architecture of the full-input parameter branch, any key of the backbone model registry (unet, resunet, unet_skip, attention_unet, unetplusplus, linknet, swin_unet, transunet, unetr, deeplabv3plus, segformer, convnext_unet, dense_unet, hrnet, multires_unet, fpn, u2net, pixel_mlp, local_cnn, nafnet); the trunk is built headless (head none) from that architecture's own config class",
+        "existence_backbone": "Trunk architecture of the existence branch, any key of the backbone model registry; built headless from that architecture's own config class, so the presence gate can use a different architecture family than the parameter branch",
         "params_input": "Channel groups fed to the parameter trunk (pass, ifg), matched against the dataset's channel labels; the selection must resolve to at least one channel. The DEM is never an input to the dual model",
         "existence_input": "Channel groups fed to the existence trunk (pass, ifg); defaults to interferograms only so the presence gate judges from interferometric phase alone",
         "params_channels": "Resolved input-tensor channel indices feeding the parameter trunk; overridden at build time from params_input and the dataset's input configuration, and persisted with the model config",
         "existence_channels": "Resolved input-tensor channel indices feeding the existence trunk; overridden at build time from existence_input and the dataset's input configuration, and persisted with the model config",
-        "params_features": "Per-level residual-block channel widths of the full-stack parameter trunk, one entry per resolution stage; default [64, 128, 256] (three levels)",
-        "existence_features": "Per-level residual-block channel widths of the interferogram-only existence trunk, one entry per resolution stage; default [64, 128] (two levels, a shallower pyramid than the parameter trunk); the existence head is sized from this trunk's own embedding width",
-        "bottleneck_factor": "Channel-width multiplier for the U-Net bottleneck relative to each trunk's deepest encoder level; categorical over {1, 2, 4}",
-        "dropout": "Dropout probability applied inside the residual blocks of both trunks, 0.0 disables it",
-        "activation": "Nonlinearity used throughout the residual blocks and head PixelMLPs: relu, leaky_relu, gelu, silu, or elu",
-        "normalization": "Convolutional normalization layer applied inside residual blocks: batch, instance, group, or none (identity)",
-        "upsample_mode": "Decoder upsampling operator for both trunks: convtranspose (learned) or bilinear (fixed interpolation)",
-        "conv_bias": "Whether convolution layers carry an additive bias term, usually disabled when a normalization layer follows",
+        "params_features": "Per-level channel widths forced onto the parameter trunk's features ladder, one entry per resolution stage; default [64, 128, 256] (three levels). An empty list keeps the trunk architecture's own default widths, and is required for trunks whose config has no features ladder (segformer, dense_unet, hrnet, nafnet, swin_unet, transunet, unetr)",
+        "existence_features": "Per-level channel widths forced onto the existence trunk's features ladder; default [64, 128] (two levels, a shallower pyramid than the parameter trunk); the existence head is sized from this trunk's own embedding width. An empty list keeps the trunk architecture's own default widths",
+        "params_overrides": "Dict of config-field overrides applied to the parameter trunk's own architecture config class (e.g. dropout, normalization, or transformer depths); structural fields the dual model forces (in_channels, out_channels, params_per_gaussian, head, init_mode, features) are rejected here",
+        "existence_overrides": "Dict of config-field overrides applied to the existence trunk's own architecture config class; structural fields the dual model forces are rejected here",
+        "head_activation": "Nonlinearity of the dual model's own PixelMLP heads (per-gaussian parameter heads and existence gate): relu, leaky_relu, gelu, silu, or elu",
         "init_mode": "Weight initialization scheme for conv/linear layers: default (framework default, no override), kaiming, or xavier",
         "params_trunk_lr": "Learning rate for the full-stack parameter trunk (encoder, bottleneck, and decoder), tuned log-uniform over 1e-5..1e-2",
         "existence_trunk_lr": "Learning rate for the interferogram-only existence trunk (encoder, bottleneck, and decoder), tuned log-uniform over 1e-5..1e-2",
@@ -1809,7 +1806,7 @@
       }
     },
     "inference/dual::DualInferenceEntryConfig": {
-      "summary": "Entry config for the scheduler that runs sliding-window dual-input ResUNet inference over multiple runs, queuing one worker process per run across a fixed pool of GPUs",
+      "summary": "Entry config for the scheduler that runs sliding-window dual-trunk model inference over multiple runs, queuing one worker process per run across a fixed pool of GPUs",
       "fields": {
         "runs_dir": "master runs directory scanned recursively for runs to infer, default is the dual subfolder of _RUNS_ROOT; every run at any depth (a directory holding a meta/ subdir) is discovered and non-dual runs are skipped by type",
         "run_filter": "run names relative to runs_dir to restrict to, default empty list processes every run found there; an unmatched name raises FileNotFoundError",
@@ -2268,7 +2265,7 @@
       }
     },
     "training/dual::DualEntryConfig": {
-      "summary": "Top-level entry config launching one dual-input ResUNet training run through the shared backbone dataset, curriculum, and trainer machinery",
+      "summary": "Top-level entry config launching one dual-trunk training run through the shared backbone dataset, curriculum, and trainer machinery",
       "fields": {
         "run_name": "Optional suffix appended to the canonical run name; every run directory is named model_head_matching_loss with this label (or a timestamp) appended",
         "resume": "Reuse this run directory when it already holds a completed run (complete.json marker stamped only at successful completion), rerunning inference only if it is missing; an unfinished run directory is deleted and restarted from scratch. Lets interrupted trials sweeps and seed sweeps continue without retraining finished units (distinct from training.resume, which continues one run mid-training from its last.pt and suppresses the delete)",
@@ -2278,10 +2275,12 @@
         "seeds": "List of seeds for a multi-seed sweep, one full run launched per seed and nested as seed<N> inside the base run directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field",
         "logdir": "Base directory under which this run's output subdirectory and TensorBoard logs are written",
         "model_overrides": "Dict of architecture-config field overrides applied to the dual model config before instantiation",
-        "params_backbone": "Trunk architecture of the full-input parameter branch (resunet, unet_skip, or unet), applied to the model config before instantiation",
-        "existence_backbone": "Trunk architecture of the existence branch (resunet, unet_skip, or unet), applied to the model config before instantiation",
+        "params_backbone": "Trunk architecture of the full-input parameter branch, any backbone-zoo model key, applied to the model config before instantiation",
+        "existence_backbone": "Trunk architecture of the existence branch, any backbone-zoo model key, applied to the model config before instantiation",
         "params_input": "Channel groups (pass, ifg) the parameter trunk receives, resolved to concrete channel indices against the assembled dataset stack at build time; the DEM is never an input to the dual model",
         "existence_input": "Channel groups (pass, ifg) the existence trunk receives; defaults to interferograms only",
+        "params_overrides": "Dict of config-field overrides applied to the parameter trunk's own architecture config class (structural fields forced by the dual model are rejected); trunk widths stay on model_overrides params_features",
+        "existence_overrides": "Dict of config-field overrides applied to the existence trunk's own architecture config class (structural fields forced by the dual model are rejected)",
         "paths": "TrainingPathsConfig sub-config holding filesystem locations for the dataset, extracted parameters, and secondary-track labels",
         "training": "TrainingQueueConfig sub-config bundling training-loop and queue settings (epochs, batch size, workers, AMP, EMA, resume, scheduler/warmup/clip knobs)",
         "pretrain": "PretrainConfig sub-config for optional pre-training preflight (batch-size search, dataloader tuning, VRAM budget)",

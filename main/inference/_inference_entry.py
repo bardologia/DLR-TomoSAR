@@ -31,7 +31,7 @@ class InferenceEntry:
         RunType.PROFILE_AE : "Profile-autoencoder inference: reconstruction scoring over every standalone profile-autoencoder run found at any depth under the runs directory.",
         RunType.IMAGE_AE   : "Image-autoencoder inference: reconstruction scoring over every standalone image-autoencoder run found at any depth under the runs directory.",
         RunType.UNROLLED   : "Unrolled physics-network inference: synthesised-coherence inversion scoring over every unrolled run found at any depth under the runs directory.",
-        RunType.DUAL       : "Dual-input ResUNet inference: sliding-window prediction, stitched cubes, and reports over every dual run found at any depth under the runs directory.",
+        RunType.DUAL       : "Dual-trunk model inference: sliding-window prediction, stitched cubes, and reports over every dual run found at any depth under the runs directory.",
     }
 
     def __init__(self, entry_script: Path, run_type: str) -> None:

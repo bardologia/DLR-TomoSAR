@@ -46,6 +46,8 @@ class JobDescriber:
             ("inference after", "infer_after",           "flag"),
         ],
         "train_dual": [
+            ("params trunk",    "params_backbone",       "text"),
+            ("existence trunk", "existence_backbone",    "text"),
             ("params input",    "params_input",          "list"),
             ("existence input", "existence_input",       "list"),
             ("dataset",         "paths.dataset_path",    "opt_tail"),

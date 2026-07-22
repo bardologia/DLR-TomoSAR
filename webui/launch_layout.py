@@ -31,7 +31,11 @@ class LaunchLayout:
     NUM_CELLS    = {"kind": "number", "int": True, "min": 10_000, "max": 100_000_000, "presets": [250_000, 500_000, 1_000_000, 2_000_000, 4_000_000, 8_000_000]}
 
     CH_AE_MODE      = {"kind": "choice", "options": ["frozen", "finetune"]}
-    CH_TRUNK        = {"kind": "choice", "options": ["resunet", "unet_skip", "unet"]}
+    CH_TRUNK        = {"kind": "choice", "options": [
+        "unet", "unet_skip", "resunet", "attention_unet", "unetplusplus", "linknet",
+        "swin_unet", "transunet", "unetr", "deeplabv3plus", "segformer", "convnext_unet",
+        "dense_unet", "hrnet", "multires_unet", "fpn", "u2net", "pixel_mlp", "local_cnn", "nafnet",
+    ]}
     CH_PROVIDER     = {"kind": "choice", "options": ["stopgrad", "live"]}
     CH_FIGSTYLE     = {"kind": "choice", "options": ["report", "paper"]}
     CH_NORM_GLOBAL  = {"kind": "choice", "options": ["per_slot"] + NORM_PRESETS}
@@ -424,7 +428,7 @@ class LaunchLayout:
         "essentials": INFER_ESSENTIALS,
         "sections": [
             {"key": "dual", "title": "Dual", "panels": [
-                {"kind": "fields", "title": "Dual-input ResUNet inference", "template": "inference_full", "at": "inference"},
+                {"kind": "fields", "title": "Dual-trunk model inference", "template": "inference_full", "at": "inference"},
 
                 {"kind": "hidden", "fields": ["gpus_file"]},
             ]},
@@ -649,10 +653,12 @@ class LaunchLayout:
                         {"title": "Parameter trunk (gaussian heads)", "fields": [
                             {"path": "params_backbone", "widget": CH_TRUNK},
                             {"path": "params_input",    "widget": MULTI_TRUNK_INPUT},
+                            "params_overrides",
                         ]},
                         {"title": "Existence trunk (presence gate)", "fields": [
                             {"path": "existence_backbone", "widget": CH_TRUNK},
                             {"path": "existence_input",    "widget": MULTI_TRUNK_INPUT},
+                            "existence_overrides",
                         ]},
                     ]},
                 ]},

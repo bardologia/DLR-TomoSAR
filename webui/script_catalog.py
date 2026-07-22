@@ -45,7 +45,7 @@ class ScriptCatalog:
         "train_dual": {
             "title"     : "Train Dual",
             "category"  : "Training",
-            "purpose"   : "Train the dual-input ResUNet set-prediction model: one trunk sees the full reduced stack and feeds the per-gaussian parameter heads, a second trunk sees only the interferogram channels and feeds the existence gate. Shares the backbone dataset, loss curriculum, and trainer. Optionally fans out trunk-input trials across GPUs, one run per params/existence channel-group assignment on fixed half-width four-level trunks.",
+            "purpose"   : "Train the dual-trunk set-prediction model: one trunk sees the full reduced stack and feeds the per-gaussian parameter heads, a second trunk sees only the interferogram channels and feeds the existence gate; each trunk is any backbone-zoo architecture. Shares the backbone dataset, loss curriculum, and trainer. Optionally fans out trunk-input trials across GPUs, one run per params/existence channel-group assignment on fixed half-width four-level trunks.",
         },
         "infer_backbone": {
             "title"     : "Infer Backbone",
@@ -70,7 +70,7 @@ class ScriptCatalog:
         "infer_dual": {
             "title"     : "Infer Dual",
             "category"  : "Inference",
-            "purpose"   : "Dual-input ResUNet inference: sliding-window prediction, stitched cubes, and reports through the shared backbone inference pipeline. Sweeps every run root and runs only dual runs.",
+            "purpose"   : "Dual-trunk model inference: sliding-window prediction, stitched cubes, and reports through the shared backbone inference pipeline. Sweeps every run root and runs only dual runs.",
         },
         "benchmark": {
             "title"     : "Benchmark",
@@ -153,7 +153,7 @@ class ScriptCatalog:
         "train": {
             "title"    : "Train",
             "category" : "Training",
-            "purpose"  : "Train one model end to end. Pick the stage to train: the supervised backbone, the profile autoencoder, the image autoencoder, the JEPA predictor, the unrolled physics network, or the dual-input ResUNet.",
+            "purpose"  : "Train one model end to end. Pick the stage to train: the supervised backbone, the profile autoencoder, the image autoencoder, the JEPA predictor, the unrolled physics network, or the dual-trunk model.",
             "members"  : [
                 ("train_backbone",            "Backbone"),
                 ("train_profile_autoencoder", "Profile AE"),
@@ -166,7 +166,7 @@ class ScriptCatalog:
         "infer": {
             "title"    : "Infer",
             "category" : "Inference",
-            "purpose"  : "Run inference end to end. Pick the stage to infer: the supervised backbone (and JEPA), the profile autoencoder, the image autoencoder, the unrolled physics network, or the dual-input ResUNet.",
+            "purpose"  : "Run inference end to end. Pick the stage to infer: the supervised backbone (and JEPA), the profile autoencoder, the image autoencoder, the unrolled physics network, or the dual-trunk model.",
             "members"  : [
                 ("infer_backbone",            "Backbone"),
                 ("infer_profile_autoencoder", "Profile AE"),

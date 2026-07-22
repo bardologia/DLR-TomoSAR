@@ -24,6 +24,7 @@ from configuration.inference                import BackboneInferenceEntryConfig,
 from configuration.patch_sweep.general      import PatchSweepConfig
 from configuration.training                 import BackboneEntryConfig, DualEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, ImageAeEntryConfig, UnrolledEntryConfig
 from configuration.tuning.general           import TuningEntryConfig
+from models.backbone                        import BACKBONE_MODEL_REGISTRY
 from pipelines.backbone.training.loss_terms import LossComponentCatalog
 
 _DISPATCH_ONLY = {"generate_tomogram", "generate_interferograms"}
@@ -69,6 +70,10 @@ def test_sweep_loss_choices_match_the_component_catalog():
     choices = {choice["value"] for choice in LaunchLayout.MULTI_SWEEP_LOSSES["choices"]}
 
     assert choices == set(LossComponentCatalog.names())
+
+
+def test_dual_trunk_choices_match_the_backbone_registry():
+    assert set(LaunchLayout.CH_TRUNK["options"]) == set(BACKBONE_MODEL_REGISTRY)
 
 
 def test_pair_components_in_experiment_builder_match_the_catalog():
