@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-from tools.runtime.run_tag import RunTag
-
 import math
 import os
 from dataclasses import dataclass, field
 from pathlib     import Path
 from typing      import ClassVar, Dict, List, Optional, Tuple
 
-from tools.data.regions import CropRegion
+from tools.runtime.run_tag import RunTag
+from tools.data.regions    import CropRegion
 
 
 @dataclass

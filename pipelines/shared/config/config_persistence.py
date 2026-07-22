@@ -4,14 +4,14 @@ from dataclasses import asdict, fields
 from pathlib     import Path
 
 from configuration.dataset.profile_autoencoder import ProfileAugmentationConfig, ProfileDatasetConfig
-from models                                     import BACKBONE_CONFIG_REGISTRY
-from models.dual                                import DUAL_CONFIG_REGISTRY
-from models.image_autoencoder                   import IMAGE_AE_CONFIG_REGISTRY
-from models.profile_autoencoder                 import PROFILE_AE_CONFIG_REGISTRY
-from models.unrolled                            import UNROLLED_CONFIG_REGISTRY
-from tools.data.io                              import FileIO
-from tools.data.regions                         import CropRegion, SplitRegions
-from pipelines.shared.inference.run_classifier            import RunArtifacts
+from models                                    import BACKBONE_CONFIG_REGISTRY
+from models.dual                               import DUAL_CONFIG_REGISTRY
+from models.image_autoencoder                  import IMAGE_AE_CONFIG_REGISTRY
+from models.profile_autoencoder                import PROFILE_AE_CONFIG_REGISTRY
+from models.unrolled                           import UNROLLED_CONFIG_REGISTRY
+from tools.data.io                             import FileIO
+from tools.data.regions                        import CropRegion, SplitRegions
+from pipelines.shared.inference.run_classifier import RunArtifacts
 
 
 class ConfigIO:

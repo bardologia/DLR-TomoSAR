@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from configuration.training.image_autoencoder import ImageAeLossConfig
+from configuration.training.image_autoencoder  import ImageAeLossConfig
 from pipelines.image_autoencoder.training.loss import Loss
 
 

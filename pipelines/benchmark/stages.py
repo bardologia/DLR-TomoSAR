@@ -4,18 +4,18 @@ import sys
 from dataclasses import asdict
 from pathlib     import Path
 
-from configuration.benchmark import BenchmarkConfig
-from configuration.sar.gaussian_config          import GaussianConfig
-from pipelines.backbone.training.loss_terms    import LossComponentCatalog
-from pipelines.benchmark.results                import BenchmarkSeedCollector
+from configuration.benchmark                       import BenchmarkConfig
+from configuration.sar.gaussian_config             import GaussianConfig
+from pipelines.backbone.training.loss_terms        import LossComponentCatalog
+from pipelines.benchmark.results                   import BenchmarkSeedCollector
 from pipelines.shared.comparison.comparison_report import ComparisonReport
-from pipelines.benchmark.sizing                 import SizeMatcher, SizeMatchResult
-from pipelines.shared.training.run_naming                import RunNaming
-from pipelines.shared.training.seed_sweep                import SeedSet
-from tools.orchestration                        import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
-from tools.data.io                              import FileIO
-from tools.monitoring.logger                    import Logger
-from tools.runtime.run_tag                     import RunTag
+from pipelines.benchmark.sizing                    import SizeMatcher, SizeMatchResult
+from pipelines.shared.training.run_naming          import RunNaming
+from pipelines.shared.training.seed_sweep          import SeedSet
+from tools.orchestration                           import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
+from tools.data.io                                 import FileIO
+from tools.monitoring.logger                       import Logger
+from tools.runtime.run_tag                         import RunTag
 
 
 class SeedExpandedStage:
@@ -266,8 +266,8 @@ class SizeMatchStage(ExperimentStage):
             if model_name == reference:
                 continue
 
-            result               = matcher.match(model_name, target)
-            records[model_name]  = asdict(result)
+            result              = matcher.match(model_name, target)
+            records[model_name] = asdict(result)
 
             self.logger.info(f"{model_name:<18} {result.parameters:>14,}  Δ {result.deviation_pct:+7.3f} %  (scale {result.scale:.4f}, {result.iterations} iterations)")
 

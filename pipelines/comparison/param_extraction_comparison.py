@@ -6,28 +6,28 @@ from pathlib     import Path
 import matplotlib.pyplot as plt
 import numpy             as np
 
-from pipelines.comparison.metric_table   import MetricTableRenderer
-from pipelines.comparison.spatial_stats   import SpatialDispersion
-from pipelines.shared.comparison.comparison_report   import ComparisonReportBase
-from tools.data.io                        import FileIO
-from tools.reporting.markdown             import MarkdownTable, ScalarFormatter
-from tools.reporting.reporting            import ReportAssets
-from tools.reporting.plotting             import PlotBase
-from tools.monitoring.logger              import Logger
+from pipelines.comparison.metric_table             import MetricTableRenderer
+from pipelines.comparison.spatial_stats            import SpatialDispersion
+from pipelines.shared.comparison.comparison_report import ComparisonReportBase
+from tools.data.io             import FileIO
+from tools.reporting.markdown  import MarkdownTable, ScalarFormatter
+from tools.reporting.reporting import ReportAssets
+from tools.reporting.plotting  import PlotBase
+from tools.monitoring.logger   import Logger
 
 
 @dataclass
 class ParamTrial:
-    name                : str
-    run_dir             : Path
-    k_max               : int
-    lambda_k            : float
-    sigma_init_divisor  : float
-    fit_sigma           : bool
-    fit_amplitude       : bool
-    fit_mean            : bool
-    dataset             : str = ""
-    metrics             : dict = field(default_factory=dict)
+    name               : str
+    run_dir            : Path
+    k_max              : int
+    lambda_k           : float
+    sigma_init_divisor : float
+    fit_sigma          : bool
+    fit_amplitude      : bool
+    fit_mean           : bool
+    dataset            : str = ""
+    metrics            : dict = field(default_factory=dict)
 
     @property
     def free_per_gaussian(self) -> int:
@@ -101,8 +101,8 @@ class ParamTrialCollector:
 
 class ParamMetrics:
 
-    EPSILON           = 1e-12
-    COLLAPSE_RATE     = 0.01
+    EPSILON       = 1e-12
+    COLLAPSE_RATE = 0.01
 
     def __init__(self, pixel_sample: int, block_size: int, logger: Logger) -> None:
         self.pixel_sample  = pixel_sample

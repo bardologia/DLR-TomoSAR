@@ -14,8 +14,8 @@ if str(WEBUI_ROOT) not in sys.path:
 from repomap_library import RepoMapLibrary
 
 
-ROLES = {"entry", "orchestrator", "config", "io", "transform", "model", "data", "metric", "external"}
-KINDS = {"data", "control", "io"}
+ROLES  = {"entry", "orchestrator", "config", "io", "transform", "model", "data", "metric", "external"}
+KINDS  = {"data", "control", "io"}
 SCOPES = {"within", "cross"}
 
 

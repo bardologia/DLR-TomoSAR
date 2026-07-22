@@ -113,7 +113,7 @@ def test_disabled_inference_check_is_inert(tmp_path):
 class _StubPipeline:
     run_label = "stub"
 
-    launched  = []
+    launched = []
 
     def __init__(self, config) -> None:
         self.config = config

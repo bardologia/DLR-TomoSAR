@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from configuration.benchmark import BenchmarkConfig
+from configuration.benchmark                import BenchmarkConfig
 from pipelines.shared.config.config_factory import ConfigFactory
-from pipelines.shared.config.run_metadata import TrainingRunMetadata
-from tools.monitoring.logger import Logger
+from pipelines.shared.config.run_metadata   import TrainingRunMetadata
+from tools.monitoring.logger                import Logger
 
 
 @pytest.fixture
@@ -48,8 +48,8 @@ def test_subdirectories_created(metadata):
 @pytest.mark.real_data
 def test_subdirectories_nested_under_run_directory(metadata):
     assert metadata.tensorboard_dir.parent    == metadata.run_directory
-    assert metadata.docs_directory.parent      == metadata.run_directory
-    assert metadata.metadata_directory.parent  == metadata.run_directory
+    assert metadata.docs_directory.parent     == metadata.run_directory
+    assert metadata.metadata_directory.parent == metadata.run_directory
 
 
 @pytest.mark.real_data

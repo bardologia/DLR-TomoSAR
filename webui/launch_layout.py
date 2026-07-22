@@ -1185,7 +1185,7 @@ class LaunchLayout:
 
         if panel["kind"] == "pair":
             base_widgets = {}
-            groups = self._panel_groups(panel, panel["base"], base_widgets)
+            groups       = self._panel_groups(panel, panel["base"], base_widgets)
             for path, widget in base_widgets.items():
                 widgets[path] = widget
                 widgets[panel["override"] + path[len(panel["base"]):]] = widget

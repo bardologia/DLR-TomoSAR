@@ -26,18 +26,18 @@ class PhysicsLossLibrary:
 
     def _operator(self) -> dict:
         return {
-            "title"  : "The shared forward operator",
-            "blurb"  : "The vertical wavenumber of each pass, the steering response sampled on the elevation grid, and the steering outer product the covariance terms reuse. By default the wavenumber is per-pixel: the geometry field (previous section) gives every pass its own kz at every azimuth and range, and the steering is assembled per pixel from that kz map. When the geometry is constant across the scene this reduces to a single TomoGeometry matrix set built once per run. Either way the same operator feeds all five terms.",
-            "items"  : [
+            "title" : "The shared forward operator",
+            "blurb" : "The vertical wavenumber of each pass, the steering response sampled on the elevation grid, and the steering outer product the covariance terms reuse. By default the wavenumber is per-pixel: the geometry field (previous section) gives every pass its own kz at every azimuth and range, and the steering is assembled per pixel from that kz map. When the geometry is constant across the scene this reduces to a single TomoGeometry matrix set built once per run. Either way the same operator feeds all five terms.",
+            "items" : [
                 {
                     "title" : "Vertical wavenumber",
                     "tex"   : r"k_z^{(i)} = \frac{4\pi\,b^{\perp}_i}{\lambda\,r\,\sin\theta}",
                     "note"  : "Each pass sees elevation through a phase ramp whose rate is set by its perpendicular baseline. The wider the baseline spread, the finer the elevation resolution the stack can resolve. This is the per-pixel height convention; the slant convention drops the sin theta. kz is recomputed for every azimuth and range pixel, and the reference pass has kz = 0.",
                     "vars"  : [
-                        {"sym": r"k_z^{(i)}",     "desc": "vertical wavenumber of pass i, per azimuth and range (rad/m)"},
-                        {"sym": r"b^{\perp}_i",   "desc": "perpendicular baseline of pass i (m)"},
-                        {"sym": r"\lambda",       "desc": "radar wavelength (m)"},
-                        {"sym": r"r, \theta",     "desc": "per-range slant range (m) and look angle"},
+                        {"sym": r"k_z^{(i)}",   "desc": "vertical wavenumber of pass i, per azimuth and range (rad/m)"},
+                        {"sym": r"b^{\perp}_i", "desc": "perpendicular baseline of pass i (m)"},
+                        {"sym": r"\lambda",     "desc": "radar wavelength (m)"},
+                        {"sym": r"r, \theta",   "desc": "per-range slant range (m) and look angle"},
                     ],
                 },
                 {
@@ -55,7 +55,7 @@ class PhysicsLossLibrary:
                     "tex"   : r"O_{i,j,n} = A_{i,n}\,\overline{A_{j,n}}",
                     "note"  : "How the covariance and Capon-cycle terms synthesise a covariance matrix with a single contraction against the profile. With constant geometry it is precomputed once per elevation bin; with per-pixel geometry the covariance is synthesised per pixel from that pixel's kz, so this outer product is the shared-geometry optimisation of the same operation.",
                     "vars"  : [
-                        {"sym": r"O_{i,j,n}",         "desc": "outer product of the steering columns at bin n"},
+                        {"sym": r"O_{i,j,n}",          "desc": "outer product of the steering columns at bin n"},
                         {"sym": r"\overline{A_{j,n}}", "desc": "complex conjugate of the steering entry"},
                     ],
                 },
@@ -101,10 +101,10 @@ class PhysicsLossLibrary:
                 "story"      : "Summarises each profile by its first three descriptors: total mass, the centroid that locates the scattering phase centre in elevation, and the spread that measures the vertical extent of the scattering. These are the quantities a forest-height or layover analysis actually reads off a tomogram.",
                 "caveat"     : "Centroid and spread are mass-normalised ratios, so they are robust to the Capon power bias even though the mass sub-term is not. Used mainly as a validation-grade physics metric rather than the primary loss; the sub-weights default to (1, 1, 1).",
                 "vars"       : [
-                    {"sym": r"\ell_{\mathrm{mom}}",  "desc": "moments term value"},
-                    {"sym": r"\bar{z}, \sigma_z",    "desc": "profile centroid and spread (m)"},
-                    {"sym": r"w_0, w_1, w_2",        "desc": "mass / centroid / spread weights, default (1, 1, 1)"},
-                    {"sym": r"\Delta\xi_R",          "desc": "elevation axis span x_max - x_min (m)"},
+                    {"sym": r"\ell_{\mathrm{mom}}", "desc": "moments term value"},
+                    {"sym": r"\bar{z}, \sigma_z",   "desc": "profile centroid and spread (m)"},
+                    {"sym": r"w_0, w_1, w_2",       "desc": "mass / centroid / spread weights, default (1, 1, 1)"},
+                    {"sym": r"\Delta\xi_R",         "desc": "elevation axis span x_max - x_min (m)"},
                 ],
             },
             {
@@ -186,11 +186,11 @@ class PhysicsLossLibrary:
                     "container" : "TrackParameters",
                     "role"      : "Per-pass acquisition parameters, parsed from each track's INF/INF-RDP pp_*.xml (STEP processor) for the dataset polarisation. The reference track is labels[0]. Source of wavelength, slant-range vector, and the sensor/terrain heights behind the look angle.",
                     "fields"    : [
-                        {"name": "lambda",            "shape": "scalar",        "desc": "radar wavelength (m); sets the 4 pi / lambda kz scale"},
+                        {"name": "lambda",            "shape": "scalar",         "desc": "radar wavelength (m); sets the 4 pi / lambda kz scale"},
                         {"name": "r",                 "shape": "[n_range_full]", "desc": "slant-range vector, one entry per range sample (m)"},
-                        {"name": "h0",                "shape": "scalar",        "desc": "sensor altitude above the datum (m)"},
-                        {"name": "terrain",           "shape": "scalar",        "desc": "reference terrain height (m); h0 - terrain is the height above ground"},
-                        {"name": "antdir / da / rref","shape": "scalar",        "desc": "look side, depression angle, reference range (reported, diagnostic)"},
+                        {"name": "h0",                "shape": "scalar",         "desc": "sensor altitude above the datum (m)"},
+                        {"name": "terrain",           "shape": "scalar",         "desc": "reference terrain height (m); h0 - terrain is the height above ground"},
+                        {"name": "antdir / da / rref","shape": "scalar",         "desc": "look side, depression angle, reference range (reported, diagnostic)"},
                     ],
                 },
                 {
@@ -290,18 +290,18 @@ class PhysicsLossLibrary:
                 "title" : "Resolved on the FL01 reference stack",
                 "blurb" : "The values every step above produces on the transferred 17sartom-traun L-band stack, as verified against the dataset artifacts.",
                 "rows"  : [
-                    {"k": "Stack",                  "v": "17sartom-traun, L-band, hv"},
-                    {"k": "Tracks",                 "v": "29 (1 primary + 28 secondaries)"},
+                    {"k": "Stack",                   "v": "17sartom-traun, L-band, hv"},
+                    {"k": "Tracks",                  "v": "29 (1 primary + 28 secondaries)"},
                     {"k": "Reference pass",          "v": "FL01_PS02 (= pass_labels[0])"},
-                    {"k": "Wavelength",             "v": "0.2262 m (L-band)"},
+                    {"k": "Wavelength",              "v": "0.2262 m (L-band)"},
                     {"k": "Sensor altitude h0",      "v": "3719.2 m"},
-                    {"k": "Terrain",                "v": "683.9 m"},
+                    {"k": "Terrain",                 "v": "683.9 m"},
                     {"k": "Height above terrain",    "v": "3035.3 m"},
                     {"k": "Slant range near to far", "v": "3598.9 to 3898.0 m"},
                     {"k": "Look angle near to far",  "v": "32.50 to 38.86 deg"},
-                    {"k": "Crop",                   "v": "azimuth [1000, 2000), range [500, 1000)"},
-                    {"k": "Elevation axis",         "v": "[-20, 80] m, 150 bins, dx = 0.671 m"},
-                    {"k": "kz convention",          "v": "height (4 pi b_perp / lambda r sin theta)"},
+                    {"k": "Crop",                    "v": "azimuth [1000, 2000), range [500, 1000)"},
+                    {"k": "Elevation axis",          "v": "[-20, 80] m, 150 bins, dx = 0.671 m"},
+                    {"k": "kz convention",           "v": "height (4 pi b_perp / lambda r sin theta)"},
                 ],
             },
         }
@@ -322,9 +322,9 @@ class PhysicsLossLibrary:
 
     def _config(self) -> dict:
         return {
-            "title"   : "Configuration reference",
-            "blurb"   : "Per-term switches and weights live in LossConfig; the shared geometry lives in GeometryConfig. Every term is off by default; weights must be calibrated with the loss scale probe before physics terms are mixed with the curve and parameter losses.",
-            "groups"  : [
+            "title"  : "Configuration reference",
+            "blurb"  : "Per-term switches and weights live in LossConfig; the shared geometry lives in GeometryConfig. Every term is off by default; weights must be calibrated with the loss scale probe before physics terms are mixed with the curve and parameter losses.",
+            "groups" : [
                 {
                     "name"   : "LossConfig",
                     "fields" : [
@@ -344,14 +344,14 @@ class PhysicsLossLibrary:
                         {"field": "wavelength",          "default": "0.23",          "meaning": "radar wavelength (m)"},
                         {"field": "slant_range",         "default": "5000.0",        "meaning": "reference slant range (m)"},
                         {"field": "look_angle_deg",      "default": "45.0",          "meaning": "projects baselines to the perpendicular component"},
-                        {"field": "baselines",          "default": "9 values, 0-90", "meaning": "synthetic baselines (m); replaced per dataset"},
+                        {"field": "baselines",           "default": "9 values, 0-90", "meaning": "synthetic baselines (m); replaced per dataset"},
                         {"field": "baseline_component",  "default": "perpendicular", "meaning": "baseline component the dataset table resolves to"},
                         {"field": "baselines_source",    "default": "dataset",       "meaning": "dataset (require meta/baselines.json) / manual (use config values)"},
                         {"field": "kz_values",           "default": "()",            "meaning": "explicit kz override; bypasses the baselines"},
                     ],
                 },
             ],
-            "cli"     : [
+            "cli"    : [
                 "python main/training/train_backbone.py --curriculum.complete.use_coherence_resyn true --curriculum.complete.weight_coherence_resyn 1.0",
                 "python main/training/train_backbone.py --geometry.kz_values \"[0.0, 0.12, 0.25, 0.37, 0.49]\"",
             ],

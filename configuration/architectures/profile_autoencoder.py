@@ -7,7 +7,7 @@ import torch.nn as nn
 
 @dataclass
 class ProfileAutoencoderBaseConfig:
-    profile_length : int   = 256
+    profile_length: int = 256
 
     embedding_dim  : int = 24
     embedding_norm : str = "layernorm"

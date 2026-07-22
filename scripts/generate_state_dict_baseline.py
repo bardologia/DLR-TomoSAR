@@ -10,7 +10,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from tests.models_baseline.test_state_dict_baseline import BASELINE_PATH, MODEL_FAMILIES, StateDictSignature, _build_case
-from tools.monitoring.logger import Logger
+from tools.monitoring.logger                        import Logger
 
 
 class BaselineGenerator:

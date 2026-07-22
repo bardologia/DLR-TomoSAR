@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-import pytest
-
 from pathlib import Path
 
-from configuration.cross_validation import CrossValidationConfig, FoldConfig
+import pytest
+
+from configuration.cross_validation   import CrossValidationConfig, FoldConfig
 from pipelines.cross_validation.folds import FoldConfigFactory, FoldNaming, FoldPlan, FoldPlanner
 from tools.data.regions               import CropRegion, SplitRegions
 
@@ -59,7 +59,7 @@ def test_blocks_are_disjoint_and_cover_every_line():
 def test_uneven_extent_last_block_absorbs_remainder():
     planner = make_planner(3, azimuth_start=1000, azimuth_end=2000)
 
-    assert planner.blocks    == [(1000, 1333), (1333, 1666), (1666, 2000)]
+    assert planner.blocks == [(1000, 1333), (1333, 1666), (1666, 2000)]
     sizes = [end - start for start, end in planner.blocks]
 
     assert max(sizes) - min(sizes) <= 3
@@ -277,7 +277,7 @@ def test_split_regions_helpers_consistent_with_plan():
 
 
 def factory_config(test_data_dir: Path, n_folds: int = 5, azimuth_start: int = 1000, azimuth_end: int = 2000) -> CrossValidationConfig:
-    config                   = CrossValidationConfig()
+    config                    = CrossValidationConfig()
     config.paths.dataset_path = test_data_dir
     config.folds              = FoldConfig(n_folds=n_folds, azimuth_start=azimuth_start, azimuth_end=azimuth_end)
     return config

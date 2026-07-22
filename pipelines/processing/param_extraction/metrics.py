@@ -145,7 +145,7 @@ class FittingMetricsCalculator:
         self.amp_threshold    = amp_threshold
 
         self.contrast_estimator = ContrastEstimator(logger=logger)
-        self.k_diagnostics = KSelectionDiagnostics(k_max=n_gaussians, logger=logger)
+        self.k_diagnostics      = KSelectionDiagnostics(k_max=n_gaussians, logger=logger)
 
     @staticmethod
     def _load_tomogram(tomogram_path: Path) -> np.ndarray:

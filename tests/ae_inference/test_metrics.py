@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from pipelines.autoencoder_common.inference.metrics import AeMetricsBase
-from pipelines.image_autoencoder.inference.metrics import ImageAeMetrics
+from pipelines.autoencoder_common.inference.metrics  import AeMetricsBase
+from pipelines.image_autoencoder.inference.metrics   import ImageAeMetrics
 from pipelines.profile_autoencoder.inference.metrics import ProfileAeMetrics
 
 

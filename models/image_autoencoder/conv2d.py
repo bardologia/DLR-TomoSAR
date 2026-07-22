@@ -3,9 +3,9 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.architectures import Conv2dImageAutoencoderConfig
-from models.image_autoencoder.base                       import ImageAutoencoderBase
-from models.blocks                                       import ConvBlock, build_activation, build_norm2d, build_upsample, downsample_stages
+from configuration.architectures   import Conv2dImageAutoencoderConfig
+from models.image_autoencoder.base import ImageAutoencoderBase
+from models.blocks                 import ConvBlock, build_activation, build_norm2d, build_upsample, downsample_stages
 
 
 class Conv2dImageEncoder(nn.Module):

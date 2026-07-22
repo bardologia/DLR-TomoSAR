@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.architectures import SegFormerLiteConfig
-from ..blocks                          import DropPath, OutputHeadsMixin, build_activation, initialize_weights
+from ..blocks                    import DropPath, OutputHeadsMixin, build_activation, initialize_weights
 
 
 class OverlapPatchEmbedding(nn.Module):

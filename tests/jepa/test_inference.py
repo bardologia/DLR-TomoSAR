@@ -8,18 +8,18 @@ import pytest
 import torch
 import torch.nn as nn
 
-from pipelines.backbone.dataset.spatial    import GridInfo
-from pipelines.backbone.inference.loader    import RunLoader
-from pipelines.backbone.inference.model_wrapper import ModelWrapper
-from configuration.architectures             import Conv2dImageAutoencoderConfig, UNetConfig
-from pipelines.jepa.inference.loader         import JepaInferenceModel, JepaParamRunLoader, JepaRunLoader
-from pipelines.shared.config.config_persistence import BackboneModelConfigIO, ImageAutoencoderConfigIO
-from pipelines.jepa.inference.pipeline       import JEPA_INFERENCE_COMPONENTS, JEPA_PARAM_INFERENCE_COMPONENTS
-from pipelines.jepa.inference.predictor      import JepaCurvePredictor
-from pipelines.jepa.training.trainer         import JepaModule
+from pipelines.backbone.dataset.spatial                  import GridInfo
+from pipelines.backbone.inference.loader                 import RunLoader
+from pipelines.backbone.inference.model_wrapper          import ModelWrapper
+from configuration.architectures                         import Conv2dImageAutoencoderConfig, UNetConfig
+from pipelines.jepa.inference.loader                     import JepaInferenceModel, JepaParamRunLoader, JepaRunLoader
+from pipelines.shared.config.config_persistence          import BackboneModelConfigIO, ImageAutoencoderConfigIO
+from pipelines.jepa.inference.pipeline                   import JEPA_INFERENCE_COMPONENTS, JEPA_PARAM_INFERENCE_COMPONENTS
+from pipelines.jepa.inference.predictor                  import JepaCurvePredictor
+from pipelines.jepa.training.trainer                     import JepaModule
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 
-from tests.jepa.conftest import EMBEDDING_DIM, PROFILE_LENGTH, SPATIAL, make_autoencoder
+from tests.jepa.conftest  import EMBEDDING_DIM, PROFILE_LENGTH, SPATIAL, make_autoencoder
 from tools.data.gaussians import GaussianReconstructor
 
 
@@ -30,7 +30,7 @@ def build_inference_module():
 
 
 def test_inference_components_wiring():
-    assert JEPA_INFERENCE_COMPONENTS.loader_cls       is JepaRunLoader
+    assert JEPA_INFERENCE_COMPONENTS.loader_cls        is JepaRunLoader
     assert JEPA_INFERENCE_COMPONENTS.predictor_cls     is JepaCurvePredictor
     assert JEPA_INFERENCE_COMPONENTS.param_space       is False
     assert JEPA_PARAM_INFERENCE_COMPONENTS.param_space is True
@@ -117,13 +117,13 @@ def test_load_checkpoint_round_trip_numpy_x_axis(tmp_path):
     path = tmp_path / "best_model.pt"
     torch.save(ckpt, path)
 
-    loader              = JepaRunLoader.__new__(JepaRunLoader)
-    loaded, axis, meta  = RunLoader._load_checkpoint(loader, path, "cpu")
+    loader             = JepaRunLoader.__new__(JepaRunLoader)
+    loaded, axis, meta = RunLoader._load_checkpoint(loader, path, "cpu")
 
     assert np.allclose(axis, x_axis)
-    assert axis.dtype       == np.float32
-    assert meta["epoch"]    == 7
-    assert meta["best_epoch"] == 5
+    assert axis.dtype            == np.float32
+    assert meta["epoch"]         == 7
+    assert meta["best_epoch"]    == 5
     assert meta["best_val_loss"] == pytest.approx(0.123)
 
 
@@ -141,8 +141,8 @@ def test_load_checkpoint_accepts_tensor_x_axis(tmp_path):
     path = tmp_path / "best_model.pt"
     torch.save(ckpt, path)
 
-    loader             = JepaRunLoader.__new__(JepaRunLoader)
-    _, axis, _         = RunLoader._load_checkpoint(loader, path, "cpu")
+    loader     = JepaRunLoader.__new__(JepaRunLoader)
+    _, axis, _ = RunLoader._load_checkpoint(loader, path, "cpu")
 
     assert axis.dtype == np.float32
     assert np.allclose(axis, x_axis.numpy())

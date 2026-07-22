@@ -29,10 +29,10 @@ def _field(look_deg=35.0, wavelength=0.2262, slant=3700.0, n_az=4, n_rg=3) -> Ge
 
 
 def test_perpendicular_baseline_matches_projection_formula():
-    field   = _field(look_deg=35.0)
-    theta   = field.look_angle[0]
+    field = _field(look_deg=35.0)
+    theta = field.look_angle[0]
 
-    bperp   = field.perpendicular_baseline()
+    bperp    = field.perpendicular_baseline()
     expected = field.baseline_h[:, :, None] * math.cos(theta) + field.baseline_v[:, :, None] * math.sin(theta)
 
     assert np.allclose(bperp, expected)
@@ -42,26 +42,26 @@ def test_slant_kz_equals_four_pi_bperp_over_lambda_r():
     field   = _field()
     kz      = field.kz("slant")
 
-    scale   = 4.0 * math.pi / field.wavelength
-    bperp   = field.perpendicular_baseline()
+    scale    = 4.0 * math.pi / field.wavelength
+    bperp    = field.perpendicular_baseline()
     expected = scale * bperp / field.slant_range.reshape(1, 1, -1)
 
     assert np.allclose(kz, expected)
 
 
 def test_height_kz_is_slant_kz_divided_by_sin_theta():
-    field    = _field()
-    sin      = np.sin(field.look_angle).reshape(1, 1, -1)
+    field = _field()
+    sin   = np.sin(field.look_angle).reshape(1, 1, -1)
 
     assert np.allclose(field.kz("height"), field.kz("slant") / sin)
 
 
 def test_interferometric_phase_invariant_across_conventions():
-    field      = _field(look_deg=35.0)
-    sin        = np.sin(field.look_angle).reshape(1, 1, -1)
+    field = _field(look_deg=35.0)
+    sin   = np.sin(field.look_angle).reshape(1, 1, -1)
 
-    elevation  = 17.0
-    height     = elevation * sin
+    elevation = 17.0
+    height    = elevation * sin
 
     phase_slant  = field.kz("slant")  * elevation
     phase_height = field.kz("height") * height

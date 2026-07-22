@@ -14,8 +14,8 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from configuration.architectures import ResUNetConfig
-from models.backbone.resunet import ResUNet
-from tools.monitoring.logger import Logger
+from models.backbone.resunet     import ResUNet
+from tools.monitoring.logger     import Logger
 
 DEFAULT_RUN     = REPO_ROOT / "runs/resunet-conv-sorted_gt-K_5-hvn-none-param_l1_1_20260617_210314"
 DEFAULT_TWIN    = REPO_ROOT / "test_data/data"

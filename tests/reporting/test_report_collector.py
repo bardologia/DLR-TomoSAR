@@ -109,7 +109,7 @@ def test_rewriter_raises_on_a_missing_image(run_directory):
 def test_collection_writes_the_report_renamed_after_the_run(run_directory, tmp_path):
     collector = tmp_path / "collected"
     collector.mkdir()
-    config    = ReportCollectionConfig(run_directory=run_directory, collector_dir=collector)
+    config = ReportCollectionConfig(run_directory=run_directory, collector_dir=collector)
 
     result = ReportCollection(config, RecordingLogger()).run()
 
@@ -120,7 +120,7 @@ def test_collection_writes_the_report_renamed_after_the_run(run_directory, tmp_p
 def test_collection_suffixes_the_inference_tag_when_collecting_all(run_directory, tmp_path):
     collector = tmp_path / "collected"
     collector.mkdir()
-    config    = ReportCollectionConfig(run_directory=run_directory, collector_dir=collector, latest_only=False)
+    config = ReportCollectionConfig(run_directory=run_directory, collector_dir=collector, latest_only=False)
 
     result = ReportCollection(config, RecordingLogger()).run()
 

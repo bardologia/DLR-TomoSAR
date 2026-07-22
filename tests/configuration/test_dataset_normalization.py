@@ -4,7 +4,7 @@ import dataclasses
 
 import pytest
 
-from configuration.dataset import (
+from configuration.dataset               import (
     InputConfig,
     OutputConfig,
     PatchConfig,
@@ -13,7 +13,7 @@ from configuration.dataset import (
     ProfileAugmentationConfig,
     ProfileDatasetConfig,
 )
-from configuration.normalization import (
+from configuration.normalization         import (
     NormMethod,
     ChannelStrategy,
     Presets,
@@ -22,10 +22,8 @@ from configuration.normalization import (
     OutputClampConfig,
 )
 from configuration.normalization.general import _SLOT_STRATEGIES
-
-from tools.data.representation import Representation
-
-from tests.configuration._helpers import make_split_regions
+from tools.data.representation           import Representation
+from tests.configuration._helpers        import make_split_regions
 
 
 def test_input_config_defaults_channel_counts():
@@ -56,21 +54,21 @@ def test_input_config_dem_adds_one_channel():
 
 def test_output_config_role_names_and_params():
     cfg = OutputConfig()
-    assert cfg.role_names == ["a", "mu", "sig"]
+    assert cfg.role_names          == ["a", "mu", "sig"]
     assert cfg.params_per_gaussian == 3
-    assert cfg.total_channels(5) == 15
+    assert cfg.total_channels(5)   == 15
 
 
 def test_output_config_selected_indices():
     cfg = OutputConfig(use_mu=False)
-    assert cfg.role_names == ["a", "sig"]
+    assert cfg.role_names          == ["a", "sig"]
     assert cfg.selected_indices(2) == [0, 2, 3, 5]
 
 
 def test_output_config_round_trips_through_dict():
     cfg     = OutputConfig()
     rebuilt = OutputConfig.from_dict(cfg.as_dict())
-    assert rebuilt.use_amplitude == cfg.use_amplitude
+    assert rebuilt.use_amplitude          == cfg.use_amplitude
     assert set(rebuilt.output_strategies) == set(cfg.output_strategies)
 
 
@@ -80,8 +78,8 @@ def test_output_config_strategy_for_known_key():
 
 
 def test_presets_by_name_resolves_and_rejects():
-    assert Presets.by_name("zscore").norm_method            is NormMethod.ZSCORE
-    assert Presets.by_name("robust_iqr_log1p").apply_log1p  is True
+    assert Presets.by_name("zscore").norm_method           is NormMethod.ZSCORE
+    assert Presets.by_name("robust_iqr_log1p").apply_log1p is True
 
     with pytest.raises(ValueError):
         Presets.by_name("not_a_preset")
@@ -89,24 +87,24 @@ def test_presets_by_name_resolves_and_rejects():
 
 def test_normalization_config_per_slot_matches_slot_defaults():
     cfg = NormalizationConfig()
-    assert cfg.input_strategy  == "per_slot"
-    assert cfg.output_strategy == "per_slot"
-    assert cfg.strategy("input", "pass/mag")  == _SLOT_STRATEGIES["pass/mag"]
-    assert cfg.strategy("output", "out/amp")  == _SLOT_STRATEGIES["out/amp"]
+    assert cfg.input_strategy                == "per_slot"
+    assert cfg.output_strategy               == "per_slot"
+    assert cfg.strategy("input", "pass/mag") == _SLOT_STRATEGIES["pass/mag"]
+    assert cfg.strategy("output", "out/amp") == _SLOT_STRATEGIES["out/amp"]
 
 
 def test_normalization_config_named_preset_overrides_every_slot():
     cfg = NormalizationConfig(input_strategy="zscore", output_strategy="zscore")
-    assert cfg.strategy("input", "pass/mag").norm_method  is NormMethod.ZSCORE
-    assert cfg.strategy("output", "out/amp").norm_method  is NormMethod.ZSCORE
+    assert cfg.strategy("input", "pass/mag").norm_method is NormMethod.ZSCORE
+    assert cfg.strategy("output", "out/amp").norm_method is NormMethod.ZSCORE
 
 
 def test_normalization_config_per_channel_override_wins_over_global():
     cfg = NormalizationConfig(output_strategy="per_slot", out_amp="zscore")
 
-    assert cfg.strategy("output", "out/amp").norm_method   is NormMethod.ZSCORE
-    assert cfg.strategy("output", "out/sigma") == _SLOT_STRATEGIES["out/sigma"]
-    assert cfg.strategy("input", "pass/mag")   == _SLOT_STRATEGIES["pass/mag"]
+    assert cfg.strategy("output", "out/amp").norm_method is NormMethod.ZSCORE
+    assert cfg.strategy("output", "out/sigma")           == _SLOT_STRATEGIES["out/sigma"]
+    assert cfg.strategy("input", "pass/mag")             == _SLOT_STRATEGIES["pass/mag"]
 
 
 def test_normalization_clamp_round_trips_through_dict():
@@ -147,7 +145,7 @@ def test_augmentation_config_probabilities_in_range():
 
 def test_dataset_config_requires_run_dir_and_split():
     cfg = DatasetConfig(preprocessing_run_directory="/tmp/run", split_regions=make_split_regions())
-    assert cfg.batch_size > 0
+    assert cfg.batch_size  > 0
     assert cfg.num_workers >= 0
     assert isinstance(cfg.patch, PatchConfig)
     assert isinstance(cfg.input_config, InputConfig)
@@ -212,10 +210,10 @@ def test_channel_stats_round_trips():
     )
     rebuilt = ChannelStats.from_dict(stats.as_dict())
     assert rebuilt.n_channels == stats.n_channels
-    assert rebuilt.loc == stats.loc
-    assert rebuilt.scale == stats.scale
-    assert rebuilt.names == stats.names
-    assert rebuilt.clampable == stats.clampable
+    assert rebuilt.loc        == stats.loc
+    assert rebuilt.scale      == stats.scale
+    assert rebuilt.names      == stats.names
+    assert rebuilt.clampable  == stats.clampable
 
 
 def test_channel_stats_serialization_requires_clampable():

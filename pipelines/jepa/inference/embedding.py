@@ -45,18 +45,18 @@ class JepaEmbeddingEvaluator:
         cosine = F.cosine_similarity(z_hat_n, z_star_n, dim=1)
 
         return {
-            "embedding_sq"  : float(((z_hat_n - z_star_n) ** 2).sum()),
-            "embedding_n"   : float(z_hat_n.numel()),
-            "cosine_sum"    : float(cosine.sum()),
-            "cosine_n"      : float(cosine.numel()),
-            "decode_sq"     : float(((decode_star - gt_curve_n) ** 2).sum()),
-            "chain_sq"      : float(((decode_hat  - gt_curve_n) ** 2).sum()),
-            "curve_n"       : float(gt_curve_n.numel()),
+            "embedding_sq" : float(((z_hat_n - z_star_n) ** 2).sum()),
+            "embedding_n"  : float(z_hat_n.numel()),
+            "cosine_sum"   : float(cosine.sum()),
+            "cosine_n"     : float(cosine.numel()),
+            "decode_sq"    : float(((decode_star - gt_curve_n) ** 2).sum()),
+            "chain_sq"     : float(((decode_hat  - gt_curve_n) ** 2).sum()),
+            "curve_n"      : float(gt_curve_n.numel()),
         }
 
     def _accumulate(self) -> Dict[str, float]:
-        x     = np.asarray(self._run.x_axis, dtype=np.float32).reshape(1, 1, -1, 1, 1)
-        sums  = {}
+        x    = np.asarray(self._run.x_axis, dtype=np.float32).reshape(1, 1, -1, 1, 1)
+        sums = {}
 
         with torch.no_grad():
             for batch in self._run.loader:

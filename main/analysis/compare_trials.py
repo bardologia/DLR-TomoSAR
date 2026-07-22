@@ -21,18 +21,18 @@ def main() -> None:
 
     config = ConfigCli(TrialComparisonConfig(), description="Compare inference results across multiple training trials").apply()
 
-    runs_dir  = Path(config.runs_dir)
-    base_out  = Path(config.output_dir) if config.output_dir else runs_dir / "_comparison"
-    out_dir   = base_out / RunTag.now()
+    runs_dir = Path(config.runs_dir)
+    base_out = Path(config.output_dir) if config.output_dir else runs_dir / "_comparison"
+    out_dir  = base_out / RunTag.now()
 
     with Logger(log_dir=str(out_dir / "logs"), name="compare_trials") as logger:
         logger.section("Trial comparison")
         logger.kv_table({
-            "Runs dir"      : str(runs_dir),
-            "Trials"        : len(config.run_tags),
-            "Compare images": config.compare_images,
-            "Compare GIFs"  : config.compare_gifs,
-            "Output dir"    : str(out_dir),
+            "Runs dir"       : str(runs_dir),
+            "Trials"         : len(config.run_tags),
+            "Compare images" : config.compare_images,
+            "Compare GIFs"   : config.compare_gifs,
+            "Output dir"     : str(out_dir),
         }, title="Configuration")
 
         collector = TrialCollector(runs_dir=runs_dir, run_tags=config.run_tags, logger=logger)

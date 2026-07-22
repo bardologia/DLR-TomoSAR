@@ -6,13 +6,13 @@ from pathlib     import Path
 import numpy as np
 
 from configuration.cross_validation import CrossValidationConfig
-from pipelines.shared.comparison.trial_collection                 import TrialCollector, TrialRecord
-from pipelines.shared.training.worker_base             import WorkerBase
-from pipelines.cross_validation.folds                  import FoldConfigFactory, FoldNaming
-from tools.data.io                                      import FileIO
-from tools.metrics.scoring                             import SeedAggregation
-from tools.data.regions                                import SplitRegions
-from tools.monitoring.logger                           import Logger
+from pipelines.shared.comparison.trial_collection import TrialCollector, TrialRecord
+from pipelines.shared.training.worker_base        import WorkerBase
+from pipelines.cross_validation.folds             import FoldConfigFactory, FoldNaming
+from tools.data.io           import FileIO
+from tools.metrics.scoring   import SeedAggregation
+from tools.data.regions      import SplitRegions
+from tools.monitoring.logger import Logger
 
 
 class FoldCollector(TrialCollector):
@@ -81,8 +81,8 @@ class FoldCollector(TrialCollector):
     def collect_by_split(self) -> tuple[list[TrialRecord], dict[str, list[TrialRecord]]]:
         groups = self._group_by_fold(self.collect())
 
-        base_records     = []
-        records_by_split = {split: [] for split in self.splits}
+        base_records         = []
+        records_by_split     = {split: [] for split in self.splits}
         self.seed_dispersion = {}
 
         for fold_name, runs in groups:
@@ -212,8 +212,8 @@ class FoldTrainingWorker(CrossValidationWorker):
 
     def run(self, fold_index: int, seed: int | None = None) -> None:
         dispatch = {
-            "backbone"    : self._run_backbone,
-            "jepa"        : self._run_jepa,
+            "backbone"            : self._run_backbone,
+            "jepa"                : self._run_jepa,
             "profile_autoencoder" : self._run_profile_autoencoder,
         }
 

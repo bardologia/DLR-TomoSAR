@@ -6,10 +6,10 @@ from script_config_resolver import ScriptConfigResolver
 
 class JobDescriber:
 
-    MAX_LENGTH     = 240
-    MAX_EXTRAS     = 3
-    MAX_EXTRA_LEN  = 40
-    UNSET_VALUES   = ("", "None", "none", "null", "[]", "{}", "()")
+    MAX_LENGTH    = 240
+    MAX_EXTRAS    = 3
+    MAX_EXTRA_LEN = 40
+    UNSET_VALUES  = ("", "None", "none", "null", "[]", "{}", "()")
 
     LEADS = {
         "train_backbone"  : "_lead_train_backbone",

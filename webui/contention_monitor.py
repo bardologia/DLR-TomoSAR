@@ -12,20 +12,20 @@ from web_logger import WebLogger
 
 class ContentionMonitor:
 
-    INTERVAL     = 5.0
-    SECTOR       = 512
-    SHARE        = 0.5
-    MEM_PSI_SOME = 10.0
-    MEM_PSI_FULL  = 3.0
-    IO_PSI_SOME   = 25.0
-    IO_UTIL       = 80.0
-    CPU_PSI_SOME  = 40.0
-    LOAD_RATIO    = 1.0
-    SWAP_OUT_MBS  = 0.5
-    CLEAR_MARGIN  = 0.8
-    SUSTAIN       = 2
-    NUKE_SUSTAIN  = 6
-    NUKE_COOLDOWN = 120.0
+    INTERVAL            = 5.0
+    SECTOR              = 512
+    SHARE               = 0.5
+    MEM_PSI_SOME        = 10.0
+    MEM_PSI_FULL        = 3.0
+    IO_PSI_SOME         = 25.0
+    IO_UTIL             = 80.0
+    CPU_PSI_SOME        = 40.0
+    LOAD_RATIO          = 1.0
+    SWAP_OUT_MBS        = 0.5
+    CLEAR_MARGIN        = 0.8
+    SUSTAIN             = 2
+    NUKE_SUSTAIN        = 6
+    NUKE_COOLDOWN       = 120.0
     LEAK_WINDOW_SAMPLES = 48
     LEAK_RECENT_SAMPLES = 12
     LEAK_MEM_FLOOR_GB   = 1.5
@@ -33,16 +33,16 @@ class ContentionMonitor:
     LEAK_RECENT_MB      = 60.0
 
     def __init__(self, paths, logger: WebLogger, nuke) -> None:
-        self.paths   = paths
-        self.logger  = logger
-        self.nuke    = nuke
-        self.lock    = threading.Lock()
-        self.armed   = False
-        self.uid     = os.getuid()
-        self.clk     = os.sysconf("SC_CLK_TCK")
-        self.page    = os.sysconf("SC_PAGE_SIZE")
-        self.cores   = os.cpu_count() or 1
-        self.device  = self._resolve_device()
+        self.paths  = paths
+        self.logger = logger
+        self.nuke   = nuke
+        self.lock   = threading.Lock()
+        self.armed  = False
+        self.uid    = os.getuid()
+        self.clk    = os.sysconf("SC_CLK_TCK")
+        self.page   = os.sysconf("SC_PAGE_SIZE")
+        self.cores  = os.cpu_count() or 1
+        self.device = self._resolve_device()
 
         self.signals = {}
         self.active  = {}
@@ -76,27 +76,27 @@ class ContentionMonitor:
 
     def state(self) -> dict:
         limits = {
-            "mem_psi_some"  : self.MEM_PSI_SOME,
-            "io_psi_some"   : self.IO_PSI_SOME,
-            "cpu_psi_some"  : self.CPU_PSI_SOME,
-            "load_ratio"    : self.LOAD_RATIO,
-            "swap_out_mbs"  : self.SWAP_OUT_MBS,
-            "share"         : self.SHARE,
-            "interval"      : self.INTERVAL,
-            "nuke_after_s"  : self.NUKE_SUSTAIN * self.INTERVAL,
+            "mem_psi_some" : self.MEM_PSI_SOME,
+            "io_psi_some"  : self.IO_PSI_SOME,
+            "cpu_psi_some" : self.CPU_PSI_SOME,
+            "load_ratio"   : self.LOAD_RATIO,
+            "swap_out_mbs" : self.SWAP_OUT_MBS,
+            "share"        : self.SHARE,
+            "interval"     : self.INTERVAL,
+            "nuke_after_s" : self.NUKE_SUSTAIN * self.INTERVAL,
         }
 
         with self.lock:
             return {
-                "armed"      : self.armed,
-                "auto_nuke"  : self.auto_nuke,
-                "nuke_streak": self.nuke_streak,
-                "device"     : self.device,
-                "limits"     : limits,
-                "signals"    : dict(self.signals),
-                "impacting"  : any(a["mine"] for a in self.active.values()),
-                "active"     : list(self.active.values()),
-                "events"     : list(self.events),
+                "armed"       : self.armed,
+                "auto_nuke"   : self.auto_nuke,
+                "nuke_streak" : self.nuke_streak,
+                "device"      : self.device,
+                "limits"      : limits,
+                "signals"     : dict(self.signals),
+                "impacting"   : any(a["mine"] for a in self.active.values()),
+                "active"      : list(self.active.values()),
+                "events"      : list(self.events),
             }
 
     def _watch(self) -> None:
@@ -239,15 +239,15 @@ class ContentionMonitor:
         return None
 
     def _scan(self, now: float, dt: float) -> dict:
-        mine_mem   = 0
-        jiffies    = 0
-        io_bytes   = 0
-        nproc      = 0
-        per_mem    = {}
-        per_comm   = {}
-        user_mem   = {}
-        user_n     = {}
-        top        = (0, None, "", self.uid)
+        mine_mem = 0
+        jiffies  = 0
+        io_bytes = 0
+        nproc    = 0
+        per_mem  = {}
+        per_comm = {}
+        user_mem = {}
+        user_n   = {}
+        top      = (0, None, "", self.uid)
 
         for entry in os.listdir("/proc"):
             if not entry.isdigit():

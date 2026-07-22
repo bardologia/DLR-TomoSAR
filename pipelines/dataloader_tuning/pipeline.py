@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import json
 import os
-from pathlib  import Path
+from pathlib import Path
 
 import torch
 
-from tools.benchmarking            import LoaderSpec, GpuFeedBenchmark, DataLoaderSweep, SweepReport
-from tools.monitoring.logger       import Logger
-from tools.runtime.event_stream    import JsonEventStream
-from tools.runtime.reproducibility import Reproducibility
+from tools.benchmarking                   import LoaderSpec, GpuFeedBenchmark, DataLoaderSweep, SweepReport
+from tools.monitoring.logger              import Logger
+from tools.runtime.event_stream           import JsonEventStream
+from tools.runtime.reproducibility        import Reproducibility
 from pipelines.dataloader_tuning.adapters import build_feed_target
 
 
@@ -142,7 +142,7 @@ class DataLoaderTuningPipeline:
         return results_path
 
     def run(self):
-        target          = self._build_target()
+        target            = self._build_target()
         benchmark, device = self._build_benchmark(target)
 
         parameter_count = sum(parameter.numel() for parameter in target.model.parameters())

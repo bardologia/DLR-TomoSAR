@@ -9,36 +9,36 @@ import threading
 from pathlib      import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
-from config_registry        import ConfigRegistry
-from cube_explorer          import CubeExplorer
-from dataset_browser        import DatasetBrowser
-from equation_library       import EquationLibrary
-from fit_lab                import FitLab
-from flow_library           import FlowLibrary
-from gpu_schedule           import GpuSchedule
-from gpu_watchdog           import GpuWatchdog
-from launch_layout           import LaunchLayout, LayoutError
-from backbone_model_library          import BackboneModelLibrary
-from image_autoencoder_model_library  import ImageAutoencoderModelLibrary
-from pipeline_library       import PipelineLibrary
-from repomap_library        import RepoMapLibrary
+from config_registry                   import ConfigRegistry
+from cube_explorer                     import CubeExplorer
+from dataset_browser                   import DatasetBrowser
+from equation_library                  import EquationLibrary
+from fit_lab                           import FitLab
+from flow_library                      import FlowLibrary
+from gpu_schedule                      import GpuSchedule
+from gpu_watchdog                      import GpuWatchdog
+from launch_layout                     import LaunchLayout, LayoutError
+from backbone_model_library            import BackboneModelLibrary
+from image_autoencoder_model_library   import ImageAutoencoderModelLibrary
+from pipeline_library                  import PipelineLibrary
+from repomap_library                   import RepoMapLibrary
 from profile_autoencoder_model_library import ProfileAutoencoderModelLibrary
-from jepa_model_library               import JepaModelLibrary
-from notifier               import JobNotifier
-from physics_loss_library   import PhysicsLossLibrary
-from process_manager        import ProcessManager, ProcessNuke, ServerDetacher
-from project_paths          import ProjectPaths
-from resource_watchdog      import ResourceWatchdog
-from results_browser        import ResultsBrowser
-from run_leaderboard        import RunLeaderboard
-from saved_run_store        import SavedRunStore
-from script_catalog         import ScriptCatalog
-from script_config_resolver import ScriptConfigResolver
-from system_monitor         import SystemMonitor
-from contention_monitor      import ContentionMonitor
-from tensorboard_manager    import TensorboardManager
-from training_curves        import TrainingCurves
-from web_logger             import WebLogger
+from jepa_model_library                import JepaModelLibrary
+from notifier                          import JobNotifier
+from physics_loss_library              import PhysicsLossLibrary
+from process_manager                   import ProcessManager, ProcessNuke, ServerDetacher
+from project_paths                     import ProjectPaths
+from resource_watchdog                 import ResourceWatchdog
+from results_browser                   import ResultsBrowser
+from run_leaderboard                   import RunLeaderboard
+from saved_run_store                   import SavedRunStore
+from script_catalog                    import ScriptCatalog
+from script_config_resolver            import ScriptConfigResolver
+from system_monitor                    import SystemMonitor
+from contention_monitor                import ContentionMonitor
+from tensorboard_manager               import TensorboardManager
+from training_curves                   import TrainingCurves
+from web_logger                        import WebLogger
 
 
 class RequestRouter:
@@ -51,38 +51,38 @@ class RequestRouter:
     }
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, saved_runs: SavedRunStore, notifier: JobNotifier, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves, fitlab: FitLab) -> None:
-        self.paths       = paths
-        self.logger      = logger
-        self.catalog     = catalog
-        self.resolver    = resolver
-        self.layout      = layout
-        self.configs     = configs
-        self.equations   = equations
-        self.physics_loss = physics_loss
-        self.flows       = flows
-        self.models      = models
+        self.paths             = paths
+        self.logger            = logger
+        self.catalog           = catalog
+        self.resolver          = resolver
+        self.layout            = layout
+        self.configs           = configs
+        self.equations         = equations
+        self.physics_loss      = physics_loss
+        self.flows             = flows
+        self.models            = models
         self.profile_ae_models = profile_ae_models
         self.image_ae_models   = image_ae_models
         self.jepa_models       = jepa_models
-        self.pipelines   = pipelines
-        self.repomap     = repomap
-        self.processes   = processes
-        self.saved_runs  = saved_runs
-        self.notifier    = notifier
-        self.nuke        = nuke
-        self.detacher    = detacher
-        self.system      = system
-        self.watchdog    = watchdog
-        self.contention  = contention
-        self.gpu_guard    = gpu_guard
-        self.gpu_schedule = gpu_schedule
-        self.tensorboard = tensorboard
-        self.results     = results
-        self.cubes       = cubes
-        self.datasets    = datasets
-        self.leaderboard = leaderboard
-        self.curves      = curves
-        self.fitlab      = fitlab
+        self.pipelines         = pipelines
+        self.repomap           = repomap
+        self.processes         = processes
+        self.saved_runs        = saved_runs
+        self.notifier          = notifier
+        self.nuke              = nuke
+        self.detacher          = detacher
+        self.system            = system
+        self.watchdog          = watchdog
+        self.contention        = contention
+        self.gpu_guard         = gpu_guard
+        self.gpu_schedule      = gpu_schedule
+        self.tensorboard       = tensorboard
+        self.results           = results
+        self.cubes             = cubes
+        self.datasets          = datasets
+        self.leaderboard       = leaderboard
+        self.curves            = curves
+        self.fitlab            = fitlab
 
     def _route_get(self, handler, path: str) -> None:
         if path == "/" or path == "":
@@ -445,18 +445,18 @@ class RequestRouter:
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
         if path == "/api/gpu-guard/history":
-            query  = parse_qs(urlparse(handler.path).query)
-            limit  = int((query.get("limit") or ["100"])[0])
+            query = parse_qs(urlparse(handler.path).query)
+            limit = int((query.get("limit") or ["100"])[0])
             self._send_json(handler, self.gpu_guard.history(limit))
             return
         if path == "/api/system":
-            payload              = self.system.snapshot()
-            payload["alerts"]    = self.watchdog.state()
-            payload["impact"]    = self.contention.state()
+            payload                 = self.system.snapshot()
+            payload["alerts"]       = self.watchdog.state()
+            payload["impact"]       = self.contention.state()
             payload["gpu_guard"]    = self.gpu_guard.state()
             payload["gpu_schedule"] = self.gpu_schedule.state()
-            payload["server"]    = self.detacher.state()
-            payload["notify"]    = self.notifier.state()
+            payload["server"]       = self.detacher.state()
+            payload["notify"]       = self.notifier.state()
             self._send_json(handler, payload)
             return
         if path.startswith("/api/jobs/") and path.endswith("/stream"):

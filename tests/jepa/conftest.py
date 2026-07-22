@@ -6,9 +6,9 @@ import pytest
 import torch
 import torch.nn as nn
 
-from configuration.architectures               import MlpAutoencoderConfig
-from configuration.training.jepa               import EmbeddingLossConfig
-from models.profile_autoencoder                import get_profile_autoencoder
+from configuration.architectures                         import MlpAutoencoderConfig
+from configuration.training.jepa                         import EmbeddingLossConfig
+from models.profile_autoencoder                          import get_profile_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 
 

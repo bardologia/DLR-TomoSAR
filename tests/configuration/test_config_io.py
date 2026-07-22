@@ -9,12 +9,10 @@ from pipelines.shared.config.config_persistence import (
     ProfileAutoencoderConfigIO,
     ImageAutoencoderConfigIO,
 )
-
-from models.backbone            import BACKBONE_CONFIG_REGISTRY
-from models.profile_autoencoder import PROFILE_AE_CONFIG_REGISTRY
-from models.image_autoencoder   import IMAGE_AE_CONFIG_REGISTRY
-
-from tools.data.io import FileIO
+from models.backbone                            import BACKBONE_CONFIG_REGISTRY
+from models.profile_autoencoder                 import PROFILE_AE_CONFIG_REGISTRY
+from models.image_autoencoder                   import IMAGE_AE_CONFIG_REGISTRY
+from tools.data.io                              import FileIO
 
 
 BACKBONE_CASES = [pytest.param(name, id=name) for name in BACKBONE_CONFIG_REGISTRY]
@@ -24,7 +22,7 @@ IMAGE_CASES    = [pytest.param(name, id=name) for name in IMAGE_AE_CONFIG_REGIST
 
 @pytest.mark.parametrize("name", BACKBONE_CASES)
 def test_backbone_config_io_round_trips(tmp_path, name):
-    config           = BACKBONE_CONFIG_REGISTRY[name]()
+    config = BACKBONE_CONFIG_REGISTRY[name]()
     BackboneModelConfigIO.save(config, name, tmp_path)
 
     assert BackboneModelConfigIO.exists(tmp_path)
@@ -55,7 +53,7 @@ def test_backbone_config_io_round_trips_the_head_into_a_loadable_model(tmp_path,
 
 @pytest.mark.parametrize("name", PROFILE_CASES)
 def test_profile_ae_config_io_round_trips(tmp_path, name):
-    config           = PROFILE_AE_CONFIG_REGISTRY[name]()
+    config = PROFILE_AE_CONFIG_REGISTRY[name]()
     ProfileAutoencoderConfigIO.save(config, name, tmp_path)
 
     loaded, raw_name = ProfileAutoencoderConfigIO.load(tmp_path)
@@ -66,7 +64,7 @@ def test_profile_ae_config_io_round_trips(tmp_path, name):
 
 @pytest.mark.parametrize("name", IMAGE_CASES)
 def test_image_ae_config_io_round_trips(tmp_path, name):
-    config           = IMAGE_AE_CONFIG_REGISTRY[name]()
+    config = IMAGE_AE_CONFIG_REGISTRY[name]()
     ImageAutoencoderConfigIO.save(config, name, tmp_path)
 
     loaded, raw_name = ImageAutoencoderConfigIO.load(tmp_path)
@@ -94,7 +92,7 @@ def test_backbone_config_io_normalizes_name(tmp_path):
 
 
 def test_backbone_config_io_excludes_shape_logger_types(tmp_path):
-    config  = BACKBONE_CONFIG_REGISTRY["unet"]()
+    config = BACKBONE_CONFIG_REGISTRY["unet"]()
     BackboneModelConfigIO.save(config, "unet", tmp_path)
 
     payload = FileIO.load_json(tmp_path / BackboneModelConfigIO.FILENAME)

@@ -120,6 +120,6 @@ def test_mag_real_imag_norm_on_real_data(interferograms):
     data = np.asarray(interferograms[0, :16, :16]).astype(np.complex64)
     out  = _convert_single_pass(Representation.MAG_REAL_IMAG, data)
 
-    norm = out[1] ** 2 + out[2] ** 2
+    norm    = out[1] ** 2 + out[2] ** 2
     nonzero = np.abs(data) > 0
     assert np.allclose(norm[nonzero], 1.0, atol=1e-3)

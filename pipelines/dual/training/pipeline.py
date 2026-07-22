@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from configuration.architectures import DualResUNetConfig
-from models.dual import get_dual
+from configuration.architectures                import DualResUNetConfig
+from models.dual                                import get_dual
 from pipelines.backbone.training.pipeline       import TrainingPipeline
 from pipelines.shared.config.config_persistence import DualModelConfigIO
 from pipelines.shared.model.model_builder       import ModelBuilder

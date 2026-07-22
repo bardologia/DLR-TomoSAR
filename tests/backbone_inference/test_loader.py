@@ -6,27 +6,27 @@ import numpy as np
 import pytest
 import torch
 
-from configuration.inference import InferenceConfig
-from models import BACKBONE_CONFIG_REGISTRY, BACKBONE_MODEL_REGISTRY, get_backbone
-from pipelines.backbone.inference.loader import RunLoader
-from pipelines.backbone.inference.model_wrapper import ModelWrapper
+from configuration.inference                         import InferenceConfig
+from models                                          import BACKBONE_CONFIG_REGISTRY, BACKBONE_MODEL_REGISTRY, get_backbone
+from pipelines.backbone.inference.loader             import RunLoader
+from pipelines.backbone.inference.model_wrapper      import ModelWrapper
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
-from pipelines.shared.config.config_persistence import BackboneModelConfigIO
+from pipelines.shared.config.config_persistence      import BackboneModelConfigIO
 
 from tests.models_backbone._helpers import SMALL_OVERRIDES, WINDOW
 
 
 def _write_fake_checkpoint(path: Path, x_axis: np.ndarray) -> dict:
     state = {
-        "weight": torch.zeros(2, 2),
-        "bias":   torch.zeros(2),
+        "weight" : torch.zeros(2, 2),
+        "bias"   : torch.zeros(2),
     }
     ckpt = {
-        "params":        state,
-        "x_axis":        x_axis,
-        "epoch":         7,
-        "best_val_loss": 0.125,
-        "best_epoch":    5,
+        "params"        : state,
+        "x_axis"        : x_axis,
+        "epoch"         : 7,
+        "best_val_loss" : 0.125,
+        "best_epoch"    : 5,
     }
     torch.save(ckpt, str(path))
     return ckpt
@@ -67,12 +67,12 @@ def test_load_checkpoint_uses_weights_only_false(tmp_path):
     x_axis    = np.arange(8, dtype=np.float32)
     ckpt_path = tmp_path / "obj.pt"
     ckpt      = {
-        "params":        {"w": torch.ones(1)},
-        "x_axis":        x_axis,
-        "epoch":         0,
-        "best_val_loss": 1.0,
-        "best_epoch":    0,
-        "extra":         np.array([1, 2, 3]),
+        "params"        : {"w": torch.ones(1)},
+        "x_axis"        : x_axis,
+        "epoch"         : 0,
+        "best_val_loss" : 1.0,
+        "best_epoch"    : 0,
+        "extra"         : np.array([1, 2, 3]),
     }
     torch.save(ckpt, str(ckpt_path))
 

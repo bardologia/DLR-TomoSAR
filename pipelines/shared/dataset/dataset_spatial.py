@@ -27,13 +27,13 @@ class Layout:
 
         self.logger.section("[Layout Loaded]")
         self.logger.kv_table({
-            "Run Directory":   self.run_directory,
-            "Global Crop":     self.global_crop.as_tuple(),
-            "Azimuth (lines)": self.global_crop.azimuth_size,
-            "Range (samples)": self.global_crop.range_size,
-            "Tomogram Tag":    self.tomogram_tag,
-            "Pass Labels":     ", ".join(self.pass_labels) if self.pass_labels else "unavailable",
-            "Parameters":      self.parameters_path,
+            "Run Directory"   : self.run_directory,
+            "Global Crop"     : self.global_crop.as_tuple(),
+            "Azimuth (lines)" : self.global_crop.azimuth_size,
+            "Range (samples)" : self.global_crop.range_size,
+            "Tomogram Tag"    : self.tomogram_tag,
+            "Pass Labels"     : ", ".join(self.pass_labels) if self.pass_labels else "unavailable",
+            "Parameters"      : self.parameters_path,
         })
 
     @property

@@ -11,6 +11,7 @@ class InferenceMetadata:
         paths = config.paths
 
         base = config.run_directory / "inference" / self.SUBDIR
+
         self.output_dir   = base / config.output_subdir if config.output_subdir else base / RunTag.now()
         self.figures_dir  = self.output_dir / paths.figures_subdir
         self.logs_dir     = self.output_dir / paths.logs_subdir

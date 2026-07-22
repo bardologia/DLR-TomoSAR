@@ -205,7 +205,7 @@ def test_steering_terms_invariant_to_phase_sign(parameters, test_data_dir, name)
     _, pc        = _pred(gt_params, 0.2, seed=3)
     pc           = pc.detach()
 
-    s2, o2 = _flip(geom)
+    s2, o2  = _flip(geom)
     flipped = type(geom).__new__(type(geom))
     flipped.steering = s2
     flipped.outer    = o2

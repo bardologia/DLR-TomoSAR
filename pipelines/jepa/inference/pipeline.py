@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pipelines.backbone.inference.pipeline import InferenceComponents
+from pipelines.backbone.inference.pipeline  import InferenceComponents
 from pipelines.backbone.inference.predictor import Predictor
 from pipelines.jepa.inference.embedding     import JepaEmbeddingEvaluator
 from pipelines.jepa.inference.loader        import JepaParamRunLoader, JepaRunLoader

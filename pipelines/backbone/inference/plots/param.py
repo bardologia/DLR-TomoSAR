@@ -11,8 +11,8 @@ import matplotlib.pyplot    as plt
 import numpy                as np
 
 from pipelines.backbone.inference.plots.base import PlotTools
-from tools.loss.param_loss                    import ParamMatcher
-from tools.metrics.gaussian_matching          import GaussianMatcher
+from tools.loss.param_loss                   import ParamMatcher
+from tools.metrics.gaussian_matching         import GaussianMatcher
 
 
 class ParamPlotter(PlotTools):

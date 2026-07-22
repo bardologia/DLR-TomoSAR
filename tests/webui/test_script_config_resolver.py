@@ -15,7 +15,7 @@ if str(WEBUI_ROOT) not in sys.path:
     sys.path.insert(0, str(WEBUI_ROOT))
 
 from configuration.training.general.ablation import AblationCatalog
-from script_config_resolver                    import ScriptConfigResolver
+from script_config_resolver                  import ScriptConfigResolver
 
 
 @pytest.fixture(scope="module")

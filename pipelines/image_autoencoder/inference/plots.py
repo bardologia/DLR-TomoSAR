@@ -61,8 +61,8 @@ class ImageAePlots(AePlotsBase):
         fig, ax = plt.subplots(figsize=(5.0, 5.0))
         ax.scatter(pg, pp, s=3, alpha=0.25, color="#1f4e79", edgecolors="none")
 
-        lo  = float(min(pg.min(initial=0.0), pp.min(initial=0.0)))
-        hi  = float(max(pg.max(initial=0.0), pp.max(initial=0.0)))
+        lo = float(min(pg.min(initial=0.0), pp.min(initial=0.0)))
+        hi = float(max(pg.max(initial=0.0), pp.max(initial=0.0)))
         ax.plot([lo, hi], [lo, hi], color="#c0392b", linewidth=1.0, linestyle="--")
 
         ax.set_xlabel("mean patch intensity (ground truth)")
@@ -77,17 +77,17 @@ class ImageAePlots(AePlotsBase):
         gt   = result.gt
         pred = result.pred
 
-        order  = np.argsort(mse)
-        rng    = np.random.default_rng(cfg.patch_seed)
+        order = np.argsort(mse)
+        rng   = np.random.default_rng(cfg.patch_seed)
 
         best   = order[: cfg.n_best_patches]
         worst  = order[::-1][: cfg.n_worst_patches]
         random = rng.choice(mse.shape[0], size=min(cfg.n_random_patches, mse.shape[0]), replace=False) if mse.shape[0] else np.empty(0, dtype=np.int64)
 
         figures = {
-            "best"   : self._reconstructions(gt, pred, mse, best,   "best",   figures_dir),
-            "worst"  : self._reconstructions(gt, pred, mse, worst,  "worst",  figures_dir),
-            "random" : self._reconstructions(gt, pred, mse, random, "random", figures_dir),
+            "best"              : self._reconstructions(gt, pred, mse, best,   "best",   figures_dir),
+            "worst"             : self._reconstructions(gt, pred, mse, worst,  "worst",  figures_dir),
+            "random"            : self._reconstructions(gt, pred, mse, random, "random", figures_dir),
             "error_histogram"   : [self._error_histogram(mse, figures_dir)],
             "channel_mse"       : [self._channel_mse(channel_mse, figures_dir)],
             "intensity_scatter" : [self._intensity_scatter(gt, pred, cfg.n_scatter_points, cfg.patch_seed, figures_dir)],

@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 import torch
 
+from configuration.benchmark.dataloader_tuning import DataLoaderTuningEntryConfig
 from pipelines.dataloader_tuning.adapters import (
     DEFAULT_MODEL,
     FEED_ADAPTERS,
@@ -19,8 +20,6 @@ from pipelines.dataloader_tuning.adapters import (
     SyntheticFeedAdapter,
     build_feed_target,
 )
-
-from configuration.benchmark.dataloader_tuning import DataLoaderTuningEntryConfig
 from tools.data.gaussians import GaussianMixture
 
 

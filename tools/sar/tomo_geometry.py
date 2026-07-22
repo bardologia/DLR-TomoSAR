@@ -45,13 +45,13 @@ class TomoGeometry:
 
     def describe(self) -> dict:
         return {
-            "Tracks":           self.n_tracks,
-            "kz min":           f"{float(self.kz.min()):.4f} rad/m",
-            "kz max":           f"{float(self.kz.max()):.4f} rad/m",
-            "Wavelength":       f"{self.cfg.wavelength} m",
-            "Slant range":      f"{self.cfg.slant_range} m",
-            "Look angle":       f"{self.cfg.look_angle_deg} deg",
-            "Axis convention":  self.cfg.height_axis_convention,
-            "kz source":        self._kz_source(),
-            "Baselines origin": getattr(self.cfg, "baselines_origin", "config"),
+            "Tracks"           : self.n_tracks,
+            "kz min"           : f"{float(self.kz.min()):.4f} rad/m",
+            "kz max"           : f"{float(self.kz.max()):.4f} rad/m",
+            "Wavelength"       : f"{self.cfg.wavelength} m",
+            "Slant range"      : f"{self.cfg.slant_range} m",
+            "Look angle"       : f"{self.cfg.look_angle_deg} deg",
+            "Axis convention"  : self.cfg.height_axis_convention,
+            "kz source"        : self._kz_source(),
+            "Baselines origin" : getattr(self.cfg, "baselines_origin", "config"),
         }

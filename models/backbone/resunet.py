@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 
 from configuration.architectures import ResUNetConfig, UNetSkipConfig
-from ..blocks                          import build_upsample, initialize_weights
-from ..blocks                          import OutputHeadsMixin, ResidualConvBlock, match_spatial_size
+from ..blocks                    import build_upsample, initialize_weights
+from ..blocks                    import OutputHeadsMixin, ResidualConvBlock, match_spatial_size
 
 
 class ResUNetBackbone(nn.Module, OutputHeadsMixin):

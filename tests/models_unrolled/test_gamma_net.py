@@ -6,10 +6,10 @@ import torch
 from models.unrolled import GammaNet, TomoOperator, UNROLLED_CONFIG_REGISTRY, UNROLLED_MODEL_REGISTRY, get_unrolled
 
 
-BATCH    = 2
-TRACKS   = 4
-POINTS   = 64
-WINDOW   = 8
+BATCH  = 2
+TRACKS = 4
+POINTS = 64
+WINDOW = 8
 
 X_AXIS = torch.linspace(-20.0, 40.0, POINTS)
 DX     = float(X_AXIS[1] - X_AXIS[0])

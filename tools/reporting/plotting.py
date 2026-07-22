@@ -62,9 +62,9 @@ class PlotBase:
 
     STYLE_RC = {"report": REPORT_RC, "paper": PAPER_RC}
 
-    PAPER_DPI : int = 300
+    PAPER_DPI: int = 300
 
-    style : str = "report"
+    style: str = "report"
 
     fig_dpi  : int = 150
     save_dpi : int = 150
@@ -125,24 +125,24 @@ class PlotBase:
 
     def _imshow_figure(
         self,
-        data            : np.ndarray,
+        data           : np.ndarray,
         *,
-        x_label         : str,
-        y_label         : str,
-        title           : str,
+        x_label        : str,
+        y_label        : str,
+        title          : str,
         cmap,
-        vmin            : float | None        = None,
-        vmax            : float | None        = None,
-        extent          : list | None         = None,
-        origin          : str                 = "upper",
-        colorbar_label  : str                 = "",
-        interpolation   : str | None          = "nearest",
-        aspect          : str                 = "auto",
-        figsize         : Tuple[float, float] = (6.2, 4.4),
-        discrete        : bool                = False,
-        levels          : List[int] | None    = None,
-        text_overlay    : str | None          = None,
-        path            : Path | None         = None,
+        vmin           : float | None        = None,
+        vmax           : float | None        = None,
+        extent         : list | None         = None,
+        origin         : str                 = "upper",
+        colorbar_label : str                 = "",
+        interpolation  : str | None          = "nearest",
+        aspect         : str                 = "auto",
+        figsize        : Tuple[float, float] = (6.2, 4.4),
+        discrete       : bool                = False,
+        levels         : List[int] | None    = None,
+        text_overlay   : str | None          = None,
+        path           : Path | None         = None,
     ):
         self._apply_style()
 

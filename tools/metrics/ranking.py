@@ -12,7 +12,7 @@ class RankMath:
     @staticmethod
     def average_ranks(values: dict[str, float], reverse: bool) -> dict[str, float]:
         ordered = sorted(values.items(), key=lambda item: item[1], reverse=reverse)
-        ranks   : dict[str, float] = {}
+        ranks: dict[str, float] = {}
 
         start = 0
         count = len(ordered)

@@ -105,13 +105,13 @@ class GeometryField:
         look_deg = np.degrees(self.look_angle)
 
         return {
-            "Tracks"          : self.n_tracks,
-            "Reference"       : self.reference,
-            "Azimuth extent"  : f"[{self.azimuth_start}, {self.azimuth_start + self.n_azimuth})",
-            "Range extent"    : f"[{self.range_start}, {self.range_start + self.n_range})",
-            "Wavelength [m]"  : f"{self.wavelength:.4f}",
-            "Slant range [m]" : f"{float(self.slant_range[0]):.1f} - {float(self.slant_range[-1]):.1f}",
-            "Look angle [deg]": f"{float(look_deg[0]):.2f} - {float(look_deg[-1]):.2f}",
+            "Tracks"           : self.n_tracks,
+            "Reference"        : self.reference,
+            "Azimuth extent"   : f"[{self.azimuth_start}, {self.azimuth_start + self.n_azimuth})",
+            "Range extent"     : f"[{self.range_start}, {self.range_start + self.n_range})",
+            "Wavelength [m]"   : f"{self.wavelength:.4f}",
+            "Slant range [m]"  : f"{float(self.slant_range[0]):.1f} - {float(self.slant_range[-1]):.1f}",
+            "Look angle [deg]" : f"{float(look_deg[0]):.2f} - {float(look_deg[-1]):.2f}",
         }
 
     def save(self, path: str | Path) -> Path:
@@ -198,7 +198,7 @@ class GeometryFieldBuilder:
     def build(self) -> GeometryField:
         self.parameters.validate_right_looking()
 
-        labels                 = self._validate_labels()
+        labels                  = self._validate_labels()
         slant_range, look_angle = self._range_geometry()
         baseline_h, baseline_v  = self._azimuth_baselines()
 

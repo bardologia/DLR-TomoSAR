@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from configuration.benchmark import BenchmarkConfig
-from models                                     import BACKBONE_HEADS, config_registry
+from configuration.benchmark                        import BenchmarkConfig
+from models                                         import BACKBONE_HEADS, config_registry
 from pipelines.shared.model.model_builder           import ModelBuilder
 from pipelines.shared.orchestration.staged_pipeline import StagedPipeline
 

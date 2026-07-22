@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 
 from configuration.architectures import MultiResUNetConfig
-from ..blocks                          import build_activation, build_norm2d, build_upsample, initialize_weights
-from ..blocks                          import OutputHeadsMixin, match_spatial_size
+from ..blocks                    import build_activation, build_norm2d, build_upsample, initialize_weights
+from ..blocks                    import OutputHeadsMixin, match_spatial_size
 
 
 class MultiResBlock(nn.Module):

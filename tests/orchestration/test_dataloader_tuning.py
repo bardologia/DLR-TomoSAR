@@ -3,24 +3,24 @@ from __future__ import annotations
 import pytest
 
 from tools.benchmarking.dataloader_tuning import DataLoaderSweep, LoaderSpec
-from tools.benchmarking.sweep_report     import SweepReport
+from tools.benchmarking.sweep_report      import SweepReport
 
 
 def _ok_record(spec: LoaderSpec, throughput: float, wait: float = 0.0, feed: float = 2.0, util: float = 90.0) -> dict:
     return {
         **spec.as_record(),
-        "loader_only_samples_per_s"    : throughput * feed,
-        "compute_ceiling_samples_per_s": throughput,
-        "feed_ratio"                   : feed,
-        "compute_efficiency"           : 1.0,
-        "end_to_end_samples_per_s"     : throughput,
-        "data_wait_fraction"           : wait,
-        "gpu_available"                : True,
-        "gpu_util_mean"                : util,
-        "gpu_util_max"                 : util,
-        "vram_peak_gb"                 : 1.0,
-        "gpu_n_samples"                : 10,
-        "status"                       : "ok",
+        "loader_only_samples_per_s"     : throughput * feed,
+        "compute_ceiling_samples_per_s" : throughput,
+        "feed_ratio"                    : feed,
+        "compute_efficiency"            : 1.0,
+        "end_to_end_samples_per_s"      : throughput,
+        "data_wait_fraction"            : wait,
+        "gpu_available"                 : True,
+        "gpu_util_mean"                 : util,
+        "gpu_util_max"                  : util,
+        "vram_peak_gb"                  : 1.0,
+        "gpu_n_samples"                 : 10,
+        "status"                        : "ok",
     }
 
 

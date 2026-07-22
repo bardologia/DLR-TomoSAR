@@ -71,7 +71,7 @@ def test_backbone_preparation_loader_batches_consistent(test_data_dir, params_di
     trainer_config = SimpleNamespace(gaussian=gaussian)
     logger         = Logger(log_dir=str(tmp_path / "logs"), name="prep2", level="ERROR")
 
-    prep                       = BackboneDatasetPreparation(dataset_config, trainer_config, tmp_path, logger, seed=0)
+    prep = BackboneDatasetPreparation(dataset_config, trainer_config, tmp_path, logger, seed=0)
     (train_loader, val_loader, test_loader), datasets, _, _ = prep.run()
 
     x, y = next(iter(train_loader))

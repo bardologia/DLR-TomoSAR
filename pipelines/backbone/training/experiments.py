@@ -4,10 +4,10 @@ from pathlib import Path
 
 import numpy as np
 
-from models import get_backbone
+from models                                 import get_backbone
 from pipelines.backbone.training.loss_terms import LOSS_TERMS
-from pipelines.shared.model.model_builder import ModelBuilder
-from tools.baselines import TrackBaselines
+from pipelines.shared.model.model_builder   import ModelBuilder
+from tools.baselines                        import TrackBaselines
 
 
 class TrialPlanner:

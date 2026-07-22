@@ -3,11 +3,11 @@ from __future__ import annotations
 import torch
 
 from pipelines.backbone.training.loss_terms import LOSS_TERMS
-from tools.data.gaussians     import GaussianClamp, GaussianCurve
-from tools.loss.curve_loss    import CurveLoss
-from tools.loss.param_loss    import ParamLoss, ParamMatcher
-from tools.loss.physical_loss import PhysicalLoss
-from tools.sar.tomo_geometry  import TomoGeometry
+from tools.data.gaussians                   import GaussianClamp, GaussianCurve
+from tools.loss.curve_loss                  import CurveLoss
+from tools.loss.param_loss                  import ParamLoss, ParamMatcher
+from tools.loss.physical_loss               import PhysicalLoss
+from tools.sar.tomo_geometry                import TomoGeometry
 
 
 class Loss:
@@ -30,9 +30,9 @@ class Loss:
 
         self.logger.section("[Loss Function]")
         self.logger.kv_table({
-            "Sample points":  x_axis.shape[0],
-            "Log all losses": self.log_all_losses,
-            "Param matching": cfg.param_matching.value,
+            "Sample points"  : x_axis.shape[0],
+            "Log all losses" : self.log_all_losses,
+            "Param matching" : cfg.param_matching.value,
         })
         self.logger.kv_table(self.geometry.describe(), title="Tomographic Geometry")
 
@@ -56,12 +56,12 @@ class Loss:
 
     def log_slot_presence_config(self, cfg, title: str) -> None:
         self.logger.kv_table({
-            "presence_balance":         cfg.presence_balance,
-            "active_weight":            cfg.active_weight,
-            "inactive_weight":          cfg.inactive_weight,
-            "amp_focal_gamma":          cfg.amp_focal_gamma,
-            "amp_focal_delta":          cfg.amp_focal_delta,
-            "use_active_normalization": cfg.use_active_normalization,
+            "presence_balance"         : cfg.presence_balance,
+            "active_weight"            : cfg.active_weight,
+            "inactive_weight"          : cfg.inactive_weight,
+            "amp_focal_gamma"          : cfg.amp_focal_gamma,
+            "amp_focal_delta"          : cfg.amp_focal_delta,
+            "use_active_normalization" : cfg.use_active_normalization,
         }, title=title)
 
     def set_curriculum(self, complete_cfg) -> None:
@@ -189,19 +189,19 @@ class Loss:
             capon_cycle      = lambda: pc.capon_cycle(pred_curves, exp_curves, self.geometry.steering, self.geometry.outer, self.dx, cfg.capon_loading, cfg.physics_floor)
 
         return {
-            "mse_curve":          lambda: lc.mse_diff(diff),
-            "l1_curve":           lambda: lc.l1_diff(diff),
-            "huber_curve":        lambda: lc.huber_diff(diff, cfg.huber_delta),
-            "charbonnier_curve":  lambda: lc.charbonnier_diff(diff, cfg.charbonnier_eps),
-            "cosine_curve":       lambda: lc.cosine(pred_curves, exp_curves, axis=1),
-            "total_power_relerr": lambda: pc.total_power(pred_curves, exp_curves, self.dx, cfg.physics_floor),
-            "moments":            lambda: pc.moments(pred_curves, exp_curves, self.x_axis, self.dx, cfg.physics_floor, cfg.moments_weights),
-            "coherence_resyn":    coherence_resyn,
-            "covariance_match":   covariance_match,
-            "capon_cycle":        capon_cycle,
-            "param_huber":        lambda: self._param_term(matched, "huber")[0],
-            "param_mse":          lambda: self._param_term(matched, "mse")[0],
-            "smoothness_tv":      lambda: ParamLoss.tv(pred_params_norm),
+            "mse_curve"          : lambda: lc.mse_diff(diff),
+            "l1_curve"           : lambda: lc.l1_diff(diff),
+            "huber_curve"        : lambda: lc.huber_diff(diff, cfg.huber_delta),
+            "charbonnier_curve"  : lambda: lc.charbonnier_diff(diff, cfg.charbonnier_eps),
+            "cosine_curve"       : lambda: lc.cosine(pred_curves, exp_curves, axis=1),
+            "total_power_relerr" : lambda: pc.total_power(pred_curves, exp_curves, self.dx, cfg.physics_floor),
+            "moments"            : lambda: pc.moments(pred_curves, exp_curves, self.x_axis, self.dx, cfg.physics_floor, cfg.moments_weights),
+            "coherence_resyn"    : coherence_resyn,
+            "covariance_match"   : covariance_match,
+            "capon_cycle"        : capon_cycle,
+            "param_huber"        : lambda: self._param_term(matched, "huber")[0],
+            "param_mse"          : lambda: self._param_term(matched, "mse")[0],
+            "smoothness_tv"      : lambda: ParamLoss.tv(pred_params_norm),
         }
 
     @torch.no_grad()
@@ -221,14 +221,14 @@ class Loss:
         pred_slot = pred_active.mean(dim=(0, 2, 3))
         gt_slot   = gt_active.mean(dim=(0, 2, 3))
 
-        out : dict = {}
+        out: dict = {}
         out["gt_active_frac"]   = gt_active.mean()
         out["pred_active_frac"] = pred_active.mean()
 
         for g in range(pred_slot.shape[0]):
             out[f"pred_active_slot{g}"] = pred_slot[g]
         for g in range(gt_slot.shape[0]):
-            out[f"gt_active_slot{g}"]   = gt_slot[g]
+            out[f"gt_active_slot{g}"] = gt_slot[g]
 
         pred_count = pred_active.sum(dim=1)
         gt_count   = gt_active.sum(dim=1)
@@ -267,10 +267,10 @@ class Loss:
         components : dict = {}
         monitor    : dict = {}
         occupancy  : dict = {}
-        total_loss            = torch.zeros((), dtype=pred_curves.dtype, device=pred_curves.device)
-        weight_sum:    float  = 0.0
+        total_loss        = torch.zeros((), dtype=pred_curves.dtype, device=pred_curves.device)
+        weight_sum: float = 0.0
 
-        per_param_l1:  dict   = {}
+        per_param_l1: dict = {}
 
         for term in LOSS_TERMS:
             is_used = getattr(cfg, term.use_flag)

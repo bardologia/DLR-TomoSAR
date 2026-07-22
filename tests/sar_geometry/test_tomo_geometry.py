@@ -92,7 +92,7 @@ def test_steering_unit_magnitude():
     cfg  = _cfg(baselines=(0.0, 7.5, 15.0))
     geom = TomoGeometry(cfg, torch.linspace(-20.0, 80.0, 64))
 
-    mag  = geom.steering.abs()
+    mag = geom.steering.abs()
 
     assert torch.allclose(mag, torch.ones_like(mag), atol=1e-6)
 
@@ -101,7 +101,7 @@ def test_steering_reference_track_is_all_ones():
     cfg  = _cfg(baselines=(0.0, 12.0))
     geom = TomoGeometry(cfg, torch.linspace(-20.0, 80.0, 32))
 
-    ref  = geom.steering[0]
+    ref = geom.steering[0]
 
     assert torch.allclose(ref.real, torch.ones_like(ref.real), atol=1e-6)
     assert torch.allclose(ref.imag, torch.zeros_like(ref.imag), atol=1e-6)

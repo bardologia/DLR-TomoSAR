@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.architectures import U2NetLiteConfig
-from ..blocks                          import OutputHeadsMixin, build_activation, build_norm2d, initialize_weights
+from ..blocks                    import OutputHeadsMixin, build_activation, build_norm2d, initialize_weights
 
 
 class RSUConv(nn.Module):

@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 from configuration.normalization import ChannelStats
-from tools.data.transforms             import Log1pTransform
+from tools.data.transforms       import Log1pTransform
 
 from pipelines.backbone.dataset.stats import Stats
 

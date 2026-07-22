@@ -3,12 +3,12 @@ from __future__ import annotations
 import gc
 from dataclasses import dataclass, field
 
-from configuration.benchmark import BenchmarkConfig
-from configuration.sar.gaussian_config          import GaussianConfig
-from models                                     import BACKBONE_CONFIG_REGISTRY, get_backbone
-from pipelines.shared.model.model_builder       import ModelBuilder
-from tools.data.gaussians                       import GaussianHead
-from tools.monitoring.logger                    import Logger
+from configuration.benchmark              import BenchmarkConfig
+from configuration.sar.gaussian_config    import GaussianConfig
+from models                               import BACKBONE_CONFIG_REGISTRY, get_backbone
+from pipelines.shared.model.model_builder import ModelBuilder
+from tools.data.gaussians                 import GaussianHead
+from tools.monitoring.logger              import Logger
 
 
 
@@ -25,7 +25,7 @@ class WidthScaler:
         self.locked   = frozenset(locked)
         feature_rules = [WidthRule(attribute="features", divisor=8)]
 
-        self.rules : dict[str, list[WidthRule]] = {
+        self.rules: dict[str, list[WidthRule]] = {
             "unet"           : feature_rules,
             "unet_skip"      : feature_rules,
             "resunet"        : feature_rules,
@@ -108,8 +108,8 @@ class SizeMatchResult:
     target        : int
     deviation_pct : float
     iterations    : int
-    history : list[dict] = field(default_factory=list)
-    flags   : list[str]  = field(default_factory=list)
+    history       : list[dict] = field(default_factory=list)
+    flags         : list[str]  = field(default_factory=list)
 
 
 class DegeneracyAuditor:

@@ -154,13 +154,13 @@ class TrackParameters:
         geometry = self.derived()
 
         return {
-            "Tracks"             : self.n_tracks,
-            "Reference"          : self.reference,
-            "Look side"          : geometry[0]["look_side"],
-            "Wavelength [m]"     : f"{geometry[0]['wavelength_m']:.4f}",
-            "Depression [deg]"   : ", ".join(f"{g['depression_angle_deg']:.2f}" for g in geometry),
-            "Slant range ref [m]": ", ".join(f"{g['slant_range_ref_m']:.1f}" for g in geometry),
-            "Look angle [deg]"   : ", ".join(f"{g['look_angle_near_deg']:.1f}-{g['look_angle_far_deg']:.1f}" for g in geometry),
+            "Tracks"              : self.n_tracks,
+            "Reference"           : self.reference,
+            "Look side"           : geometry[0]["look_side"],
+            "Wavelength [m]"      : f"{geometry[0]['wavelength_m']:.4f}",
+            "Depression [deg]"    : ", ".join(f"{g['depression_angle_deg']:.2f}" for g in geometry),
+            "Slant range ref [m]" : ", ".join(f"{g['slant_range_ref_m']:.1f}" for g in geometry),
+            "Look angle [deg]"    : ", ".join(f"{g['look_angle_near_deg']:.1f}-{g['look_angle_far_deg']:.1f}" for g in geometry),
         }
 
     def _validate_key_sets(self) -> None:

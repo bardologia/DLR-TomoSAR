@@ -96,11 +96,11 @@ def test_report_aggregates_mean_and_sample_std(tmp_path):
 
     payload = json.loads((group / "inference" / "stamp" / "metrics.json").read_text(encoding="utf-8"))
 
-    assert payload["n_seeds"] == 2
-    assert list(payload["seed_runs"]) == ["seed0", "seed1"]
-    assert payload["seed_inference"] == {"seed0": "stamp", "seed1": "stamp"}
-    assert payload["mean"]["curve_mse_gt"] == pytest.approx(2.0)
-    assert payload["std"]["curve_mse_gt"]  == pytest.approx(math.sqrt(2.0))
+    assert payload["n_seeds"]               == 2
+    assert list(payload["seed_runs"])       == ["seed0", "seed1"]
+    assert payload["seed_inference"]        == {"seed0": "stamp", "seed1": "stamp"}
+    assert payload["mean"]["curve_mse_gt"]  == pytest.approx(2.0)
+    assert payload["std"]["curve_mse_gt"]   == pytest.approx(math.sqrt(2.0))
     assert payload["mean"]["overall_r2_gt"] == pytest.approx(0.6)
     assert "split" not in payload["mean"]
 

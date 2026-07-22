@@ -4,10 +4,10 @@ from typing import Optional
 
 import numpy as np
 
-from configuration.dataset import InputConfig, OutputConfig
+from configuration.dataset       import InputConfig, OutputConfig
 from configuration.normalization import ChannelStats, ChannelStrategy, NormalizationConfig, NormMethod
-from tools.monitoring.logger           import Logger
-from tools.reporting.ranges            import RangeFormatter
+from tools.monitoring.logger     import Logger
+from tools.reporting.ranges      import RangeFormatter
 
 from pipelines.backbone.dataset.stats import Stats
 
@@ -118,12 +118,12 @@ class StatsComputer:
         for c in range(n):
             strat = strategies[c]
             rows.append({
-                "Ch":       str(c),
-                "Slot":     group_keys[c],
-                "Method":   strat.norm_method.value,
-                "log1p":    str(strat.apply_log1p),
-                "loc":      f"{locs[c]:+.6f}",
-                "scale":    f"{scales[c]:.6f}",
+                "Ch"     : str(c),
+                "Slot"   : group_keys[c],
+                "Method" : strat.norm_method.value,
+                "log1p"  : str(strat.apply_log1p),
+                "loc"    : f"{locs[c]:+.6f}",
+                "scale"  : f"{scales[c]:.6f}",
             })
         logger.metrics_table(rows, ["Ch", "Slot", "Method", "log1p", "loc", "scale"])
 
@@ -160,9 +160,9 @@ class StatsComputer:
 
         logger.section("[Input Normalization Statistics]")
         logger.kv_table({
-            "Strategy":       f"{normalization.input_strategy} (per slot-kind, grouped across passes/ifgs)",
-            "Source":         f"{len(parts)} region array(s), up to {max_vals_per_group:,} values per group",
-            "Input channels": in_channels,
+            "Strategy"       : f"{normalization.input_strategy} (per slot-kind, grouped across passes/ifgs)",
+            "Source"         : f"{len(parts)} region array(s), up to {max_vals_per_group:,} values per group",
+            "Input channels" : in_channels,
         })
 
         strategies = {g: normalization.strategy("input", g) for g in dict.fromkeys(group_keys)}
@@ -227,12 +227,12 @@ class StatsComputer:
             for key, (m, s) in role_fit.items():
                 strat = role_strat[key]
                 rows.append({
-                    "Channel":  key,
-                    "loc":      f"{m:.5f}",
-                    "scale":    f"{s:.5f}",
-                    "Method":    strat.norm_method.value,
-                    "log1p":    str(strat.apply_log1p),
-                    "clamped":  str(_role_clampable[key]),
+                    "Channel" : key,
+                    "loc"     : f"{m:.5f}",
+                    "scale"   : f"{s:.5f}",
+                    "Method"  : strat.norm_method.value,
+                    "log1p"   : str(strat.apply_log1p),
+                    "clamped" : str(_role_clampable[key]),
                 })
             logger.metrics_table(rows, ["Channel", "loc", "scale", "Method", "log1p", "clamped"])
 

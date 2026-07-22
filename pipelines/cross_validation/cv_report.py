@@ -6,13 +6,13 @@ from pathlib import Path
 import numpy as np
 
 from pipelines.shared.comparison.comparison_report import ComparisonReport
-from pipelines.shared.comparison.trial_collection import TrialRecord
-from pipelines.cross_validation.folds import FoldPlanner
-from tools                            import FileIO, MetricSectionGrouper
-from tools.metrics.scoring            import FiniteScalar
-from tools.monitoring.logger          import Logger
-from tools.reporting.markdown         import MarkdownTable, ScalarFormatter
-from tools.runtime.run_tag            import RunTag
+from pipelines.shared.comparison.trial_collection  import TrialRecord
+from pipelines.cross_validation.folds              import FoldPlanner
+from tools                    import FileIO, MetricSectionGrouper
+from tools.metrics.scoring    import FiniteScalar
+from tools.monitoring.logger  import Logger
+from tools.reporting.markdown import MarkdownTable, ScalarFormatter
+from tools.runtime.run_tag    import RunTag
 
 
 class CrossValidationReport:
@@ -197,7 +197,7 @@ class CrossValidationReport:
         return lines
 
     def _write_summary_json(self) -> Path:
-        payload : dict = {
+        payload: dict = {
             "model"   : self.model_name,
             "n_folds" : self.planner.n_folds,
             "folds"   : [record.name for record in self.base_records],

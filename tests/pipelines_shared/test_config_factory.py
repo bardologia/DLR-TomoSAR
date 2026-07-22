@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from configuration.benchmark.general import BenchmarkConfig
-from configuration.dataset           import Representation
+from configuration.benchmark.general        import BenchmarkConfig
+from configuration.dataset                  import Representation
 from pipelines.shared.config.config_factory import ConfigFactory
-from tools.data.regions              import CropRegion
+from tools.data.regions                     import CropRegion
 
 
 def _factory(test_data_dir, params_dir, **overrides) -> ConfigFactory:

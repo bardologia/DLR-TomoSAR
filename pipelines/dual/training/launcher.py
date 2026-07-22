@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from configuration.training import CurriculumInheritance, DualEntryConfig, dual_curriculum
+from configuration.training               import CurriculumInheritance, DualEntryConfig, dual_curriculum
 from models.dual                          import DUAL_CONFIG_REGISTRY
 from pipelines.backbone.training.launcher import SingleTrainRunner, TrainScheduler
 from pipelines.dual.inference.pipeline    import DUAL_INFERENCE_COMPONENTS

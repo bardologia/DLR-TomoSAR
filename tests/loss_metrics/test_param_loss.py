@@ -20,7 +20,7 @@ def _weights(b=2, g=5, h=4, w=4) -> torch.Tensor:
 
 
 def test_l1_zero_on_identical():
-    p     = _params(0)
+    p = _params(0)
     total, per = ParamLoss.l1(p, p.clone(), _weights(), PARAM_NAMES)
     assert total.item() == 0.0
     for v in per.values():
@@ -61,7 +61,7 @@ def test_l1_gradient_flow():
 
 
 def test_huber_zero_on_identical():
-    p = _params(9)
+    p   = _params(9)
     out = ParamLoss.huber(p, p.clone(), _weights(), 1.0)
     assert out.item() == 0.0
 
@@ -150,10 +150,10 @@ def test_match_ignores_inactive_gt():
     gt_phys[:, :, 0] = 1.0
     gt_phys[:, 2, :] = 0.0
 
-    perm    = [2, 0, 1]
+    perm = [2, 0, 1]
     matched, _, sorted_gt, sorted_phys = ParamMatcher.match(gt[:, perm].clone(), gt_phys[:, perm].clone(), gt, gt_phys)
-    active  = sorted_phys[:, :, 0] > 1e-3
-    err     = ((matched - sorted_gt).abs().sum(2) * active)[active.bool()]
+    active = sorted_phys[:, :, 0] > 1e-3
+    err    = ((matched - sorted_gt).abs().sum(2) * active)[active.bool()]
     assert err.max().item() < 1e-9
 
 

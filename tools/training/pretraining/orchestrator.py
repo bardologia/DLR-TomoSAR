@@ -7,7 +7,7 @@ from typing      import Callable, Optional
 
 import torch
 
-from tools.monitoring.logger              import Logger
+from tools.monitoring.logger                 import Logger
 from tools.training.pretraining.batch_finder import BatchSizeFinder
 from tools.training.pretraining.loader_tuner import LoaderTuner
 
@@ -20,8 +20,8 @@ class PretrainContext:
     forward_loss   : Callable
     trial_step     : Callable[[int], float]
     device         : torch.device
-    use_amp        : bool  = False
-    context_gb     : float = 0.0
+    use_amp        : bool                         = False
+    context_gb     : float                        = 0.0
     on_oom         : Optional[Callable[[], None]] = None
 
 

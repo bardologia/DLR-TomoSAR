@@ -141,7 +141,7 @@ def test_compress_monotonic():
 
 @pytest.mark.real_data
 def test_compress_real_magnitude_window(secondaries):
-    mag       = np.abs(np.asarray(secondaries[0, :32, :32])).astype(np.float64)
+    mag        = np.abs(np.asarray(secondaries[0, :32, :32])).astype(np.float64)
     compressed = Log1pTransform.compress(mag)
 
     assert compressed.shape == mag.shape

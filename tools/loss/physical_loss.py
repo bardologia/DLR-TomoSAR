@@ -12,7 +12,7 @@ class PhysicalLoss:
 
     @staticmethod
     def moment_sums(curves: torch.Tensor, x_axis: torch.Tensor, dx: float) -> tuple:
-        x  = x_axis.reshape(1, -1, 1, 1)
+        x = x_axis.reshape(1, -1, 1, 1)
 
         s0 = curves.sum(dim=1) * dx
         s1 = (curves * x).sum(dim=1) * dx

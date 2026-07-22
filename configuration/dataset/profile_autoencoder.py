@@ -38,6 +38,6 @@ class ProfileDatasetConfig:
     pin_memory      : bool = True
     shuffle_train   : bool = True
 
-    stats_max_samples           : int   = 100_000
+    stats_max_samples: int = 100_000
 
-    augmentation                : ProfileAugmentationConfig = field(default_factory=ProfileAugmentationConfig)
+    augmentation: ProfileAugmentationConfig = field(default_factory=ProfileAugmentationConfig)

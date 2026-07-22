@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 
-from configuration.normalization import Presets
-from configuration.sar.geometry_config import GeometryConfig
-from configuration.training import BackboneEntryConfig, CurriculumInheritance, default_curriculum
-from configuration.training.backbone        import HeadMatchingTrialsConfig, NormalizationTrialsConfig, PairTrialsConfig, PatchTrialsConfig, PhysicsTrialsConfig, ReachTrialsConfig, SecondaryTrialsConfig, _default_augmentation_trials, _default_context_trials, _default_input_trials, _default_presence_trials
+from configuration.normalization             import Presets
+from configuration.sar.geometry_config       import GeometryConfig
+from configuration.training                  import BackboneEntryConfig, CurriculumInheritance, default_curriculum
+from configuration.training.backbone         import HeadMatchingTrialsConfig, NormalizationTrialsConfig, PairTrialsConfig, PatchTrialsConfig, PhysicsTrialsConfig, ReachTrialsConfig, SecondaryTrialsConfig, _default_augmentation_trials, _default_context_trials, _default_input_trials, _default_presence_trials
 from configuration.training.general.ablation import AblationCatalog
 from pipelines.backbone.training.experiments import (
     AblationTrialPlanner,
@@ -23,7 +23,7 @@ from pipelines.backbone.training.experiments import (
     SlotPresenceTrialPlanner,
     WarmupTrialPlanner,
 )
-from tools.runtime.config_cli import ConfigCli
+from tools.runtime.config_cli                import ConfigCli
 
 
 CANDIDATES = ["PS04", "PS06", "PS08", "PS10", "PS12", "PS14"]
@@ -42,8 +42,8 @@ def test_curriculum_planner_crosses_warmup_and_complete():
 
     run_name, overrides = plans[0]
     assert run_name == "w-w1_c-c1"
-    assert overrides["curriculum.enabled"] is True
-    assert overrides["curriculum.warmup.use_param_l1"] is True
+    assert overrides["curriculum.enabled"]                is True
+    assert overrides["curriculum.warmup.use_param_l1"]    is True
     assert overrides["curriculum.complete.use_mse_curve"] is True
 
 
@@ -73,8 +73,8 @@ def test_presence_planner_disables_curriculum():
 
     assert ov["curriculum.enabled"] is False
     assert "curriculum.complete.param_match" not in ov
-    assert ov["curriculum.complete.use_active_normalization"]  is True
-    assert ov["curriculum.complete.presence_balance"]          is True
+    assert ov["curriculum.complete.use_active_normalization"] is True
+    assert ov["curriculum.complete.presence_balance"]         is True
 
 
 def test_presence_planner_default_matrix():
@@ -91,9 +91,9 @@ def test_presence_planner_default_matrix():
         "pr-AB"   : (True,  True),
     }
     for name, (active_norm, balance) in expected.items():
-        assert plans[name]["curriculum.enabled"]                                is False
-        assert plans[name]["curriculum.complete.use_active_normalization"]      is active_norm
-        assert plans[name]["curriculum.complete.presence_balance"]              is balance
+        assert plans[name]["curriculum.enabled"]                           is False
+        assert plans[name]["curriculum.complete.use_active_normalization"] is active_norm
+        assert plans[name]["curriculum.complete.presence_balance"]         is balance
 
 
 def test_presence_planner_rejects_missing_flag():
@@ -729,17 +729,17 @@ def test_physics_plan_round_trips_through_config_cli():
     assert baseline.curriculum.complete.use_covariance_match is False
 
     tested = _apply({**plans["phys-coherence_resyn-w0.05-cur"], "run_name": "phys-coherence_resyn-w0.05-cur", "logdir": "/tmp/phys"})
-    assert tested.curriculum.enabled                           is True
-    assert tested.curriculum.complete.use_coherence_resyn      is True
-    assert tested.curriculum.complete.weight_coherence_resyn   == 0.05
-    assert tested.curriculum.complete.use_covariance_match     is False
-    assert tested.curriculum.warmup.use_coherence_resyn        is False
-    assert tested.curriculum.warmup.weight_coherence_resyn     == 0.0
+    assert tested.curriculum.enabled                         is True
+    assert tested.curriculum.complete.use_coherence_resyn    is True
+    assert tested.curriculum.complete.weight_coherence_resyn == 0.05
+    assert tested.curriculum.complete.use_covariance_match   is False
+    assert tested.curriculum.warmup.use_coherence_resyn      is False
+    assert tested.curriculum.warmup.weight_coherence_resyn   == 0.0
 
     immediate = _apply({**plans["phys-coherence_resyn-w0.05-nc"], "run_name": "phys-coherence_resyn-w0.05-nc", "logdir": "/tmp/phys"})
-    assert immediate.curriculum.enabled                          is False
-    assert immediate.curriculum.complete.use_coherence_resyn     is True
-    assert immediate.curriculum.complete.weight_coherence_resyn  == 0.05
+    assert immediate.curriculum.enabled                           is False
+    assert immediate.curriculum.complete.use_coherence_resyn      is True
+    assert immediate.curriculum.complete.weight_coherence_resyn   == 0.05
     assert immediate.curriculum.initial_stage.use_coherence_resyn is True
 
 
@@ -770,11 +770,11 @@ def test_pair_planner_crosses_components_and_weights():
     assert planner.summary()["Base"]       == "param_l1 @ 1"
 
     overrides = dict(plans)["pair-cosine_curve-w0.05"]
-    assert overrides["curriculum.enabled"]                    is False
-    assert overrides["curriculum.inherit"]                    is False
-    assert overrides["curriculum.complete.use_param_l1"]      is True
-    assert overrides["curriculum.complete.weight_param_l1"]   == 1.0
-    assert overrides["curriculum.complete.use_cosine_curve"]  is True
+    assert overrides["curriculum.enabled"]                      is False
+    assert overrides["curriculum.inherit"]                      is False
+    assert overrides["curriculum.complete.use_param_l1"]        is True
+    assert overrides["curriculum.complete.weight_param_l1"]     == 1.0
+    assert overrides["curriculum.complete.use_cosine_curve"]    is True
     assert overrides["curriculum.complete.weight_cosine_curve"] == 0.05
 
 
@@ -786,9 +786,9 @@ def test_pair_planner_neutralizes_every_other_term():
     enabled   = [path for path, value in overrides.items() if path.startswith("curriculum.complete.use_") and value is True]
 
     assert sorted(enabled) == ["curriculum.complete.use_covariance_match", "curriculum.complete.use_param_l1"]
-    assert overrides["curriculum.complete.use_cosine_curve"]      is False
-    assert overrides["curriculum.complete.weight_cosine_curve"]   == 0.0
-    assert overrides["curriculum.complete.use_coherence_resyn"]   is False
+    assert overrides["curriculum.complete.use_cosine_curve"]       is False
+    assert overrides["curriculum.complete.weight_cosine_curve"]    == 0.0
+    assert overrides["curriculum.complete.use_coherence_resyn"]    is False
     assert overrides["curriculum.complete.weight_coherence_resyn"] == 0.0
 
 
@@ -882,18 +882,18 @@ def test_pair_plan_round_trips_through_config_cli():
     plans = dict(planner.plan())
 
     baseline = _apply({**plans["pair-baseline"], "run_name": "pair-baseline", "logdir": "/tmp/pair"})
-    assert baseline.curriculum.enabled                         is False
-    assert baseline.curriculum.initial_stage.use_param_l1      is True
-    assert baseline.curriculum.initial_stage.use_cosine_curve  is False
+    assert baseline.curriculum.enabled                           is False
+    assert baseline.curriculum.initial_stage.use_param_l1        is True
+    assert baseline.curriculum.initial_stage.use_cosine_curve    is False
     assert baseline.curriculum.initial_stage.use_coherence_resyn is False
 
     tested = _apply({**plans["pair-cosine_curve-w0.05"], "run_name": "pair-cosine_curve-w0.05", "logdir": "/tmp/pair"})
-    assert tested.curriculum.enabled                              is False
-    assert tested.curriculum.initial_stage.use_param_l1           is True
-    assert tested.curriculum.initial_stage.weight_param_l1        == 1.0
-    assert tested.curriculum.initial_stage.use_cosine_curve       is True
-    assert tested.curriculum.initial_stage.weight_cosine_curve    == 0.05
-    assert tested.curriculum.initial_stage.use_covariance_match   is False
+    assert tested.curriculum.enabled                            is False
+    assert tested.curriculum.initial_stage.use_param_l1         is True
+    assert tested.curriculum.initial_stage.weight_param_l1      == 1.0
+    assert tested.curriculum.initial_stage.use_cosine_curve     is True
+    assert tested.curriculum.initial_stage.weight_cosine_curve  == 0.05
+    assert tested.curriculum.initial_stage.use_covariance_match is False
 
 
 def test_pair_planner_paths_are_entry_config_leaves():
@@ -928,18 +928,18 @@ def test_ablation_planner_cumulative_full_to_baseline():
 
     full = dict(plans)["abl-0-full"]
     assert full["curriculum.warmup.use_active_normalization"] is True
-    assert full["curriculum.warmup.amp_focal_gamma"]      == 2.0
-    assert full["curriculum.warmup.presence_balance"]     is True
+    assert full["curriculum.warmup.amp_focal_gamma"]          == 2.0
+    assert full["curriculum.warmup.presence_balance"]         is True
 
     step1 = dict(plans)["abl-1-no_active_norm"]
     assert step1["curriculum.warmup.use_active_normalization"] is False
-    assert step1["curriculum.warmup.amp_focal_gamma"]     == 2.0
-    assert step1["curriculum.warmup.presence_balance"]    is True
+    assert step1["curriculum.warmup.amp_focal_gamma"]          == 2.0
+    assert step1["curriculum.warmup.presence_balance"]         is True
 
     baseline = dict(plans)["abl-3-baseline"]
     assert baseline["curriculum.warmup.use_active_normalization"] is False
-    assert baseline["curriculum.warmup.amp_focal_gamma"]  == 0.0
-    assert baseline["curriculum.warmup.presence_balance"] is False
+    assert baseline["curriculum.warmup.amp_focal_gamma"]          == 0.0
+    assert baseline["curriculum.warmup.presence_balance"]         is False
 
 
 def test_ablation_planner_without_full_run():
@@ -1019,7 +1019,7 @@ def test_ablation_catalog_standard_categories_present():
     assert catalog["pass_mag"]["degrade"]["normalization.pass_mag"]    == "zscore_log1p"
     assert catalog["ifg_phase"]["degrade"]["normalization.ifg_phase"]  == "zscore"
     assert catalog["augmentation"]["degrade"]["augmentation.p_flip_h"] == 0.0
-    assert "augmentation.p_noise"     not in catalog["augmentation"]["enable"]
+    assert "augmentation.p_noise" not in catalog["augmentation"]["enable"]
     assert "out_mu"      not in catalog
     assert "total_power" not in catalog
     assert "moments"     not in catalog
@@ -1035,8 +1035,8 @@ def test_ablation_catalog_standard_categories_present():
     assert "curriculum.warmup.use_coherence_resyn" not in coherence["degrade"]
 
     physics_curriculum = catalog["physics_curriculum"]
-    assert physics_curriculum["enable"]["curriculum.enabled"]  is True
-    assert physics_curriculum["degrade"]                       == {"curriculum.enabled": False}
+    assert physics_curriculum["enable"]["curriculum.enabled"] is True
+    assert physics_curriculum["degrade"]                      == {"curriculum.enabled": False}
 
     cosine = catalog["cosine_curve"]
     assert cosine["enable"]["curriculum.complete.use_cosine_curve"]  is True
@@ -1067,10 +1067,10 @@ def test_ablation_catalog_standard_categories_present():
     assert lr_warmup["degrade"]["training.warmup_enabled"] is False
 
     lr_per_group = catalog["lr_per_group"]
-    assert lr_per_group["enable"]["model_overrides"]["output_head_lr"]  == 1e-3
-    assert lr_per_group["enable"]["model_overrides"]["encoder_lr"]      == 3e-4
-    assert set(lr_per_group["degrade"]["model_overrides"].values())     == {3e-4}
-    assert set(lr_per_group["degrade"]["model_overrides"])              == set(lr_per_group["enable"]["model_overrides"])
+    assert lr_per_group["enable"]["model_overrides"]["output_head_lr"] == 1e-3
+    assert lr_per_group["enable"]["model_overrides"]["encoder_lr"]     == 3e-4
+    assert set(lr_per_group["degrade"]["model_overrides"].values())    == {3e-4}
+    assert set(lr_per_group["degrade"]["model_overrides"])             == set(lr_per_group["enable"]["model_overrides"])
 
 
 def test_ablation_catalog_as_dict_covers_loss_terms():
@@ -1153,22 +1153,22 @@ def test_ablation_default_plan_round_trips_through_config_cli():
 
     full     = _apply(dict(plans)["abl-0-full"])
     baseline = _apply(dict(plans)[f"abl-{len(config.ablation_features)}-baseline"])
-    assert full.curriculum.enabled                         is True
-    assert full.backbone_name                              == "resunet"
-    assert full.curriculum.complete.use_param_l1           is True
-    assert full.curriculum.complete.use_cosine_curve       is True
-    assert full.curriculum.warmup.use_param_l1             is True
-    assert full.curriculum.warmup.use_cosine_curve         is True
-    assert full.curriculum.warmup.use_coherence_resyn      is False
-    assert full.training.warmup_enabled                    is True
-    assert baseline.curriculum.enabled                     is False
-    assert baseline.backbone_name                          == "unet"
-    assert baseline.curriculum.complete.use_param_mse      is True
-    assert baseline.curriculum.complete.use_param_l1       is False
+    assert full.curriculum.enabled                               is True
+    assert full.backbone_name                                    == "resunet"
+    assert full.curriculum.complete.use_param_l1                 is True
+    assert full.curriculum.complete.use_cosine_curve             is True
+    assert full.curriculum.warmup.use_param_l1                   is True
+    assert full.curriculum.warmup.use_cosine_curve               is True
+    assert full.curriculum.warmup.use_coherence_resyn            is False
+    assert full.training.warmup_enabled                          is True
+    assert baseline.curriculum.enabled                           is False
+    assert baseline.backbone_name                                == "unet"
+    assert baseline.curriculum.complete.use_param_mse            is True
+    assert baseline.curriculum.complete.use_param_l1             is False
     assert baseline.curriculum.complete.use_active_normalization is False
-    assert baseline.curriculum.warmup.use_param_mse        is True
-    assert set(baseline.model_overrides.values())          == {3e-4}
-    assert baseline.training.warmup_enabled                is False
-    assert baseline.normalization.clamp_output           is False
-    assert baseline.normalization.out_amp                == "zscore"
-    assert baseline.normalization.ifg_phase              == "zscore"
+    assert baseline.curriculum.warmup.use_param_mse              is True
+    assert set(baseline.model_overrides.values())                == {3e-4}
+    assert baseline.training.warmup_enabled                      is False
+    assert baseline.normalization.clamp_output                   is False
+    assert baseline.normalization.out_amp                        == "zscore"
+    assert baseline.normalization.ifg_phase                      == "zscore"

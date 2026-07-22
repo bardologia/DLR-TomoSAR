@@ -4,13 +4,13 @@ import torch
 import torch.nn as nn
 
 from models                                              import get_backbone
-from models.profile_autoencoder                                  import get_profile_autoencoder
+from models.profile_autoencoder                          import get_profile_autoencoder
 from models.image_autoencoder                            import get_image_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 from pipelines.backbone.inference.loader                 import RunLoader
 from pipelines.backbone.inference.model_wrapper          import ModelWrapper
 from pipelines.jepa.training.trainer                     import JepaModule
-from pipelines.shared.config.config_persistence                 import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO, BackboneModelConfigIO
+from pipelines.shared.config.config_persistence          import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO, BackboneModelConfigIO
 from pipelines.shared.model.model_builder                import ModelBuilder
 
 

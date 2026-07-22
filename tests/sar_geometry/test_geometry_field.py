@@ -7,8 +7,8 @@ import pytest
 
 from tools.baselines.containers import TrackProfiles
 from tools.data.regions         import CropRegion
-from tools.sar.geometry_field    import GeometryField, GeometryFieldBuilder
-from tools.sar.track_parameters  import TrackParameters
+from tools.sar.geometry_field   import GeometryField, GeometryFieldBuilder
+from tools.sar.track_parameters import TrackParameters
 
 
 def _field(**kwargs) -> GeometryField:
@@ -31,8 +31,8 @@ def test_kz_height_matches_closed_form():
     gf = _field()
     kz = gf.kz("height")
 
-    i, a, g = 1, 0, 1
-    bperp   = gf.baseline_h[i, a] * math.cos(gf.look_angle[g]) + gf.baseline_v[i, a] * math.sin(gf.look_angle[g])
+    i, a, g  = 1, 0, 1
+    bperp    = gf.baseline_h[i, a] * math.cos(gf.look_angle[g]) + gf.baseline_v[i, a] * math.sin(gf.look_angle[g])
     expected = 4.0 * math.pi * bperp / (gf.wavelength * gf.slant_range[g] * math.sin(gf.look_angle[g]))
 
     assert float(kz[i, a, g]) == pytest.approx(expected, rel=1e-9)
@@ -42,15 +42,15 @@ def test_kz_slant_matches_closed_form_without_sin_theta():
     gf = _field()
     kz = gf.kz("slant")
 
-    i, a, g = 2, 1, 0
-    bperp   = gf.baseline_h[i, a] * math.cos(gf.look_angle[g]) + gf.baseline_v[i, a] * math.sin(gf.look_angle[g])
+    i, a, g  = 2, 1, 0
+    bperp    = gf.baseline_h[i, a] * math.cos(gf.look_angle[g]) + gf.baseline_v[i, a] * math.sin(gf.look_angle[g])
     expected = 4.0 * math.pi * bperp / (gf.wavelength * gf.slant_range[g])
 
     assert float(kz[i, a, g]) == pytest.approx(expected, rel=1e-9)
 
 
 def test_height_equals_slant_over_sin_theta():
-    gf       = _field()
+    gf        = _field()
     sin_theta = np.sin(gf.look_angle).reshape(1, 1, -1)
 
     assert np.allclose(gf.kz("height"), gf.kz("slant") / sin_theta, rtol=1e-9)
@@ -114,8 +114,8 @@ def test_save_load_round_trip(tmp_path):
 
 def test_builder_look_angle_from_reference_track():
     parameters = TrackParameters(
-        labels      = ["REF", "S1"],
-        parameters  = [
+        labels     = ["REF", "S1"],
+        parameters = [
             {"r": [3600.0, 3700.0, 3800.0, 3900.0], "h0": 3719.0, "terrain": 684.0, "lambda": 0.2262, "antdir": 1},
             {"r": [3600.0, 3700.0, 3800.0, 3900.0], "h0": 3719.0, "terrain": 684.0, "lambda": 0.2262, "antdir": 1},
         ],
@@ -177,10 +177,10 @@ def test_builder_rejects_height_at_or_above_slant_range():
 
 @pytest.mark.real_data
 def test_real_geometry_field_matches_builder(meta_dir, data_dir, dataset_json):
-    parameters = TrackParameters.load(meta_dir / TrackParameters.FILENAME)
-    profiles   = TrackProfiles.load(data_dir / TrackProfiles.FILENAME)
+    parameters  = TrackParameters.load(meta_dir / TrackParameters.FILENAME)
+    profiles    = TrackProfiles.load(data_dir / TrackProfiles.FILENAME)
     global_crop = dataset_json["global_crop"]
-    crop       = CropRegion(global_crop[0], global_crop[1], global_crop[2], global_crop[3])
+    crop        = CropRegion(global_crop[0], global_crop[1], global_crop[2], global_crop[3])
 
     built  = GeometryFieldBuilder(parameters, profiles, crop).build()
     stored = GeometryField.load(meta_dir / GeometryField.FILENAME)
@@ -191,11 +191,11 @@ def test_real_geometry_field_matches_builder(meta_dir, data_dir, dataset_json):
 
 @pytest.mark.real_data
 def test_real_geometry_field_reference_kz_zero_and_mean_baseline(meta_dir, baselines_json):
-    gf        = GeometryField.load(meta_dir / GeometryField.FILENAME)
-    th_mean   = float(gf.look_angle.mean())
+    gf         = GeometryField.load(meta_dir / GeometryField.FILENAME)
+    th_mean    = float(gf.look_angle.mean())
     bperp_mean = gf.perpendicular_baseline().mean(axis=(1, 2))
 
-    expected  = np.array([h * math.cos(th_mean) + v * math.sin(th_mean) for v, h in zip(baselines_json["vertical"], baselines_json["horizontal"])])
+    expected = np.array([h * math.cos(th_mean) + v * math.sin(th_mean) for v, h in zip(baselines_json["vertical"], baselines_json["horizontal"])])
 
     assert np.abs(gf.kz("height")[0]).max() == 0.0
     assert np.allclose(bperp_mean, expected, atol=0.1)

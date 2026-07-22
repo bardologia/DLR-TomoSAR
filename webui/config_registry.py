@@ -127,9 +127,9 @@ class ConfigRegistry:
         return path.relative_to(self.paths.config_dir).with_suffix("").as_posix()
 
     def _attach_descriptions(self, cls: dict) -> None:
-        entry            = self.descriptions["configs"][f"{cls['module']}::{cls['name']}"]
-        cls["desc"]      = entry["summary"]
-        field_descs      = entry["fields"]
+        entry       = self.descriptions["configs"][f"{cls['module']}::{cls['name']}"]
+        cls["desc"] = entry["summary"]
+        field_descs = entry["fields"]
         for field in cls["fields"]:
             field["desc"] = field_descs[field["name"]]
 
@@ -145,9 +145,9 @@ class ConfigRegistry:
             if not classes:
                 continue
             groups.append({
-                "module" : section,
-                "title"  : self.SECTION_TITLES.get(section, section.replace("_", " ").title()),
-                "desc"   : self.descriptions["sections"][section],
-                "classes": classes,
+                "module"  : section,
+                "title"   : self.SECTION_TITLES.get(section, section.replace("_", " ").title()),
+                "desc"    : self.descriptions["sections"][section],
+                "classes" : classes,
             })
         return groups

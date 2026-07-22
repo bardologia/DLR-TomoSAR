@@ -4,16 +4,16 @@ import numpy as np
 import pytest
 import torch
 
-from configuration.normalization.general    import ChannelStats, ChannelStrategy, NormMethod
+from configuration.normalization.general      import ChannelStats, ChannelStrategy, NormMethod
 from pipelines.backbone.dataset.normalizer    import Normalizer
 from pipelines.backbone.dataset.stats         import Stats
 
 ROBUST_LOG1P_SLOTS = ["pass/mag", "ifg/mag", "out/amp", "out/sigma"]
 ZSCORE_SLOTS       = ["out/mu", "pass/phase", "pass/raw_re_im", "ifg/raw_re_im", "dem/elevation"]
 
-AMP_THR        = 1e-2
-SCALE_FLOOR    = 1e-8
-REL_AGREE_TOL  = 0.05
+AMP_THR       = 1e-2
+SCALE_FLOOR   = 1e-8
+REL_AGREE_TOL = 0.05
 
 
 def _active(parameters):
@@ -26,9 +26,9 @@ def _active(parameters):
 
 
 def _random_split_agreement(strat, vals, seed):
-    r       = np.random.default_rng(seed).random(vals.shape) < 0.5
-    l1, s1  = strat.fit(vals[r])
-    l2, s2  = strat.fit(vals[~r])
+    r         = np.random.default_rng(seed).random(vals.shape) < 0.5
+    l1, s1    = strat.fit(vals[r])
+    l2, s2    = strat.fit(vals[~r])
     loc_rel   = abs(l1 - l2) / (abs(l1) + abs(l2) + 1e-9)
     scale_rel = abs(s1 - s2) / (s1 + s2 + 1e-9)
     return loc_rel, scale_rel
@@ -160,10 +160,10 @@ def test_robust_iqr_scale_is_more_outlier_stable_than_zscore():
 
     outliers = np.concatenate([base, np.full(400, 500.0)])
 
-    z_clean  = ChannelStrategy(NormMethod.ZSCORE,     apply_log1p=False).fit(base)[1]
-    z_out    = ChannelStrategy(NormMethod.ZSCORE,     apply_log1p=False).fit(outliers)[1]
-    r_clean  = ChannelStrategy(NormMethod.ROBUST_IQR, apply_log1p=False).fit(base)[1]
-    r_out    = ChannelStrategy(NormMethod.ROBUST_IQR, apply_log1p=False).fit(outliers)[1]
+    z_clean = ChannelStrategy(NormMethod.ZSCORE,     apply_log1p=False).fit(base)[1]
+    z_out   = ChannelStrategy(NormMethod.ZSCORE,     apply_log1p=False).fit(outliers)[1]
+    r_clean = ChannelStrategy(NormMethod.ROBUST_IQR, apply_log1p=False).fit(base)[1]
+    r_out   = ChannelStrategy(NormMethod.ROBUST_IQR, apply_log1p=False).fit(outliers)[1]
 
     z_drift = abs(z_out - z_clean) / z_clean
     r_drift = abs(r_out - r_clean) / r_clean

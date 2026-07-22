@@ -3,8 +3,8 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.architectures import MlpAutoencoderConfig
-from models.profile_autoencoder.base                       import ProfileAutoencoderBase, ProfileAutoencoderBlocks
+from configuration.architectures     import MlpAutoencoderConfig
+from models.profile_autoencoder.base import ProfileAutoencoderBase, ProfileAutoencoderBlocks
 
 
 class MlpEncoder(nn.Module):

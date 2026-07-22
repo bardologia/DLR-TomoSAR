@@ -6,7 +6,7 @@ from typing  import Dict
 import matplotlib
 
 matplotlib.use("Agg")
-import numpy             as np
+import numpy as np
 
 from tools.reporting.plotting                                  import PlotBase
 from tools.monitoring.logger                                   import Logger

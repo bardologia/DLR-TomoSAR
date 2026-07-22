@@ -5,8 +5,8 @@ from pathlib     import Path
 from typing      import Optional
 
 from configuration.normalization import ChannelStats, OutputClampConfig
-from tools.data.io                     import FileIO
-from tools.monitoring.logger           import Logger
+from tools.data.io               import FileIO
+from tools.monitoring.logger     import Logger
 
 
 @dataclass
@@ -45,13 +45,13 @@ class Stats:
 
         logger.section("[Normalization stats loaded]")
         logger.kv_table({
-            "Stats path":      path,
-            "Input channels":  input_stats.n_channels,
-            "Output channels": output_stats.n_channels,
-            "Output clamp":    f"{clamp.floor} to {clamp.ceil}" if clamp.enabled else "disabled",
-            "Clamp leak":      clamp.leaky_slope,
-            "Param leak":      clamp.param_leaky_slope,
-            "Amp max":         clamp.amp_max,
+            "Stats path"      : path,
+            "Input channels"  : input_stats.n_channels,
+            "Output channels" : output_stats.n_channels,
+            "Output clamp"    : f"{clamp.floor} to {clamp.ceil}" if clamp.enabled else "disabled",
+            "Clamp leak"      : clamp.leaky_slope,
+            "Param leak"      : clamp.param_leaky_slope,
+            "Amp max"         : clamp.amp_max,
         })
 
         return cls(input_stats = input_stats, output_stats = output_stats, clamp = clamp)

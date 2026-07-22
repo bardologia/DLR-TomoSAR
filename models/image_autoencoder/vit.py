@@ -3,9 +3,9 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.architectures import ViTImageAutoencoderConfig
-from models.image_autoencoder.base                       import ImageAutoencoderBase
-from models.blocks                                       import PatchEmbedding, TransformerBlock, tokens_to_feature_map
+from configuration.architectures   import ViTImageAutoencoderConfig
+from models.image_autoencoder.base import ImageAutoencoderBase
+from models.blocks                 import PatchEmbedding, TransformerBlock, tokens_to_feature_map
 
 
 class ViTImageEncoder(nn.Module):

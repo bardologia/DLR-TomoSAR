@@ -42,10 +42,10 @@ class GpuUtilizationSampler:
         self.interval_s = float(interval_s)
         self.gpu_index  = self._resolve_index(gpu_index)
 
-        self._handle      = None
-        self._nvml_ok     = False
-        self._stop_evt    = threading.Event()
-        self._thread      = None
+        self._handle       = None
+        self._nvml_ok      = False
+        self._stop_evt     = threading.Event()
+        self._thread       = None
         self._util_samples = []
         self._vram_samples = []
 
@@ -279,20 +279,20 @@ class GpuFeedBenchmark:
     def measure(self, spec: LoaderSpec) -> dict:
         loader = self._build_loader(spec)
 
-        loader_only    = self._measure_loader_only(loader, spec)
-        reference      = self._reference_batch(loader)
+        loader_only     = self._measure_loader_only(loader, spec)
+        reference       = self._reference_batch(loader)
         compute_ceiling = self._measure_compute_ceiling(reference, spec)
-        end_to_end     = self._measure_end_to_end(loader, spec)
+        end_to_end      = self._measure_end_to_end(loader, spec)
 
         feed_ratio = loader_only / max(compute_ceiling, 1e-9)
         efficiency = end_to_end["end_to_end_samples_per_s"] / max(compute_ceiling, 1e-9)
 
         record = {
             **spec.as_record(),
-            "loader_only_samples_per_s"   : loader_only,
-            "compute_ceiling_samples_per_s": compute_ceiling,
-            "feed_ratio"                  : feed_ratio,
-            "compute_efficiency"          : efficiency,
+            "loader_only_samples_per_s"     : loader_only,
+            "compute_ceiling_samples_per_s" : compute_ceiling,
+            "feed_ratio"                    : feed_ratio,
+            "compute_efficiency"            : efficiency,
             **end_to_end,
         }
 

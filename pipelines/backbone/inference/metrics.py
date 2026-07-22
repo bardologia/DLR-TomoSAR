@@ -6,16 +6,16 @@ from dataclasses        import dataclass
 from pathlib            import Path
 from typing             import Dict, Optional, Tuple
 
-import numpy         as np
+import numpy as np
 from skimage.metrics import structural_similarity as ssim
 from tqdm            import tqdm
 
-from tools.data.io               import FileIO
-from tools.data.preprocessing    import ProfileNormalizer
-from tools.loss.param_loss       import ParamMatcher
+from tools.data.io                   import FileIO
+from tools.data.preprocessing        import ProfileNormalizer
+from tools.loss.param_loss           import ParamMatcher
 from tools.metrics.gaussian_matching import GaussianMatcher
 from tools.metrics.slot_organization import SlotOrganization
-from tools.metrics.scoring       import R2, RelativeImprovement
+from tools.metrics.scoring           import R2, RelativeImprovement
 
 
 @dataclass

@@ -7,8 +7,8 @@ from typing      import Literal, Optional, Sequence, Tuple
 import numpy as np
 
 from configuration.normalization.general import ChannelStrategy, NormalizationConfig
-from tools.data.representation      import Representation
-from tools.data.regions             import SplitRegions
+from tools.data.representation           import Representation
+from tools.data.regions                  import SplitRegions
 
 
 @dataclass
@@ -105,7 +105,7 @@ class OutputConfig:
     use_mu        : bool = True
     use_sigma     : bool = True
     
-    output_strategies  : dict[str, ChannelStrategy] = field(default_factory=lambda: {
+    output_strategies : dict[str, ChannelStrategy] = field(default_factory=lambda: {
         "out/amp"   : ChannelStrategy.from_slot("out/amp"),
         "out/mu"    : ChannelStrategy.from_slot("out/mu"),
         "out/sigma" : ChannelStrategy.from_slot("out/sigma"),
@@ -187,19 +187,19 @@ class AugmentationConfig:
 class DatasetConfig:
     preprocessing_run_directory : Path
     split_regions               : SplitRegions
-    parameters_path  : Optional[Path]            = None
-    secondary_labels : Optional[Tuple[str, ...]] = ("FL01_PS04", "FL01_PS06", "FL01_PS08", "FL01_PS26")
-    patch            : PatchConfig               = field(default_factory=PatchConfig)
-    input_config     : InputConfig               = field(default_factory=InputConfig)
-    output_config    : OutputConfig              = field(default_factory=OutputConfig)
-    normalization    : NormalizationConfig       = field(default_factory=NormalizationConfig)
-    augmentation     : AugmentationConfig        = field(default_factory=AugmentationConfig)
+    parameters_path             : Optional[Path]            = None
+    secondary_labels            : Optional[Tuple[str, ...]] = ("FL01_PS04", "FL01_PS06", "FL01_PS08", "FL01_PS26")
+    patch                       : PatchConfig               = field(default_factory=PatchConfig)
+    input_config                : InputConfig               = field(default_factory=InputConfig)
+    output_config               : OutputConfig              = field(default_factory=OutputConfig)
+    normalization               : NormalizationConfig       = field(default_factory=NormalizationConfig)
+    augmentation                : AugmentationConfig        = field(default_factory=AugmentationConfig)
 
-    batch_size        : int                  = 8
-    num_workers       : int                  = 16
-    prefetch_factor   : int                  = 8
-    shuffle_train     : bool                 = True
-    pin_memory        : bool                 = True
-    x_axis            : Optional[np.ndarray] = field(default=None, repr=False)
-    n_gaussians       : int                  = 1
+    batch_size      : int                  = 8
+    num_workers     : int                  = 16
+    prefetch_factor : int                  = 8
+    shuffle_train   : bool                 = True
+    pin_memory      : bool                 = True
+    x_axis          : Optional[np.ndarray] = field(default=None, repr=False)
+    n_gaussians     : int                  = 1
 

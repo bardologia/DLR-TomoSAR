@@ -30,7 +30,7 @@ class ProfileAePredictor(AeReconstructionPredictor):
 
     def _summary(self, result) -> dict:
         return {
-            "Curves"        : result.gt.shape[0],
-            "Profile length": result.gt.shape[1],
-            "Embedding dim" : result.embeddings.shape[1],
+            "Curves"         : result.gt.shape[0],
+            "Profile length" : result.gt.shape[1],
+            "Embedding dim"  : result.embeddings.shape[1],
         }

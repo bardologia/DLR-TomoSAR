@@ -5,9 +5,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from tools.baselines.containers  import TrackBaselines, TrackProfiles
-from tools.baselines.extraction  import BaselineExtractor
-from tools.baselines.reading     import TrackFileResolver, TrackReader
+from tools.baselines.containers import TrackBaselines, TrackProfiles
+from tools.baselines.extraction import BaselineExtractor
+from tools.baselines.reading    import TrackFileResolver, TrackReader
 
 
 def _fake_track(n_azimuth: int = 50, h: float = 5.0, v: float = 3700.0) -> np.ndarray:

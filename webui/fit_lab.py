@@ -321,8 +321,8 @@ class FitLab:
             }
 
             if active[i]:
-                pos    = act_pos[i]
-                per_k  = []
+                pos   = act_pos[i]
+                per_k = []
                 for K, (fit_a, fit_m, fit_s, mse, pen) in sorted(per_k_out.items()):
                     order       = np.argsort(fit_m[pos])
                     amps        = fit_a[pos][order] * scale[i, 0]

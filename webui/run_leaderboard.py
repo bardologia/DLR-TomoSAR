@@ -6,9 +6,8 @@ import re
 import statistics
 from pathlib import Path
 
-from web_logger import WebLogger
-
 from tools.reporting.reporting import MetricSectionGrouper
+from web_logger                import WebLogger
 
 
 class RunAxes:

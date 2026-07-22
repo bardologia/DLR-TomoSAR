@@ -26,9 +26,9 @@ class TuningConfig:
     n_trials : int = 100
     n_epochs : int = 30
 
-    base_seed               : int  = 42
+    base_seed : int = 42
 
-    early_stop_patience     : int  = 8
+    early_stop_patience : int = 8
 
     pruner_n_startup_trials : int = 8
     pruner_n_warmup_steps   : int = 8
@@ -41,14 +41,14 @@ class TuningConfig:
 class TuningEntryConfig:
     training_type : str = "backbone"
 
-    paths  : RunPathsConfig       = field(default_factory=lambda: RunPathsConfig(log_base_dir=Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/tuning")))
-    tuning : TuningConfig         = field(default_factory=TuningConfig)
+    paths  : RunPathsConfig = field(default_factory=lambda: RunPathsConfig(log_base_dir=Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/tuning")))
+    tuning : TuningConfig   = field(default_factory=TuningConfig)
 
-    gpus         : list[int]  = field(default_factory=lambda: [0, 1, 2, 3])
-    gpus_file    : str        = ""
-    heads        : list[str]  = field(default_factory=lambda: ["conv"])
-    skip_models  : list[str]  = field(default_factory=list)
-    run_tag      : str | None = None
+    gpus        : list[int]  = field(default_factory=lambda: [0, 1, 2, 3])
+    gpus_file   : str        = ""
+    heads       : list[str]  = field(default_factory=lambda: ["conv"])
+    skip_models : list[str]  = field(default_factory=list)
+    run_tag     : str | None = None
 
     training        : TrainingQueueConfig  = field(default_factory=TrainingQueueConfig)
     curriculum      : LossCurriculumConfig = field(default_factory=default_curriculum)

@@ -58,7 +58,7 @@ class LayerReport:
     init_ratio        : Optional[float] = None
     duplicate_units   : Optional[int]   = None
 
-    issues : list = field(default_factory=list)
+    issues: list = field(default_factory=list)
 
     @property
     def severity(self) -> str:
@@ -159,8 +159,8 @@ class WeightAnalyzer:
         if singular.size == 0:
             return {"spectral_norm": 0.0, "stable_rank": 0.0, "effective_rank": 0.0, "rank_ratio": 0.0, "condition_number": 0.0}
 
-        spectral     = float(singular[0])
-        frobenius_sq = float((singular ** 2).sum())
+        spectral      = float(singular[0])
+        frobenius_sq  = float((singular ** 2).sum())
         probabilities = singular / singular.sum()
         entropy       = float(-(probabilities * np.log(probabilities)).sum())
 

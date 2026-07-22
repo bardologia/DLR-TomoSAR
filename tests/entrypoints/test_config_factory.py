@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from configuration.benchmark import BenchmarkConfig
-from configuration.dataset import Representation
-from configuration.inference import InferenceConfig
-from configuration.training import BackboneTrainerConfig
+from configuration.benchmark                import BenchmarkConfig
+from configuration.dataset                  import Representation
+from configuration.inference                import InferenceConfig
+from configuration.training                 import BackboneTrainerConfig
 from pipelines.shared.config.config_factory import ConfigFactory
-from tools.data.regions import CropRegion
+from tools.data.regions                     import CropRegion
 
 
 @pytest.fixture

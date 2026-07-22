@@ -9,24 +9,24 @@ from pathlib            import Path
 import matplotlib.pyplot as plt
 import numpy             as np
 
-from pipelines.comparison.metric_table           import MetricTableRenderer
-from pipelines.comparison.spatial_stats          import SpatialDispersion
+from pipelines.comparison.metric_table             import MetricTableRenderer
+from pipelines.comparison.spatial_stats            import SpatialDispersion
 from pipelines.processing.param_extraction.metrics import ContrastEstimator
-from tools.data.io                               import FileIO
-from tools.reporting.markdown                    import MarkdownDoc
-from tools.reporting.plotting                    import PlotBase
-from tools.monitoring.logger                     import Logger
+from tools.data.io            import FileIO
+from tools.reporting.markdown import MarkdownDoc
+from tools.reporting.plotting import PlotBase
+from tools.monitoring.logger  import Logger
 
 
 @dataclass
 class WindowTrial:
-    name           : str
-    run_dir        : Path
-    tomogram_path  : Path
-    window         : tuple
-    window_label   : str
-    window_area    : int
-    metrics        : dict = field(default_factory=dict)
+    name          : str
+    run_dir       : Path
+    tomogram_path : Path
+    window        : tuple
+    window_label  : str
+    window_area   : int
+    metrics       : dict = field(default_factory=dict)
 
 
 class WindowTrialCollector:

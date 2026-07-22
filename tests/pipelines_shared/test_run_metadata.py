@@ -4,10 +4,10 @@ import json
 
 import pytest
 
-from configuration.sar.gaussian_config import GaussianConfig
-from configuration.training            import BackboneTrainerConfig
-from pipelines.shared.config.run_metadata     import TrainingRunMetadata
-from tools.monitoring.logger           import Logger
+from configuration.sar.gaussian_config    import GaussianConfig
+from configuration.training               import BackboneTrainerConfig
+from pipelines.shared.config.run_metadata import TrainingRunMetadata
+from tools.monitoring.logger              import Logger
 
 
 def _trainer_config() -> BackboneTrainerConfig:

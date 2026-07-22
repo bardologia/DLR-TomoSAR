@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from configuration.dataset  import AugmentationConfig
-from configuration.training import LossConfig, LossCurriculumConfig
+from configuration.dataset                  import AugmentationConfig
+from configuration.training                 import LossConfig, LossCurriculumConfig
 from pipelines.backbone.training.loss_terms import LOSS_TERMS
 from pipelines.shared.model.model_builder   import ModelBuilder
 

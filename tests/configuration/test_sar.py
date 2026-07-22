@@ -35,7 +35,7 @@ def test_geometry_config_defaults():
     assert cfg.slant_range > 0
     assert 0 < cfg.look_angle_deg < 90
     assert isinstance(cfg.baselines, tuple)
-    assert cfg.baselines_source == "dataset"
+    assert cfg.baselines_source   == "dataset"
     assert cfg.baseline_component == "perpendicular"
 
 
@@ -117,9 +117,9 @@ def test_parallel_config_effort_fractions_increase():
 
 def test_path_config_directory_properties():
     cfg = PathConfig(run_subdirectory="run_x")
-    assert cfg.run_directory.name == "run_x"
-    assert cfg.data_directory.name == cfg.data_subdirectory
-    assert cfg.metadata_directory.name == cfg.metadata_subdirectory
+    assert cfg.run_directory.name       == "run_x"
+    assert cfg.data_directory.name      == cfg.data_subdirectory
+    assert cfg.metadata_directory.name  == cfg.metadata_subdirectory
     assert cfg.temporary_directory.name == cfg.temporary_subdirectory
 
 

@@ -11,9 +11,9 @@ from tools.runtime.reproducibility import Reproducibility
 class Loader:
     @staticmethod
     def build(
-        train_dataset : Dataset,
-        val_dataset   : Dataset,
-        test_dataset  : Dataset,
+        train_dataset   : Dataset,
+        val_dataset     : Dataset,
+        test_dataset    : Dataset,
         batch_size      : int,
         num_workers     : int,
         logger          : Logger,
@@ -26,12 +26,12 @@ class Loader:
 
         logger.section(section_label)
         logger.kv_table({
-            "Batch size":      batch_size,
-            "Num workers":     num_workers,
-            "Pin memory":      pin_memory,
-            "Prefetch factor": prefetch_factor,
-            "Shuffle train":   shuffle_train,
-            "Seed":            seed,
+            "Batch size"      : batch_size,
+            "Num workers"     : num_workers,
+            "Pin memory"      : pin_memory,
+            "Prefetch factor" : prefetch_factor,
+            "Shuffle train"   : shuffle_train,
+            "Seed"            : seed,
         })
 
         worker_init = Reproducibility.worker_init(seed) if num_workers > 0 else None
@@ -50,9 +50,9 @@ class Loader:
         test_loader  = DataLoader(test_dataset,  shuffle = False,         drop_last = False, **_base)
 
         logger.kv_table({
-            "Train batches": len(train_loader),
-            "Val batches":   len(val_loader),
-            "Test batches":  len(test_loader),
+            "Train batches" : len(train_loader),
+            "Val batches"   : len(val_loader),
+            "Test batches"  : len(test_loader),
         })
 
         return train_loader, val_loader, test_loader

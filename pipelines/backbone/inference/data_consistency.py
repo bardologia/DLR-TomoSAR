@@ -8,12 +8,12 @@ import numpy as np
 import torch
 from scipy.ndimage import uniform_filter
 
-from configuration.inference import InferenceConfig
+from configuration.inference            import InferenceConfig
 from pipelines.backbone.inference.loader import Run
-from tools.data.io            import FileIO
-from tools.loss.physical_loss import PhysicalLoss
-from tools.monitoring.logger  import Logger
-from tools.sar                import GeometryField
+from tools.data.io                       import FileIO
+from tools.loss.physical_loss            import PhysicalLoss
+from tools.monitoring.logger             import Logger
+from tools.sar                           import GeometryField
 
 
 @dataclass
@@ -216,12 +216,12 @@ class DataConsistencyEvaluator:
 
     def _report(self, metrics: Dict[str, float]) -> None:
         self.logger.kv_table({
-            "Coherence error (mean)"     : f"{metrics['physics_coherence_error_mean']:.6f}",
-            "Covariance error (mean)"    : f"{metrics['physics_covariance_error_mean']:.6f}",
-            "Valid fraction"             : f"{metrics['physics_valid_fraction']:.4f}",
-            "Phase agreement GT (mean)"  : f"{metrics['phase_agreement_gt_mean']:.4f}",
-            "Phase agreement GT flipped" : f"{metrics['phase_agreement_gt_flipped_mean']:.4f}",
-            "Phase agreement pred (mean)": f"{metrics['phase_agreement_pred_mean']:.4f}",
+            "Coherence error (mean)"      : f"{metrics['physics_coherence_error_mean']:.6f}",
+            "Covariance error (mean)"     : f"{metrics['physics_covariance_error_mean']:.6f}",
+            "Valid fraction"              : f"{metrics['physics_valid_fraction']:.4f}",
+            "Phase agreement GT (mean)"   : f"{metrics['phase_agreement_gt_mean']:.4f}",
+            "Phase agreement GT flipped"  : f"{metrics['phase_agreement_gt_flipped_mean']:.4f}",
+            "Phase agreement pred (mean)" : f"{metrics['phase_agreement_pred_mean']:.4f}",
         }, title="Interferometric data consistency")
 
         if metrics["phase_agreement_gt_flipped_mean"] > metrics["phase_agreement_gt_mean"]:

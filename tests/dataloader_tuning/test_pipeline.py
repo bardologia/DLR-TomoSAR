@@ -6,10 +6,9 @@ from pathlib import Path
 import pytest
 import torch
 
-from pipelines.dataloader_tuning.pipeline import DataLoaderTuningPipeline
-
+from pipelines.dataloader_tuning.pipeline      import DataLoaderTuningPipeline
 from configuration.benchmark.dataloader_tuning import DataLoaderTuningEntryConfig
-from tools.benchmarking import LoaderSpec, SweepReport
+from tools.benchmarking                        import LoaderSpec, SweepReport
 
 
 def _config(tmp_path, **kwargs):

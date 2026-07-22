@@ -200,7 +200,7 @@ class RunLoader:
         self.logger.section("[Inference: Load Run]")
         self.logger.subsection(f"Run Directory : {self.run_directory} \n")
 
-        run_summary    = self._read_json("run_summary.json")
+        run_summary = self._read_json("run_summary.json")
 
         dataset_config = self._build_dataset_config(
             payload     = self._read_json("dataset_creation_config.json"),

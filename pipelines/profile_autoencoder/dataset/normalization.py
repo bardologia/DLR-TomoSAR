@@ -42,9 +42,9 @@ class ProfileStats:
         if logger is not None:
             logger.section("[Profile normalization stats loaded]")
             logger.kv_table({
-                "Stats path":  path,
-                "loc":         payload["loc"],
-                "scale":       payload["scale"],
+                "Stats path" : path,
+                "loc"        : payload["loc"],
+                "scale"      : payload["scale"],
             })
 
         return cls(loc = float(payload["loc"]), scale = float(payload["scale"]))
@@ -78,10 +78,10 @@ class ProfileStatsComputer:
         scale  = float(values.std())
 
         logger.kv_table({
-            "Samples":   f"{len(indices):,} / {len(dataset):,} profiles",
-            "Transform": "log1p then standardize",
-            "loc":       f"{loc:+.6f}",
-            "scale":     f"{scale:.6f}",
+            "Samples"   : f"{len(indices):,} / {len(dataset):,} profiles",
+            "Transform" : "log1p then standardize",
+            "loc"       : f"{loc:+.6f}",
+            "scale"     : f"{scale:.6f}",
         })
 
         return ProfileStats(loc = loc, scale = max(scale, ProfileNormalizer.SCALE_FLOOR))

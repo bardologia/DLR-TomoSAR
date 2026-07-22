@@ -4,12 +4,12 @@ import pytest
 import torch
 import torch.nn as nn
 
-from configuration.architectures      import Conv2dImageAutoencoderConfig
-from configuration.training.jepa      import EmbeddingLossConfig
-from models.image_autoencoder         import get_image_autoencoder
-from pipelines.jepa.training.coupling import CouplingMode, TargetProvider
-from pipelines.jepa.training.loss     import Loss as EmbeddingLoss
-from pipelines.jepa.training.trainer  import JepaModule, Trainer
+from configuration.architectures                         import Conv2dImageAutoencoderConfig
+from configuration.training.jepa                         import EmbeddingLossConfig
+from models.image_autoencoder                            import get_image_autoencoder
+from pipelines.jepa.training.coupling                    import CouplingMode, TargetProvider
+from pipelines.jepa.training.loss                        import Loss as EmbeddingLoss
+from pipelines.jepa.training.trainer                     import JepaModule, Trainer
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 
 from tests.jepa.conftest import EMBEDDING_DIM, IdentityNormStats, N_GAUSSIANS, SPATIAL, make_autoencoder
@@ -38,10 +38,10 @@ def test_jepa_module_image_autoencoder_disabled_by_default():
 
 
 def test_jepa_module_forward_routes_through_image_autoencoder():
-    image_cfg    = Conv2dImageAutoencoderConfig(in_channels=2, embedding_dim=4, base_channels=4, depth=1, downsample_factor=2)
-    image_ae, _  = get_image_autoencoder("conv2d_ae", image_cfg)
-    backbone     = nn.Conv2d(4, EMBEDDING_DIM, kernel_size=1)
-    module       = JepaModule(backbone, profile_autoencoder=make_autoencoder("none"), image_autoencoder=image_ae)
+    image_cfg   = Conv2dImageAutoencoderConfig(in_channels=2, embedding_dim=4, base_channels=4, depth=1, downsample_factor=2)
+    image_ae, _ = get_image_autoencoder("conv2d_ae", image_cfg)
+    backbone    = nn.Conv2d(4, EMBEDDING_DIM, kernel_size=1)
+    module      = JepaModule(backbone, profile_autoencoder=make_autoencoder("none"), image_autoencoder=image_ae)
     module.eval()
 
     images = torch.randn(2, 2, 8, 8)
@@ -109,7 +109,7 @@ def make_trainer_shim(target_kind="stopgrad", trainable=True):
     mode   = CouplingMode("finetune" if trainable else "frozen", "profile autoencoder")
     mode.apply(module.profile_autoencoder)
 
-    x_axis             = torch.linspace(-4.0, 4.0, module.profile_autoencoder.config.profile_length)
+    x_axis = torch.linspace(-4.0, 4.0, module.profile_autoencoder.config.profile_length)
 
     norm_stats         = IdentityNormStats()
     profile_normalizer = ProfileNormalizer(ProfileStats(loc=0.0, scale=1.0))
@@ -118,7 +118,7 @@ def make_trainer_shim(target_kind="stopgrad", trainable=True):
     provider  = TargetProvider(target_kind)
     criterion = EmbeddingLoss(module.profile_autoencoder, provider, emb_cfg, x_axis, norm_stats, 3, profile_normalizer)
 
-    trainer = Trainer.__new__(Trainer)
+    trainer              = Trainer.__new__(Trainer)
     trainer.model        = module
     trainer.device       = torch.device("cpu")
     trainer.has_profile  = True

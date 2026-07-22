@@ -36,8 +36,8 @@ def _probe(probe_cfg: LossScaleProbeConfig, n_channels: int = 6) -> LossScalePro
 def test_probe_forces_all_terms_on_with_unit_weight():
     probe = _probe(LossScaleProbeConfig(enabled=True, n_batches=2, exit_after=False))
 
-    assert probe.loss_cfg.use_mse_curve is True
-    assert probe.loss_cfg.weight_mse_curve == 1.0
+    assert probe.loss_cfg.use_mse_curve        is True
+    assert probe.loss_cfg.weight_mse_curve     == 1.0
     assert probe.loss_cfg.use_covariance_match is True
 
 
@@ -46,7 +46,7 @@ def test_probe_respects_enabled_losses_override():
     probe     = _probe(LossScaleProbeConfig(enabled=True, n_batches=2, exit_after=False, enabled_losses=overrides))
 
     assert probe.loss_cfg.use_covariance_match is False
-    assert probe.loss_cfg.use_mse_curve is True
+    assert probe.loss_cfg.use_mse_curve        is True
 
 
 def test_probe_runs_and_reports_suggested_weights():

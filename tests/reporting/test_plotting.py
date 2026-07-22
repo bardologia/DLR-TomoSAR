@@ -97,7 +97,7 @@ def test_cmap_with_bad_returns_colormap():
 
 def test_cmap_with_bad_sets_bad_color():
     cmap = PlotBase._cmap_with_bad("viridis", bad_color="red")
-    bad = cmap.get_bad()
+    bad  = cmap.get_bad()
     assert tuple(bad) == mcolors.to_rgba("red")
 
 

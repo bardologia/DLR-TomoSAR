@@ -16,9 +16,9 @@ def state_dict():
     dead[0, 0] = 1.0
 
     return {
-        "encoder.blocks.0.conv.weight": torch.randn(16, 8) * 0.05,
-        "encoder.blocks.0.conv.bias"  : torch.randn(16) * 0.01,
-        "decoder.head.weight"         : dead,
+        "encoder.blocks.0.conv.weight" : torch.randn(16, 8) * 0.05,
+        "encoder.blocks.0.conv.bias"   : torch.randn(16) * 0.01,
+        "decoder.head.weight"          : dead,
     }
 
 

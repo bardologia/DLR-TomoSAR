@@ -5,8 +5,7 @@ import pytest
 import torch
 
 from pipelines.backbone.training.diagnostics import ExampleSelector, ParamSampler, ReconstructionFigures
-
-from tests.backbone_training._helpers import build_loss, valid_param_tensor
+from tests.backbone_training._helpers        import build_loss, valid_param_tensor
 
 
 class FigureTracker:
@@ -174,10 +173,10 @@ def test_selector_finds_all_categories():
     selector  = ExampleSelector(params_per_gaussian=3, amp_zero_thr=1e-3)
     selected  = selector.select(_category_loader(), criterion.norm_stats.denormalize_output)
 
-    assert selected["single_gaussian"]  == [(0, 1, 1), (0, 2, 2), (0, 3, 3)]
-    assert selected["two_overlapping"]  == [(1, 4, 4), (1, 5, 5), (1, 6, 6)]
-    assert selected["two_separated"]    == [(3, 1, 1), (3, 2, 2), (3, 3, 3)]
-    assert selected["two_distant"]      == [(2, 1, 1), (2, 2, 2), (2, 3, 3)]
+    assert selected["single_gaussian"] == [(0, 1, 1), (0, 2, 2), (0, 3, 3)]
+    assert selected["two_overlapping"] == [(1, 4, 4), (1, 5, 5), (1, 6, 6)]
+    assert selected["two_separated"]   == [(3, 1, 1), (3, 2, 2), (3, 3, 3)]
+    assert selected["two_distant"]     == [(2, 1, 1), (2, 2, 2), (2, 3, 3)]
 
 
 def test_figures_capture_reference_once():

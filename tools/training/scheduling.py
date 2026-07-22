@@ -5,8 +5,8 @@ import math
 
 class Warmup:
     def __init__(self, config, logger):
-        self.config  = config
-        self.logger  = logger
+        self.config = config
+        self.logger = logger
 
         self.warmup_steps        = self.config.warmup.warmup_steps
         self.warmup_start_factor = self.config.warmup.warmup_start_factor
@@ -93,15 +93,15 @@ class Warmup:
 
 class Scheduler:
     def __init__(self, base_lrs, warmup, config, logger):
-        self.config  = config
-        self.warmup  = warmup
-        self.logger  = logger
+        self.config = config
+        self.warmup = warmup
+        self.logger = logger
 
         self.base_lrs       = list(base_lrs)
         self.current_lrs    = list(base_lrs)
         self.scheduler_type = self.config.scheduler.type
 
-        self._epoch_offset  = 0
+        self._epoch_offset = 0
 
         self._log_scheduler_info()
 

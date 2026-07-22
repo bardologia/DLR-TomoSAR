@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from pipelines.shared.comparison.trial_collection import SeedRunAggregator, TrialCollector
-from tools.monitoring.logger            import Logger
+from tools.monitoring.logger                      import Logger
 
 
 class BenchmarkSeedCollector(TrialCollector):

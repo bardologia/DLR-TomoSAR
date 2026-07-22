@@ -124,10 +124,10 @@ def test_fit_settings_default_factory_independent():
 
 def test_extraction_config_paths_derived():
     cfg = ExtractionConfig(processed_data_path=Path("/tmp/run"))
-    assert cfg.data_directory     == Path("/tmp/run/data")
-    assert cfg.metadata_directory == Path("/tmp/run/meta")
-    assert cfg.parameters_npy_path.name   == "parameters.npy"
-    assert cfg.diagnostics_npz_path.name  == "fit_diagnostics.npz"
+    assert cfg.data_directory            == Path("/tmp/run/data")
+    assert cfg.metadata_directory        == Path("/tmp/run/meta")
+    assert cfg.parameters_npy_path.name  == "parameters.npy"
+    assert cfg.diagnostics_npz_path.name == "fit_diagnostics.npz"
 
 
 def test_extraction_config_default_suffix_encodes_fit():
@@ -151,13 +151,13 @@ def test_extraction_config_suffix_encodes_free_parameters():
 def test_extraction_config_explicit_suffix_used():
     cfg = ExtractionConfig(processed_data_path=Path("/tmp/run"), output_suffix="custom")
     assert cfg.output_suffix_value == "custom"
-    assert cfg.output_subdir_name == "params_custom"
+    assert cfg.output_subdir_name  == "params_custom"
 
 
 def test_extraction_config_output_directory_layout():
     cfg = ExtractionConfig(processed_data_path=Path("/tmp/run"))
     assert cfg.output_directory.parent.name == "params"
-    assert cfg.output_directory.name == cfg.output_subdir_name
+    assert cfg.output_directory.name        == cfg.output_subdir_name
 
 
 def test_extraction_config_matches_param_extraction_meta_suffix(param_extraction_meta):

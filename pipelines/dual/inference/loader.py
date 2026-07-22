@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from models.dual import get_dual
+from models.dual                                import get_dual
 from pipelines.backbone.inference.loader        import RunLoader
 from pipelines.shared.config.config_persistence import DualModelConfigIO
 

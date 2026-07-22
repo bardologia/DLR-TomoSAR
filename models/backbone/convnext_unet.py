@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 
 from configuration.architectures import ConvNeXtUNetConfig
-from ..blocks                          import ChannelLayerNorm, ConvNeXtBlock, OutputHeadsMixin, initialize_weights
-from ..blocks                          import match_spatial_size
+from ..blocks                    import ChannelLayerNorm, ConvNeXtBlock, OutputHeadsMixin, initialize_weights
+from ..blocks                    import match_spatial_size
 
 
 class ConvNeXtStage(nn.Module):

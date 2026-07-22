@@ -7,23 +7,23 @@ from typing             import List, Optional, Tuple
 import numpy as np
 import torch
 
-from pipelines.backbone.dataset.spatial   import GridInfo
-from pipelines.backbone.inference.loader  import Run
+from pipelines.backbone.dataset.spatial              import GridInfo
+from pipelines.backbone.inference.loader             import Run
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
-from pipelines.backbone.inference.metrics import Metrics, Result
-from tools.data.gaussians                 import GaussianReconstructor
-from tools.loss.param_loss                import ParamMatcher
-from tools.monitoring.logger              import Logger
+from pipelines.backbone.inference.metrics            import Metrics, Result
+from tools.data.gaussians                            import GaussianReconstructor
+from tools.loss.param_loss                           import ParamMatcher
+from tools.monitoring.logger                         import Logger
 
 
 class CubeStitcher:
     def __init__(
         self,
-        grid           : GridInfo,
-        n_channels     : int,
-        window_kind    : str           = "hann",
-        dtype          : str           = "float32",
-        memmap_path    : Optional[str] = None,
+        grid        : GridInfo,
+        n_channels  : int,
+        window_kind : str           = "hann",
+        dtype       : str           = "float32",
+        memmap_path : Optional[str] = None,
     ) -> None:
         self.grid       = grid
         self.n_channels = int(n_channels)
@@ -95,10 +95,10 @@ class CubeStitcher:
 class SelectStitcher:
     def __init__(
         self,
-        grid           : GridInfo,
-        n_channels     : int,
-        dtype          : str           = "float32",
-        memmap_path    : Optional[str] = None,
+        grid        : GridInfo,
+        n_channels  : int,
+        dtype       : str           = "float32",
+        memmap_path : Optional[str] = None,
     ) -> None:
         self.grid       = grid
         self.n_channels = int(n_channels)
@@ -146,14 +146,14 @@ class SelectStitcher:
 class Predictor:
     def __init__(
         self,
-        run            : Run,
-        logger         : Logger,
+        run         : Run,
+        logger      : Logger,
         *,
-        window_kind    : str,
-        cube_dtype     : str,
-        save_cubes     : bool,
-        meta           : InferenceMetadata,
-        cpu_workers    : int | None = None,
+        window_kind : str,
+        cube_dtype  : str,
+        save_cubes  : bool,
+        meta        : InferenceMetadata,
+        cpu_workers : int | None = None,
     ) -> None:
 
         self.run         = run

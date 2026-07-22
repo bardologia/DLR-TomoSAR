@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict
 from pathlib     import Path
 
-from configuration.dataset import DatasetConfig
+from configuration.dataset   import DatasetConfig
 from tools.data.regions      import CropRegion
 from tools.data.io           import FileIO
 from tools.monitoring.logger import Logger

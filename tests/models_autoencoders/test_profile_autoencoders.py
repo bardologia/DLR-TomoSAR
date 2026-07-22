@@ -93,9 +93,9 @@ def test_backward_finite_grads(name, tomogram_full):
     model, _ = _build(name)
     model.train()
 
-    x       = _profile_input(tomogram_full, _real_batch())
-    x_hat   = model(x)
-    loss    = torch.nn.functional.mse_loss(x_hat, x)
+    x     = _profile_input(tomogram_full, _real_batch())
+    x_hat = model(x)
+    loss  = torch.nn.functional.mse_loss(x_hat, x)
     loss.backward()
 
     assert _finite(loss)
@@ -145,9 +145,9 @@ def test_constant_input_finite(name):
 
 @pytest.mark.parametrize("name", NAMES)
 def test_layernorm_embedding_is_registered_module(name):
-    cfg          = _tiny_config(name)
+    cfg                = _tiny_config(name)
     cfg.embedding_norm = "layernorm"
-    model, _     = get_profile_autoencoder(name, cfg)
+    model, _           = get_profile_autoencoder(name, cfg)
 
     keys = model.state_dict().keys()
     assert any("embedding_layernorm" in k for k in keys)
@@ -168,9 +168,9 @@ def test_collapsed_embedding_backward_finite(name):
 
     model.encode = collapsed_encode
 
-    x       = torch.randn(2, PROFILE_LENGTH, 3, 3)
-    x_hat   = model.decode(model.encode(x))
-    loss    = torch.nn.functional.mse_loss(x_hat, x)
+    x     = torch.randn(2, PROFILE_LENGTH, 3, 3)
+    x_hat = model.decode(model.encode(x))
+    loss  = torch.nn.functional.mse_loss(x_hat, x)
     loss.backward()
 
     grads = [p.grad for p in model.parameters() if p.grad is not None]

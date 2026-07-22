@@ -121,10 +121,10 @@ class GpuAvailability:
 
 class GpuSchedule:
 
-    INTERVAL        = 30.0
-    SWEEP_INTERVAL  = 600.0
-    FILE_NAME = "gpu_schedule.json"
-    GPU_KEYS  = ("weekday_gpus", "night_gpus", "weekend_gpus")
+    INTERVAL       = 30.0
+    SWEEP_INTERVAL = 600.0
+    FILE_NAME      = "gpu_schedule.json"
+    GPU_KEYS       = ("weekday_gpus", "night_gpus", "weekend_gpus")
 
     DEFAULTS = {
         "enabled"          : False,

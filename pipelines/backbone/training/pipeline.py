@@ -4,19 +4,19 @@ from pathlib import Path
 
 import numpy as np
 
-from configuration.dataset  import DatasetConfig
-from configuration.training import BackboneTrainerConfig, OverfitCheckConfig
-from models                 import get_backbone
-from pipelines.backbone.dataset.pipeline     import DatasetPipeline
-from pipelines.backbone.training.loss_terms  import LossComponentCatalog
-from pipelines.backbone.training.trainer     import Trainer
+from configuration.dataset                      import DatasetConfig
+from configuration.training                     import BackboneTrainerConfig, OverfitCheckConfig
+from models                                     import get_backbone
+from pipelines.backbone.dataset.pipeline        import DatasetPipeline
+from pipelines.backbone.training.loss_terms     import LossComponentCatalog
+from pipelines.backbone.training.trainer        import Trainer
 from pipelines.shared.config.config_persistence import BackboneModelConfigIO
-from pipelines.shared.config.run_metadata    import TrainingRunMetadata
-from pipelines.shared.model.model_builder    import ModelBuilder
-from pipelines.shared.training.overfit_check import OverfitCheck
-from tools.data.gaussians          import GaussianAxis, GaussianHead
-from tools.runtime.config_cli      import ConfigCli
-from tools.runtime.reproducibility import Reproducibility
+from pipelines.shared.config.run_metadata       import TrainingRunMetadata
+from pipelines.shared.model.model_builder       import ModelBuilder
+from pipelines.shared.training.overfit_check    import OverfitCheck
+from tools.data.gaussians                       import GaussianAxis, GaussianHead
+from tools.runtime.config_cli                   import ConfigCli
+from tools.runtime.reproducibility              import Reproducibility
 
 
 class TrainingPipeline:

@@ -76,7 +76,7 @@ class ProfileAeRunLoader:
         return dataset, x_axis, x_len
 
     def _build_model(self, x_len: int, device: str):
-        ae_cfg, ae_name      = ProfileAutoencoderConfigIO.load(self.meta_directory)
+        ae_cfg, ae_name       = ProfileAutoencoderConfigIO.load(self.meta_directory)
         ae_cfg.profile_length = x_len
 
         model, _ = get_profile_autoencoder(ae_name, ae_cfg)

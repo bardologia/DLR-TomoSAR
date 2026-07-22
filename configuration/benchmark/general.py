@@ -46,7 +46,7 @@ class InferenceQueueConfig:
     save_cubes      : bool = False
     stitch_window   : str  = "hann"
 
-    compute_reduced : bool = True
+    compute_reduced: bool = True
 
     n_best_profiles   : int = 12
     n_worst_profiles  : int = 12
@@ -63,7 +63,7 @@ class InferenceQueueConfig:
 
 @dataclass
 class ComparisonReportConfig:
-    embed_images : bool = False
+    embed_images: bool = False
 
 
 def _default_ae_loss():
@@ -76,7 +76,7 @@ def _default_base_loss():
 
 @dataclass
 class BenchmarkConfig:
-    training_type : str = "backbone"
+    training_type: str = "backbone"
 
     paths      : RunPathsConfig         = field(default_factory=RunPathsConfig)
     max_batch  : MaxBatchConfig         = field(default_factory=MaxBatchConfig)
@@ -93,7 +93,7 @@ class BenchmarkConfig:
     overfit_check : OverfitCheckConfig  = field(default_factory=OverfitCheckConfig)
 
     ae_loss         : object          = field(default_factory=_default_ae_loss)
-    jepa            : JepaBenchConfig  = field(default_factory=JepaBenchConfig)
+    jepa            : JepaBenchConfig = field(default_factory=JepaBenchConfig)
     pixel_subsample : float           = 1.0
     keep_empty_frac : float           = 0.05
 
@@ -108,7 +108,7 @@ class BenchmarkConfig:
     seeds           : list[int]  = field(default_factory=standard_seeds)
     poll_interval_s : float      = 5.0
 
-    sweep_loss_components : list[str] = field(default_factory=lambda: ["param_l1"])
+    sweep_loss_components: list[str] = field(default_factory=lambda: ["param_l1"])
 
     def runs_size_match(self) -> bool:
         return self.training_type == "backbone"

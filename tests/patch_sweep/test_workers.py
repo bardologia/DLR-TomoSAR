@@ -4,19 +4,19 @@ from pathlib import Path
 
 import pytest
 
-from configuration.patch_sweep import PatchSweepConfig
-from pipelines.patch_sweep.planner import PatchSweepPlanner
-from pipelines.patch_sweep.workers import SweepTrainingWorker
+from configuration.patch_sweep              import PatchSweepConfig
+from pipelines.patch_sweep.planner          import PatchSweepPlanner
+from pipelines.patch_sweep.workers          import SweepTrainingWorker
 from pipelines.shared.config.config_factory import ConfigFactory
 
 
 def make_worker(test_data_dir, params_dir, tmp_path: Path, batch_size: int | None = None) -> SweepTrainingWorker:
-    config                        = PatchSweepConfig()
-    config.dataset_base_path      = test_data_dir.parent
-    config.dataset_filter         = [test_data_dir.name]
-    config.paths.dataset_path     = test_data_dir
-    config.paths.parameters_path  = params_dir / "parameters.npy"
-    config.paths.log_base_dir     = tmp_path
+    config                       = PatchSweepConfig()
+    config.dataset_base_path     = test_data_dir.parent
+    config.dataset_filter        = [test_data_dir.name]
+    config.paths.dataset_path    = test_data_dir
+    config.paths.parameters_path = params_dir / "parameters.npy"
+    config.paths.log_base_dir    = tmp_path
 
     if batch_size is not None:
         config.training.batch_size = batch_size

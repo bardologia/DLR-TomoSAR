@@ -5,6 +5,7 @@ import threading
 import time
 from datetime import datetime
 from pathlib  import Path
+
 import psutil
 import pynvml
 
@@ -64,13 +65,13 @@ class ResourceMonitor:
 
     def _init_peak_tracking(self):
         self.peak = {
-            "ram_used_gb": 0.0,
-            "ram_pct": 0.0,
-            "proc_rss_gb": 0.0,
-            "swap_used_gb": 0.0,
-            "shm_used_gb": 0.0,
-            "vram_used_gb": 0.0,
-            "vram_pct": 0.0,
+            "ram_used_gb"  : 0.0,
+            "ram_pct"      : 0.0,
+            "proc_rss_gb"  : 0.0,
+            "swap_used_gb" : 0.0,
+            "shm_used_gb"  : 0.0,
+            "vram_used_gb" : 0.0,
+            "vram_pct"     : 0.0,
         }
 
     @staticmethod
@@ -181,12 +182,12 @@ class ResourceMonitor:
                     free_gb  = self._bytes_to_gb(mem.free)
                     pct      = 100.0 * mem.used / max(mem.total, 1)
                     
-                    metrics[f"gpu{i}_vram_used_gb"] = used_gb
-                    metrics[f"gpu{i}_vram_free_gb"] = free_gb
+                    metrics[f"gpu{i}_vram_used_gb"]  = used_gb
+                    metrics[f"gpu{i}_vram_free_gb"]  = free_gb
                     metrics[f"gpu{i}_vram_total_gb"] = total_gb
-                    metrics[f"gpu{i}_vram_pct"] = pct
-                    metrics[f"gpu{i}_util_pct"] = float(util.gpu)
-                    metrics[f"gpu{i}_mem_util_pct"] = float(util.memory)
+                    metrics[f"gpu{i}_vram_pct"]      = pct
+                    metrics[f"gpu{i}_util_pct"]      = float(util.gpu)
+                    metrics[f"gpu{i}_mem_util_pct"]  = float(util.memory)
                     
                     try:
                         temp = pynvml.nvmlDeviceGetTemperature(h, pynvml.NVML_TEMPERATURE_GPU)

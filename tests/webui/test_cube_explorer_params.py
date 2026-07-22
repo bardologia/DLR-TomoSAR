@@ -54,9 +54,9 @@ def _make_cube_run(base: Path, with_params: tuple = ("pred", "gt"), with_spacing
         np.save(stamp / "cubes" / f"{source}_curves.npy", rng.random((N_ELEV, N_AZ, N_RG)).astype(np.float32))
 
     if with_reduced:
-        reduced           = np.zeros((N_ELEV, N_AZ, N_RG), dtype=np.float32)
-        reduced[2, 3, 4]  = 2.0
-        reduced[4, 5, 1]  = 1.0
+        reduced          = np.zeros((N_ELEV, N_AZ, N_RG), dtype=np.float32)
+        reduced[2, 3, 4] = 2.0
+        reduced[4, 5, 1] = 1.0
         np.save(stamp / "cubes" / "reduced_curves.npy", reduced)
 
     for source in with_params:
@@ -270,8 +270,8 @@ def test_dem_grid_with_artifact(tmp_path):
     preproc = tmp_path / "preproc"
     layout  = json.loads((preproc / "data" / "dataset.json").read_text())
 
-    dem          = np.linspace(600.0, 700.0, N_AZ * N_RG).reshape(N_AZ, N_RG).astype(np.float32)
-    dem[2, 3]    = np.nan
+    dem       = np.linspace(600.0, 700.0, N_AZ * N_RG).reshape(N_AZ, N_RG).astype(np.float32)
+    dem[2, 3] = np.nan
     np.save(preproc / "data" / "dem.npy", dem)
     layout["artifacts"]["dem_full"] = "dem.npy"
     (preproc / "data" / "dataset.json").write_text(json.dumps(layout))

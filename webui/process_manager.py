@@ -148,20 +148,20 @@ class ProcessManager:
         overrides = self._with_pool_file(key, overrides, job_id)
 
         return {
-            "job_id"      : job_id,
-            "script"      : key,
-            "command"     : self._render_command(interpreter, key, overrides, detach),
-            "description" : self.describer.describe(key, interpreter, overrides),
-            "interpreter" : interpreter,
-            "overrides"   : overrides,
-            "detach"      : detach,
-            "status"      : "pending",
-            "pid"         : None,
-            "started"     : datetime.now().isoformat(timespec="seconds"),
-            "exit_code"   : None,
-            "follow_of"   : None,
-            "follow_up"   : None,
-            "queue_follow": None,
+            "job_id"       : job_id,
+            "script"       : key,
+            "command"      : self._render_command(interpreter, key, overrides, detach),
+            "description"  : self.describer.describe(key, interpreter, overrides),
+            "interpreter"  : interpreter,
+            "overrides"    : overrides,
+            "detach"       : detach,
+            "status"       : "pending",
+            "pid"          : None,
+            "started"      : datetime.now().isoformat(timespec="seconds"),
+            "exit_code"    : None,
+            "follow_of"    : None,
+            "follow_up"    : None,
+            "queue_follow" : None,
         }
 
     def _with_pool_file(self, key: str, overrides: dict, job_id: str) -> dict:

@@ -6,10 +6,10 @@ import types
 import numpy as np
 import pytest
 
-from configuration.inference import InferenceConfig
+from configuration.inference                       import InferenceConfig
 from pipelines.backbone.inference.data_consistency import DataConsistencyEvaluator
-from tools.data.regions import CropRegion
-from tools.sar          import GeometryField
+from tools.data.regions                            import CropRegion
+from tools.sar                                     import GeometryField
 
 
 class _SilentLogger:

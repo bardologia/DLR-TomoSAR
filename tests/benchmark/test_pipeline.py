@@ -7,7 +7,7 @@ import pytest
 from pipelines.benchmark.pipeline import BenchmarkPipeline
 
 from configuration.benchmark import BenchmarkConfig
-from tools.data.io import FileIO
+from tools.data.io           import FileIO
 
 
 ENTRY = Path("/entry/run_benchmark.py")
@@ -55,16 +55,16 @@ def test_runs_gating_for_backbone(tmp_path):
     config = _config(tmp_path, training_type="backbone")
 
     assert config.runs_size_match() is True
-    assert config.runs_max_batch() is True
-    assert config.runs_inference() is True
+    assert config.runs_max_batch()  is True
+    assert config.runs_inference()  is True
 
 
 def test_runs_gating_for_profile_autoencoder(tmp_path):
     config = _config(tmp_path, training_type="profile_autoencoder")
 
     assert config.runs_size_match() is False
-    assert config.runs_max_batch() is False
-    assert config.runs_inference() is False
+    assert config.runs_max_batch()  is False
+    assert config.runs_inference()  is False
 
 
 def _patch_stage_methods(pipeline, monkeypatch, order):
@@ -100,9 +100,9 @@ def test_run_skips_size_match_and_maxbatch_for_autoencoder(tmp_path, monkeypatch
     pipeline.run()
 
     assert "size_match" not in order
-    assert "max_batch" not in order
-    assert "inference" not in order
-    assert "training" in order
+    assert "max_batch"  not in order
+    assert "inference"  not in order
+    assert "training"   in order
     assert "comparison" in order
 
 

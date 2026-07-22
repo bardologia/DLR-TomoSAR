@@ -6,9 +6,9 @@ from types   import SimpleNamespace
 
 import optuna
 import pytest
+from optuna.trial import TrialState
 
 from configuration.architectures.backbone import UNetConfig
-from optuna.trial                         import TrialState
 from pipelines.tuning.pipeline            import TuningScheduler
 from pipelines.tuning.tuners              import ParamSampler
 

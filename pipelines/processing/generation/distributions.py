@@ -137,7 +137,7 @@ class StackDistributionAnalyzer:
         return dirs
 
     def _pass_distributions(self, primary_path: Path, secondaries_path: Path, pass_labels: Optional[List[str]], out_dir: Path) -> Tuple[Dict[str, object], str]:
-        entries : Dict[str, object] = {}
+        entries: Dict[str, object] = {}
 
         primary       = np.load(str(primary_path), mmap_mode="r")
         primary_label = str(pass_labels[0]) if pass_labels else "primary"
@@ -165,7 +165,7 @@ class StackDistributionAnalyzer:
         return entries, primary_label
 
     def _interferogram_distributions(self, interferograms_path: Path, pass_labels: Optional[List[str]], primary_label: str, out_dir: Path) -> Dict[str, object]:
-        entries : Dict[str, object] = {}
+        entries: Dict[str, object] = {}
 
         interferograms   = np.load(str(interferograms_path), mmap_mode="r")
         n_interferograms = interferograms.shape[0]

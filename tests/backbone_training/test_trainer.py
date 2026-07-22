@@ -56,10 +56,10 @@ def test_trainer_builds_on_cpu_with_wired_components(tmp_path):
 
     assert trainer.device.type == "cpu"
     assert isinstance(trainer.criterion, Loss)
-    assert trainer.optimizer is not None
-    assert trainer.lr_scheduler is not None
+    assert trainer.optimizer      is not None
+    assert trainer.lr_scheduler   is not None
     assert trainer.early_stopping is not None
-    assert trainer.warmup is not None
+    assert trainer.warmup         is not None
     assert isinstance(trainer.curriculum_controller, CurriculumController)
 
 
@@ -204,7 +204,7 @@ def test_evaluate_returns_nan_when_all_batches_nonfinite(tmp_path):
     result = trainer.evaluate(_loader(), epoch=0)
 
     assert result["num_batches"] == 0
-    assert result["avg_loss"] != result["avg_loss"]
+    assert result["avg_loss"]    != result["avg_loss"]
 
 
 def test_checkpoint_save_restore_round_trip(tmp_path):
@@ -259,7 +259,7 @@ def test_early_stopping_reset_clears_state(tmp_path):
     trainer.early_stopping.reset()
 
     assert trainer.early_stopping.best_loss is None
-    assert trainer.early_stopping.counter == 0
+    assert trainer.early_stopping.counter   == 0
     assert trainer.early_stopping.triggered is False
 
 

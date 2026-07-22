@@ -6,8 +6,8 @@ import numpy as np
 import pytest
 
 from configuration.sar.gaussian_config import GaussianConfig
-from tools.sar.geometry_field           import GeometryField
-from tools.sar.track_parameters          import TrackParameters
+from tools.sar.geometry_field          import GeometryField
+from tools.sar.track_parameters        import TrackParameters
 
 
 @pytest.mark.real_data
@@ -57,7 +57,7 @@ def test_slant_range_is_reference_track_vector_cropped(meta_dir, config_state_js
     parameters = TrackParameters.load(meta_dir / TrackParameters.FILENAME)
     crop       = config_state_json["crop"]
 
-    reference  = np.asarray(parameters.parameters[0]["r"], dtype=np.float64)
+    reference = np.asarray(parameters.parameters[0]["r"], dtype=np.float64)
 
     assert reference.shape[0] >= crop["range_end"]
     assert np.allclose(field.slant_range, reference[crop["range_start"]:crop["range_end"]])
@@ -69,18 +69,18 @@ def test_look_angle_is_arccos_height_over_slant(meta_dir, config_state_json):
     parameters = TrackParameters.load(meta_dir / TrackParameters.FILENAME)
     crop       = config_state_json["crop"]
 
-    reference  = parameters.parameters[0]
-    height     = float(reference["h0"]) - float(reference["terrain"])
-    slant      = np.asarray(reference["r"], dtype=np.float64)[crop["range_start"]:crop["range_end"]]
-    expected   = np.arccos(np.clip(height / slant, -1.0, 1.0))
+    reference = parameters.parameters[0]
+    height    = float(reference["h0"]) - float(reference["terrain"])
+    slant     = np.asarray(reference["r"], dtype=np.float64)[crop["range_start"]:crop["range_end"]]
+    expected  = np.arccos(np.clip(height / slant, -1.0, 1.0))
 
     assert np.allclose(field.look_angle, expected)
 
 
 @pytest.mark.real_data
 def test_baselines_are_profile_offsets_relative_to_reference(meta_dir, baselines_json):
-    field  = GeometryField.load(meta_dir / GeometryField.FILENAME)
-    look   = float(field.look_angle.mean())
+    field = GeometryField.load(meta_dir / GeometryField.FILENAME)
+    look  = float(field.look_angle.mean())
 
     measured = field.perpendicular_baseline().mean(axis=(1, 2))
     expected = np.array([h * math.cos(look) + v * math.sin(look) for v, h in zip(baselines_json["vertical"], baselines_json["horizontal"])])
@@ -95,9 +95,9 @@ def test_sensor_geometry_is_physically_plausible(meta_dir):
     field      = GeometryField.load(meta_dir / GeometryField.FILENAME)
     parameters = TrackParameters.load(meta_dir / TrackParameters.FILENAME)
 
-    reference  = parameters.parameters[0]
-    height     = float(reference["h0"]) - float(reference["terrain"])
-    look_deg   = np.degrees(field.look_angle)
+    reference = parameters.parameters[0]
+    height    = float(reference["h0"]) - float(reference["terrain"])
+    look_deg  = np.degrees(field.look_angle)
 
     assert height > 0.0
     assert float(field.slant_range[0]) > height

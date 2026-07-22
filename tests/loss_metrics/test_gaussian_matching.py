@@ -23,21 +23,21 @@ def _reorder(params, order):
 
 
 def test_assignment_is_identity_for_separated_match():
-    p   = _separated_params()
-    sel = GaussianMatcher().assignment(p, p.copy(), N_K)
+    p        = _separated_params()
+    sel      = GaussianMatcher().assignment(p, p.copy(), N_K)
     expected = np.tile(np.arange(N_K), (sel.shape[0], 1))
     assert np.array_equal(sel, expected)
 
 
 def test_aligned_prediction_invariant_to_pred_slot_order():
-    rng = np.random.default_rng(0)
-    gt  = _separated_params(4, 4)
+    rng  = np.random.default_rng(0)
+    gt   = _separated_params(4, 4)
     pred = gt.copy()
     for k in range(N_K):
         pred[3 * k + 1] += 0.5 * rng.standard_normal((4, 4)).astype(np.float32)
         pred[3 * k + 2] += 0.2 * rng.standard_normal((4, 4)).astype(np.float32)
 
-    matcher = GaussianMatcher()
+    matcher  = GaussianMatcher()
     base     = matcher.aligned_prediction(pred,                          gt, N_K)
     shuffled = matcher.aligned_prediction(_reorder(pred, [2, 0, 4, 1, 3]), gt, N_K)
 

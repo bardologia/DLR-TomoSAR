@@ -24,11 +24,11 @@ def _clean_pixels(tomogram: np.ndarray, z: np.ndarray, az: np.ndarray, rg: np.nd
     profile = np.abs(np.asarray(tomogram[:, az][:, :, rg])).astype(np.float64)
     n_elev  = profile.shape[0]
 
-    argmax  = profile.argmax(0)
-    total   = profile.sum(0)
-    peak_z  = z[argmax]
+    argmax = profile.argmax(0)
+    total  = profile.sum(0)
+    peak_z = z[argmax]
 
-    window  = 6
+    window        = 6
     concentration = np.empty(argmax.shape)
     for i in range(argmax.shape[0]):
         for j in range(argmax.shape[1]):
@@ -51,9 +51,9 @@ def _beamform_peaks(interferograms: np.ndarray, kz_secondary: np.ndarray, z: np.
 
 
 def _sampled(meta_dir, tomogram_full, interferograms, convention: str, max_pixels: int = 2000):
-    field   = _geometry_field(meta_dir)
-    n_elev  = tomogram_full.shape[0]
-    z       = _height_axis(n_elev)
+    field  = _geometry_field(meta_dir)
+    n_elev = tomogram_full.shape[0]
+    z      = _height_axis(n_elev)
 
     az      = np.arange(0, tomogram_full.shape[1], 8)
     rg      = np.arange(0, tomogram_full.shape[2], 8)
@@ -65,9 +65,9 @@ def _sampled(meta_dir, tomogram_full, interferograms, convention: str, max_pixel
 
     reference = peak_z[ys, xs]
 
-    kz        = field.kz(convention)[:, az][:, :, rg]
-    kz_sec    = kz[1:, ys, xs]
-    ifg       = np.asarray(interferograms[:, az][:, :, rg])[:, ys, xs]
+    kz     = field.kz(convention)[:, az][:, :, rg]
+    kz_sec = kz[1:, ys, xs]
+    ifg    = np.asarray(interferograms[:, az][:, :, rg])[:, ys, xs]
 
     best_peaks = None
     best_error = None

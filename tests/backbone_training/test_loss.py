@@ -4,12 +4,13 @@ import numpy as np
 import pytest
 import torch
 
-from configuration.training.backbone     import default_curriculum
-from configuration.training.general.loss import LossConfig, ParamMatching
+from configuration.training.backbone        import default_curriculum
+from configuration.training.general.loss    import LossConfig, ParamMatching
 from pipelines.backbone.training.loss       import Loss
 from pipelines.backbone.training.loss_terms import LOSS_TERMS, LossComponentCatalog
 
 from tests.backbone_training._helpers import build_loss, gaussian_config, geometry_config, identity_normalizer, log1p_normalizer, param_tensor, valid_param_tensor, x_axis_tensor, zscore_normalizer
+
 import tools
 
 
@@ -50,11 +51,11 @@ def test_catalog_standalone_inherits_shared_knobs_from_base():
     base = LossConfig(param_matching=ParamMatching.SORTED_GT, param_weights=(2.0, 3.0, 4.0), use_mse_curve=True, weight_mse_curve=5.0)
     cfg  = LossComponentCatalog.standalone("param_l1", base=base)
 
-    assert cfg.use_param_l1   is True
+    assert cfg.use_param_l1    is True
     assert cfg.weight_param_l1 == 1.0
-    assert cfg.param_matching == ParamMatching.SORTED_GT
-    assert cfg.param_weights  == (2.0, 3.0, 4.0)
-    assert cfg.use_mse_curve  is False
+    assert cfg.param_matching  == ParamMatching.SORTED_GT
+    assert cfg.param_weights   == (2.0, 3.0, 4.0)
+    assert cfg.use_mse_curve   is False
 
 
 def test_catalog_curriculum_is_disabled_with_matching_phases():
@@ -83,11 +84,11 @@ def test_probe_union_merges_stages_when_curriculum_enabled():
 
     union = LossComponentCatalog.probe_union(curriculum)
 
-    assert union.use_coherence_resyn    is True
-    assert union.use_covariance_match   is True
-    assert union.use_smoothness_tv      is True
-    assert union.weight_smoothness_tv   == pytest.approx(0.7)
-    assert union.use_param_l1           is True
+    assert union.use_coherence_resyn  is True
+    assert union.use_covariance_match is True
+    assert union.use_smoothness_tv    is True
+    assert union.weight_smoothness_tv == pytest.approx(0.7)
+    assert union.use_param_l1         is True
 
 
 def test_probe_union_is_the_single_stage_when_curriculum_disabled():
@@ -97,8 +98,8 @@ def test_probe_union_is_the_single_stage_when_curriculum_disabled():
 
     union = LossComponentCatalog.probe_union(curriculum)
 
-    assert union.use_smoothness_tv    is False
-    assert union.use_coherence_resyn  is True
+    assert union.use_smoothness_tv   is False
+    assert union.use_coherence_resyn is True
 
 
 def test_catalog_combined_rejects_empty_and_unknown():
@@ -138,8 +139,8 @@ def test_physical_errors_logged_without_active_param_term():
 
     out  = loss(pred, param_tensor(2, 2, 6, 6, seed=1))
 
-    assert set(out["components"].keys())  == {"mse_curve"}
-    assert set(out["physical"].keys())    == {"amp_mae", "mu_mae_m", "sigma_mae_m"}
+    assert set(out["components"].keys()) == {"mse_curve"}
+    assert set(out["physical"].keys())   == {"amp_mae", "mu_mae_m", "sigma_mae_m"}
     assert all(torch.isfinite(v).item() for v in out["physical"].values())
 
     out["total_loss"].backward()
@@ -178,10 +179,10 @@ def test_amp_gradient_survives_below_physical_floor():
 
     gt = loss.norm_stats.normalize_output(valid_param_tensor(1, 1, 4, 4, seed=40))
 
-    pred        = torch.zeros(1, 3, 4, 4)
-    pred[:, 0]  = -8.0
-    pred[:, 1]  = 0.1
-    pred[:, 2]  = 0.2
+    pred       = torch.zeros(1, 3, 4, 4)
+    pred[:, 0] = -8.0
+    pred[:, 1] = 0.1
+    pred[:, 2] = 0.2
     pred.requires_grad_(True)
 
     loss(pred, gt)["total_loss"].backward()
@@ -384,7 +385,7 @@ def test_geometry_coupled_covariance_term_uses_geometry():
     cfg  = LossConfig(use_covariance_match=True, weight_covariance_match=1.0)
     loss = build_loss(n_gaussians=2, loss_cfg=cfg)
 
-    assert loss.geometry.outer.shape[0] == loss.geometry.n_tracks
+    assert loss.geometry.outer.shape[0]    == loss.geometry.n_tracks
     assert loss.geometry.steering.shape[0] == loss.geometry.n_tracks
 
     pred = param_tensor(2, 2, 5, 5, seed=17).requires_grad_(True)
@@ -417,9 +418,9 @@ def test_total_loss_is_weighted_normalised_mean():
 
     out  = loss(pred, gt)
 
-    weight_sum   = cfg.weight_param_l1 + cfg.weight_mse_curve
-    summed       = cfg.weight_param_l1 * out["components"]["param_l1"].item() + cfg.weight_mse_curve * out["components"]["mse_curve"].item()
-    expected     = summed / weight_sum
+    weight_sum = cfg.weight_param_l1 + cfg.weight_mse_curve
+    summed     = cfg.weight_param_l1 * out["components"]["param_l1"].item() + cfg.weight_mse_curve * out["components"]["mse_curve"].item()
+    expected   = summed / weight_sum
 
     assert out["total_loss"].item() == pytest.approx(expected, rel=1e-4)
 
@@ -436,8 +437,8 @@ def test_param_weights_length_mismatch_raises():
 
 @pytest.mark.real_data
 def test_loss_on_real_tomogram_param_target(parameters):
-    win        = np.asarray(parameters[:15, :8, :8]).astype(np.float32)
-    n_channels = win.shape[0]
+    win         = np.asarray(parameters[:15, :8, :8]).astype(np.float32)
+    n_channels  = win.shape[0]
     n_gaussians = n_channels // 3
 
     gt   = torch.from_numpy(win)[None]

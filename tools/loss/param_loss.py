@@ -119,7 +119,7 @@ class ParamLoss:
         weighted_diff = weights * torch.abs(diff)
         total         = ParamLoss._reduce(weighted_diff, weights, active_norm)
 
-        per_param     = {
+        per_param = {
             name: ParamLoss._reduce(weights[:, :, i:i+1] * torch.abs(diff[:, :, i:i+1]), weights[:, :, i:i+1], active_norm)
             for i, name in enumerate(param_names)
             if i < pred.shape[2]

@@ -61,10 +61,10 @@ def test_curve_pixel_metrics_identical_is_perfect():
 
 
 def test_curve_pixel_metrics_more_noise_is_worse():
-    rng    = np.random.default_rng(1)
-    ref    = rng.random((N_ELEV, 5, 5)).astype(np.float32) + 0.5
-    small  = ref + 0.01 * rng.standard_normal(ref.shape).astype(np.float32)
-    large  = ref + 0.50 * rng.standard_normal(ref.shape).astype(np.float32)
+    rng   = np.random.default_rng(1)
+    ref   = rng.random((N_ELEV, 5, 5)).astype(np.float32) + 0.5
+    small = ref + 0.01 * rng.standard_normal(ref.shape).astype(np.float32)
+    large = ref + 0.50 * rng.standard_normal(ref.shape).astype(np.float32)
 
     mse_small = Metrics.curve_pixel_metrics(small, ref)["mse"].mean()
     mse_large = Metrics.curve_pixel_metrics(large, ref)["mse"].mean()
@@ -83,10 +83,10 @@ def test_curve_pixel_metrics_mse_mae_exact_on_tiny_input():
 
 
 def test_curve_pixel_metrics_peak_index_difference():
-    ref       = np.zeros((4, 1, 1), dtype=np.float32)
-    pred      = np.zeros((4, 1, 1), dtype=np.float32)
-    ref[1]    = 1.0
-    pred[3]   = 1.0
+    ref     = np.zeros((4, 1, 1), dtype=np.float32)
+    pred    = np.zeros((4, 1, 1), dtype=np.float32)
+    ref[1]  = 1.0
+    pred[3] = 1.0
 
     out = Metrics.curve_pixel_metrics(pred, ref)
 
@@ -94,10 +94,10 @@ def test_curve_pixel_metrics_peak_index_difference():
 
 
 def test_curve_pixel_metrics_cosine_orthogonal():
-    ref       = np.zeros((4, 1, 1), dtype=np.float32)
-    pred      = np.zeros((4, 1, 1), dtype=np.float32)
-    ref[0]    = 1.0
-    pred[1]   = 1.0
+    ref     = np.zeros((4, 1, 1), dtype=np.float32)
+    pred    = np.zeros((4, 1, 1), dtype=np.float32)
+    ref[0]  = 1.0
+    pred[1] = 1.0
 
     out = Metrics.curve_pixel_metrics(pred, ref)
 
@@ -218,14 +218,14 @@ def test_active_count_stats_identical_perfect_agreement():
     res = _make_result(np.zeros((N_ELEV, H, W), np.float32), np.zeros((N_ELEV, H, W), np.float32), params_pred=params.copy(), params_gt=params.copy())
     out = Metrics(res, _x_axis(), N_GAUSSIANS)._active_count_stats()
 
-    assert out["count_exact_frac"]    == pytest.approx(1.0)
-    assert out["count_under_frac"]    == pytest.approx(0.0)
-    assert out["count_over_frac"]     == pytest.approx(0.0)
-    assert out["active_count_gt_mean"] == pytest.approx(2.0)
+    assert out["count_exact_frac"]      == pytest.approx(1.0)
+    assert out["count_under_frac"]      == pytest.approx(0.0)
+    assert out["count_over_frac"]       == pytest.approx(0.0)
+    assert out["active_count_gt_mean"]  == pytest.approx(2.0)
     assert out["slot_0_active_gt_frac"] == pytest.approx(1.0)
     assert out["slot_2_active_gt_frac"] == pytest.approx(0.0)
-    assert out["count_acc_gt2"]       == pytest.approx(1.0)
-    assert out["count_acc_pred2"]     == pytest.approx(1.0)
+    assert out["count_acc_gt2"]         == pytest.approx(1.0)
+    assert out["count_acc_pred2"]       == pytest.approx(1.0)
     assert "count_acc_gt1" not in out
     assert "count_acc_pred1" not in out
 
@@ -234,9 +234,9 @@ def test_active_count_stats_per_slot_pred_is_permutation_invariant():
     H, W = 5, 5
     gt   = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
 
-    gt[0],  gt[1]  = 1.0, -10.0
-    gt[3],  gt[4]  =  1.0,  10.0
-    gt[6],  gt[7]  =  1.0,  40.0
+    gt[0],  gt[1] = 1.0, -10.0
+    gt[3],  gt[4] =  1.0,  10.0
+    gt[6],  gt[7] =  1.0,  40.0
 
     order = [2, 0, 1, 3, 4]
     pred  = _reorder_groups(gt, order)
@@ -248,23 +248,23 @@ def test_active_count_stats_per_slot_pred_is_permutation_invariant():
 
 
 def test_active_count_stats_undercount_when_pred_drops_slot():
-    H, W   = 4, 4
-    gt     = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
+    H, W = 4, 4
+    gt   = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
 
     gt[0] = 1.0
     gt[3] = 1.0
 
-    pred       = gt.copy()
-    pred[3]    = 0.0
+    pred    = gt.copy()
+    pred[3] = 0.0
 
     res = _make_result(np.zeros((N_ELEV, H, W), np.float32), np.zeros((N_ELEV, H, W), np.float32), params_pred=pred, params_gt=gt)
     out = Metrics(res, _x_axis(), N_GAUSSIANS)._active_count_stats()
 
-    assert out["count_under_frac"]      == pytest.approx(1.0)
-    assert out["count_exact_frac"]      == pytest.approx(0.0)
+    assert out["count_under_frac"]       == pytest.approx(1.0)
+    assert out["count_exact_frac"]       == pytest.approx(0.0)
     assert out["active_count_pred_mean"] == pytest.approx(1.0)
-    assert out["active_frac_pred"]      == pytest.approx(1.0 / N_GAUSSIANS)
-    assert out["count_acc_gt2"]         == pytest.approx(0.0)
+    assert out["active_frac_pred"]       == pytest.approx(1.0 / N_GAUSSIANS)
+    assert out["count_acc_gt2"]          == pytest.approx(0.0)
 
 
 def _reorder_groups(params: np.ndarray, order: list) -> np.ndarray:
@@ -339,9 +339,9 @@ def test_matched_identical_is_perfect():
 
     out = _matched(params.copy(), params.copy())
 
-    assert out["matched_mu_mae"]  == pytest.approx(0.0, abs=1e-6)
-    assert out["matched_sig_mae"] == pytest.approx(0.0, abs=1e-6)
-    assert out["matched_amp_mae"] == pytest.approx(0.0, abs=1e-6)
+    assert out["matched_mu_mae"]    == pytest.approx(0.0, abs=1e-6)
+    assert out["matched_sig_mae"]   == pytest.approx(0.0, abs=1e-6)
+    assert out["matched_amp_mae"]   == pytest.approx(0.0, abs=1e-6)
     assert out["matched_recall"]    == pytest.approx(1.0, abs=1e-6)
     assert out["matched_precision"] == pytest.approx(1.0, abs=1e-6)
 
@@ -418,8 +418,8 @@ def test_metrics_identical_real_parameter_window_is_perfect(parameters):
 
     metrics = m.compute(param_space=True)
 
-    assert metrics["curve_mse_gt"]   == pytest.approx(0.0, abs=1e-8)
-    assert metrics["overall_r2_gt"]  == pytest.approx(1.0, abs=1e-5)
+    assert metrics["curve_mse_gt"]     == pytest.approx(0.0, abs=1e-8)
+    assert metrics["overall_r2_gt"]    == pytest.approx(1.0, abs=1e-5)
     assert metrics["pixel_r2_gt_mean"] == pytest.approx(1.0, abs=1e-4)
 
 
@@ -445,13 +445,13 @@ def test_metrics_perturbed_real_window_is_worse(parameters):
 
 @pytest.mark.real_data
 def test_reduced_comparison_identical_reduced_zero_improvement(parameters):
-    params  = np.asarray(parameters[:, :12, :12], dtype=np.float32)
-    x_axis  = _x_axis(40)
-    gt      = _curves_from_params(params, x_axis, N_GAUSSIANS)
-    pred    = gt.copy()
+    params = np.asarray(parameters[:, :12, :12], dtype=np.float32)
+    x_axis = _x_axis(40)
+    gt     = _curves_from_params(params, x_axis, N_GAUSSIANS)
+    pred   = gt.copy()
 
-    m       = Metrics(_make_result(pred, gt), x_axis, N_GAUSSIANS)
-    comp    = m.reduced_comparison(gt.copy())
+    m    = Metrics(_make_result(pred, gt), x_axis, N_GAUSSIANS)
+    comp = m.reduced_comparison(gt.copy())
 
     assert comp.metrics["improvement_pixel_mse_mean"] == pytest.approx(0.0, abs=1e-6)
     assert comp.reduced_norm.shape == gt.shape

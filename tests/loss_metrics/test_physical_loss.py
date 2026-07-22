@@ -88,8 +88,8 @@ def test_moments_weight_normalisation_invariant():
     target = _curves(8)
     x      = _x_axis()
     dx     = float(x[1] - x[0])
-    a = PhysicalLoss.moments(pred, target, x, dx, 1e-6, (1.0, 1.0, 1.0))
-    b = PhysicalLoss.moments(pred, target, x, dx, 1e-6, (2.0, 2.0, 2.0))
+    a      = PhysicalLoss.moments(pred, target, x, dx, 1e-6, (1.0, 1.0, 1.0))
+    b      = PhysicalLoss.moments(pred, target, x, dx, 1e-6, (2.0, 2.0, 2.0))
     assert torch.allclose(a, b, atol=1e-9)
 
 
@@ -113,11 +113,11 @@ def test_coherence_resynthesis_nonnegative():
 
 
 def test_covariance_matching_zero_on_identical():
-    target   = _curves(12)
-    x        = _x_axis()
-    dx       = float(x[1] - x[0])
-    outer    = _outer(_steering())
-    out      = PhysicalLoss.covariance_matching(target.clone(), target, outer, dx, 1e-6)
+    target = _curves(12)
+    x      = _x_axis()
+    dx     = float(x[1] - x[0])
+    outer  = _outer(_steering())
+    out    = PhysicalLoss.covariance_matching(target.clone(), target, outer, dx, 1e-6)
     assert out.item() < 1e-9
 
 

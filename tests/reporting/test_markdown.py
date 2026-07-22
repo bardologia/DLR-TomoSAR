@@ -111,7 +111,7 @@ def test_table_render_structure():
 def test_table_render_pipe_count_consistent():
     table = MarkdownTable(["a", "b", "c"])
     table.add_row("x", "y", "z")
-    lines = table.render()
+    lines       = table.render()
     pipe_counts = {line.count("|") for line in lines}
     assert pipe_counts == {4}
 
@@ -119,7 +119,7 @@ def test_table_render_pipe_count_consistent():
 def test_table_render_column_widths_align():
     table = MarkdownTable(["aa", "b"])
     table.add_row("longcell", "y")
-    lines = table.render()
+    lines   = table.render()
     lengths = {len(line) for line in lines}
     assert len(lengths) == 1
 
@@ -135,7 +135,7 @@ def test_table_separator_right_alignment():
 def test_table_separator_center_alignment():
     table = MarkdownTable(["num"], align=["center"])
     table.add_row("1")
-    sep = table.render()[1].strip()
+    sep   = table.render()[1].strip()
     inner = sep[1:-1].strip()
     assert inner.startswith(":") and inner.endswith(":")
 
@@ -218,7 +218,7 @@ def test_doc_image_markdown():
 
 
 def test_doc_methods_chainable():
-    doc = MarkdownDoc()
+    doc    = MarkdownDoc()
     result = doc.heading("h").paragraph("p").bold_kv("k", "v").blank()
     assert result is doc
 
@@ -254,14 +254,14 @@ def test_doc_kv_table_custom_header():
 
 def test_doc_table_appends_render_plus_blank():
     table = MarkdownTable(["a"]).add_row("1")
-    doc = MarkdownDoc()
+    doc   = MarkdownDoc()
     doc.table(table)
     assert doc.lines[-1] == ""
     assert any("a" in line for line in doc.lines)
 
 
 def test_doc_render_ends_with_single_newline():
-    doc = MarkdownDoc("T")
+    doc      = MarkdownDoc("T")
     rendered = doc.render()
     assert rendered.endswith("\n")
     assert not rendered.endswith("\n\n")

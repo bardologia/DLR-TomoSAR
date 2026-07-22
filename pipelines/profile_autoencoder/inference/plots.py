@@ -75,13 +75,13 @@ class ProfileAePlots(AePlotsBase):
         random = rng.choice(active, size=min(cfg.n_random_curves, active.shape[0]), replace=False) if active.size else np.empty(0, dtype=np.int64)
 
         figures = {
-            "best"   : self._reconstructions(x_axis, gt, pred, mse, best,   "best",   figures_dir),
-            "worst"  : self._reconstructions(x_axis, gt, pred, mse, worst,  "worst",  figures_dir),
-            "random" : self._reconstructions(x_axis, gt, pred, mse, random, "random", figures_dir),
-            "mean_profile"     : [self._mean_profile(x_axis, gt, pred, figures_dir)],
-            "error_histogram"  : [self._error_histogram(mse, figures_dir)],
-            "power_scatter"    : [self._power_scatter(x_axis, gt, pred, active, cfg.n_scatter_points, cfg.curve_seed, figures_dir)],
-            "embedding_norm"   : [self._embedding_norm(result.embeddings, figures_dir)],
+            "best"            : self._reconstructions(x_axis, gt, pred, mse, best,   "best",   figures_dir),
+            "worst"           : self._reconstructions(x_axis, gt, pred, mse, worst,  "worst",  figures_dir),
+            "random"          : self._reconstructions(x_axis, gt, pred, mse, random, "random", figures_dir),
+            "mean_profile"    : [self._mean_profile(x_axis, gt, pred, figures_dir)],
+            "error_histogram" : [self._error_histogram(mse, figures_dir)],
+            "power_scatter"   : [self._power_scatter(x_axis, gt, pred, active, cfg.n_scatter_points, cfg.curve_seed, figures_dir)],
+            "embedding_norm"  : [self._embedding_norm(result.embeddings, figures_dir)],
         }
 
         return figures

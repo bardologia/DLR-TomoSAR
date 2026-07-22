@@ -2,8 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 
-from tools.data.regions import CropRegion, SplitRegions
-
+from tools.data.regions                import CropRegion, SplitRegions
 from configuration.sar.gaussian_config import GaussianConfig
 
 

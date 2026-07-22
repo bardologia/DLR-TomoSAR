@@ -8,11 +8,11 @@ import torch
 from tensorboard.summary.writer.event_file_writer import EventFileWriter as _  # noqa: F401
 from torch.utils.tensorboard                      import SummaryWriter
 
-from configuration.training import BackboneTrainerConfig
-from pipelines.shared.config.config_persistence    import BackboneModelConfigIO
-from tools.data.io                          import FileIO
-from tools.monitoring.logger                import Logger
-from tools.runtime.run_tag                  import RunTag
+from configuration.training                     import BackboneTrainerConfig
+from pipelines.shared.config.config_persistence import BackboneModelConfigIO
+from tools.data.io                              import FileIO
+from tools.monitoring.logger                    import Logger
+from tools.runtime.run_tag                      import RunTag
 
 
 class TrainingRunMetadata:
@@ -81,15 +81,15 @@ class TrainingRunMetadata:
         out_path = self.metadata_directory / "run_summary.json"
 
         payload  = {
-            "model_name"       : model_name,
-            "in_channels"      : in_channels,
-            "out_channels"     : out_channels,
-            "x_axis_length"    : x_axis_length,
-            "run_directory"    : str(self.run_directory),
-            "framework"        : "pytorch",
-            "n_devices"        : torch.cuda.device_count() if torch.cuda.is_available() else 0,
-            "n_gaussians"      : n_gaussians,
-            "seed"             : seed,
+            "model_name"    : model_name,
+            "in_channels"   : in_channels,
+            "out_channels"  : out_channels,
+            "x_axis_length" : x_axis_length,
+            "run_directory" : str(self.run_directory),
+            "framework"     : "pytorch",
+            "n_devices"     : torch.cuda.device_count() if torch.cuda.is_available() else 0,
+            "n_gaussians"   : n_gaussians,
+            "seed"          : seed,
         }
 
         FileIO.save_json(payload, out_path)

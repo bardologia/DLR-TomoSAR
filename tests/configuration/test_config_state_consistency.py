@@ -10,10 +10,9 @@ from configuration.sar.processing_config import (
     PathConfig,
     ProcessingConfig,
 )
-from configuration.sar.gaussian_config import GaussianConfig
-
-from tests.configuration._helpers import make_crop
-from tools.data.regions           import CropRegion
+from configuration.sar.gaussian_config   import GaussianConfig
+from tests.configuration._helpers        import make_crop
+from tools.data.regions                  import CropRegion
 
 
 @pytest.mark.real_data
@@ -113,6 +112,6 @@ def test_gaussian_from_dataset_matches_state(meta_dir, params_dir, config_state_
     gaussian     = GaussianConfig.from_dataset(meta_dir.parent, params_dir / "parameters.npy")
     height_range = config_state_json["tomogram_config"]["height_range"]
 
-    assert gaussian.x_min == float(height_range[0])
-    assert gaussian.x_max == float(height_range[1])
+    assert gaussian.x_min               == float(height_range[0])
+    assert gaussian.x_max               == float(height_range[1])
     assert gaussian.n_default_gaussians == 5

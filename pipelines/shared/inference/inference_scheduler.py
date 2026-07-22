@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sys
-from pathlib  import Path
+from pathlib import Path
 
 from pipelines.shared.inference.run_classifier import RunClassifier, RunDirectoryWalk
 from tools.monitoring.logger                   import Logger

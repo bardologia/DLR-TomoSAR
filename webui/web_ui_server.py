@@ -1,41 +1,40 @@
 from __future__ import annotations
 
 import threading
-
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from config_registry                    import ConfigRegistry
-from cube_explorer                      import CubeExplorer
-from dataset_browser                    import DatasetBrowser
-from equation_library                   import EquationLibrary
-from fit_lab                            import FitLab
-from flow_library                       import FlowLibrary
-from gpu_schedule                       import GpuSchedule
-from gpu_watchdog                       import GpuWatchdog
-from job_describer                      import JobDescriber
-from launch_layout                      import LaunchLayout
-from backbone_model_library             import BackboneModelLibrary
-from image_autoencoder_model_library    import ImageAutoencoderModelLibrary
-from physics_loss_library               import PhysicsLossLibrary
-from pipeline_library                   import PipelineLibrary
-from repomap_library                    import RepoMapLibrary
-from profile_autoencoder_model_library  import ProfileAutoencoderModelLibrary
-from jepa_model_library                 import JepaModelLibrary
-from notifier                           import ExperimentProgressWatcher, JobNotifier
-from process_manager                    import ProcessManager, ProcessNuke, ServerDetacher
-from project_paths                      import ProjectPaths
-from request_router                     import RequestRouter
-from resource_watchdog                  import ResourceWatchdog
-from contention_monitor                 import ContentionMonitor
-from results_browser                    import ResultsBrowser
-from run_leaderboard                    import RunLeaderboard
-from saved_run_store                    import SavedRunStore
-from script_catalog                     import ScriptCatalog
-from script_config_resolver             import ScriptConfigResolver
-from system_monitor                     import SystemMonitor
-from tensorboard_manager                import TensorboardManager
-from training_curves                    import TrainingCurves
-from web_logger                         import WebLogger
+from config_registry                   import ConfigRegistry
+from cube_explorer                     import CubeExplorer
+from dataset_browser                   import DatasetBrowser
+from equation_library                  import EquationLibrary
+from fit_lab                           import FitLab
+from flow_library                      import FlowLibrary
+from gpu_schedule                      import GpuSchedule
+from gpu_watchdog                      import GpuWatchdog
+from job_describer                     import JobDescriber
+from launch_layout                     import LaunchLayout
+from backbone_model_library            import BackboneModelLibrary
+from image_autoencoder_model_library   import ImageAutoencoderModelLibrary
+from physics_loss_library              import PhysicsLossLibrary
+from pipeline_library                  import PipelineLibrary
+from repomap_library                   import RepoMapLibrary
+from profile_autoencoder_model_library import ProfileAutoencoderModelLibrary
+from jepa_model_library                import JepaModelLibrary
+from notifier                          import ExperimentProgressWatcher, JobNotifier
+from process_manager                   import ProcessManager, ProcessNuke, ServerDetacher
+from project_paths                     import ProjectPaths
+from request_router                    import RequestRouter
+from resource_watchdog                 import ResourceWatchdog
+from contention_monitor                import ContentionMonitor
+from results_browser                   import ResultsBrowser
+from run_leaderboard                   import RunLeaderboard
+from saved_run_store                   import SavedRunStore
+from script_catalog                    import ScriptCatalog
+from script_config_resolver            import ScriptConfigResolver
+from system_monitor                    import SystemMonitor
+from tensorboard_manager               import TensorboardManager
+from training_curves                   import TrainingCurves
+from web_logger                        import WebLogger
 
 
 class _Server(ThreadingHTTPServer):
@@ -99,7 +98,7 @@ class WebUIServer:
         self.curves            = TrainingCurves(self.logger)
         self.fitlab            = FitLab(self.paths, self.logger)
 
-        self.router    = RequestRouter(
+        self.router = RequestRouter(
             paths             = self.paths,
             logger            = self.logger,
             catalog           = self.catalog,

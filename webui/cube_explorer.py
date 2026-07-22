@@ -94,14 +94,14 @@ class CubeExplorer:
 
     METRIC_EXCLUDED = ("_curves", "params_")
     METRIC_LABELS   = {
-        "pixel_mse"               : "MSE",
-        "pixel_mae"               : "MAE",
-        "pixel_r2"                : "R2",
-        "pixel_cos"               : "cosine",
-        "pixel_peak"              : "peak shift",
-        "physics_coherence_error" : "coherence err",
-        "physics_covariance_error": "covariance err",
-        "physics_valid_mask"      : "valid mask",
+        "pixel_mse"                : "MSE",
+        "pixel_mae"                : "MAE",
+        "pixel_r2"                 : "R2",
+        "pixel_cos"                : "cosine",
+        "pixel_peak"               : "peak shift",
+        "physics_coherence_error"  : "coherence err",
+        "physics_covariance_error" : "covariance err",
+        "physics_valid_mask"       : "valid mask",
     }
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
@@ -261,7 +261,7 @@ class CubeExplorer:
             order   = np.argsort(entry["x_axis"])
             heights = np.asarray(entry["x_axis"])[order]
             values  = entry["cube"][:, az, rg][order]
-            sources[source]  = {"heights": heights.tolist(), "values": values.astype(float).tolist()}
+            sources[source] = {"heights": heights.tolist(), "values": values.astype(float).tolist()}
 
         return {"ok": True, "az": az, "rg": rg, "sources": sources}
 

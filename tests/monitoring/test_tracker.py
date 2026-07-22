@@ -42,10 +42,10 @@ def test_set_step_and_advance():
     t = Tracker()
     t.set_step(10)
 
-    assert t._step == 10
-    assert t.advance()    == 11
-    assert t.advance(4)   == 15
-    assert t._step        == 15
+    assert t._step      == 10
+    assert t.advance()  == 11
+    assert t.advance(4) == 15
+    assert t._step      == 15
 
 
 def test_set_step_casts_to_int():
@@ -66,8 +66,8 @@ def test_scope_nesting_and_tagging():
             assert t._tag("x") == "a/b/x"
         assert t._tag("x") == "a/x"
 
-    assert t._tag("x")   == "x"
-    assert t._scopes     == []
+    assert t._tag("x") == "x"
+    assert t._scopes   == []
 
 
 def test_scope_pops_on_exception():

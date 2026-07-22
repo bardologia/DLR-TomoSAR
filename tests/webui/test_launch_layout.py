@@ -16,6 +16,7 @@ from launch_layout            import LaunchLayout
 from project_paths            import ProjectPaths
 from script_catalog           import ScriptCatalog
 from tools.runtime.config_cli import ConfigCli
+
 from configuration.benchmark.general        import BenchmarkConfig
 from configuration.comparison               import ComparisonEntryConfig
 from configuration.cross_validation.general import CrossValidationConfig

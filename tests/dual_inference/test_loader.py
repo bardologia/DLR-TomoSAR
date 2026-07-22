@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from models.dual import DUAL_CONFIG_REGISTRY, DUAL_MODEL_REGISTRY, get_dual
+from models.dual                                import DUAL_CONFIG_REGISTRY, DUAL_MODEL_REGISTRY, get_dual
 from pipelines.backbone.inference.model_wrapper import ModelWrapper
 from pipelines.dual.inference.loader            import DualRunLoader
 from pipelines.shared.config.config_persistence import DualModelConfigIO

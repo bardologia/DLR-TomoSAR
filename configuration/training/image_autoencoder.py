@@ -40,8 +40,8 @@ class ImageAeTrainerConfig(SharedSubConfigInheritance):
 
 @dataclass
 class ImageAeEntryConfig:
-    run_name    : str | None = None
-    resume      : bool       = True
+    run_name        : str | None = None
+    resume          : bool       = True
     gpu             : int        = 0
     gpus            : list[int]  = field(default_factory=lambda: [0, 1, 3])
     gpus_file       : str        = ""

@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from pipelines.autoencoder_common.inference.plots import AePlotsBase
-from pipelines.image_autoencoder.inference.plots import ImageAePlots
+from pipelines.autoencoder_common.inference.plots  import AePlotsBase
+from pipelines.image_autoencoder.inference.plots   import ImageAePlots
 from pipelines.profile_autoencoder.inference.plots import ProfileAePlots
 
 

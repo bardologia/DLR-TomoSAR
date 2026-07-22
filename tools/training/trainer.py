@@ -165,9 +165,9 @@ class BaseTrainer:
         self.optimizer.zero_grad(set_to_none=True)
 
         loss_sum, n = 0.0, 0
-        aggregator = MetricAggregator()
-        n_batches  = len(loader)
-        clear_n    = self.config.memory.clear_cache_every_n_steps
+        aggregator  = MetricAggregator()
+        n_batches   = len(loader)
+        clear_n     = self.config.memory.clear_cache_every_n_steps
 
         window_has_grads = False
         nonfinite_count  = 0

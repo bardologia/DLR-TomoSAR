@@ -7,12 +7,12 @@ from pathlib     import Path
 from pipelines.shared.comparison.trial_collection import SeedRunAggregator
 from pipelines.shared.comparison.trial_collection import TrialCollector as BaseTrialCollector
 from pipelines.shared.comparison.trial_collection import TrialRecord    as BaseTrialRecord
-from tools.monitoring.logger           import Logger
+from tools.monitoring.logger import Logger
 
 
 @dataclass
 class TrialRecord(BaseTrialRecord):
-    figures_dir : Path | None = None
+    figures_dir: Path | None = None
 
     def figure_subdir(self, name: str) -> Path | None:
         if self.figures_dir is None:
@@ -71,7 +71,7 @@ class TrialCollector(BaseTrialCollector):
                 self.logger.error(f"Run directory not found: {run_dir}")
                 continue
 
-            record = TrialRecord(name=tag, run_dir=run_dir)
+            record            = TrialRecord(name=tag, run_dir=run_dir)
             record.checkpoint = self._read_checkpoint(run_dir)
             self._attach_inference(record)
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 import torch
 
-from configuration.training.profile_autoencoder import ProfileAeLossConfig
+from configuration.training.profile_autoencoder  import ProfileAeLossConfig
 from pipelines.profile_autoencoder.training.loss import Loss
 
 

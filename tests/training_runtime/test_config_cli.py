@@ -19,18 +19,18 @@ class NestedConfig:
 
 @dataclass
 class PathsConfig:
-    log_base_dir : Path = Path("logs")
+    log_base_dir: Path = Path("logs")
 
 
 @dataclass
 class RootConfig:
-    nested  : NestedConfig = field(default_factory=NestedConfig)
-    paths   : PathsConfig  = field(default_factory=PathsConfig)
-    seed    : int          = 42
-    betas   : tuple        = (0.9, 0.999)
-    layers  : list         = field(default_factory=lambda: [16, 32])
-    extra   : dict         = field(default_factory=lambda: {"a": 1})
-    opt     : str          = None
+    nested : NestedConfig = field(default_factory=NestedConfig)
+    paths  : PathsConfig  = field(default_factory=PathsConfig)
+    seed   : int          = 42
+    betas  : tuple        = (0.9, 0.999)
+    layers : list         = field(default_factory=lambda: [16, 32])
+    extra  : dict         = field(default_factory=lambda: {"a": 1})
+    opt    : str          = None
 
 
 def _config():
@@ -219,8 +219,8 @@ def test_load_resolved_unknown_key_raises(tmp_path):
 
 
 def test_to_argv_round_trips_overrides():
-    cfg  = _config()
-    cli  = ConfigCli(cfg)
+    cfg = _config()
+    cli = ConfigCli(cfg)
     cli.apply(["--nested.lr", "0.25", "--nested.enabled", "false", "--betas", "[0.1, 0.2]"])
 
     argv  = ConfigCli.to_argv(cli.overrides)

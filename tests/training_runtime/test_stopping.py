@@ -63,8 +63,8 @@ def test_early_stopping_strict_less_than_for_improvement(logger, tracker):
 
 
 def test_early_stopping_best_tracks_running_minimum(logger, tracker):
-    es      = EarlyStopping(_es_config(patience=10), logger, tracker)
-    losses  = [5.0, 4.0, 4.5, 3.0, 3.2, 2.0]
+    es     = EarlyStopping(_es_config(patience=10), logger, tracker)
+    losses = [5.0, 4.0, 4.5, 3.0, 3.2, 2.0]
 
     for epoch, loss in enumerate(losses):
         es(loss, epoch)

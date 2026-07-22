@@ -1,14 +1,14 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from pathlib import Path
+from pathlib     import Path
 
 import pytest
 
-from configuration.sar.processing_config import PathConfig, TomogramConfig
+from configuration.sar.processing_config  import PathConfig, TomogramConfig
 from pipelines.processing.generation.base import GeneratorBase
-from tools import FileIO
-from tools.monitoring.logger import Logger
+from tools                                import FileIO
+from tools.monitoring.logger              import Logger
 
 
 @pytest.fixture
@@ -83,7 +83,7 @@ def test_from_spec_file_round_trip_rebuilds_configs(spec, logger, tmp_path):
     generator = GeneratorBase.from_spec_file(spec_path, logger)
     reloaded  = FileIO.load_json(spec_path)["tomogram_config"]
 
-    assert generator._paths().run_subdirectory == "run_w20_10"
+    assert generator._paths().run_subdirectory  == "run_w20_10"
     assert asdict(generator._tomogram_config()) == reloaded
 
 

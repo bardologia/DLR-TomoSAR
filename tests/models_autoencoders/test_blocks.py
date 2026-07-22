@@ -131,8 +131,8 @@ def test_conv_block(activation, normalization):
 
 @pytest.mark.parametrize("stride,first_unit", [(1, False), (1, True), (2, False)])
 def test_residual_conv_block(stride, first_unit):
-    block = ResidualConvBlock(4, 8, stride=stride, first_unit=first_unit)
-    out   = block(torch.randn(2, 4, 8, 8))
+    block    = ResidualConvBlock(4, 8, stride=stride, first_unit=first_unit)
+    out      = block(torch.randn(2, 4, 8, 8))
     expected = 8 // stride
     assert out.shape == (2, 8, expected, expected)
     assert _finite(out)
@@ -172,8 +172,8 @@ def test_encoder_decoder_roundtrip():
     encoder       = Encoder(3, feature_sizes)
     decoder       = Decoder(feature_sizes[::-1])
 
-    x                       = torch.randn(2, 3, 16, 16)
-    bottleneck, skips       = encoder(x)
+    x                 = torch.randn(2, 3, 16, 16)
+    bottleneck, skips = encoder(x)
     assert bottleneck.shape == (2, 16, 2, 2)
     assert len(skips) == len(feature_sizes)
     assert _finite(bottleneck)
@@ -212,8 +212,8 @@ def test_transformer_block(drop_path_rate):
 
 
 def test_patch_embedding_and_back():
-    block            = PatchEmbedding(3, 16, patch_size=4)
-    tokens, gh, gw   = block(torch.randn(2, 3, 16, 16))
+    block          = PatchEmbedding(3, 16, patch_size=4)
+    tokens, gh, gw = block(torch.randn(2, 3, 16, 16))
     assert (gh, gw) == (4, 4)
     assert tokens.shape == (2, 16, 16)
     assert _finite(tokens)
@@ -236,10 +236,10 @@ class _GaussianModule(OutputHeadsMixin):
             params_per_gaussian = 3
             out_channels        = 9
             activation          = "relu"
-        _Cfg.head                = head
-        self.config              = _Cfg()
-        self.embedding_channels  = 8
-        self.hidden_channels     = 16
+        _Cfg.head               = head
+        self.config             = _Cfg()
+        self.embedding_channels = 8
+        self.hidden_channels    = 16
         self._resolve_gaussian_layout()
 
 

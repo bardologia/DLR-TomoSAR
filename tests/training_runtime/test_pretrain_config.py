@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
+from configuration.training   import BackboneEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, ImageAeEntryConfig
 from tools.runtime.config_cli import ConfigCli
-from configuration.training import BackboneEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, ImageAeEntryConfig
 
 
 _ENTRY_CONFIGS = [BackboneEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, ImageAeEntryConfig]

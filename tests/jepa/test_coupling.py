@@ -19,8 +19,8 @@ def test_coupling_mode_rejects_unknown_kind():
 
 
 def test_coupling_mode_frozen_disables_grad_and_eval():
-    mode       = CouplingMode("frozen", "profile autoencoder")
-    encoder    = make_encoder()
+    mode    = CouplingMode("frozen", "profile autoencoder")
+    encoder = make_encoder()
     mode.apply(encoder)
 
     assert mode.trainable is False
@@ -52,10 +52,10 @@ def test_coupling_mode_param_groups_carry_lr_and_wd_when_finetune():
 
     groups = mode.param_groups(encoder, lr=7e-4, wd=2e-5)
 
-    assert len(groups)          == 1
-    assert groups[0]["lr"]      == 7e-4
+    assert len(groups)               == 1
+    assert groups[0]["lr"]           == 7e-4
     assert groups[0]["weight_decay"] == 2e-5
-    assert groups[0]["name"]    == "profile autoencoder"
+    assert groups[0]["name"]         == "profile autoencoder"
     assert len(groups[0]["params"]) > 0
 
 

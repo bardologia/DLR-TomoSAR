@@ -4,15 +4,15 @@ from pathlib import Path
 
 import pytest
 
-from configuration.cross_validation import CrossValidationConfig, FoldConfig
+import pipelines.cross_validation.stages as stages_module
+from configuration.cross_validation    import CrossValidationConfig, FoldConfig
 from pipelines.cross_validation.folds  import FoldPlanner
 from pipelines.cross_validation.stages import (
     CrossValidationReportStage,
     FoldInferenceStage,
     FoldTrainingStage,
 )
-import pipelines.cross_validation.stages as stages_module
-from tools.monitoring.logger import Logger
+from tools.monitoring.logger  import Logger
 from tools.runtime.completion import CompletionMarker
 
 
@@ -66,7 +66,7 @@ def test_training_stage_job_carries_fold_index(tmp_path):
     job = stage._job("fold_3")
 
     assert job.command[job.command.index("--worker") + 1] == "train"
-    assert job.command[job.command.index("--fold")  + 1] == "3"
+    assert job.command[job.command.index("--fold")   + 1] == "3"
     assert "--seed" not in job.command
 
 
@@ -232,7 +232,7 @@ def test_report_stage_invokes_collector_and_report(tmp_path, monkeypatch):
             seen["wrote"] = True
             return [seen["out_dir"] / "cv_aggregate_report.md"]
 
-    monkeypatch.setattr(stages_module, "FoldCollector",        FakeCollector, raising=True)
+    monkeypatch.setattr(stages_module, "FoldCollector",         FakeCollector, raising=True)
     monkeypatch.setattr(stages_module, "CrossValidationReport", FakeReport,    raising=True)
 
     out_dir = stage.run()
@@ -268,7 +268,7 @@ def test_report_stage_model_name_for_profile_autoencoder(tmp_path, monkeypatch):
         def write_all(self):
             return []
 
-    monkeypatch.setattr(stages_module, "FoldCollector",        FakeCollector, raising=True)
+    monkeypatch.setattr(stages_module, "FoldCollector",         FakeCollector, raising=True)
     monkeypatch.setattr(stages_module, "CrossValidationReport", FakeReport,    raising=True)
 
     stage.run()

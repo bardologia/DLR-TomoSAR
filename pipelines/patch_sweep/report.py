@@ -12,7 +12,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from pipelines.patch_sweep.planner                import PatchSweepPlanner, SweepUnit
+from pipelines.patch_sweep.planner import PatchSweepPlanner, SweepUnit
 from tools.data.io                 import FileIO
 from tools.metrics.scoring         import SeedAggregation
 from tools.monitoring.logger       import Logger

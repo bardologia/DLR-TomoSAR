@@ -32,7 +32,7 @@ class DualResUNetConfig:
     existence_trunk_wd : float = 1e-4
     output_head_wd     : float = 1e-4
 
-    shape_logger_types  : tuple           = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,

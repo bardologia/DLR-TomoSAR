@@ -116,8 +116,8 @@ class SigmaFittingExtractor:
 
         tomogram_mmap = np.load(str(tomogram_path), mmap_mode="r", allow_pickle=False)
         H, Az, R      = tomogram_mmap.shape
-        height_axis = np.linspace(height_range[0], height_range[1], H, dtype=np.float32)
-        height_ax_j = jnp.array(height_axis)
+        height_axis   = np.linspace(height_range[0], height_range[1], H, dtype=np.float32)
+        height_ax_j   = jnp.array(height_axis)
 
         h_span = float(height_axis[-1] - height_axis[0])
         dh     = h_span / (H - 1)

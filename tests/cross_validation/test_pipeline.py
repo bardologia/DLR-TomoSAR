@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from configuration.cross_validation import CrossValidationConfig, FoldConfig
 import pipelines.cross_validation.pipeline as pipeline_module
+from configuration.cross_validation      import CrossValidationConfig, FoldConfig
 from pipelines.cross_validation.pipeline import CrossValidationPipeline
 
 

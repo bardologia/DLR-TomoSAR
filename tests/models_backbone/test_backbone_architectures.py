@@ -17,18 +17,18 @@ GAUSSIAN_HEADS = [head for head in BACKBONE_HEADS if head != "conv"]
 
 
 def _build(name, head: str = "conv"):
-    overrides = dict(SMALL_OVERRIDES.get(name, {}))
+    overrides     = dict(SMALL_OVERRIDES.get(name, {}))
     model, config = get_backbone(name, head=head, **overrides)
-    model = model.to(DEVICE).eval()
+    model         = model.to(DEVICE).eval()
     return model, config
 
 
 def _input_window(interferograms, in_channels):
-    raw  = np.asarray(interferograms[:in_channels, :WINDOW, :WINDOW])
-    mag  = np.abs(raw).astype(np.float32)
-    mean = mag.mean(axis=(1, 2), keepdims=True)
-    std  = mag.std(axis=(1, 2), keepdims=True) + 1e-6
-    norm = (mag - mean) / std
+    raw   = np.asarray(interferograms[:in_channels, :WINDOW, :WINDOW])
+    mag   = np.abs(raw).astype(np.float32)
+    mean  = mag.mean(axis=(1, 2), keepdims=True)
+    std   = mag.std(axis=(1, 2), keepdims=True) + 1e-6
+    norm  = (mag - mean) / std
     batch = np.repeat(norm[None, ...], BATCH, axis=0)
     return torch.from_numpy(batch).to(DEVICE)
 

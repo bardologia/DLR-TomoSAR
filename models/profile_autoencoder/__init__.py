@@ -1,13 +1,13 @@
 from configuration.architectures import ProfileAutoencoderBaseConfig, Conv1dAutoencoderConfig, MlpAutoencoderConfig, Transformer1dAutoencoderConfig, ResMlpAutoencoderConfig, TcnAutoencoderConfig, GruAutoencoderConfig, CnnAttnAutoencoderConfig
-from ..registry     import RegistryFactory
-from .base          import ProfileAutoencoderBase, ProfileAutoencoderBlocks
-from .mlp           import MlpAutoencoder
-from .conv1d        import Conv1dAutoencoder
-from .transformer1d import Transformer1dAutoencoder
-from .resmlp        import ResMlpAutoencoder
-from .tcn           import TcnAutoencoder
-from .gru           import GruAutoencoder
-from .cnn_attn      import CnnAttnAutoencoder
+from ..registry                  import RegistryFactory
+from .base                       import ProfileAutoencoderBase, ProfileAutoencoderBlocks
+from .mlp                        import MlpAutoencoder
+from .conv1d                     import Conv1dAutoencoder
+from .transformer1d              import Transformer1dAutoencoder
+from .resmlp                     import ResMlpAutoencoder
+from .tcn                        import TcnAutoencoder
+from .gru                        import GruAutoencoder
+from .cnn_attn                   import CnnAttnAutoencoder
 
 
 PROFILE_AE_MODEL_REGISTRY: dict[str, type] = {

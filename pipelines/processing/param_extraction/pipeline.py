@@ -6,10 +6,10 @@ from typing  import Dict, Tuple
 
 import numpy as np
 
-from configuration.param_extraction import ExtractionConfig
-from pipelines.processing.param_extraction.io import ExtractionMetadataManager, ParameterIO
+from configuration.param_extraction              import ExtractionConfig
+from pipelines.processing.param_extraction.io    import ExtractionMetadataManager, ParameterIO
 from pipelines.processing.param_extraction.queue import ExtractionGroup
-from tools.monitoring.logger import Logger
+from tools.monitoring.logger                     import Logger
 
 
 class ParameterExtractor:
@@ -68,7 +68,7 @@ class ParameterExtractor:
     @staticmethod
     def _sort_gaussians(parameters_array: np.ndarray, n_gaussians: int, activity_threshold: float) -> np.ndarray:
         n_params, Az, R = parameters_array.shape
-        reshaped = parameters_array.reshape(n_gaussians, 3, Az, R)
+        reshaped        = parameters_array.reshape(n_gaussians, 3, Az, R)
 
         amps = reshaped[:, 0, :, :]
         mus  = reshaped[:, 1, :, :]
@@ -82,7 +82,7 @@ class ParameterExtractor:
     def run(self, tomogram_path: Path, height_range: Tuple[float, float]) -> Dict[tuple, Tuple[np.ndarray, dict]]:
         self.logger.section(f"[Extraction Start] Source: {tomogram_path.name}")
 
-        results = self._gpu_extractor.run(tomogram_path, height_range)
+        results        = self._gpu_extractor.run(tomogram_path, height_range)
         sorted_results = {key: (self._sort_gaussians(params, self.k_max, self.activity_threshold), diagnostics) for key, (params, diagnostics) in results.items()}
 
         self.logger.subsection("[Extraction Complete]")

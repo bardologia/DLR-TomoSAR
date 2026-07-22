@@ -5,7 +5,7 @@ from pathlib import Path
 from pipelines.shared.config.config_factory  import ConfigFactory
 from pipelines.shared.config.run_metadata    import TrainingRunMetadata
 from pipelines.shared.training.overfit_check import OverfitCheck
-from tools.runtime.reproducibility   import Reproducibility
+from tools.runtime.reproducibility           import Reproducibility
 
 
 class AutoencoderTrainingPipeline:

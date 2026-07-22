@@ -3,11 +3,11 @@ from __future__ import annotations
 import torch
 from torch.utils.data import DataLoader
 
-from tools.training                          import BaseTrainer
 from pipelines.backbone.training.loss        import Loss
 from pipelines.backbone.training.loss_probe  import LossScaleProbe
 from pipelines.backbone.training.docs        import TrainingDocs
 from pipelines.backbone.training.diagnostics import ParamSampler, ReconstructionFigures
+from tools.training                          import BaseTrainer
 
 
 class CurriculumController:
@@ -95,9 +95,9 @@ class Trainer(BaseTrainer):
     def _log_init_banner(self) -> None:
         self.logger.section("[Training Start]")
         self.logger.kv_table({
-            "Backend":       "PyTorch",
-            "Device":        self.device,
-            "Log Directory": self.config.io.logdir,
+            "Backend"       : "PyTorch",
+            "Device"        : self.device,
+            "Log Directory" : self.config.io.logdir,
         })
 
     def _build_param_groups(self) -> list[dict]:

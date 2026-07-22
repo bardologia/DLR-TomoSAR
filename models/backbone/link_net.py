@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from configuration.architectures import LinkNetConfig
-from ..blocks                          import OutputHeadsMixin, build_activation, build_norm2d, initialize_weights, match_spatial_size
+from ..blocks                    import OutputHeadsMixin, build_activation, build_norm2d, initialize_weights, match_spatial_size
 
 class ResidualEncoderBlock(nn.Module):
     def __init__(

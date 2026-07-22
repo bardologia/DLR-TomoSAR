@@ -7,9 +7,9 @@ import numpy as np
 import pytest
 import torch
 
-from pipelines.benchmark.results import BenchmarkSeedCollector
+from pipelines.benchmark.results                   import BenchmarkSeedCollector
 from pipelines.shared.comparison.comparison_report import ComparisonReport
-from pipelines.shared.comparison.trial_collection import TrialCollector, TrialRecord
+from pipelines.shared.comparison.trial_collection  import TrialCollector, TrialRecord
 
 from tools.data.io import FileIO
 
@@ -144,13 +144,13 @@ def test_seed_collector_aggregates_runs_per_model(tmp_path, logger_stub):
     assert [record.name for record in records] == ["unet"]
 
     record = records[0]
-    assert record.metrics["curve_rmse_gt"]          == 3.0
-    assert record.parameters                        == 100
-    assert record.training_result["duration_s"]     == pytest.approx(15.0)
+    assert record.metrics["curve_rmse_gt"]      == 3.0
+    assert record.parameters                    == 100
+    assert record.training_result["duration_s"] == pytest.approx(15.0)
 
     dispersion = collector.seed_dispersion["unet"]
-    assert dispersion["n_seeds"]                     == 2
-    assert dispersion["metrics"]["curve_rmse_gt"]    == pytest.approx(float(np.std([2.0, 4.0], ddof=1)))
+    assert dispersion["n_seeds"]                  == 2
+    assert dispersion["metrics"]["curve_rmse_gt"] == pytest.approx(float(np.std([2.0, 4.0], ddof=1)))
 
 
 def test_model_of_strips_head_stem_loss_component_and_seed():
@@ -177,8 +177,8 @@ def test_size_match_attaches_to_every_component(tmp_path, logger_stub):
 
     assert {record.name for record in records} == {"unet__param_l1", "unet__covariance_match"}
     for record in records:
-        assert record.size_match["parameters"]   == 12345
-        assert record.parameters                 == 12345
+        assert record.size_match["parameters"] == 12345
+        assert record.parameters               == 12345
 
 
 def test_seed_collector_single_run_is_identity(tmp_path, logger_stub):

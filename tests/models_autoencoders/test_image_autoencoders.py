@@ -14,7 +14,7 @@ NAMES         = sorted(IMAGE_AE_CONFIG_REGISTRY.keys())
 
 
 def _tiny_config(name):
-    cfg = IMAGE_AE_CONFIG_REGISTRY[name](in_channels=IN_CHANNELS, embedding_dim=EMBEDDING_DIM)
+    cfg               = IMAGE_AE_CONFIG_REGISTRY[name](in_channels=IN_CHANNELS, embedding_dim=EMBEDDING_DIM)
     cfg.base_channels = 8
     cfg.depth         = 1
     if hasattr(cfg, "hidden_dim"):

@@ -4,14 +4,14 @@ import numpy as np
 import pytest
 import torch
 
-from configuration.dataset                    import InputConfig, OutputConfig, Representation
-from configuration.normalization.general      import ChannelStats, ChannelStrategy, NormMethod, OutputClampConfig
-from pipelines.backbone.dataset.datasets      import PatchDataset
-from pipelines.backbone.dataset.normalizer    import Normalizer
-from pipelines.backbone.dataset.spatial       import Patcher
-from pipelines.backbone.dataset.stats         import Stats
+from configuration.dataset                     import InputConfig, OutputConfig, Representation
+from configuration.normalization.general       import ChannelStats, ChannelStrategy, NormMethod, OutputClampConfig
+from pipelines.backbone.dataset.datasets       import PatchDataset
+from pipelines.backbone.dataset.normalizer     import Normalizer
+from pipelines.backbone.dataset.spatial        import Patcher
+from pipelines.backbone.dataset.stats          import Stats
 from pipelines.backbone.dataset.stats_computer import StatsComputer
-from tools.monitoring.logger                  import Logger
+from tools.monitoring.logger                   import Logger
 
 
 def _zscore_stats() -> Stats:
@@ -133,8 +133,8 @@ def test_nonlog_clampable_channel_is_identity_in_range():
 def test_mu_channel_bypasses_the_output_clamp():
     norm = Normalizer(_mixed_output_stats())
 
-    x        = torch.zeros(1, 3, 2, 2)
-    x[:, 1]  = -5.0
+    x       = torch.zeros(1, 3, 2, 2)
+    x[:, 1] = -5.0
 
     phys = norm.denormalize_output(x, leaky_slope=0.1)
 
@@ -175,10 +175,10 @@ def test_extreme_out_of_range_values_backpropagate_finite_gradients():
 def test_output_denormalization_torch_and_numpy_agree():
     norm = Normalizer(_mixed_output_stats())
 
-    x           = np.zeros((1, 3, 2, 2), dtype=np.float32)
-    x[:, 0]     = 1e10
-    x[:, 1]     = -3.0
-    x[:, 2]     = 25.0
+    x       = np.zeros((1, 3, 2, 2), dtype=np.float32)
+    x[:, 0] = 1e10
+    x[:, 1] = -3.0
+    x[:, 2] = 25.0
 
     out_np    = norm.denormalize_output(x, leaky_slope=0.1)
     out_torch = norm.denormalize_output(torch.from_numpy(x), leaky_slope=0.1)

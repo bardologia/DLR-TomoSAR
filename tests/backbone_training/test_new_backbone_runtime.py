@@ -40,7 +40,7 @@ def _loader(n: int = 6, hw: int = 16) -> DataLoader:
 
 def _build_trainer(tmp_path, name: str, reserve_vram: bool = False) -> Trainer:
     backbone_name, overrides = NEW_BACKBONES[name]
-    model, model_cfg = get_backbone(backbone_name, in_channels=2, out_channels=6, **overrides)
+    model, model_cfg         = get_backbone(backbone_name, in_channels=2, out_channels=6, **overrides)
 
     config = tiny_trainer_config(n_gaussians=2, epochs=1)
     config.training.use_ema      = True

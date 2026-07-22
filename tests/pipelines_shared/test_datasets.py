@@ -3,14 +3,14 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from configuration.dataset                       import InputConfig, OutputConfig, Representation
-from configuration.normalization                 import ChannelStats, ChannelStrategy, NormMethod
-from pipelines.backbone.dataset.datasets         import MultiRegionDataset, PatchDataset
-from pipelines.backbone.dataset.normalizer       import Normalizer
-from pipelines.backbone.dataset.spatial          import Patcher
-from pipelines.backbone.dataset.stats            import Stats
+from configuration.dataset                          import InputConfig, OutputConfig, Representation
+from configuration.normalization                    import ChannelStats, ChannelStrategy, NormMethod
+from pipelines.backbone.dataset.datasets            import MultiRegionDataset, PatchDataset
+from pipelines.backbone.dataset.normalizer          import Normalizer
+from pipelines.backbone.dataset.spatial             import Patcher
+from pipelines.backbone.dataset.stats               import Stats
 from pipelines.profile_autoencoder.dataset.datasets import ProfileDataset
-from tools.monitoring.logger                     import Logger
+from tools.monitoring.logger                        import Logger
 
 
 def _identity_channel_stats(n: int) -> ChannelStats:

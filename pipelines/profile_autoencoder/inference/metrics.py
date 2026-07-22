@@ -53,10 +53,10 @@ class ProfileAeMetrics(AeMetricsBase):
         rel_l2 = np.linalg.norm(pred - gt, axis=1) / (np.linalg.norm(gt, axis=1) + self.EPS)
 
         return {
-            "pearson_mean"      : float(np.mean(pearson)),
-            "pearson_median"    : float(np.median(pearson)),
-            "relative_l2_mean"  : float(np.mean(rel_l2)),
-            "relative_l2_median": float(np.median(rel_l2)),
+            "pearson_mean"       : float(np.mean(pearson)),
+            "pearson_median"     : float(np.median(pearson)),
+            "relative_l2_mean"   : float(np.mean(rel_l2)),
+            "relative_l2_median" : float(np.median(rel_l2)),
         }
 
     def _power_errors(self) -> dict:

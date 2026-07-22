@@ -87,7 +87,7 @@ def test_reconstruct_batch_shape_and_dtype():
     gauss = np.zeros((4, 2, 3), dtype=np.float32)
     gauss[:, :, 0] = 1.0
     gauss[:, :, 2] = 1.0
-    x     = np.linspace(-3.0, 3.0, 50).astype(np.float32)
+    x = np.linspace(-3.0, 3.0, 50).astype(np.float32)
 
     out = GaussianReconstructor.reconstruct_batch(gauss, x)
 
@@ -99,7 +99,7 @@ def test_reconstruct_batch_clamps_negative_amp():
     gauss = np.zeros((1, 1, 3), dtype=np.float32)
     gauss[0, 0, 0] = -5.0
     gauss[0, 0, 2] = 1.0
-    x     = np.linspace(-3.0, 3.0, 10).astype(np.float32)
+    x = np.linspace(-3.0, 3.0, 10).astype(np.float32)
 
     out = GaussianReconstructor.reconstruct_batch(gauss, x)
 
@@ -202,7 +202,7 @@ def test_gaussian_curve_matches_mixture_batch():
     params[0, 0, 0, 0] = a
     params[0, 1, 0, 0] = mu
     params[0, 2, 0, 0] = sig
-    curve  = GaussianCurve.reconstruct(params, torch.from_numpy(x_np))[0, :, 0, 0].numpy()
+    curve = GaussianCurve.reconstruct(params, torch.from_numpy(x_np))[0, :, 0, 0].numpy()
 
     assert np.allclose(batch[0], curve, atol=1e-4)
 
@@ -228,7 +228,7 @@ def test_evaluate_pixel_on_real_parameters(parameters, param_extraction_meta):
 
     total, comps = GaussianMixture.evaluate_pixel(params, h, n_gaussians=k_max)
 
-    assert len(comps) == k_max
+    assert len(comps)  == k_max
     assert total.shape == (100,)
     assert np.allclose(total, sum(comps))
     assert np.all(np.isfinite(total))

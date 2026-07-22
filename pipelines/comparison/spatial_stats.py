@@ -36,7 +36,7 @@ class SpatialDispersion:
 
     @staticmethod
     def autocorr_length(field: np.ndarray, axis: int = 0, max_lines: int = 256) -> float:
-        moved = np.moveaxis(field, axis, 0)
+        moved  = np.moveaxis(field, axis, 0)
         length = moved.shape[0]
 
         columns = moved.reshape(length, -1)

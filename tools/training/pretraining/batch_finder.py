@@ -69,8 +69,8 @@ class BatchSizeFinder:
         ceiling    : int,
         device     : torch.device,
         logger     : Logger,
-        model_name : Optional[str]            = None,
-        context_gb : float                    = 0.0,
+        model_name : Optional[str]                = None,
+        context_gb : float                        = 0.0,
         on_oom     : Optional[Callable[[], None]] = None,
     ) -> None:
         self.trial_step = trial_step

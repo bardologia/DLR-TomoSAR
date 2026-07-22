@@ -183,7 +183,7 @@ def test_fit_modes_share_kernel(tmp_path):
     all_free   = _fit(lab, {"pixels": [{"az": 3, "rg": 7}], "config": {**BASE_CONFIG, "mode": "sigma_amp_mu"}})
 
     assert sigma_only["config"]["mode"] == "sigma"
-    assert all_free["config"]["mode"] == "sigma_amp_mu"
+    assert all_free["config"]["mode"]   == "sigma_amp_mu"
 
     mse_sigma = sigma_only["pixels"][0]["per_k"][0]["mse"]
     mse_free  = all_free["pixels"][0]["per_k"][0]["mse"]

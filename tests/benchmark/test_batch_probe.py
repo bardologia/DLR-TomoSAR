@@ -6,11 +6,11 @@ import pytest
 import torch
 
 import pipelines.benchmark.batch_probe as module
-from configuration.benchmark import BenchmarkConfig
-from pipelines.backbone.training.loss_terms import LossComponentCatalog
-from pipelines.backbone.training.pipeline import TrainingPipeline
-from pipelines.benchmark.batch_probe import MaxBatchProbe
-from tools.monitoring.logger import Logger
+from configuration.benchmark                 import BenchmarkConfig
+from pipelines.backbone.training.loss_terms  import LossComponentCatalog
+from pipelines.backbone.training.pipeline    import TrainingPipeline
+from pipelines.benchmark.batch_probe         import MaxBatchProbe
+from tools.monitoring.logger                 import Logger
 from tools.training.pretraining.batch_finder import TrainStepMemoryProbe
 
 
@@ -100,8 +100,8 @@ def test_probe_init_requires_cuda_device(tmp_path):
     probe = MaxBatchProbe(config=config, model_name="unet", overrides={})
 
     assert probe.device.type == "cuda"
-    assert probe.budget_gb == config.max_batch.vram_budget_gb
-    assert probe.ceiling   == config.max_batch.max_batch
+    assert probe.budget_gb   == config.max_batch.vram_budget_gb
+    assert probe.ceiling     == config.max_batch.max_batch
 
 
 def test_run_caps_the_ceiling_at_the_dataset_size():

@@ -3,8 +3,7 @@ from __future__ import annotations
 import pytest
 
 from pipelines.benchmark.sizing import DegeneracyAuditor, SizeMatcher, SizeMatchResult, WidthRule, WidthScaler
-
-from configuration.benchmark import BenchmarkConfig
+from configuration.benchmark    import BenchmarkConfig
 
 
 LOCKED = ("embedding_dim", "embedding_dims")
@@ -55,9 +54,9 @@ def test_width_scaler_rejects_rule_on_locked_parameter():
 def test_width_scaler_round_snaps_to_divisor_multiple(scaler):
     rule = WidthRule(attribute="features", divisor=8)
 
-    assert scaler._round(64, 0.5, rule)  == 32
-    assert scaler._round(64, 1.0, rule)  == 64
-    assert scaler._round(64, 2.0, rule)  == 128
+    assert scaler._round(64, 0.5, rule) == 32
+    assert scaler._round(64, 1.0, rule) == 64
+    assert scaler._round(64, 2.0, rule) == 128
 
 
 def test_width_scaler_round_floors_at_divisor(scaler):
@@ -105,9 +104,9 @@ def test_width_scaler_scaled_config_applies_overrides(scaler):
 
 
 def _config(dataset_path) -> BenchmarkConfig:
-    config                        = BenchmarkConfig()
-    config.paths.dataset_path     = dataset_path
-    config.paths.parameters_path  = dataset_path / "params" / "params_k5_lam0.01_sig4_sigma" / "parameters.npy"
+    config                       = BenchmarkConfig()
+    config.paths.dataset_path    = dataset_path
+    config.paths.parameters_path = dataset_path / "params" / "params_k5_lam0.01_sig4_sigma" / "parameters.npy"
     return config
 
 
@@ -161,9 +160,9 @@ def test_size_matcher_history_records_each_iteration(test_data_dir, logger_stub)
 
 
 def _fake_matcher(monkeypatch, count_fn):
-    matcher = SizeMatcher.__new__(SizeMatcher)
-    matcher.config = BenchmarkConfig()
-    matcher.scaler = WidthScaler(locked=LOCKED)
+    matcher         = SizeMatcher.__new__(SizeMatcher)
+    matcher.config  = BenchmarkConfig()
+    matcher.scaler  = WidthScaler(locked=LOCKED)
     matcher.auditor = DegeneracyAuditor(config=matcher.config.size_match, scaler=matcher.scaler)
 
     monkeypatch.setattr(matcher, "_count_at", count_fn)
@@ -241,8 +240,8 @@ def _result(scale=1.0, overrides=None, deviation_pct=0.0, iterations=1, paramete
 
 
 def test_auditor_flags_lower_bound_convergence():
-    config   = BenchmarkConfig().size_match
-    auditor  = DegeneracyAuditor(config=config, scaler=WidthScaler(locked=LOCKED))
+    config  = BenchmarkConfig().size_match
+    auditor = DegeneracyAuditor(config=config, scaler=WidthScaler(locked=LOCKED))
 
     flags = auditor.audit(_result(scale=config.scale_low))
 

@@ -6,13 +6,13 @@ from typing      import Tuple
 
 from torch.utils.data import DataLoader
 
-from configuration.inference.image_autoencoder import ImageAeInferenceConfig
-from models.image_autoencoder                  import get_image_autoencoder
-from pipelines.backbone.dataset.normalizer     import Normalizer
-from pipelines.backbone.dataset.stats          import Stats
-from pipelines.backbone.inference.loader       import RunLoader
-from pipelines.shared.config.config_persistence       import ImageAutoencoderConfigIO
-from tools.data.regions                        import CropRegion
+from configuration.inference.image_autoencoder  import ImageAeInferenceConfig
+from models.image_autoencoder                   import get_image_autoencoder
+from pipelines.backbone.dataset.normalizer      import Normalizer
+from pipelines.backbone.dataset.stats           import Stats
+from pipelines.backbone.inference.loader        import RunLoader
+from pipelines.shared.config.config_persistence import ImageAutoencoderConfigIO
+from tools.data.regions                         import CropRegion
 
 
 @dataclass
@@ -51,8 +51,8 @@ class ImageAeRunLoader(RunLoader):
         self.logger.section("[Image AE Inference: Load Run]")
         self.logger.subsection(f"Run Directory : {self.run_directory} \n")
 
-        summary        = self._read_run_summary()
-        embedding_dim  = int(summary["out_channels"])
+        summary       = self._read_run_summary()
+        embedding_dim = int(summary["out_channels"])
 
         dataset_config = self._build_dataset_config(
             payload     = self._read_json("dataset_creation_config.json"),
@@ -60,8 +60,8 @@ class ImageAeRunLoader(RunLoader):
             num_workers = config.num_workers,
         )
 
-        norm_stats              = Stats.load(self.meta_directory, self.logger)
-        model, ae_name, ae_cfg  = self._build_model(device)
+        norm_stats             = Stats.load(self.meta_directory, self.logger)
+        model, ae_name, ae_cfg = self._build_model(device)
 
         ckpt_path               = self.run_directory / config.checkpoint_name
         ckpt, x_axis, ckpt_meta = self._load_checkpoint(ckpt_path, device)

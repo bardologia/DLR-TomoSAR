@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from configuration.dataset  import AugmentationConfig
-from configuration.training import LossConfig, LossCurriculumConfig, ParamMatching
+from configuration.dataset                import AugmentationConfig
+from configuration.training               import LossConfig, LossCurriculumConfig, ParamMatching
 from pipelines.shared.training.run_naming import RunNaming
 
 

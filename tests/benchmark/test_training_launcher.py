@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pipelines.backbone.training.launcher as backbone_pipeline
-from configuration.training import BackboneEntryConfig, default_curriculum
+from configuration.training    import BackboneEntryConfig, default_curriculum
 from pipelines.shared.training import training_launcher as mod
 
 
@@ -194,8 +194,8 @@ def test_ablation_scheduler_houses_runs_in_ablation_dir(tmp_path):
 
     job = scheduler._job("model_abl-0-full", {"curriculum.enabled": True})
 
-    assert job.command[-2:]    == ["--logdir", str(tmp_path / "ablation")]
-    assert job.log_path        == tmp_path / "ablation" / "batch_train_logs" / "model_abl-0-full.log"
+    assert job.command[-2:] == ["--logdir", str(tmp_path / "ablation")]
+    assert job.log_path     == tmp_path / "ablation" / "batch_train_logs" / "model_abl-0-full.log"
 
 
 def test_context_scheduler_plans_the_receptive_field_ladder(tmp_path):
@@ -295,7 +295,7 @@ def test_scheduler_fans_out_one_gpu_job_per_trial_seed(tmp_path):
 
     units = scheduler._seed_units(scheduler.planner().plan(), [0, 1])
 
-    assert [name for name, _ in units]              == ["aug-on/seed0", "aug-on/seed1", "aug-off/seed0", "aug-off/seed1"]
+    assert [name for name, _ in units]                    == ["aug-on/seed0", "aug-on/seed1", "aug-off/seed0", "aug-off/seed1"]
     assert [overrides["seed"] for _, overrides in units]  == [0, 1, 0, 1]
     assert [overrides["seeds"] for _, overrides in units] == [(0,), (1,), (0,), (1,)]
 

@@ -56,7 +56,7 @@ def _curve(name, pc, target):
 
 
 def _gt5(parameters):
-    gt        = _gt_params(parameters)
+    gt         = _gt_params(parameters)
     b, _, h, w = gt.shape
     return gt.reshape(b, 5, PPG, h, w)
 
@@ -89,9 +89,9 @@ def _param(name, p, gt5, weights):
 @pytest.mark.real_data
 @pytest.mark.parametrize("name", CURVE_ALL)
 def test_curve_term_forward_finite_nonnegative(parameters, name):
-    gt          = _gt_params(parameters)
-    target      = _curves(gt)
-    _, pc       = _pred_curves(gt, 0.2)
+    gt     = _gt_params(parameters)
+    target = _curves(gt)
+    _, pc  = _pred_curves(gt, 0.2)
 
     val = _curve(name, pc, target)
 
@@ -138,9 +138,9 @@ def test_curve_term_monotonic_in_error(parameters, name):
 @pytest.mark.real_data
 @pytest.mark.parametrize("name", CURVE_ALL)
 def test_curve_term_gradient_finite_and_nonzero(parameters, name):
-    gt    = _gt_params(parameters)
+    gt     = _gt_params(parameters)
     target = _curves(gt)
-    p, pc = _pred_curves(gt, 0.2)
+    p, pc  = _pred_curves(gt, 0.2)
 
     _curve(name, pc, target).backward()
 
@@ -289,9 +289,9 @@ def test_match_sorts_gt_by_mu_among_active():
 
 
 def test_match_gt_sort_is_idempotent():
-    pred      = torch.randn(1, 5, 3, 3, 3)
-    gt        = torch.randn(1, 5, 3, 3, 3)
-    gt_phys   = torch.rand(1, 5, 3, 3, 3) + 0.5
+    pred    = torch.randn(1, 5, 3, 3, 3)
+    gt      = torch.randn(1, 5, 3, 3, 3)
+    gt_phys = torch.rand(1, 5, 3, 3, 3) + 0.5
 
     once  = PM.match(pred, pred.clone(), gt, gt_phys)
     twice = PM.match(once[0], once[1], once[2], once[3])

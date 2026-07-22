@@ -4,7 +4,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from _bootstrap import EnvironmentPinner
+from _bootstrap                                import EnvironmentPinner
 from pipelines.shared.inference.run_classifier import RunType
 
 

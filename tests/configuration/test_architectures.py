@@ -61,10 +61,10 @@ def test_arch_config_instantiates_with_defaults(config_cls):
 @pytest.mark.parametrize("config_cls", BACKBONE_CONFIGS, ids=[c.__name__ for c in BACKBONE_CONFIGS])
 def test_backbone_default_channels_are_positive(config_cls):
     instance = config_cls()
-    assert instance.in_channels  > 0
-    assert instance.out_channels > 0
+    assert instance.in_channels         > 0
+    assert instance.out_channels        > 0
     assert instance.params_per_gaussian == 3
-    assert instance.head == "conv"
+    assert instance.head                == "conv"
 
 
 @pytest.mark.parametrize("config_cls", BACKBONE_CONFIGS, ids=[c.__name__ for c in BACKBONE_CONFIGS])
@@ -77,8 +77,8 @@ def test_backbone_dropout_in_unit_range(config_cls):
 
 @pytest.mark.parametrize("config_cls", BACKBONE_CONFIGS, ids=[c.__name__ for c in BACKBONE_CONFIGS])
 def test_backbone_learning_rates_positive(config_cls):
-    instance   = config_cls()
-    lr_fields  = [f.name for f in dataclasses.fields(instance) if f.name.endswith("_lr")]
+    instance  = config_cls()
+    lr_fields = [f.name for f in dataclasses.fields(instance) if f.name.endswith("_lr")]
     assert lr_fields
     for name in lr_fields:
         assert getattr(instance, name) > 0

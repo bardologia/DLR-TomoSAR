@@ -21,12 +21,12 @@ def test_seed_everything_makes_torch_deterministic():
 
 def test_seed_everything_makes_numpy_and_random_deterministic():
     Reproducibility.seed_everything(7)
-    np_a  = np.random.rand(4)
-    py_a  = [random.random() for _ in range(4)]
+    np_a = np.random.rand(4)
+    py_a = [random.random() for _ in range(4)]
 
     Reproducibility.seed_everything(7)
-    np_b  = np.random.rand(4)
-    py_b  = [random.random() for _ in range(4)]
+    np_b = np.random.rand(4)
+    py_b = [random.random() for _ in range(4)]
 
     assert np.array_equal(np_a, np_b)
     assert py_a == py_b

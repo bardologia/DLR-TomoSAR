@@ -3,11 +3,11 @@ from __future__ import annotations
 import pytest
 import torch
 
-from configuration.dataset                  import DatasetConfig, InputConfig, PatchConfig, Representation, SplitRegions
-from configuration.sar.gaussian_config      import GaussianConfig
-from configuration.training.backbone        import BackboneTrainerConfig
-from pipelines.backbone.training.pipeline   import TrainingPipeline
-from tools.data.regions                     import CropRegion
+from configuration.dataset                import DatasetConfig, InputConfig, PatchConfig, Representation, SplitRegions
+from configuration.sar.gaussian_config    import GaussianConfig
+from configuration.training.backbone      import BackboneTrainerConfig
+from pipelines.backbone.training.pipeline import TrainingPipeline
+from tools.data.regions                   import CropRegion
 
 from tests.backbone_training._helpers import geometry_config
 
@@ -48,12 +48,12 @@ def _trainer_config(test_data_dir, params_dir, tmp_path) -> BackboneTrainerConfi
     gaussian = GaussianConfig.from_dataset(test_data_dir, params_dir / "parameters.npy")
     config   = BackboneTrainerConfig(gaussian=gaussian)
 
-    config.io.logdir                  = str(tmp_path)
-    config.io.writer                  = None
-    config.training.epochs            = 1
+    config.io.logdir                     = str(tmp_path)
+    config.io.writer                     = None
+    config.training.epochs               = 1
     config.training.validation_frequency = 1
-    config.resources.enabled          = False
-    config.geometry                   = geometry_config()
+    config.resources.enabled             = False
+    config.geometry                      = geometry_config()
 
     config.curriculum.complete.use_param_l1    = True
     config.curriculum.complete.weight_param_l1 = 1.0
@@ -94,7 +94,7 @@ def test_training_pipeline_runs_per_pixel_physics_geometry(test_data_dir, params
 
     trainer_config.curriculum.complete.use_covariance_match    = True
     trainer_config.curriculum.complete.weight_covariance_match = 1.0
-    trainer_config.geometry.height_axis_convention           = "height"
+    trainer_config.geometry.height_axis_convention             = "height"
 
     pipeline = TrainingPipeline(
         trainer_config = trainer_config,

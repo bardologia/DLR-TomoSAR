@@ -5,9 +5,9 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from configuration.cross_validation import CrossValidationConfig, FoldConfig
 import pipelines.backbone.inference.pipeline as pipeline_module
 import pipelines.backbone.training.pipeline  as backbone_pipeline_module
+from configuration.cross_validation     import CrossValidationConfig, FoldConfig
 from pipelines.cross_validation.folds   import FoldNaming
 from pipelines.cross_validation.workers import (
     CrossValidationWorker,
@@ -28,7 +28,7 @@ def worker_config(test_data_dir: Path, training_type: str = "backbone") -> Cross
     config                       = CrossValidationConfig(training_type=training_type)
     config.paths.dataset_path    = test_data_dir
     config.paths.parameters_path = test_data_dir / "params" / "params_k5_lam0.01_sig4_sigma" / "parameters.npy"
-    config.folds              = FoldConfig(n_folds=5, azimuth_start=1000, azimuth_end=2000)
+    config.folds                 = FoldConfig(n_folds=5, azimuth_start=1000, azimuth_end=2000)
     return config
 
 
@@ -67,8 +67,8 @@ def test_collector_collects_every_fold(tmp_path):
     base, by_split = collector.collect_by_split()
 
     assert [record.name for record in base] == names
-    assert set(by_split)                     == {"test"}
-    assert len(by_split["test"])             == 5
+    assert set(by_split)                    == {"test"}
+    assert len(by_split["test"])            == 5
 
 
 def test_collector_attaches_training_results(tmp_path):
@@ -88,9 +88,9 @@ def test_collector_split_view_loads_metrics_when_present(tmp_path):
     _, by_split = collector.collect_by_split()
     records     = by_split["test"]
 
-    assert records[0].metrics                 == {"curve_rmse_gt": 2.5}
-    assert records[0].inference_dir           is not None
-    assert records[0].inference_dir.name      == "test"
+    assert records[0].metrics            == {"curve_rmse_gt": 2.5}
+    assert records[0].inference_dir      is not None
+    assert records[0].inference_dir.name == "test"
 
 
 def test_collector_split_view_empty_when_metrics_absent(tmp_path):
@@ -119,7 +119,7 @@ def test_collector_aggregates_seeds_per_fold(tmp_path):
 
     base, by_split = collector.collect_by_split()
 
-    assert [record.name for record in base]            == ["fold_0", "fold_1"]
+    assert [record.name for record in base]             == ["fold_0", "fold_1"]
     assert by_split["test"][0].metrics["curve_rmse_gt"] == 3.0
     assert by_split["test"][1].metrics["curve_rmse_gt"] == 2.0
 
@@ -180,7 +180,7 @@ def test_training_worker_passes_planned_split_regions(test_data_dir, monkeypatch
     worker.run(2)
 
     train = sorted((r.azimuth_start, r.azimuth_end) for r in captured["sr"].regions("train"))
-    assert train                                        == [(1000, 1368), (1832, 2000)]
+    assert train == [(1000, 1368), (1832, 2000)]
     assert worker.factory.planner().plan(2).split_regions.regions("test")[0].azimuth_start == 1432
 
 
@@ -204,7 +204,7 @@ def test_training_worker_dispatch_routes_by_type(test_data_dir, monkeypatch):
 
 @pytest.mark.real_data
 def test_training_worker_rejects_unknown_type(test_data_dir):
-    config = worker_config(test_data_dir)
+    config               = worker_config(test_data_dir)
     config.training_type = "bogus"
 
     worker = FoldTrainingWorker(config, run_tag="rt")
@@ -232,13 +232,13 @@ def test_inference_worker_builds_run_directory(test_data_dir, monkeypatch):
     worker.run(1, "test")
 
     expected_dir = worker.run_dir / "folds" / worker.fold_run_name(1, None)
-    assert captured["ran"]                       is True
-    assert captured["config"].run_directory      == expected_dir
+    assert captured["ran"]                  is True
+    assert captured["config"].run_directory == expected_dir
     assert expected_dir.name.endswith("_fold_1")
     assert expected_dir.name.startswith(f"{worker.config.backbone_name}-{worker.config.backbone_head}-")
     assert "-K_" in expected_dir.name
-    assert captured["config"].split              == "test"
-    assert captured["config"].output_subdir      == "test"
+    assert captured["config"].split         == "test"
+    assert captured["config"].output_subdir == "test"
 
 
 @pytest.mark.real_data

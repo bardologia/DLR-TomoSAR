@@ -8,9 +8,8 @@ from pipelines.benchmark.workers import (
     BenchmarkWorker,
     MaxBatchWorker,
 )
-
-from configuration.benchmark import BenchmarkConfig
-from tools.data.io import FileIO
+from configuration.benchmark     import BenchmarkConfig
+from tools.data.io               import FileIO
 
 
 @pytest.fixture
@@ -101,7 +100,7 @@ def test_probe_config_is_disabled(config):
     worker = BenchmarkWorker(config, "tag")
     probe  = worker._probe_config()
 
-    assert probe.enabled is False
+    assert probe.enabled    is False
     assert probe.exit_after is True
 
 
@@ -146,8 +145,8 @@ def test_max_batch_worker_raises_on_probe_fail(config, monkeypatch):
 def test_training_worker_scales_the_lr_from_the_measured_batch(config, test_data_dir, params_dir, monkeypatch):
     from pipelines.benchmark.workers import TrainingWorker
 
-    config.paths.dataset_path    = test_data_dir
-    config.paths.parameters_path = params_dir / "parameters.npy"
+    config.paths.dataset_path     = test_data_dir
+    config.paths.parameters_path  = params_dir / "parameters.npy"
     config.training.train_azimuth = (1000, 1400)
     config.training.val_azimuth   = (1400, 1700)
     config.training.test_azimuth  = (1700, 2000)
@@ -180,8 +179,8 @@ def test_training_entry_configs_carry_the_overfit_check(config):
     ae_entry   = worker._ae_entry_config("mlp_ae", worker.run_dir / "training")
     jepa_entry = worker._jepa_entry_config("resunet", worker.run_dir / "training")
 
-    assert ae_entry.overfit_check   is config.overfit_check
-    assert jepa_entry.overfit_check is config.overfit_check
+    assert ae_entry.overfit_check         is config.overfit_check
+    assert jepa_entry.overfit_check       is config.overfit_check
     assert ae_entry.overfit_check.enabled is True
 
 

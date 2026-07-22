@@ -4,10 +4,8 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 from pipelines.backbone.training.docs import LayerRecord, ModelInspector, TrainingDocs
-
 from tests.backbone_training._helpers import tiny_model
-
-from tools.monitoring.logger import Logger
+from tools.monitoring.logger          import Logger
 
 
 def _loader(in_channels: int = 2, n_gaussians: int = 2, hw: int = 16) -> DataLoader:
@@ -25,7 +23,7 @@ def test_inspector_totals_report_all_parameters(tmp_path):
 
     totals = inspector.totals()
 
-    assert set(totals.keys()) == {"total", "trainable", "frozen", "size_mb"}
+    assert set(totals.keys())  == {"total", "trainable", "frozen", "size_mb"}
     assert totals["total"]     == sum(p.numel() for p in model.parameters())
     assert totals["trainable"] == totals["total"]
     assert totals["size_mb"]   > 0.0
@@ -54,8 +52,8 @@ def test_inspector_to_markdown_structure(tmp_path):
 
     text = inspector.to_markdown(title="Tiny Model").render()
 
-    assert "Tiny Model"       in text
-    assert "Total Parameters" in text
+    assert "Tiny Model"             in text
+    assert "Total Parameters"       in text
     assert model.__class__.__name__ in text
 
 
@@ -100,4 +98,4 @@ def test_layer_record_own_params_sums_trainable_and_frozen():
     expected = sum(p.numel() for p in conv.parameters())
 
     assert record.own_params == expected
-    assert record.frozen == 0
+    assert record.frozen     == 0

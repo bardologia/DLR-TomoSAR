@@ -7,17 +7,17 @@ from pathlib import Path
 import numpy as np
 import torch
 
-from configuration.benchmark            import BenchmarkConfig
-from models                             import BACKBONE_CONFIG_REGISTRY, get_backbone
-from pipelines.shared.model.model_builder import ModelBuilder
-from pipelines.backbone.dataset.pipeline import DatasetPipeline
-from pipelines.backbone.training.loss_terms import LossComponentCatalog
-from pipelines.backbone.training.pipeline import TrainingPipeline
-from pipelines.backbone.training.trainer import Trainer
-from pipelines.shared.config.config_factory     import ConfigFactory
-from tools.data.gaussians                import GaussianAxis, GaussianHead
-from tools.monitoring.logger             import Logger
-from tools.runtime.reproducibility       import Reproducibility
+from configuration.benchmark                 import BenchmarkConfig
+from models                                  import BACKBONE_CONFIG_REGISTRY, get_backbone
+from pipelines.shared.model.model_builder    import ModelBuilder
+from pipelines.backbone.dataset.pipeline     import DatasetPipeline
+from pipelines.backbone.training.loss_terms  import LossComponentCatalog
+from pipelines.backbone.training.pipeline    import TrainingPipeline
+from pipelines.backbone.training.trainer     import Trainer
+from pipelines.shared.config.config_factory  import ConfigFactory
+from tools.data.gaussians                    import GaussianAxis, GaussianHead
+from tools.monitoring.logger                 import Logger
+from tools.runtime.reproducibility           import Reproducibility
 from tools.training.pretraining.batch_finder import BatchSizeFinder, TrainStepMemoryProbe
 
 
@@ -38,7 +38,7 @@ class MaxBatchProbe:
         self.context_gb = 0.0
         self.work_dir   = Path(config.paths.log_base_dir) / "max_batch_probe" / model_name
         self.work_dir.mkdir(parents=True, exist_ok=True)
-        self.logger     = Logger(log_dir=str(self.work_dir / "logs"), name="max_batch", level="INFO")
+        self.logger = Logger(log_dir=str(self.work_dir / "logs"), name="max_batch", level="INFO")
 
     def _measure_context(self) -> float:
         return TrainStepMemoryProbe.measure_context(self.device)

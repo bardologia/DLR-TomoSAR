@@ -3,10 +3,10 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pipelines.shared.dataset.dataset_spatial            import Layout
+from pipelines.shared.dataset.dataset_spatial        import Layout
 from pipelines.profile_autoencoder.dataset.splitting import ParameterCropper
-from tools.data.regions                          import CropRegion, SplitRegions
-from tools.monitoring.logger                     import Logger
+from tools.data.regions                              import CropRegion, SplitRegions
+from tools.monitoring.logger                         import Logger
 
 
 def _ranges(region: CropRegion) -> set[int]:

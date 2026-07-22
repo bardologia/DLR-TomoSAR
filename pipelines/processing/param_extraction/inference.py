@@ -4,7 +4,7 @@ import gc
 from pathlib import Path
 
 from pipelines.processing.param_extraction.metrics  import FittingMetricsCalculator
-from pipelines.processing.param_extraction.io      import ParameterIO
+from pipelines.processing.param_extraction.io       import ParameterIO
 from pipelines.processing.param_extraction.plots    import FittingResultPlotter
 from pipelines.shared.orchestration.session_scheduler import SequentialSessionScheduler
 from tools.data.io                                  import FileIO
@@ -28,8 +28,8 @@ class ParamRunInferencePipeline:
     def _load(self) -> tuple:
         meta = self.parameter_io.load_metadata(self.run_dir / self.META_FILENAME)
 
-        parameters = self.parameter_io.load_params(self.run_dir / meta["parameters_npy"])
-        diagnostics = self.parameter_io.load_diagnostics(self.run_dir / meta["diagnostics_npz"])
+        parameters    = self.parameter_io.load_params(self.run_dir / meta["parameters_npy"])
+        diagnostics   = self.parameter_io.load_diagnostics(self.run_dir / meta["diagnostics_npz"])
         tomogram_path = Path(meta["source_tomogram"])
 
         return meta, parameters, diagnostics, tomogram_path

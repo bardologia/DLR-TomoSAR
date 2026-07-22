@@ -4,10 +4,10 @@ from dataclasses import dataclass
 from pathlib     import Path
 
 from configuration.cross_validation import CrossValidationConfig
-from configuration.inference import InferenceConfig
-from pipelines.shared.config.config_factory                   import ConfigFactory
-from pipelines.shared.training.seed_sweep                       import SeedSet
-from tools.data.regions                                import CropRegion, SplitRegions
+from configuration.inference        import InferenceConfig
+from pipelines.shared.config.config_factory import ConfigFactory
+from pipelines.shared.training.seed_sweep   import SeedSet
+from tools.data.regions import CropRegion, SplitRegions
 
 
 @dataclass

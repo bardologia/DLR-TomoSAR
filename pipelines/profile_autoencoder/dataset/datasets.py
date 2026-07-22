@@ -78,11 +78,11 @@ class ProfileDataset(Dataset):
     def _log(self, logger: Logger) -> None:
         logger.section(f"[ProfileDataset: {self.split_name}]")
         logger.kv_table({
-            "Total pixels"  : int(self.amps.shape[0]),
-            "Active pixels" : self.n_active,
-            "Kept pixels"   : int(self.index.shape[0]),
-            "Profile length": int(self.x_axis.shape[0]),
-            "Gaussians"     : self.n_gaussians,
+            "Total pixels"   : int(self.amps.shape[0]),
+            "Active pixels"  : self.n_active,
+            "Kept pixels"    : int(self.index.shape[0]),
+            "Profile length" : int(self.x_axis.shape[0]),
+            "Gaussians"      : self.n_gaussians,
         })
 
     def __len__(self) -> int:

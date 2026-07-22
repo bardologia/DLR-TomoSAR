@@ -13,9 +13,9 @@ class TrialComparisonConfig:
     runs_dir : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
     run_tags : List[str] = field(default_factory=list)
 
-    compare_images : bool          = True
-    compare_gifs   : bool          = True
-    embed_images   : bool          = False
+    compare_images : bool           = True
+    compare_gifs   : bool           = True
+    embed_images   : bool           = False
     output_dir     : Optional[Path] = None
 
 
@@ -29,7 +29,7 @@ class PreprocessingComparisonConfig:
     range_chunk  : int = 512
     workers      : int = 4
 
-    make_plots : bool          = True
+    make_plots : bool           = True
     output_dir : Optional[Path] = None
 
 
@@ -68,5 +68,5 @@ class ParamExtractionComparisonConfig:
     block_size   : int = 8
     range_chunk  : int = 512
 
-    make_plots : bool          = True
+    make_plots : bool           = True
     output_dir : Optional[Path] = None

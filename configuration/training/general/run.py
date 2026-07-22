@@ -28,17 +28,17 @@ class RunPathsConfig(TrainingPathsConfig):
 
 @dataclass
 class TrainingQueueConfig:
-    epochs               : int             = 60
-    scheduler_epochs     : int | None      = None
-    validation_frequency : int             = 1
-    batch_size           : int             = 256
-    num_workers          : int             = 4
-    prefetch_factor      : int             = 2
-    eta_min              : float           = 1e-6
-    early_stop_patience  : int             = 30
-    early_stop_min_delta : float           = 0.0
-    log_all_losses       : bool            = False
-    log_debug            : bool            = False
+    epochs               : int        = 60
+    scheduler_epochs     : int | None = None
+    validation_frequency : int        = 1
+    batch_size           : int        = 256
+    num_workers          : int        = 4
+    prefetch_factor      : int        = 2
+    eta_min              : float      = 1e-6
+    early_stop_patience  : int        = 30
+    early_stop_min_delta : float      = 0.0
+    log_all_losses       : bool       = False
+    log_debug            : bool       = False
 
     use_amp                     : bool  = False
     gradient_accumulation_steps : int   = 1
@@ -69,8 +69,8 @@ class TrainingQueueConfig:
     clip_adaptive_percentile : float    = 95.0
     clip_adaptive_mean_std_k : float    = 2.0
 
-    patch_size           : tuple[int, int] = (64, 32)
-    patch_stride         : tuple[int, int] = (32, 16)
-    train_azimuth        : tuple[int, int] = (1000, 13000)
-    val_azimuth          : tuple[int, int] = (13064, 14500)
-    test_azimuth         : tuple[int, int] = (14564, 16000)
+    patch_size    : tuple[int, int] = (64, 32)
+    patch_stride  : tuple[int, int] = (32, 16)
+    train_azimuth : tuple[int, int] = (1000, 13000)
+    val_azimuth   : tuple[int, int] = (13064, 14500)
+    test_azimuth  : tuple[int, int] = (14564, 16000)

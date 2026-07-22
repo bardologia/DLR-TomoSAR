@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from configuration.cross_validation import CrossValidationConfig
-from pipelines.cross_validation.folds                  import FoldConfigFactory, FoldPlanner
-from pipelines.cross_validation.stages                 import CrossValidationReportStage, FoldInferenceStage, FoldTrainingStage
-from pipelines.shared.orchestration.staged_pipeline    import StagedPipeline
+from pipelines.cross_validation.folds               import FoldConfigFactory, FoldPlanner
+from pipelines.cross_validation.stages              import CrossValidationReportStage, FoldInferenceStage, FoldTrainingStage
+from pipelines.shared.orchestration.staged_pipeline import StagedPipeline
 
 
 class CrossValidationPipeline(StagedPipeline):

@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
-from typing  import Dict, List
+from pathlib     import Path
+from typing      import Dict, List
 
 import numpy as np
 
-from configuration.inference import InferenceConfig
+from configuration.inference                         import InferenceConfig
 from pipelines.backbone.inference.loader             import Run
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
-from tools                                    import FileIO
-from tools.monitoring.logger                  import Logger
-from tools.data.preprocessing                 import ProfileNormalizer
-from tools.data.regions                       import CropRegion
-from tools.sar                                import TomogramLauncher
-from tools.baselines                          import SecondarySelection
+from tools                                           import FileIO
+from tools.monitoring.logger                         import Logger
+from tools.data.preprocessing                        import ProfileNormalizer
+from tools.data.regions                              import CropRegion
+from tools.sar                                       import TomogramLauncher
+from tools.baselines                                 import SecondarySelection
 
 
 @dataclass
@@ -109,8 +109,8 @@ class ReducedTomogramSynthesizer:
         corr_flipped = float(np.dot(gt_centered, red_centered[::-1])) / denom
 
         self.logger.kv_table({
-            "Mean-profile corr (aligned)": f"{corr_direct:.4f}",
-            "Mean-profile corr (flipped)": f"{corr_flipped:.4f}",
+            "Mean-profile corr (aligned)" : f"{corr_direct:.4f}",
+            "Mean-profile corr (flipped)" : f"{corr_flipped:.4f}",
         }, title="Reduced vs GT elevation orientation (verify capon_phase_sign)")
 
         if corr_flipped > corr_direct:

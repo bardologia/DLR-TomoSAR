@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from pipelines.shared.config.config_persistence import BackboneModelConfigIO, DualModelConfigIO, ImageAutoencoderConfigIO, ProfileAutoencoderConfigIO, UnrolledModelConfigIO
-from pipelines.shared.inference.run_classifier import RunArtifacts, RunClassifier, RunType
+from pipelines.shared.inference.run_classifier  import RunArtifacts, RunClassifier, RunType
 
 
 def _make_run(tmp_path, *filenames):
@@ -62,8 +62,8 @@ def test_is_type_returns_false_for_unrecognized_run(tmp_path):
 
 
 def test_run_classifier_artifacts_match_config_io_filenames():
-    assert BackboneModelConfigIO.FILENAME       == RunArtifacts.BACKBONE_CONFIG
-    assert ProfileAutoencoderConfigIO.FILENAME  == RunArtifacts.PROFILE_AE_CONFIG
-    assert ImageAutoencoderConfigIO.FILENAME    == RunArtifacts.IMAGE_AE_CONFIG
-    assert UnrolledModelConfigIO.FILENAME       == RunArtifacts.UNROLLED_CONFIG
-    assert DualModelConfigIO.FILENAME           == RunArtifacts.DUAL_CONFIG
+    assert BackboneModelConfigIO.FILENAME      == RunArtifacts.BACKBONE_CONFIG
+    assert ProfileAutoencoderConfigIO.FILENAME == RunArtifacts.PROFILE_AE_CONFIG
+    assert ImageAutoencoderConfigIO.FILENAME   == RunArtifacts.IMAGE_AE_CONFIG
+    assert UnrolledModelConfigIO.FILENAME      == RunArtifacts.UNROLLED_CONFIG
+    assert DualModelConfigIO.FILENAME          == RunArtifacts.DUAL_CONFIG

@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import torch
 
-from configuration.training import OverfitCheckConfig, ProfileAeTrainerConfig
+from configuration.training                  import OverfitCheckConfig, ProfileAeTrainerConfig
 from pipelines.shared.training.overfit_check import OverfitCheck
 
 
@@ -32,8 +32,8 @@ class _StubTrainer:
 
 class _TupleDataset(torch.utils.data.Dataset):
     def __init__(self, n=10):
-        self.n         = n
-        self.augmenter = object()
+        self.n                      = n
+        self.augmenter              = object()
         self.fetched_with_augmenter = []
 
     def __len__(self):
@@ -221,7 +221,7 @@ def test_run_restores_global_rng_state(tmp_path):
     torch.manual_seed(1234)
     np.random.seed(1234)
 
-    check    = _check(tmp_path)
+    check          = _check(tmp_path)
     expected_torch = torch.get_rng_state().clone()
     expected_numpy = np.random.get_state()[1].copy()
 

@@ -6,23 +6,23 @@ import numpy as np
 import pytest
 import torch
 
-from configuration.dataset   import DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
-from configuration.inference import InferenceConfig
-from configuration.normalization                 import ChannelStats, OutputClampConfig
-from configuration.normalization.general         import ChannelStrategy, NormMethod
-from models                                      import BACKBONE_CONFIG_REGISTRY, get_backbone
-from pipelines.backbone.dataset.metadata_writer  import MetadataWriter
-from pipelines.backbone.dataset.stats            import Stats
-from pipelines.backbone.inference.pipeline       import InferencePipeline
-from pipelines.shared.config.config_persistence  import BackboneModelConfigIO
-from tools.data.io      import FileIO
-from tools.data.regions import CropRegion
+from configuration.dataset                      import DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
+from configuration.inference                    import InferenceConfig
+from configuration.normalization                import ChannelStats, OutputClampConfig
+from configuration.normalization.general        import ChannelStrategy, NormMethod
+from models                                     import BACKBONE_CONFIG_REGISTRY, get_backbone
+from pipelines.backbone.dataset.metadata_writer import MetadataWriter
+from pipelines.backbone.dataset.stats           import Stats
+from pipelines.backbone.inference.pipeline      import InferencePipeline
+from pipelines.shared.config.config_persistence import BackboneModelConfigIO
+from tools.data.io                              import FileIO
+from tools.data.regions                         import CropRegion
 
 
 class _SilentLogger:
-    def section(self, *a, **k):    pass
-    def subsection(self, *a, **k): pass
-    def kv_table(self, *a, **k):   pass
+    def section(self, *a, **k):       pass
+    def subsection(self, *a, **k):    pass
+    def kv_table(self, *a, **k):      pass
     def metrics_table(self, *a, **k): pass
 
 
@@ -73,10 +73,10 @@ def _persist_stats(meta_dir, in_channels: int) -> None:
 
 
 def _persist_model(run_dir, meta_dir, in_channels: int) -> None:
-    config              = BACKBONE_CONFIG_REGISTRY["unet"]()
-    config.in_channels  = in_channels
-    config.out_channels = 3 * N_GAUSSIANS
-    config.features     = [8, 16]
+    config                   = BACKBONE_CONFIG_REGISTRY["unet"]()
+    config.in_channels       = in_channels
+    config.out_channels      = 3 * N_GAUSSIANS
+    config.features          = [8, 16]
     config.bottleneck_factor = 1
 
     BackboneModelConfigIO.save(config, "unet", meta_dir)
@@ -136,7 +136,7 @@ def test_inference_pipeline_end_to_end(tmp_path, test_data_dir, params_dir):
 
     metrics = json.loads((output_dir / "metrics.json").read_text())
 
-    assert metrics["split"] == "test"
+    assert metrics["split"]                   == "test"
     assert metrics["reduced_status"]          == "skipped: compute_reduced disabled"
     assert metrics["data_consistency_status"] == "computed"
 
@@ -151,10 +151,10 @@ def test_inference_pipeline_end_to_end(tmp_path, test_data_dir, params_dir):
         assert f"phase_agreement_gt_track_{label}" in metrics
 
     cubes = output_dir / "cubes"
-    assert np.load(cubes / "pred_curves.npy").shape == (N_ELEV, 96, 96)
-    assert np.load(cubes / "gt_curves.npy").shape   == (N_ELEV, 96, 96)
-    assert np.load(cubes / "params_pred.npy").shape == (3 * N_GAUSSIANS, 96, 96)
-    assert np.load(cubes / "params_gt.npy").shape   == (3 * N_GAUSSIANS, 96, 96)
+    assert np.load(cubes / "pred_curves.npy").shape             == (N_ELEV, 96, 96)
+    assert np.load(cubes / "gt_curves.npy").shape               == (N_ELEV, 96, 96)
+    assert np.load(cubes / "params_pred.npy").shape             == (3 * N_GAUSSIANS, 96, 96)
+    assert np.load(cubes / "params_gt.npy").shape               == (3 * N_GAUSSIANS, 96, 96)
     assert np.load(cubes / "physics_coherence_error.npy").shape == (96, 96)
 
     report = report_path.read_text()

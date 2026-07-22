@@ -4,8 +4,8 @@ import torch
 import torch.nn as nn
 
 from configuration.architectures import UNetConfig
-from ..blocks                          import initialize_weights
-from ..blocks                          import ConvBlock, Decoder, Encoder, OutputHeadsMixin
+from ..blocks                    import initialize_weights
+from ..blocks                    import ConvBlock, Decoder, Encoder, OutputHeadsMixin
 
 
 class UNetBackbone(nn.Module, OutputHeadsMixin):

@@ -3,9 +3,9 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.architectures import DilatedConv2dImageAutoencoderConfig
-from models.image_autoencoder.base                       import ImageAutoencoderBase
-from models.blocks                                       import build_activation, build_norm2d
+from configuration.architectures   import DilatedConv2dImageAutoencoderConfig
+from models.image_autoencoder.base import ImageAutoencoderBase
+from models.blocks                 import build_activation, build_norm2d
 
 
 class Dilated2dResidualBlock(nn.Module):

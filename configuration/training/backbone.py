@@ -3,17 +3,17 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib     import Path
 
-from configuration.training.general.run         import TrainingPathsConfig, TrainingQueueConfig, standard_seeds
+from configuration.training.general.run          import TrainingPathsConfig, TrainingQueueConfig, standard_seeds
 from configuration.dataset                       import AugmentationConfig, InputConfig
-from configuration.inference.general            import InferenceConfig
-from configuration.sar.gaussian_config          import GaussianConfig
-from configuration.sar.geometry_config          import GeometryConfig
-from configuration.normalization.general        import NormalizationConfig
-from configuration.training.general.ablation    import AblationCatalog
-from configuration.training.general.loss        import LossConfig, LossCurriculumConfig
+from configuration.inference.general             import InferenceConfig
+from configuration.sar.gaussian_config           import GaussianConfig
+from configuration.sar.geometry_config           import GeometryConfig
+from configuration.normalization.general         import NormalizationConfig
+from configuration.training.general.ablation     import AblationCatalog
+from configuration.training.general.loss         import LossConfig, LossCurriculumConfig
 from configuration.training.general.optimization import EarlyStoppingConfig, GradientClipperConfig, OptimizerConfig, SchedulerConfig, WarmupConfig
-from configuration.training.general.runtime     import IOConfig, MemoryConfig, OverfitCheckConfig, ResourceConfig, TrainingLoopConfig
-from configuration.training.general.pretraining import PretrainConfig
+from configuration.training.general.runtime      import IOConfig, MemoryConfig, OverfitCheckConfig, ResourceConfig, TrainingLoopConfig
+from configuration.training.general.pretraining  import PretrainConfig
 
 
 def default_curriculum() -> LossCurriculumConfig:
@@ -205,18 +205,18 @@ class LossScaleProbeConfig:
 
 @dataclass
 class BackboneTrainerConfig:
-    gaussian            : GaussianConfig
-    geometry            : GeometryConfig           = field(default_factory=GeometryConfig)
-    early_stopping      : EarlyStoppingConfig      = field(default_factory=EarlyStoppingConfig)
-    warmup              : WarmupConfig             = field(default_factory=WarmupConfig)
-    scheduler           : SchedulerConfig          = field(default_factory=SchedulerConfig)
-    io                  : IOConfig                 = field(default_factory=IOConfig)
-    optimizer           : OptimizerConfig          = field(default_factory=OptimizerConfig)
-    training            : TrainingLoopConfig       = field(default_factory=TrainingLoopConfig)
-    curriculum          : LossCurriculumConfig     = field(default_factory=LossCurriculumConfig)
-    resources           : ResourceConfig           = field(default_factory=ResourceConfig)
-    memory              : MemoryConfig             = field(default_factory=MemoryConfig)
-    gradient_clipper    : GradientClipperConfig    = field(default_factory=GradientClipperConfig)
+    gaussian         : GaussianConfig
+    geometry         : GeometryConfig        = field(default_factory=GeometryConfig)
+    early_stopping   : EarlyStoppingConfig   = field(default_factory=EarlyStoppingConfig)
+    warmup           : WarmupConfig          = field(default_factory=WarmupConfig)
+    scheduler        : SchedulerConfig       = field(default_factory=SchedulerConfig)
+    io               : IOConfig              = field(default_factory=IOConfig)
+    optimizer        : OptimizerConfig       = field(default_factory=OptimizerConfig)
+    training         : TrainingLoopConfig    = field(default_factory=TrainingLoopConfig)
+    curriculum       : LossCurriculumConfig  = field(default_factory=LossCurriculumConfig)
+    resources        : ResourceConfig        = field(default_factory=ResourceConfig)
+    memory           : MemoryConfig          = field(default_factory=MemoryConfig)
+    gradient_clipper : GradientClipperConfig = field(default_factory=GradientClipperConfig)
 
 
 @dataclass
@@ -250,25 +250,25 @@ class BackboneEntryConfig:
     infer_after : bool            = False
     inference   : InferenceConfig = field(default_factory=_default_inference)
 
-    trials_enabled   : bool                  = False
-    trials_mode      : str                   = "curriculum"
-    warmup_losses    : dict                  = field(default_factory=_default_warmup_losses)
-    complete_losses  : dict                  = field(default_factory=_default_complete_losses)
-    presence_trials  : dict                  = field(default_factory=_default_presence_trials)
-    physics_trials   : PhysicsTrialsConfig   = field(default_factory=PhysicsTrialsConfig)
-    pair_trials      : PairTrialsConfig      = field(default_factory=PairTrialsConfig)
-    secondary_trials : SecondaryTrialsConfig = field(default_factory=SecondaryTrialsConfig)
-    patch_trials     : PatchTrialsConfig     = field(default_factory=PatchTrialsConfig)
-    input_trials     : dict                  = field(default_factory=_default_input_trials)
-    context_trials   : list                  = field(default_factory=_default_context_trials)
-    reach_trials     : ReachTrialsConfig     = field(default_factory=ReachTrialsConfig)
-    head_trials      : HeadMatchingTrialsConfig = field(default_factory=HeadMatchingTrialsConfig)
-    augmentation_trials : dict               = field(default_factory=_default_augmentation_trials)
+    trials_enabled       : bool                      = False
+    trials_mode          : str                       = "curriculum"
+    warmup_losses        : dict                      = field(default_factory=_default_warmup_losses)
+    complete_losses      : dict                      = field(default_factory=_default_complete_losses)
+    presence_trials      : dict                      = field(default_factory=_default_presence_trials)
+    physics_trials       : PhysicsTrialsConfig       = field(default_factory=PhysicsTrialsConfig)
+    pair_trials          : PairTrialsConfig          = field(default_factory=PairTrialsConfig)
+    secondary_trials     : SecondaryTrialsConfig     = field(default_factory=SecondaryTrialsConfig)
+    patch_trials         : PatchTrialsConfig         = field(default_factory=PatchTrialsConfig)
+    input_trials         : dict                      = field(default_factory=_default_input_trials)
+    context_trials       : list                      = field(default_factory=_default_context_trials)
+    reach_trials         : ReachTrialsConfig         = field(default_factory=ReachTrialsConfig)
+    head_trials          : HeadMatchingTrialsConfig  = field(default_factory=HeadMatchingTrialsConfig)
+    augmentation_trials  : dict                      = field(default_factory=_default_augmentation_trials)
     normalization_trials : NormalizationTrialsConfig = field(default_factory=NormalizationTrialsConfig)
 
     ablation_features     : list = field(default_factory=AblationCatalog.default_features)
     ablation_include_full : bool = True
 
-    gpus             : list[int]             = field(default_factory=lambda: [0, 1, 3])
-    gpus_file        : str                   = ""
-    poll_interval_s  : float                 = 5.0
+    gpus            : list[int] = field(default_factory=lambda: [0, 1, 3])
+    gpus_file       : str       = ""
+    poll_interval_s : float     = 5.0

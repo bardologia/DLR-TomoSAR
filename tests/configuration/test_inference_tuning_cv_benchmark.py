@@ -15,19 +15,19 @@ from configuration.inference.profile_autoencoder import ProfileAeInferenceConfig
 from configuration.tuning.general import TuningConfig, TuningEntryConfig
 from configuration.tuning.jepa    import JepaTuneConfig
 
-from configuration.cross_validation.general              import FoldConfig, CrossValidationConfig
-from configuration.cross_validation.jepa                 import JepaCvConfig
-from configuration.cross_validation.profile_autoencoder  import AeCvConfig
+from configuration.cross_validation.general             import FoldConfig, CrossValidationConfig
+from configuration.cross_validation.jepa                import JepaCvConfig
+from configuration.cross_validation.profile_autoencoder import AeCvConfig
 
-from configuration.benchmark.general          import (
+from configuration.benchmark.general import (
     MaxBatchConfig,
     SizeMatchConfig,
     InferenceQueueConfig,
     ComparisonReportConfig,
     BenchmarkConfig,
 )
-from configuration.benchmark.jepa             import JepaBenchConfig
-from configuration.benchmark.dataloader_tuning import DataLoaderTuningEntryConfig
+from configuration.benchmark.jepa               import JepaBenchConfig
+from configuration.benchmark.dataloader_tuning  import DataLoaderTuningEntryConfig
 from configuration.training.general.run         import RunPathsConfig, TrainingQueueConfig
 from configuration.training.profile_autoencoder import ProfileAeLossConfig
 
@@ -81,8 +81,8 @@ def test_inference_config_requires_run_directory():
 
 def test_inference_config_profile_counts_positive():
     cfg = InferenceConfig(run_directory=Path("."))
-    assert cfg.n_best_profiles  > 0
-    assert cfg.n_worst_profiles > 0
+    assert cfg.n_best_profiles   > 0
+    assert cfg.n_worst_profiles  > 0
     assert cfg.n_random_profiles > 0
 
 

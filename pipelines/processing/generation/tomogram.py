@@ -10,17 +10,17 @@ from typing  import Tuple
 import h5py
 import numpy as np
 
-from configuration.sar.processing_config              import (
+from configuration.sar.processing_config  import (
     ParallelConfig,
     ProcessingConfig,
     TomogramConfig,
 )
+from pipelines.processing.generation.base import GeneratorBase
 from tools.sar.pyrat_env                  import PyRatEnvironment
 from tools.sar.tomogram_worker            import PyRatJob, run_pyrat_job
 from tools                                import FileIO, ProcessPoolRunner
 from tools.monitoring.logger              import Logger
 from tools.data.regions                   import CropRegion
-from pipelines.processing.generation.base import GeneratorBase
 
 
 class TomogramProcessor:
@@ -201,10 +201,10 @@ class TomogramGenerator(GeneratorBase):
 
         self.logger.section("[Tomogram Generation]")
         self.logger.kv_table({
-            "Stack id"       : config.stack_identifier,
-            "Track selection": config.tomogram_config.track_selection,
-            "Crop"           : config.crop.as_tuple(),
-            "Output"         : self.spec["tomogram_path"],
+            "Stack id"        : config.stack_identifier,
+            "Track selection" : config.tomogram_config.track_selection,
+            "Crop"            : config.crop.as_tuple(),
+            "Output"          : self.spec["tomogram_path"],
         })
 
         TomogramProcessor(config, logger=self.logger).run(

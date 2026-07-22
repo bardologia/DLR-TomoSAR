@@ -18,7 +18,7 @@ from configuration.training.general.loss import (
     LossCurriculumConfig,
     ParamMatching,
 )
-from configuration.training.general.trainer import SharedSubConfigInheritance
+from configuration.training.general.trainer     import SharedSubConfigInheritance
 from configuration.training.general.pretraining import PretrainConfig
 from configuration.training.general.run import (
     RunPathsConfig,

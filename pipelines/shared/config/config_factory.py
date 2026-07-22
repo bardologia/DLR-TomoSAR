@@ -2,16 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from configuration.benchmark import BenchmarkConfig
-from configuration.dataset import DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
-from configuration.inference import InferenceConfig
-from configuration.training import default_curriculum, EarlyStoppingConfig, GradientClipperConfig, MemoryConfig, OptimizerConfig, SchedulerConfig, WarmupConfig, IOConfig, TrainingLoopConfig, BackboneTrainerConfig
-from tools.data.io                              import FileIO
-from tools.data.regions                         import CropRegion
-
-
-from configuration.sar.gaussian_config          import GaussianConfig
-from configuration.sar.geometry_config          import GeometryConfig
+from configuration.benchmark            import BenchmarkConfig
+from configuration.dataset             import DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
+from configuration.inference           import InferenceConfig
+from configuration.training            import default_curriculum, EarlyStoppingConfig, GradientClipperConfig, MemoryConfig, OptimizerConfig, SchedulerConfig, WarmupConfig, IOConfig, TrainingLoopConfig, BackboneTrainerConfig
+from configuration.sar.gaussian_config import GaussianConfig
+from configuration.sar.geometry_config import GeometryConfig
+from tools.data.io                     import FileIO
+from tools.data.regions                import CropRegion
 
 
 class ConfigFactory:
@@ -53,16 +51,16 @@ class ConfigFactory:
             parameters_path             = self.config.paths.parameters_path,
             split_regions               = self.split_regions(),
             secondary_labels            = self._secondary_labels(),
-            patch           = PatchConfig(size=training.patch_size, stride=training.patch_stride, use_symmetric_padding=True),
-            input_config    = self.benchmark_input_config(),
-            output_config   = self._output_config(),
-            normalization   = self.config.normalization,
-            augmentation    = self.config.augmentation,
-            batch_size      = training.batch_size,
-            num_workers     = training.num_workers,
-            prefetch_factor = training.prefetch_factor,
-            shuffle_train   = True,
-            pin_memory      = True,
+            patch                       = PatchConfig(size=training.patch_size, stride=training.patch_stride, use_symmetric_padding=True),
+            input_config                = self.benchmark_input_config(),
+            output_config               = self._output_config(),
+            normalization               = self.config.normalization,
+            augmentation                = self.config.augmentation,
+            batch_size                  = training.batch_size,
+            num_workers                 = training.num_workers,
+            prefetch_factor             = training.prefetch_factor,
+            shuffle_train               = True,
+            pin_memory                  = True,
         )
 
     def gaussian_config(self) -> GaussianConfig:

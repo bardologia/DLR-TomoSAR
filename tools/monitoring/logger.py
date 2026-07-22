@@ -26,7 +26,7 @@ from rich.text  import Text
 from rich.theme import Theme
 
 from tools.reporting.markdown import MarkdownDoc, MarkdownTable
-from tools.runtime.run_tag import RunTag
+from tools.runtime.run_tag    import RunTag
 
 
 class LiveMonitor:
@@ -67,19 +67,19 @@ class LiveMonitor:
 
 
 _THEME = Theme({
-    "section":    "bold cyan",
-    "subsection": "white",
-    "key":        "bold magenta",
-    "value":      "bright_white",
-    "ok":         "bold green",
-    "warn":       "bold yellow",
-    "err":        "bold red",
-    "muted":      "white",
-    "logging.level.debug":    "white",
-    "logging.level.info":     "white",
-    "logging.level.warning":  "bold yellow",
-    "logging.level.error":    "bold red",
-    "logging.level.critical": "bold red",
+    "section"                : "bold cyan",
+    "subsection"             : "white",
+    "key"                    : "bold magenta",
+    "value"                  : "bright_white",
+    "ok"                     : "bold green",
+    "warn"                   : "bold yellow",
+    "err"                    : "bold red",
+    "muted"                  : "white",
+    "logging.level.debug"    : "white",
+    "logging.level.info"     : "white",
+    "logging.level.warning"  : "bold yellow",
+    "logging.level.error"    : "bold red",
+    "logging.level.critical" : "bold red",
 })
 
 _CONSOLE: Optional[Console] = None
@@ -145,14 +145,14 @@ class Logger:
         self.logger.setLevel(log_level)
 
         rich_handler = RichHandler(
-            console            = self.console,
-            level              = log_level,
-            show_time          = True,
-            show_level         = True,
-            show_path          = False,
-            markup             = True,
-            rich_tracebacks    = True,
-            log_time_format    = "[%H:%M:%S]",
+            console         = self.console,
+            level           = log_level,
+            show_time       = True,
+            show_level      = True,
+            show_path       = False,
+            markup          = True,
+            rich_tracebacks = True,
+            log_time_format = "[%H:%M:%S]",
         )
         rich_handler.setLevel(log_level)
         self.logger.addHandler(rich_handler)

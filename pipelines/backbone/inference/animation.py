@@ -240,15 +240,15 @@ class Animator:
 
     def walk_gif(
         self,
-        pred_cube    : np.ndarray,
-        gt_cube      : np.ndarray,
-        axis         : str,
-        out_path     : Path,
+        pred_cube : np.ndarray,
+        gt_cube   : np.ndarray,
+        axis      : str,
+        out_path  : Path,
         *,
-        x_axis       : np.ndarray,
-        az_offset    : int,
-        rg_offset    : int,
-        full_cube    : np.ndarray | None = None,
+        x_axis    : np.ndarray,
+        az_offset : int,
+        rg_offset : int,
+        full_cube : np.ndarray | None = None,
     ) -> Path:
         plt.rcParams.update(Plotter.SCIENTIFIC_RC)
         plt.rcParams.update(Plotter.REPORT_RC)

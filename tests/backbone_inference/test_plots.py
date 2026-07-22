@@ -9,7 +9,7 @@ import pytest
 
 from pipelines.backbone.inference.plots          import Plotter, PlotTools, SlicePlotter, ParamPlotter, SlotPlotter, TrackPlotter
 from pipelines.backbone.inference.plots.plotter  import Plotter as PloterClass
-from tools.baselines.containers import TrackBaselines, TrackProfiles
+from tools.baselines.containers                  import TrackBaselines, TrackProfiles
 
 
 N_GAUSSIANS = 2
@@ -83,7 +83,7 @@ def test_plottools_intensity_scale_normalize():
 
 
 def test_param_plotter_distributions(tmp_path):
-    params = _params()
+    params  = _params()
     plotter = ParamPlotter()
 
     paths = plotter.plot_param_distributions(
@@ -93,7 +93,7 @@ def test_param_plotter_distributions(tmp_path):
 
 
 def test_param_plotter_scatter(tmp_path):
-    params = _params()
+    params  = _params()
     plotter = ParamPlotter()
 
     paths = plotter.plot_param_scatter(
@@ -103,7 +103,7 @@ def test_param_plotter_scatter(tmp_path):
 
 
 def test_param_plotter_error_maps(tmp_path):
-    params = _params()
+    params  = _params()
     plotter = ParamPlotter()
 
     paths = plotter.plot_param_error_maps(
@@ -132,7 +132,7 @@ def test_param_scatter_r2_value_exact():
 
 
 def test_slot_plotter_active_count_map(tmp_path):
-    params = _params()
+    params  = _params()
     plotter = SlotPlotter()
     paths   = plotter.plot_active_count_map(
         params_pred=params, params_gt=params, n_gaussians=N_GAUSSIANS,
@@ -191,8 +191,8 @@ def test_slice_plotter_tomogram_slice_range_and_azimuth(tmp_path):
 
 
 def test_slice_plotter_tomogram_slice_bad_axis_raises(tmp_path):
-    x_axis = _x_axis()
-    gt     = _curves(_params(), x_axis)
+    x_axis  = _x_axis()
+    gt      = _curves(_params(), x_axis)
     plotter = SlicePlotter()
 
     with pytest.raises(ValueError, match="axis must be"):

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from configuration.patch_sweep import PatchSweepConfig
+from configuration.patch_sweep     import PatchSweepConfig
 from pipelines.patch_sweep.planner import ArchitecturePatchStep, PatchSweepPlanner
 
 

@@ -21,9 +21,9 @@ def test_backbone_run_resolves_default_components(tmp_path):
 
     components = InferenceComponentsResolver.for_run(run)
 
-    assert components.loader_cls    is RunLoader
-    assert components.predictor_cls is Predictor
-    assert components.param_space   is True
+    assert components.loader_cls              is RunLoader
+    assert components.predictor_cls           is Predictor
+    assert components.param_space             is True
     assert components.embedding_evaluator_cls is None
 
 

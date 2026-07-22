@@ -35,17 +35,17 @@ class SweepReport:
         best = pool.iloc[0]
 
         return {
-            "found"              : True,
-            "cpu_bound"          : bool(cpu_bound),
-            "batch_size"         : int(best["batch_size"]),
-            "num_workers"        : int(best["num_workers"]),
-            "prefetch_factor"    : int(best["prefetch_factor"]),
-            "pin_memory"         : bool(best["pin_memory"]),
-            "persistent_workers" : bool(best["persistent_workers"]),
+            "found"                    : True,
+            "cpu_bound"                : bool(cpu_bound),
+            "batch_size"               : int(best["batch_size"]),
+            "num_workers"              : int(best["num_workers"]),
+            "prefetch_factor"          : int(best["prefetch_factor"]),
+            "pin_memory"               : bool(best["pin_memory"]),
+            "persistent_workers"       : bool(best["persistent_workers"]),
             "end_to_end_samples_per_s" : float(best["end_to_end_samples_per_s"]),
-            "data_wait_fraction" : float(best["data_wait_fraction"]),
-            "gpu_util_mean"      : float(best["gpu_util_mean"]),
-            "feed_ratio"         : float(best["feed_ratio"]),
+            "data_wait_fraction"       : float(best["data_wait_fraction"]),
+            "gpu_util_mean"            : float(best["gpu_util_mean"]),
+            "feed_ratio"               : float(best["feed_ratio"]),
         }
 
     def _new_axes(self):

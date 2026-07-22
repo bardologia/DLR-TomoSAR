@@ -5,12 +5,12 @@ import re
 from pathlib import Path
 
 from pipelines.shared.comparison.trial_collection import TrialRecord
-from tools.data.io                     import FileIO
-from tools.metrics.ranking             import RankingComputer, RankingResult
-from tools.metrics.scoring             import FiniteScalar, MetricOrientation
-from tools.monitoring.logger           import Logger
-from tools.reporting.markdown          import MarkdownTable, ScalarFormatter
-from tools.reporting.reporting         import MetricSectionGrouper, ReportAssets
+from tools.data.io                                import FileIO
+from tools.metrics.ranking                        import RankingComputer, RankingResult
+from tools.metrics.scoring                        import FiniteScalar, MetricOrientation
+from tools.monitoring.logger                      import Logger
+from tools.reporting.markdown                     import MarkdownTable, ScalarFormatter
+from tools.reporting.reporting                    import MetricSectionGrouper, ReportAssets
 
 
 class ComparisonReportBase:

@@ -31,16 +31,16 @@ class ProfileAeInferenceConfig:
     pixel_subsample : float = 1.0
     keep_empty_frac : float = 0.05
 
-    save_plots        : bool = True
-    n_best_curves     : int  = 12
-    n_worst_curves    : int  = 12
-    n_random_curves   : int  = 12
-    n_scatter_points  : int  = 20000
-    curve_seed        : int  = 0
+    save_plots       : bool = True
+    n_best_curves    : int  = 12
+    n_worst_curves   : int  = 12
+    n_random_curves  : int  = 12
+    n_scatter_points : int  = 20000
+    curve_seed       : int  = 0
 
-    fig_dpi     : int = 150
-    save_dpi    : int = 300
-    figure_style: str = "report"
+    fig_dpi      : int = 150
+    save_dpi     : int = 300
+    figure_style : str = "report"
 
     paths : ProfileAeInferencePaths = field(default_factory=ProfileAeInferencePaths)
 

@@ -5,7 +5,7 @@ import numpy as np
 
 class ProfilePreprocessor:
     @staticmethod
-    def apply(profile : np.ndarray, threshold_factor : float, truncation_index : int) -> np.ndarray:
+    def apply(profile: np.ndarray, threshold_factor: float, truncation_index: int) -> np.ndarray:
         out    = np.asarray(profile)
         copied = False
 
@@ -23,7 +23,7 @@ class ProfilePreprocessor:
 
 class ProfileNormalizer:
     @staticmethod
-    def unit_area(cube : np.ndarray, axis : int = 0, eps : float = 1e-12) -> np.ndarray:
+    def unit_area(cube: np.ndarray, axis: int = 0, eps: float = 1e-12) -> np.ndarray:
         cube  = np.asarray(cube, dtype=np.float32)
         total = cube.sum(axis=axis, keepdims=True)
 

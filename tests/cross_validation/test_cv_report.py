@@ -7,11 +7,11 @@ from pathlib import Path
 import numpy as np
 import pytest
 
-from configuration.cross_validation import CrossValidationConfig, FoldConfig
+from configuration.cross_validation               import CrossValidationConfig, FoldConfig
 from pipelines.shared.comparison.trial_collection import TrialRecord
-from pipelines.cross_validation.cv_report import CrossValidationReport
-from pipelines.cross_validation.folds     import FoldNaming, FoldPlanner
-from tools.monitoring.logger              import Logger
+from pipelines.cross_validation.cv_report         import CrossValidationReport
+from pipelines.cross_validation.folds             import FoldNaming, FoldPlanner
+from tools.monitoring.logger                      import Logger
 
 
 N_FOLDS = 5
@@ -154,8 +154,8 @@ def test_summary_json_best_val_loss_aggregate(tmp_path):
     payload = json.loads((report.out_dir / "cv_summary.json").read_text())
     losses  = [0.1 * (index + 1) for index in range(N_FOLDS)]
 
-    assert payload["best_val_loss"]["mean"]  == pytest.approx(float(np.mean(losses)))
-    assert payload["best_val_loss"]["std"]   == pytest.approx(float(np.std(losses, ddof=1)))
+    assert payload["best_val_loss"]["mean"]   == pytest.approx(float(np.mean(losses)))
+    assert payload["best_val_loss"]["std"]    == pytest.approx(float(np.std(losses, ddof=1)))
     assert payload["best_val_loss"]["n_used"] == N_FOLDS
 
 
@@ -169,7 +169,7 @@ def test_aggregate_markdown_has_structure(tmp_path):
     assert "## Fold Plan"               in text
     assert "## Training Across Folds"   in text
     assert "## Split `test`"            in text
-    assert "`curve_rmse_gt`"           in text
+    assert "`curve_rmse_gt`"            in text
 
 
 def test_aggregate_markdown_reports_correct_mean(tmp_path):
@@ -276,7 +276,7 @@ def test_no_seed_dispersion_keeps_summary_unchanged(tmp_path):
 
 
 def test_partial_fold_metrics_counted_in_n_used(tmp_path):
-    metrics = split_metrics()
+    metrics                     = split_metrics()
     metrics[3]["curve_rmse_gt"] = float("nan")
 
     base = make_records(metrics)

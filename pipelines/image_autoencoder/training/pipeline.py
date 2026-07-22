@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from configuration.training import ImageAeTrainerConfig
+from configuration.training                       import ImageAeTrainerConfig
 from models.image_autoencoder                     import IMAGE_AE_CONFIG_REGISTRY, get_image_autoencoder
 from pipelines.autoencoder_common.training        import AutoencoderTrainingPipeline
 from pipelines.backbone.dataset.pipeline          import BackboneDatasetPreparation

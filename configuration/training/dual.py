@@ -108,6 +108,6 @@ class DualEntryConfig:
     input_trials   : DualInputTrialsConfig = field(default_factory=DualInputTrialsConfig)
     ratio_trials   : DualRatioTrialsConfig = field(default_factory=DualRatioTrialsConfig)
 
-    gpus             : list[int] = field(default_factory=lambda: [0, 1, 3])
-    gpus_file        : str       = ""
-    poll_interval_s  : float     = 5.0
+    gpus            : list[int] = field(default_factory=lambda: [0, 1, 3])
+    gpus_file       : str       = ""
+    poll_interval_s : float     = 5.0

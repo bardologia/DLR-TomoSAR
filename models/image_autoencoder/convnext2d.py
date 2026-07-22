@@ -3,9 +3,9 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.architectures import ConvNeXt2dImageAutoencoderConfig
-from models.image_autoencoder.base                       import ImageAutoencoderBase
-from models.blocks                                       import ChannelLayerNorm, ConvNeXtBlock, build_upsample, downsample_stages
+from configuration.architectures   import ConvNeXt2dImageAutoencoderConfig
+from models.image_autoencoder.base import ImageAutoencoderBase
+from models.blocks                 import ChannelLayerNorm, ConvNeXtBlock, build_upsample, downsample_stages
 
 
 FFN_RATIO        = 4.0

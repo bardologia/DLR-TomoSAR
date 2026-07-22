@@ -7,11 +7,11 @@ import pytest
 import torch
 from torch.utils.data import DataLoader
 
-from configuration.training.general.runtime import ResourceConfig, TrainingLoopConfig
-from configuration.training.profile_autoencoder import ProfileAeLossConfig, ProfileAeTrainerConfig
-from models.profile_autoencoder import PROFILE_AE_CONFIG_REGISTRY, get_profile_autoencoder
+from configuration.training.general.runtime         import ResourceConfig, TrainingLoopConfig
+from configuration.training.profile_autoencoder     import ProfileAeLossConfig, ProfileAeTrainerConfig
+from models.profile_autoencoder                     import PROFILE_AE_CONFIG_REGISTRY, get_profile_autoencoder
 from pipelines.profile_autoencoder.training.trainer import Trainer
-from tools.monitoring.logger import Logger
+from tools.monitoring.logger                        import Logger
 
 
 PROFILE_LENGTH = 16

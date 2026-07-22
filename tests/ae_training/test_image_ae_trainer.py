@@ -7,16 +7,16 @@ import pytest
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from configuration.training.general.runtime import ResourceConfig, TrainingLoopConfig
-from configuration.training.image_autoencoder import ImageAeLossConfig, ImageAeTrainerConfig
-from models.image_autoencoder import IMAGE_AE_CONFIG_REGISTRY, get_image_autoencoder
+from configuration.training.general.runtime       import ResourceConfig, TrainingLoopConfig
+from configuration.training.image_autoencoder     import ImageAeLossConfig, ImageAeTrainerConfig
+from models.image_autoencoder                     import IMAGE_AE_CONFIG_REGISTRY, get_image_autoencoder
 from pipelines.image_autoencoder.training.trainer import Trainer
-from tools.monitoring.logger import Logger
+from tools.monitoring.logger                      import Logger
 
 
-IN_CHANNELS    = 2
-EMBEDDING_DIM  = 8
-PATCH          = 16
+IN_CHANNELS   = 2
+EMBEDDING_DIM = 8
+PATCH         = 16
 
 
 @pytest.fixture(autouse=True)

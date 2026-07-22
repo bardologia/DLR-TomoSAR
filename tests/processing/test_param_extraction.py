@@ -22,9 +22,9 @@ from pipelines.processing.param_extraction.pipeline  import ParameterExtractor
 from pipelines.processing.param_extraction.inference import ParamRunInferencePipeline
 from pipelines.processing.param_extraction.queue     import ExtractionPlanResolver
 from pipelines.processing.param_extraction.plots     import FittingResultPlotter
-from tools.data.gaussians     import GaussianMixture
-from tools.data.preprocessing import ProfilePreprocessor
-from tools.monitoring.logger  import Logger
+from tools.data.gaussians                            import GaussianMixture
+from tools.data.preprocessing                        import ProfilePreprocessor
+from tools.monitoring.logger                         import Logger
 
 
 K_MAX            = 5
@@ -240,9 +240,9 @@ def _height_axis(H):
 
 @pytest.mark.real_data
 def test_parameters_layout(parameters, param_extraction_meta):
-    assert param_extraction_meta["k_max"]    == K_MAX
-    assert parameters.shape[0]               == 3 * K_MAX
-    assert parameters.shape[1:]              == (1000, 500)
+    assert param_extraction_meta["k_max"] == K_MAX
+    assert parameters.shape[0]            == 3 * K_MAX
+    assert parameters.shape[1:]           == (1000, 500)
 
 
 @pytest.mark.real_data
@@ -281,13 +281,13 @@ def test_active_mu_in_physical_height_range(parameters):
 
 @pytest.mark.real_data
 def test_active_sigma_within_bounds(parameters):
-    H        = 150
-    h_span   = HEIGHT_RANGE[1] - HEIGHT_RANGE[0]
-    dh       = h_span / (H - 1)
-    w        = np.array(parameters)
-    amps     = w[0::3]
-    sigs     = w[2::3]
-    act      = amps > ACTIVITY_THRESH
+    H      = 150
+    h_span = HEIGHT_RANGE[1] - HEIGHT_RANGE[0]
+    dh     = h_span / (H - 1)
+    w      = np.array(parameters)
+    amps   = w[0::3]
+    sigs   = w[2::3]
+    act    = amps > ACTIVITY_THRESH
 
     assert sigs[act].min() >= dh - 1e-3
     assert sigs[act].max() <= h_span / 2.0 + 1e-3
@@ -366,8 +366,8 @@ def test_best_k_is_argmin_of_penalised(fit_diagnostics):
 
 @pytest.mark.real_data
 def test_inactive_pixels_have_zero_best_k_and_nan_mse(fit_diagnostics):
-    mse = fit_diagnostics["mse_per_k"]
-    bk  = fit_diagnostics["best_k_map"]
+    mse   = fit_diagnostics["mse_per_k"]
+    bk    = fit_diagnostics["best_k_map"]
     inact = bk == 0
 
     assert np.all(bk[inact] == 0)
@@ -398,9 +398,9 @@ def test_stored_mse_matches_reconstruction_from_params(tomogram_full, parameters
     prof_norm  = profiles / safe_scale[:, None]
     mse_recon  = ((pred_norm - prof_norm) ** 2).mean(axis=1)
 
-    bk_flat = fit_diagnostics["best_k_map"][a0:a1, r0:r1].T.reshape(-1)
-    mse_w   = fit_diagnostics["mse_per_k"][:, a0:a1, r0:r1].transpose(0, 2, 1).reshape(K_MAX, -1)
-    idx     = np.clip(bk_flat - 1, 0, K_MAX - 1)
+    bk_flat  = fit_diagnostics["best_k_map"][a0:a1, r0:r1].T.reshape(-1)
+    mse_w    = fit_diagnostics["mse_per_k"][:, a0:a1, r0:r1].transpose(0, 2, 1).reshape(K_MAX, -1)
+    idx      = np.clip(bk_flat - 1, 0, K_MAX - 1)
     mse_best = mse_w[idx, np.arange(len(idx))]
 
     mask = active & (bk_flat > 0)
@@ -438,7 +438,7 @@ def test_k_selection_diagnostics_runs(fit_diagnostics, logger):
 def test_metrics_calculator_runs_on_window(tomogram_full, parameters, fit_diagnostics, small_metadata, logger, tmp_path):
     a0, a1, r0, r1 = 0, 48, 0, 48
 
-    tomo_win = np.array(tomogram_full[:, a0:a1, r0:r1])
+    tomo_win  = np.array(tomogram_full[:, a0:a1, r0:r1])
     tomo_path = tmp_path / "tomo.npy"
     np.save(tomo_path, tomo_win)
 
@@ -468,7 +468,7 @@ def test_metrics_calculator_runs_on_window(tomogram_full, parameters, fit_diagno
 @pytest.mark.real_data
 def test_activity_map_counts_active_components(parameters, logger):
     a0, a1, r0, r1 = 0, 60, 0, 60
-    parw = np.array(parameters[:, a0:a1, r0:r1])
+    parw           = np.array(parameters[:, a0:a1, r0:r1])
 
     calc = FittingMetricsCalculator(
         n_gaussians      = K_MAX,

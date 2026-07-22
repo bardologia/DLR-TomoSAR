@@ -31,7 +31,7 @@ def test_assets_rel_path_relative(tmp_path):
 
 
 def test_assets_rel_path_parent(tmp_path):
-    base   = tmp_path / "sub"
+    base = tmp_path / "sub"
     base.mkdir()
     assets = ReportAssets(base=base)
     target = tmp_path / "a.png"
@@ -71,7 +71,7 @@ def test_assets_src_embedded_unknown_suffix_defaults_png(tmp_path):
 
 
 def test_assets_src_embedded_missing_file_falls_back_to_rel(tmp_path):
-    assets = ReportAssets(base=tmp_path, embed_images=True)
+    assets  = ReportAssets(base=tmp_path, embed_images=True)
     missing = tmp_path / "gone.png"
     assert assets.src(missing) == "gone.png"
 
@@ -123,7 +123,7 @@ def test_assets_header_structure():
 
 
 def test_natural_key_numeric_ordering():
-    names  = ["item10", "item2", "item1"]
+    names   = ["item10", "item2", "item1"]
     ordered = sorted(names, key=ReportAssets.natural_key)
     assert ordered == ["item1", "item2", "item10"]
 

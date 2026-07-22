@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from tools.loss.param_loss import ParamMatcher
+from tools.loss.param_loss           import ParamMatcher
 from tools.metrics.gaussian_matching import GaussianMatcher
 
 

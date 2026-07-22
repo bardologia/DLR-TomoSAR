@@ -6,7 +6,7 @@ import torch
 from models.backbone.nafnet  import NAFNet
 from models.backbone.resunet import ResUNetBackbone
 from models.backbone.unet    import UNetBackbone
-from models.dual import DUAL_MODEL_REGISTRY, get_dual
+from models.dual             import DUAL_MODEL_REGISTRY, get_dual
 
 
 WINDOW = 32
@@ -199,7 +199,7 @@ def test_param_groups_cover_every_parameter_exactly_once():
 
 
 def test_any_zoo_backbone_is_a_valid_trunk():
-    small_nafnet = {"width": 8, "enc_blocks": [1, 1], "middle_blocks": 1, "dec_blocks": [1, 1]}
+    small_nafnet  = {"width": 8, "enc_blocks": [1, 1], "middle_blocks": 1, "dec_blocks": [1, 1]}
     model, config = _build(existence_backbone="nafnet", existence_features=[], existence_overrides=small_nafnet)
 
     assert isinstance(model.trunk_existence, NAFNet)

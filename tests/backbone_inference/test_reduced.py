@@ -5,7 +5,7 @@ import types
 import numpy as np
 import pytest
 
-from tools.data.regions import CropRegion
+from tools.data.regions                   import CropRegion
 from pipelines.backbone.inference.reduced import ReducedTomogramSynthesizer
 
 
@@ -74,24 +74,24 @@ def test_build_spec_carries_track_selection_and_crop():
     )
 
     state = {
-        "tomogram_config" : {"height_range": [-20.0, 80.0]},
-        "stack_identifier": "stackX",
-        "dataset_type"    : "L",
-        "paths"           : {"pyrat_directory": "/pyrat"},
+        "tomogram_config"  : {"height_range": [-20.0, 80.0]},
+        "stack_identifier" : "stackX",
+        "dataset_type"     : "L",
+        "paths"            : {"pyrat_directory": "/pyrat"},
     }
 
     spec = synth._build_spec(state, [1, 4], region, tomogram_path="/t.npy", dem_path="/d.npy")
 
     assert spec["tomogram_config"]["track_selection"] == [1, 4]
-    assert spec["pyrat_directory"] == "/pyrat"
-    assert spec["crop"]            == list(region.as_tuple())
-    assert spec["effort"]          == "high"
+    assert spec["pyrat_directory"]  == "/pyrat"
+    assert spec["crop"]             == list(region.as_tuple())
+    assert spec["effort"]           == "high"
     assert spec["stack_identifier"] == "stackX"
 
 
 def test_report_orientation_returns_persistable_correlations():
-    region  = CropRegion(azimuth_start=0, azimuth_end=4, range_start=0, range_end=4)
-    synth   = _make_synth(x_axis_length=20, region=region)
+    region = CropRegion(azimuth_start=0, azimuth_end=4, range_start=0, range_end=4)
+    synth  = _make_synth(x_axis_length=20, region=region)
 
     x       = np.linspace(0, 1, 20)
     profile = np.exp(-((x - 0.3) ** 2) / 0.01).astype(np.float32)
@@ -105,8 +105,8 @@ def test_report_orientation_returns_persistable_correlations():
 
 
 def test_report_orientation_detects_flipped_axis():
-    region  = CropRegion(azimuth_start=0, azimuth_end=4, range_start=0, range_end=4)
-    synth   = _make_synth(x_axis_length=20, region=region)
+    region = CropRegion(azimuth_start=0, azimuth_end=4, range_start=0, range_end=4)
+    synth  = _make_synth(x_axis_length=20, region=region)
 
     x       = np.linspace(0, 1, 20)
     profile = np.exp(-((x - 0.3) ** 2) / 0.01).astype(np.float32)

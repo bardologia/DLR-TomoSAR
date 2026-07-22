@@ -7,15 +7,15 @@ import numpy as np
 import pytest
 import torch
 
-from configuration.inference.image_autoencoder import ImageAeInferenceConfig
-from configuration.inference.profile_autoencoder import ProfileAeInferenceConfig
-from configuration.training import ImageAeEntryConfig
-from configuration.training.profile_autoencoder import ProfileAeEntryConfig
-from pipelines.backbone.inference.loader import RunLoader
-from pipelines.image_autoencoder.inference.pipeline import ImageAeInferencePipeline
-from pipelines.image_autoencoder.training.pipeline import TrainingPipeline
+from configuration.inference.image_autoencoder        import ImageAeInferenceConfig
+from configuration.inference.profile_autoencoder      import ProfileAeInferenceConfig
+from configuration.training                           import ImageAeEntryConfig
+from configuration.training.profile_autoencoder       import ProfileAeEntryConfig
+from pipelines.backbone.inference.loader              import RunLoader
+from pipelines.image_autoencoder.inference.pipeline   import ImageAeInferencePipeline
+from pipelines.image_autoencoder.training.pipeline    import TrainingPipeline
 from pipelines.profile_autoencoder.inference.pipeline import ProfileAeInferencePipeline
-from pipelines.profile_autoencoder.training.pipeline import TrainingPipeline as ProfileTrainingPipeline
+from pipelines.profile_autoencoder.training.pipeline  import TrainingPipeline as ProfileTrainingPipeline
 
 
 pytestmark = [pytest.mark.real_data, pytest.mark.slow]

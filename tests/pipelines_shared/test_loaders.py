@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import Dataset
 
 from pipelines.shared.dataset.loaders import Loader
-from tools.monitoring.logger  import Logger
+from tools.monitoring.logger          import Logger
 
 
 class _CountingDataset(Dataset):

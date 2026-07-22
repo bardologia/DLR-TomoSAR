@@ -25,7 +25,7 @@ def test_mse_diff_nonnegative():
 
 
 def test_mse_diff_matches_definition():
-    diff = _curves(1) - 0.5
+    diff     = _curves(1) - 0.5
     expected = (diff * diff).mean()
     assert torch.allclose(CurveLoss.mse_diff(diff), expected)
 
@@ -50,9 +50,9 @@ def test_huber_quadratic_below_delta():
 
 
 def test_huber_linear_above_delta():
-    diff  = torch.full((1, 1, 1, 1), 5.0, dtype=torch.float64)
-    delta = 1.0
-    out   = CurveLoss.huber_diff(diff, delta)
+    diff     = torch.full((1, 1, 1, 1), 5.0, dtype=torch.float64)
+    delta    = 1.0
+    out      = CurveLoss.huber_diff(diff, delta)
     expected = delta * (diff.abs() - 0.5 * delta)
     assert torch.allclose(out, expected)
 
@@ -71,7 +71,7 @@ def test_charbonnier_nonnegative_and_floor():
 
 
 def test_smooth_l1_quadratic_and_linear():
-    beta = 1.0
+    beta  = 1.0
     small = torch.full((1, 1, 1, 1), 0.2, dtype=torch.float64)
     large = torch.full((1, 1, 1, 1), 4.0, dtype=torch.float64)
     assert torch.allclose(CurveLoss.smooth_l1_diff(small, beta), 0.5 * small * small / beta)

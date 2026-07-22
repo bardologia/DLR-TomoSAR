@@ -5,11 +5,11 @@ from pathlib import Path
 import pytest
 
 import pipelines.dual.training.launcher as dual_launcher
-from configuration.training import DualEntryConfig, DualInputTrialsConfig, DualRatioTrialsConfig, dual_curriculum
-from configuration.training.dual import _default_dual_input_trials, _default_dual_ratio_trials
+from configuration.training              import DualEntryConfig, DualInputTrialsConfig, DualRatioTrialsConfig, dual_curriculum
+from configuration.training.dual         import _default_dual_input_trials, _default_dual_ratio_trials
 from pipelines.dual.training.experiments import DualInputTrialPlanner, DualRatioTrialPlanner
-from pipelines.dual.training.pipeline import TrunkChannelMap
-from tools.runtime.config_cli import ConfigCli
+from pipelines.dual.training.pipeline    import TrunkChannelMap
+from tools.runtime.config_cli            import ConfigCli
 
 
 PARITY_FEATURES = [48, 96, 184, 352]
@@ -328,14 +328,14 @@ def test_dual_scheduler_forwards_only_non_scheduler_overrides(tmp_path):
     config.logdir = tmp_path
 
     overrides = {
-        "trials_enabled"                  : True,
-        "trials_mode"                     : "input",
-        "input_trials.params_features"    : [16, 32],
-        "ratio_trials.match_tolerance"    : 0.02,
-        "gpus"                            : [0, 1],
-        "poll_interval_s"                 : 1.0,
-        "training.max_epochs"             : 5,
-        "params_backbone"                 : "unet",
+        "trials_enabled"               : True,
+        "trials_mode"                  : "input",
+        "input_trials.params_features" : [16, 32],
+        "ratio_trials.match_tolerance" : 0.02,
+        "gpus"                         : [0, 1],
+        "poll_interval_s"              : 1.0,
+        "training.max_epochs"          : 5,
+        "params_backbone"              : "unet",
     }
 
     scheduler = dual_launcher.DualTrainScheduler(config=config, cli_overrides=overrides, entry_script=Path("/entry/train_dual.py"))

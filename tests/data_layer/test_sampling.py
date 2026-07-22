@@ -72,6 +72,6 @@ def test_sample_real_secondary_pixels(secondaries):
     idx     = Sampler.deterministic_indices(flat.shape[0], 100, seed=42)
     sampled = flat[idx]
 
-    assert idx.shape == (100,)
+    assert idx.shape     == (100,)
     assert sampled.shape == (100,)
     assert idx.max() < flat.shape[0]

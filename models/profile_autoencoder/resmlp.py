@@ -3,9 +3,9 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 
-from configuration.architectures import ResMlpAutoencoderConfig
-from models.profile_autoencoder.base                       import ProfileAutoencoderBase, ProfileAutoencoderBlocks
-from models.blocks                                         import build_activation
+from configuration.architectures     import ResMlpAutoencoderConfig
+from models.profile_autoencoder.base import ProfileAutoencoderBase, ProfileAutoencoderBlocks
+from models.blocks                   import build_activation
 
 
 class ResidualMlpBlock(nn.Module):

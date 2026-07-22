@@ -3,12 +3,12 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-from pipelines.comparison.trial_collector import TrialRecord
-from pipelines.shared.comparison.comparison_report    import ComparisonReportBase
-from tools.metrics.scoring                 import FiniteScalar, MetricOrientation
-from tools.reporting.markdown              import MarkdownTable, ScalarFormatter
-from tools.reporting.reporting             import MetricSectionGrouper, ReportAssets
-from tools.monitoring.logger               import Logger
+from pipelines.comparison.trial_collector          import TrialRecord
+from pipelines.shared.comparison.comparison_report import ComparisonReportBase
+from tools.metrics.scoring                         import FiniteScalar, MetricOrientation
+from tools.reporting.markdown                      import MarkdownTable, ScalarFormatter
+from tools.reporting.reporting                     import MetricSectionGrouper, ReportAssets
+from tools.monitoring.logger                       import Logger
 
 
 class TrialComparisonReport(ComparisonReportBase):

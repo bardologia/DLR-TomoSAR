@@ -9,13 +9,13 @@ matplotlib.use("Agg")
 import numpy as np
 import pytest
 
-from configuration.sar.processing_config import ProcessingConfig, PathConfig
+from configuration.sar.processing_config           import ProcessingConfig, PathConfig
 from pipelines.processing.generation.plots         import StackPlotter
 from pipelines.processing.generation.artifacts     import ArtifactRegistry, MetadataManager
 from pipelines.processing.generation.inference     import StackInferencePipeline
 from pipelines.processing.generation.distributions import ValueDistribution, StackDistributionAnalyzer
-from tools.data.regions import CropRegion
-from tools.monitoring.logger import Logger
+from tools.data.regions                            import CropRegion
+from tools.monitoring.logger                       import Logger
 
 
 CLIP = 1.25
@@ -82,10 +82,10 @@ def test_interferogram_phase_within_pi(interferograms, small_window):
 
 @pytest.mark.real_data
 def test_interferogram_phasor_unit_magnitude_where_active(secondaries, interferograms, small_window):
-    az, rg   = small_window
-    ifg      = np.array(interferograms[0][az, rg])
-    sec_amp  = np.clip(np.abs(np.array(secondaries[0][az, rg])), 0.0, CLIP)
-    active   = sec_amp > 1e-6
+    az, rg  = small_window
+    ifg     = np.array(interferograms[0][az, rg])
+    sec_amp = np.clip(np.abs(np.array(secondaries[0][az, rg])), 0.0, CLIP)
+    active  = sec_amp > 1e-6
 
     recovered_phasor_mag = np.abs(ifg[active]) / sec_amp[active]
 
@@ -191,9 +191,9 @@ def test_value_distribution_log_conserves_counts():
 
 
 def test_value_distribution_honours_fixed_range_and_nonfinite():
-    values      = np.array([-np.pi, 0.0, np.pi / 2, np.nan], dtype=np.float32)
-    result      = ValueDistribution(values, scale="linear", n_bins=8, value_range=(-np.pi, np.pi)).compute()
-    edges       = result["histogram"]["bin_edges"]
+    values = np.array([-np.pi, 0.0, np.pi / 2, np.nan], dtype=np.float32)
+    result = ValueDistribution(values, scale="linear", n_bins=8, value_range=(-np.pi, np.pi)).compute()
+    edges  = result["histogram"]["bin_edges"]
 
     assert result["statistics"]["n_nonfinite"] == 1
     assert result["statistics"]["count"]       == 3

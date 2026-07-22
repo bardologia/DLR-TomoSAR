@@ -7,7 +7,7 @@ import torch.nn as nn
 
 @dataclass
 class ImageAutoencoderBaseConfig:
-    in_channels : int = 1
+    in_channels: int = 1
 
     embedding_dim  : int = 24
     embedding_norm : str = "none"
@@ -51,7 +51,7 @@ class ImageAutoencoderBaseConfig:
 
 @dataclass
 class Conv2dImageAutoencoderConfig(ImageAutoencoderBaseConfig):
-    upsample_mode : str = "convtranspose"
+    upsample_mode: str = "convtranspose"
 
     @classmethod
     def tunable_arch_params(cls) -> dict:
@@ -84,7 +84,7 @@ class ResNet2dImageAutoencoderConfig(ImageAutoencoderBaseConfig):
 
 @dataclass
 class ConvNeXt2dImageAutoencoderConfig(ImageAutoencoderBaseConfig):
-    normalization     : str = "layernorm"
+    normalization: str = "layernorm"
 
     downsample_factor : int = 2
     upsample_mode     : str = "convtranspose"

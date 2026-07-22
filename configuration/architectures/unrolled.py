@@ -20,7 +20,7 @@ class GammaNetConfig:
     steps_wd : float = 0.0
     prox_wd  : float = 1e-4
 
-    shape_logger_types  : tuple           = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv1d, nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
     ))
 

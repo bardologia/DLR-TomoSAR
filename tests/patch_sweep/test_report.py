@@ -6,10 +6,10 @@ from pathlib import Path
 import pytest
 import torch
 
-from configuration.patch_sweep import PatchSweepConfig
+from configuration.patch_sweep     import PatchSweepConfig
 from pipelines.patch_sweep.planner import PatchSweepPlanner
-from pipelines.patch_sweep.report import PatchSweepReport, SweepCollector
-from tools.monitoring.logger import Logger
+from pipelines.patch_sweep.report  import PatchSweepReport, SweepCollector
+from tools.monitoring.logger       import Logger
 
 
 OPTIMA = {"w20_10": (24, 16), "w20_20": (16, 8)}

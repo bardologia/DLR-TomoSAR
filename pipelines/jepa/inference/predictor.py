@@ -97,10 +97,10 @@ class JepaCurvePredictor(Predictor):
         backend = "cuda" if torch.cuda.is_available() else "cpu"
         self.logger.section("[Inference: Predict]")
         self.logger.kv_table({
-            "Backend":    f"PyTorch / {backend}",
-            "Cube dir":   self.cube_dir,
-            "Window":     self.window_kind,
-            "Cube dtype": self.cube_dtype,
+            "Backend"    : f"PyTorch / {backend}",
+            "Cube dir"   : self.cube_dir,
+            "Window"     : self.window_kind,
+            "Cube dtype" : self.cube_dtype,
         })
 
         all_indices, all_pred, all_gt = self._forward_pass()

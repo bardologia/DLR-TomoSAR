@@ -6,7 +6,7 @@ from typing  import Tuple
 
 import numpy as np
 
-from configuration.sar.processing_config         import (
+from configuration.sar.processing_config  import (
     ParallelConfig,
     ProcessingConfig,
 )
@@ -65,8 +65,8 @@ class InterferogramProcessor:
         return primary, secondaries, interferograms
 
     def _extract_baselines(self, pass_directories: list, crop_tuple: Tuple[int, int, int, int]) -> Tuple[TrackBaselines, TrackProfiles]:
-        azimuth_window = (crop_tuple[0], crop_tuple[1])
-        extractor      = BaselineExtractor.from_pass_directories([str(p) for p in pass_directories], azimuth_window=azimuth_window)
+        azimuth_window  = (crop_tuple[0], crop_tuple[1])
+        extractor       = BaselineExtractor.from_pass_directories([str(p) for p in pass_directories], azimuth_window=azimuth_window)
         table, profiles = extractor.extract_with_profiles()
 
         self.logger.kv_table(table.describe(), title="Track Baselines")
@@ -91,7 +91,7 @@ class InterferogramProcessor:
             self.logger.subsection("[FSAR] Project options declare no 'suffix' entry — loading INF products without a coregistration suffix")
 
         self.logger.subsection("[FSAR] Loading primary SLC")
-        primary_slc  = getdata(
+        primary_slc = getdata(
             pyrat_module.load.fsar(
                 tomography_object.master,
                 product       = "RGI-SLC",

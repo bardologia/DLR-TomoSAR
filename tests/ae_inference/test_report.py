@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from pipelines.shared.inference.report import InferenceReportBase
-from pipelines.image_autoencoder.inference.report import ImageAeReport
+from pipelines.shared.inference.report              import InferenceReportBase
+from pipelines.image_autoencoder.inference.report   import ImageAeReport
 from pipelines.profile_autoencoder.inference.report import ProfileAeReport
 
 

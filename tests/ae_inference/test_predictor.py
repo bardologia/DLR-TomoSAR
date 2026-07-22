@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import torch
 
-from pipelines.autoencoder_common.inference.predictor import AeReconstructionPredictor, AeResult
-from pipelines.image_autoencoder.inference.predictor import ImageAePredictor, ImageAeResult
+from pipelines.autoencoder_common.inference.predictor  import AeReconstructionPredictor, AeResult
+from pipelines.image_autoencoder.inference.predictor   import ImageAePredictor, ImageAeResult
 from pipelines.profile_autoencoder.inference.predictor import ProfileAePredictor, ProfileAeResult
 
 

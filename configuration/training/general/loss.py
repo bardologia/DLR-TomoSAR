@@ -73,7 +73,7 @@ class LossConfig:
     weight_capon_cycle : float = 0.0
     capon_loading      : float = 1e-2
 
-    physics_floor            : float = 1e-3
+    physics_floor : float = 1e-3
 
 
 @dataclass
@@ -85,9 +85,9 @@ class LossCurriculumConfig:
     warmup   : LossConfig = field(default_factory=LossConfig)
     complete : LossConfig = field(default_factory=LossConfig)
 
-    reset_lr             : bool = False
-    reset_warmup         : bool = False
-    reset_optimizer      : bool = False
+    reset_lr        : bool = False
+    reset_warmup    : bool = False
+    reset_optimizer : bool = False
 
     @property
     def initial_stage(self) -> LossConfig:

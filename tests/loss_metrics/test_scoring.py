@@ -118,7 +118,7 @@ def test_relative_improvement_percent_string():
 
 @pytest.mark.real_data
 def test_r2_on_real_tomogram_self_is_one(tomogram_full):
-    win = np.abs(np.asarray(tomogram_full[:16, :8, :8])).astype(np.float64)
+    win  = np.abs(np.asarray(tomogram_full[:16, :8, :8])).astype(np.float64)
     pred = win.copy()
     out  = R2.pixel_map(pred, win, axis=0)
     assert np.allclose(out, 1.0, atol=1e-5)

@@ -6,9 +6,9 @@ import pytest
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from configuration.training               import UnrolledEntryConfig
-from models.unrolled                      import get_unrolled
-from pipelines.unrolled.training.trainer  import UnrolledTrainer
+from configuration.training              import UnrolledEntryConfig
+from models.unrolled                     import get_unrolled
+from pipelines.unrolled.training.trainer import UnrolledTrainer
 
 from tests.backbone_training._helpers import identity_normalizer, x_axis_numpy
 
@@ -41,12 +41,12 @@ def _loader(n: int = 2 * N_BATCH) -> DataLoader:
 def _entry_config(epochs: int = 2, warmup_steps: int = 4, use_ema: bool = True, reserve_vram: bool = False) -> UnrolledEntryConfig:
     config = UnrolledEntryConfig()
 
-    config.training.epochs            = epochs
-    config.training.warmup_enabled    = True
-    config.training.warmup_steps      = warmup_steps
-    config.training.use_ema           = use_ema
-    config.training.ema_decay         = 0.5
-    config.training.reserve_vram      = reserve_vram
+    config.training.epochs              = epochs
+    config.training.warmup_enabled      = True
+    config.training.warmup_steps        = warmup_steps
+    config.training.use_ema             = use_ema
+    config.training.ema_decay           = 0.5
+    config.training.reserve_vram        = reserve_vram
     config.training.early_stop_patience = 100
 
     return config

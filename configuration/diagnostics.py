@@ -11,8 +11,8 @@ class WeightXrayThresholds:
     dead_fraction_warn     : float = 0.50
     dead_fraction_critical : float = 0.95
 
-    dead_unit_norm_frac    : float = 1e-3
-    dead_unit_fraction_warn: float = 0.10
+    dead_unit_norm_frac     : float = 1e-3
+    dead_unit_fraction_warn : float = 0.10
 
     uniform_cv_threshold   : float = 0.05
     constant_std_threshold : float = 1e-9
@@ -32,8 +32,8 @@ class WeightXrayThresholds:
     init_ratio_low         : float = 0.10
     init_ratio_high        : float = 3.00
 
-    duplicate_cosine       : float = 0.999
-    duplicate_fraction_warn: float = 0.05
+    duplicate_cosine        : float = 0.999
+    duplicate_fraction_warn : float = 0.05
 
 
 @dataclass
@@ -51,8 +51,8 @@ class WeightXrayConfig:
     histogram_sample_max : int = 2_000_000
     max_layer_histograms : int = 24
 
-    make_plots    : bool = True
-    embed_images  : bool = False
+    make_plots   : bool = True
+    embed_images : bool = False
 
     @property
     def resolved_checkpoint_path(self) -> Path:
@@ -127,9 +127,9 @@ class WeightXrayEntryConfig:
 
 @dataclass
 class TensorboardExportConfig:
-    run_directory        : Path = Path("logs")
-    tensorboard_dirname  : str  = "tensorboard"
-    output_subdir        : str  = "tensorboard_plots"
+    run_directory       : Path = Path("logs")
+    tensorboard_dirname : str  = "tensorboard"
+    output_subdir       : str  = "tensorboard_plots"
 
     @property
     def tensorboard_directory(self) -> Path:

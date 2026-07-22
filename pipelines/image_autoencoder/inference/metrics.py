@@ -58,11 +58,11 @@ class ImageAeMetrics(AeMetricsBase):
 
     def compute(self) -> dict:
         metrics = {
-            "n_patches"      : int(self.n_patches),
-            "n_channels"     : int(self.n_channels),
-            "patch_height"   : int(self.gt.shape[2]),
-            "patch_width"    : int(self.gt.shape[3]),
-            "embedding_dim"  : int(self.emb.shape[1]),
+            "n_patches"     : int(self.n_patches),
+            "n_channels"    : int(self.n_channels),
+            "patch_height"  : int(self.gt.shape[2]),
+            "patch_width"   : int(self.gt.shape[3]),
+            "embedding_dim" : int(self.emb.shape[1]),
         }
 
         metrics.update(self._physical_errors())

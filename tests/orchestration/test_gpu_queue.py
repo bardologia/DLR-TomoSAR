@@ -199,8 +199,8 @@ def test_mixed_success_and_failure(tmp_path, logger):
     results = queue.run(jobs)
 
     by_name = {r.name: r for r in results}
-    assert by_name["good"].status == "DONE"
-    assert by_name["bad"].status  == "FAILED"
+    assert by_name["good"].status     == "DONE"
+    assert by_name["bad"].status      == "FAILED"
     assert by_name["bad"].returncode == 3
 
 
@@ -251,7 +251,7 @@ def test_reconcile_adds_requested_gpus_to_the_idle_pool(tmp_path):
     _write_pool(pool, [0, 1, 2])
     queue._reconcile(gpu_pool, [])
 
-    assert gpu_pool      == [0, 1, 2]
+    assert gpu_pool       == [0, 1, 2]
     assert queue.retiring == set()
 
 

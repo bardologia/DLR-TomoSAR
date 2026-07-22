@@ -7,9 +7,9 @@ import optuna
 
 import pipelines.tuning.trial as trial_mod
 
-from pipelines.tuning.tuners               import ParamSampler, BestConfigWriter, Tuner
-from pipelines.backbone.training.pipeline  import TrainingPipeline
-from configuration.architectures.backbone  import UNetConfig
+from pipelines.tuning.tuners              import ParamSampler, BestConfigWriter, Tuner
+from pipelines.backbone.training.pipeline import TrainingPipeline
+from configuration.architectures.backbone import UNetConfig
 
 
 FLOAT_SPACE = {

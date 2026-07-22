@@ -107,10 +107,10 @@ def test_window_that_does_not_wrap_the_week():
 def test_window_boundaries_are_inclusive_at_the_start_and_exclusive_at_the_end():
     window = WeekWindow(**{key: GpuSchedule.DEFAULTS[key] for key in ("start_day", "start_hour", "end_day", "end_hour")})
 
-    assert window.contains(datetime(2026, 7, 17, 18, 0)) is True
+    assert window.contains(datetime(2026, 7, 17, 18, 0))  is True
     assert window.contains(datetime(2026, 7, 17, 17, 59)) is False
-    assert window.contains(datetime(2026, 7, 20, 7, 59)) is True
-    assert window.contains(datetime(2026, 7, 20, 8, 0))  is False
+    assert window.contains(datetime(2026, 7, 20, 7, 59))  is True
+    assert window.contains(datetime(2026, 7, 20, 8, 0))   is False
 
 
 def test_default_night_window_spans_the_evening_to_the_next_morning():
@@ -217,7 +217,7 @@ def test_a_gpu_held_by_another_user_is_left_out_of_the_pool(schedule):
     scheduler.tick(WEDNESDAY)
     scheduler.tick(WEDNESDAY_NIGHT)
 
-    assert processes.writes                     == [("job1", [0, 2, 3])]
+    assert processes.writes                      == [("job1", [0, 2, 3])]
     assert scheduler.applied["job1"]["withheld"] == [1]
 
 
@@ -230,7 +230,7 @@ def test_our_own_processes_never_block_the_pool(schedule):
     scheduler.tick(WEDNESDAY)
     scheduler.tick(WEDNESDAY_NIGHT)
 
-    assert processes.writes                     == [("job1", [0, 1, 2, 3])]
+    assert processes.writes                      == [("job1", [0, 1, 2, 3])]
     assert scheduler.applied["job1"]["withheld"] == []
 
 

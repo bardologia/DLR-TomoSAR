@@ -6,16 +6,16 @@ from typing  import Optional, Tuple
 import numpy as np
 from torch.utils.data import DataLoader
 
-from configuration.dataset import DatasetConfig
+from configuration.dataset                      import DatasetConfig
 from tools.data.regions                         import CropRegion
 from pipelines.backbone.dataset.augmentation    import SpatialAugmenter
 from pipelines.backbone.dataset.datasets        import MultiRegionDataset, PatchDataset
-from pipelines.shared.dataset.loaders                   import Loader
+from pipelines.shared.dataset.loaders           import Loader
 from pipelines.backbone.dataset.normalizer      import Normalizer
 from pipelines.backbone.dataset.stats_computer  import StatsComputer
 from pipelines.backbone.dataset.spatial         import Cropper, Patcher
 from pipelines.backbone.dataset.metadata_writer import MetadataWriter
-from pipelines.shared.dataset.dataset_spatial           import Layout
+from pipelines.shared.dataset.dataset_spatial   import Layout
 from tools.data.gaussians                       import GaussianAxis
 from tools.monitoring.logger                    import Logger
 from tools.sar                                  import GeometryField
@@ -52,15 +52,15 @@ class DatasetPipeline:
         self.logger.section("[DatasetPipeline Initialized]")
         self.logger.kv_table(
             {
-                "Pre-processing Run"  : str(config.preprocessing_run_directory),
-                "Training Run"        : str(self.training_run_directory),
-                "Primary"             : f"use={ic.use_primary} rep={ic.primary_representation.value}",
-                "Secondaries"         : f"use={ic.use_secondaries} rep={ic.secondaries_representation.value}",
-                "Interferograms"      : f"use={ic.use_interferograms} rep={ic.interferograms_representation.value}",
-                "DEM"                 : f"use={ic.use_dem}",
-                "Output Parameters"   : ",".join(oc.role_names),
-                "Patch Size"          : config.patch.size,
-                "Patch Stride"        : config.patch.stride,
+                "Pre-processing Run" : str(config.preprocessing_run_directory),
+                "Training Run"       : str(self.training_run_directory),
+                "Primary"            : f"use={ic.use_primary} rep={ic.primary_representation.value}",
+                "Secondaries"        : f"use={ic.use_secondaries} rep={ic.secondaries_representation.value}",
+                "Interferograms"     : f"use={ic.use_interferograms} rep={ic.interferograms_representation.value}",
+                "DEM"                : f"use={ic.use_dem}",
+                "Output Parameters"  : ",".join(oc.role_names),
+                "Patch Size"         : config.patch.size,
+                "Patch Stride"       : config.patch.stride,
             },
             title="Dataset Creation",
         )

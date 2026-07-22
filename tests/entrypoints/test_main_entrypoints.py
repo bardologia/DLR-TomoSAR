@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from configuration.inference import BackboneInferenceEntryConfig
+from configuration.inference  import BackboneInferenceEntryConfig
 from tools.runtime.config_cli import ConfigCli
 
 
@@ -76,26 +76,26 @@ CLI_MODULES = (
 )
 
 ENTRY_CONFIGS = {
-    "infer_backbone"            : ("configuration.inference",          "BackboneInferenceEntryConfig"),
-    "infer_profile_autoencoder" : ("configuration.inference",          "ProfileAeInferenceEntryConfig"),
-    "infer_image_autoencoder"   : ("configuration.inference",          "ImageAeInferenceEntryConfig"),
-    "infer_unrolled"            : ("configuration.inference",          "UnrolledInferenceEntryConfig"),
-    "infer_dual"                : ("configuration.inference",          "DualInferenceEntryConfig"),
-    "pre_process"               : ("configuration.sar.processing_config",        "PreProcessEntryConfig"),
-    "extract_params"            : ("configuration.param_extraction", "ExtractParamsEntryConfig"),
-    "analyze_preprocessing"     : ("configuration.sar.processing_config", "PreprocessInferenceConfig"),
-    "analyze_param_extraction"  : ("configuration.param_extraction",      "ParamExtractionInferenceConfig"),
-    "tune"                      : ("configuration.tuning",                       "TuningEntryConfig"),
-    "tune_dataloader"           : ("configuration.benchmark.dataloader_tuning",  "DataLoaderTuningEntryConfig"),
-    "benchmark"                 : ("configuration.benchmark",                    "BenchmarkConfig"),
-    "cross_validate"            : ("configuration.cross_validation",             "CrossValidationConfig"),
-    "sweep_patches"             : ("configuration.patch_sweep",                  "PatchSweepConfig"),
-    "compare_runs"              : ("configuration.comparison",                   "ComparisonEntryConfig"),
-    "compare_trials"            : ("configuration.comparison",                   "TrialComparisonConfig"),
+    "infer_backbone"                  : ("configuration.inference",          "BackboneInferenceEntryConfig"),
+    "infer_profile_autoencoder"       : ("configuration.inference",          "ProfileAeInferenceEntryConfig"),
+    "infer_image_autoencoder"         : ("configuration.inference",          "ImageAeInferenceEntryConfig"),
+    "infer_unrolled"                  : ("configuration.inference",          "UnrolledInferenceEntryConfig"),
+    "infer_dual"                      : ("configuration.inference",          "DualInferenceEntryConfig"),
+    "pre_process"                     : ("configuration.sar.processing_config",        "PreProcessEntryConfig"),
+    "extract_params"                  : ("configuration.param_extraction", "ExtractParamsEntryConfig"),
+    "analyze_preprocessing"           : ("configuration.sar.processing_config", "PreprocessInferenceConfig"),
+    "analyze_param_extraction"        : ("configuration.param_extraction",      "ParamExtractionInferenceConfig"),
+    "tune"                            : ("configuration.tuning",                       "TuningEntryConfig"),
+    "tune_dataloader"                 : ("configuration.benchmark.dataloader_tuning",  "DataLoaderTuningEntryConfig"),
+    "benchmark"                       : ("configuration.benchmark",                    "BenchmarkConfig"),
+    "cross_validate"                  : ("configuration.cross_validation",             "CrossValidationConfig"),
+    "sweep_patches"                   : ("configuration.patch_sweep",                  "PatchSweepConfig"),
+    "compare_runs"                    : ("configuration.comparison",                   "ComparisonEntryConfig"),
+    "compare_trials"                  : ("configuration.comparison",                   "TrialComparisonConfig"),
     "compare_param_extraction_trials" : ("configuration.comparison",             "ParamExtractionComparisonConfig"),
     "compare_preprocessing_trials"    : ("configuration.comparison",             "PreprocessingComparisonConfig"),
-    "export_tensorboard_plots"  : ("configuration.diagnostics",                  "TensorboardExportEntryConfig"),
-    "collect_reports"           : ("configuration.diagnostics",                  "ReportCollectionEntryConfig"),
+    "export_tensorboard_plots"        : ("configuration.diagnostics",                  "TensorboardExportEntryConfig"),
+    "collect_reports"                 : ("configuration.diagnostics",                  "ReportCollectionEntryConfig"),
 }
 
 ENTRY_SCRIPTS = sorted(script for subdir in _SUBDIRS for script in (_MAIN_DIR / subdir).glob("*.py") if not script.stem.startswith("_"))

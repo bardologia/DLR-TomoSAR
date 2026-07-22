@@ -13,10 +13,9 @@ from pipelines.benchmark.stages import (
     SizeMatchStage,
     TrainingStage,
 )
-
-from configuration.benchmark import BenchmarkConfig
-from tools.data.io import FileIO
-from tools.orchestration import QueuedInferenceStage, QueuedTrainingStage
+from configuration.benchmark    import BenchmarkConfig
+from tools.data.io              import FileIO
+from tools.orchestration        import QueuedInferenceStage, QueuedTrainingStage
 
 
 class _SilentLogger:
@@ -116,12 +115,12 @@ def test_sizematch_reference_record_is_zero_deviation(config, logger_stub):
 @pytest.mark.real_data
 @pytest.mark.slow
 def test_sizematch_run_emits_reference_and_matched(monkeypatch, logger_stub, test_data_dir, tmp_path):
-    config                    = BenchmarkConfig()
+    config                       = BenchmarkConfig()
     config.paths.log_base_dir    = tmp_path
     config.paths.dataset_path    = test_data_dir
     config.paths.parameters_path = test_data_dir / "params" / "params_k5_lam0.01_sig4_sigma" / "parameters.npy"
-    config.resume             = False
-    config.skip_models        = []
+    config.resume                = False
+    config.skip_models           = []
 
     stage = SizeMatchStage(config=config, run_tag="t", models=["unet", "resunet"], logger=logger_stub)
 
@@ -170,8 +169,8 @@ def test_comparison_stage_run_invokes_collector_and_report(config, logger_stub, 
 
     class FakeCollector:
         def __init__(self, run_dir, logger):
-            collected["run_dir"]  = run_dir
-            self.seed_dispersion  = {"unet": {"n_seeds": 2}}
+            collected["run_dir"] = run_dir
+            self.seed_dispersion = {"unet": {"n_seeds": 2}}
         def collect(self):
             return []
 

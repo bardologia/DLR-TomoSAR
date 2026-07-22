@@ -14,13 +14,13 @@ from tests.jepa.conftest import EMBEDDING_DIM, N_GAUSSIANS, SPATIAL, make_autoen
 def build_loss(autoencoder, x_axis, norm_stats, profile_normalizer, emb_cfg, target_kind="stopgrad"):
     provider = TargetProvider(target_kind)
     return EmbeddingLoss(
-        autoencoder        = autoencoder,
-        target_provider    = provider,
-        embedding_cfg      = emb_cfg,
-        x_axis             = x_axis,
-        norm_stats         = norm_stats,
-        params_per_gaussian= 3,
-        profile_normalizer = profile_normalizer,
+        autoencoder         = autoencoder,
+        target_provider     = provider,
+        embedding_cfg       = emb_cfg,
+        x_axis              = x_axis,
+        norm_stats          = norm_stats,
+        params_per_gaussian = 3,
+        profile_normalizer  = profile_normalizer,
     )
 
 
@@ -31,8 +31,8 @@ def random_inputs(requires_grad=True):
 
 
 def test_loss_returns_finite_scalar(autoencoder, x_axis, norm_stats, profile_normalizer, embedding_loss_cfg):
-    loss        = build_loss(autoencoder, x_axis, norm_stats, profile_normalizer, embedding_loss_cfg)
-    z_hat, gt   = random_inputs()
+    loss      = build_loss(autoencoder, x_axis, norm_stats, profile_normalizer, embedding_loss_cfg)
+    z_hat, gt = random_inputs()
 
     out = loss(z_hat, gt)
 
@@ -100,11 +100,11 @@ def test_loss_increases_with_divergence(x_axis, norm_stats, profile_normalizer):
 def test_loss_curve_recon_flows_to_decoder(x_axis, norm_stats, profile_normalizer):
     autoencoder = make_autoencoder("none")
     emb_cfg     = EmbeddingLossConfig(
-        use_embedding_mse  = False,
+        use_embedding_mse    = False,
         weight_embedding_mse = 0.0,
-        use_curve_recon    = True,
-        weight_curve_recon = 1.0,
-        curve_kind         = "mse",
+        use_curve_recon      = True,
+        weight_curve_recon   = 1.0,
+        curve_kind           = "mse",
     )
     loss      = build_loss(autoencoder, x_axis, norm_stats, profile_normalizer, emb_cfg, target_kind="stopgrad")
     z_hat, gt = random_inputs()

@@ -3,22 +3,21 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from configuration.normalization               import ChannelStats, ChannelStrategy, NormMethod
-from configuration.sar.gaussian_config         import GaussianConfig
-from configuration.sar.geometry_config         import GeometryConfig
-from configuration.training.backbone           import BackboneTrainerConfig
-from configuration.training.general.loss       import LossConfig
-from pipelines.backbone.dataset.normalizer     import Normalizer
-from pipelines.backbone.dataset.stats           import Stats
-from pipelines.backbone.training.loss          import Loss
-from models                                    import get_backbone
-
 import tools
+from configuration.normalization           import ChannelStats, ChannelStrategy, NormMethod
+from configuration.sar.gaussian_config     import GaussianConfig
+from configuration.sar.geometry_config     import GeometryConfig
+from configuration.training.backbone       import BackboneTrainerConfig
+from configuration.training.general.loss   import LossConfig
+from pipelines.backbone.dataset.normalizer import Normalizer
+from pipelines.backbone.dataset.stats      import Stats
+from pipelines.backbone.training.loss      import Loss
+from models                                import get_backbone
 
 
-X_MIN  = -20.0
-X_MAX  = 80.0
-X_LEN  = 32
+X_MIN = -20.0
+X_MAX = 80.0
+X_LEN = 32
 
 
 def x_axis_tensor(length: int = X_LEN) -> torch.Tensor:
@@ -128,11 +127,11 @@ def tiny_model(in_channels: int = 2, n_gaussians: int = 2):
 def tiny_trainer_config(n_gaussians: int = 2, epochs: int = 1) -> BackboneTrainerConfig:
     cfg = BackboneTrainerConfig(gaussian=gaussian_config(n_gaussians))
 
-    cfg.io.writer                    = None
-    cfg.training.epochs              = epochs
+    cfg.io.writer                     = None
+    cfg.training.epochs               = epochs
     cfg.training.validation_frequency = 1
-    cfg.resources.enabled            = False
-    cfg.geometry                     = geometry_config()
+    cfg.resources.enabled             = False
+    cfg.geometry                      = geometry_config()
 
     cfg.curriculum.complete.use_param_l1    = True
     cfg.curriculum.complete.weight_param_l1 = 1.0

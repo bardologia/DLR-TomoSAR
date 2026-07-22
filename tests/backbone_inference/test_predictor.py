@@ -6,14 +6,14 @@ import numpy as np
 import pytest
 import torch
 
-from models.backbone import get_backbone
-from pipelines.backbone.dataset.spatial import Patcher
-from pipelines.backbone.inference.model_wrapper import ModelWrapper
+from models.backbone                                 import get_backbone
+from pipelines.backbone.dataset.spatial              import Patcher
+from pipelines.backbone.inference.model_wrapper      import ModelWrapper
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
-from pipelines.backbone.inference.metrics    import Result
-from pipelines.backbone.inference.predictor  import CubeStitcher, Predictor, SelectStitcher
-from tools.data.regions import CropRegion
-from configuration.inference import InferenceConfig
+from pipelines.backbone.inference.metrics            import Result
+from pipelines.backbone.inference.predictor          import CubeStitcher, Predictor, SelectStitcher
+from tools.data.regions                              import CropRegion
+from configuration.inference                         import InferenceConfig
 
 
 N_GAUSSIANS = 5
@@ -32,10 +32,10 @@ class _SilentLogger:
 
 
 class _NullProgress:
-    def __enter__(self):              return self
-    def __exit__(self, *a):           return False
-    def add_task(self, *a, **k):      return 0
-    def advance(self, *a, **k):       pass
+    def __enter__(self):         return self
+    def __exit__(self, *a):      return False
+    def add_task(self, *a, **k): return 0
+    def advance(self, *a, **k):  pass
 
 
 class _IdentityNormalizer:

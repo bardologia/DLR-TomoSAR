@@ -4,7 +4,7 @@ import json
 from dataclasses import asdict
 from pathlib     import Path
 
-from tools.reporting.markdown import MarkdownDoc, MarkdownTable
+from tools.reporting.markdown  import MarkdownDoc, MarkdownTable
 from tools.reporting.reporting import ReportAssets
 
 from configuration.diagnostics import WeightXrayConfig
@@ -15,8 +15,8 @@ SEVERITY_STYLE = {"critical": "err", "warning": "warn", "info": "muted", "ok": "
 
 class WeightXrayReport:
     def __init__(self, config: WeightXrayConfig) -> None:
-        self.config  = config
-        self.assets  = ReportAssets(config.report_directory, embed_images=config.embed_images)
+        self.config = config
+        self.assets = ReportAssets(config.report_directory, embed_images=config.embed_images)
 
     def _log_console(self, logger, reports: list, summary: dict) -> None:
         logger.kv_table({

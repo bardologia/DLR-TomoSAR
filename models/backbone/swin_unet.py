@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.architectures import SwinUNetConfig
-from ..blocks                          import DropPath, OutputHeadsMixin, build_activation, initialize_weights, match_spatial_size, scaled_dot_product, tokens_to_feature_map
+from ..blocks                    import DropPath, OutputHeadsMixin, build_activation, initialize_weights, match_spatial_size, scaled_dot_product, tokens_to_feature_map
 
 
 class WindowAttention(nn.Module):
@@ -61,10 +61,10 @@ class WindowAttention(nn.Module):
 
         if attention_mask is not None:
             num_windows    = attention_mask.shape[0]
-            mask_bias       = attention_mask.view(1, num_windows, 1, sequence_length, sequence_length)
-            mask_bias       = mask_bias.expand(batch_windows // num_windows, num_windows, 1, sequence_length, sequence_length)
-            mask_bias       = mask_bias.reshape(batch_windows, 1, sequence_length, sequence_length)
-            attention_bias  = attention_bias + mask_bias
+            mask_bias      = attention_mask.view(1, num_windows, 1, sequence_length, sequence_length)
+            mask_bias      = mask_bias.expand(batch_windows // num_windows, num_windows, 1, sequence_length, sequence_length)
+            mask_bias      = mask_bias.reshape(batch_windows, 1, sequence_length, sequence_length)
+            attention_bias = attention_bias + mask_bias
 
         attended  = scaled_dot_product(query, key, value, self.scale, self.attention_dropout, attention_bias).transpose(1, 2)
         attended  = attended.reshape(batch_windows, sequence_length, embedding_dim)

@@ -18,11 +18,11 @@ class PlotTools(PlotBase):
 
     def __init__(
         self,
-        cmap     : str  = "jet",
-        err_cmap : str  = "magma",
-        normalize: bool = False,
-        fig_dpi  : int  = 150,
-        save_dpi : int  = 150,
+        cmap      : str  = "jet",
+        err_cmap  : str  = "magma",
+        normalize : bool = False,
+        fig_dpi   : int  = 150,
+        save_dpi  : int  = 150,
     ) -> None:
 
         self.cmap      = cmap

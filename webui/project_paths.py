@@ -8,8 +8,8 @@ class ProjectPaths:
 
     PRIORITY        = ["conda:dlr-cu12", "conda:Dune", "conda:nazaria"]
     SCRIPT_PRIORITY = {
-        "generate_tomogram"        : ["conda:stetools"],
-        "generate_interferograms"  : ["conda:stetools"],
+        "generate_tomogram"       : ["conda:stetools"],
+        "generate_interferograms" : ["conda:stetools"],
     }
 
     ENTRY_OVERRIDES = {
@@ -70,48 +70,48 @@ class ProjectPaths:
     }
 
     def __init__(self) -> None:
-        self.webui_root  = Path(__file__).resolve().parent
-        self.repo_root   = self.webui_root.parent
-        self.main_dir    = self.repo_root / "main"
-        self.scripts_dir = self.repo_root / "scripts"
-        self.config_dir  = self.repo_root / "configuration"
-        self.static_dir  = self.webui_root / "static"
-        self.logs_dir    = self.repo_root / "logs"
+        self.webui_root     = Path(__file__).resolve().parent
+        self.repo_root      = self.webui_root.parent
+        self.main_dir       = self.repo_root / "main"
+        self.scripts_dir    = self.repo_root / "scripts"
+        self.config_dir     = self.repo_root / "configuration"
+        self.static_dir     = self.webui_root / "static"
+        self.logs_dir       = self.repo_root / "logs"
         self.gpu_guard_dir  = self.logs_dir / "gpu_guard"
         self.gpu_pools_dir  = self.logs_dir / "gpu_pools"
         self.saved_runs_dir = self.logs_dir / "saved_runs"
 
     SCRIPT_DIRS = {
-        "pre_process"               : "processing",
-        "extract_params"            : "processing",
-        "generate_tomogram"         : "processing",
-        "generate_interferograms"   : "processing",
-        "train_backbone"            : "training",
-        "train_profile_autoencoder" : "training",
-        "train_image_autoencoder"   : "training",
-        "train_jepa"                : "training",
-        "train_unrolled"            : "training",
-        "train_dual"                : "training",
-        "infer_backbone"            : "inference",
-        "infer_profile_autoencoder" : "inference",
-        "infer_image_autoencoder"   : "inference",
-        "infer_unrolled"            : "inference",
-        "infer_dual"                : "inference",
-        "benchmark"                 : "experiments",
-        "cross_validate"            : "experiments",
-        "sweep_patches"             : "experiments",
-        "tune"                      : "experiments",
-        "tune_dataloader"           : "experiments",
-        "analyze_preprocessing"     : "analysis",
-        "analyze_param_extraction"  : "analysis",
-        "compare_trials"            : "analysis",
+        "pre_process"                     : "processing",
+        "extract_params"                  : "processing",
+        "generate_tomogram"               : "processing",
+        "generate_interferograms"         : "processing",
+        "train_backbone"                  : "training",
+        "train_profile_autoencoder"       : "training",
+        "train_image_autoencoder"         : "training",
+        "train_jepa"                      : "training",
+        "train_unrolled"                  : "training",
+        "train_dual"                      : "training",
+        "infer_backbone"                  : "inference",
+        "infer_profile_autoencoder"       : "inference",
+        "infer_image_autoencoder"         : "inference",
+        "infer_unrolled"                  : "inference",
+        "infer_dual"                      : "inference",
+        "benchmark"                       : "experiments",
+        "cross_validate"                  : "experiments",
+        "sweep_patches"                   : "experiments",
+        "tune"                            : "experiments",
+        "tune_dataloader"                 : "experiments",
+        "analyze_preprocessing"           : "analysis",
+        "analyze_param_extraction"        : "analysis",
+        "compare_trials"                  : "analysis",
         "compare_preprocessing_trials"    : "analysis",
         "compare_param_extraction_trials" : "analysis",
-        "compare_runs"              : "analysis",
-        "compare_seeds"             : "analysis",
-        "xray_weights"              : "analysis",
-        "export_tensorboard_plots"  : "analysis",
-        "collect_reports"           : "analysis",
+        "compare_runs"                    : "analysis",
+        "compare_seeds"                   : "analysis",
+        "xray_weights"                    : "analysis",
+        "export_tensorboard_plots"        : "analysis",
+        "collect_reports"                 : "analysis",
     }
 
     def has_script(self, key: str) -> bool:

@@ -26,7 +26,7 @@ class DataLoaderTuningEntryConfig:
     timed_batches      : int = 60
     cpu_threads        : int = 8
 
-    data_wait_target : float = 0.05
+    data_wait_target: float = 0.05
 
     refine       : bool = True
     save_figures : bool = True

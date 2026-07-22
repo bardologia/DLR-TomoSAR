@@ -30,7 +30,7 @@ class UNetConfig:
     decoder_wd     : float = 1e-4
     output_head_wd : float = 1e-4
     
-    shape_logger_types  : tuple           = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
@@ -94,7 +94,7 @@ class ResUNetConfig:
     decoder_wd     : float = 1e-4
     output_head_wd : float = 1e-4
     
-    shape_logger_types  : tuple           = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
@@ -160,7 +160,7 @@ class UNetSkipConfig:
     decoder_wd     : float = 1e-4
     output_head_wd : float = 1e-4
 
-    shape_logger_types  : tuple           = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
@@ -227,7 +227,7 @@ class AttentionUNetConfig:
     decoder_wd     : float = 1e-4
     output_head_wd : float = 1e-4
     
-    shape_logger_types           : tuple     = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU, nn.Sigmoid,
@@ -302,7 +302,7 @@ class UNetPlusPlusConfig:
     decoder_wd     : float = 1e-4
     output_head_wd : float = 1e-4
     
-    shape_logger_types    : tuple     = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Upsample, nn.Dropout2d,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
@@ -375,7 +375,7 @@ class LinkNetConfig:
     decoder_wd     : float = 1e-4
     output_head_wd : float = 1e-4
     
-    shape_logger_types       : tuple     = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.Dropout2d,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
@@ -396,11 +396,11 @@ class LinkNetConfig:
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
-            "features"                : {"type": "indexed_categorical", "choices": [[64, 128, 256, 512], [152, 312, 624, 1248], [96, 192, 384, 768]]},
-            "initial_kernel_size"     : {"type": "categorical",         "choices": [3, 5, 7]},
-            "decoder_bottleneck_ratio": {"type": "categorical",         "choices": [2, 4, 8]},
-            "activation"              : {"type": "categorical",         "choices": ["relu", "leaky_relu", "gelu", "silu"]},
-            "normalization"           : {"type": "categorical",         "choices": ["batch", "instance", "group"]},
+            "features"                 : {"type": "indexed_categorical", "choices": [[64, 128, 256, 512], [152, 312, 624, 1248], [96, 192, 384, 768]]},
+            "initial_kernel_size"      : {"type": "categorical",         "choices": [3, 5, 7]},
+            "decoder_bottleneck_ratio" : {"type": "categorical",         "choices": [2, 4, 8]},
+            "activation"               : {"type": "categorical",         "choices": ["relu", "leaky_relu", "gelu", "silu"]},
+            "normalization"            : {"type": "categorical",         "choices": ["batch", "instance", "group"]},
         }
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:
@@ -439,7 +439,7 @@ class SwinUNetConfig:
     decoder_wd     : float = 1e-2
     output_head_wd : float = 1e-2
     
-    shape_logger_types    : tuple     = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.Linear, nn.LayerNorm, nn.GELU, nn.Dropout,
     ))
 
@@ -523,7 +523,7 @@ class TransUNetConfig:
     decoder_wd     : float = 5e-3
     output_head_wd : float = 5e-3
     
-    shape_logger_types    : tuple     = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Linear, nn.LayerNorm,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
@@ -616,7 +616,7 @@ class UNETRConfig:
     decoder_wd     : float = 5e-3
     output_head_wd : float = 5e-3
     
-    shape_logger_types    : tuple     = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.Linear, nn.LayerNorm,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.GELU, nn.SiLU,
@@ -699,7 +699,7 @@ class DeepLabV3PlusConfig:
     decoder_wd     : float = 1e-4
     output_head_wd : float = 1e-4
 
-    shape_logger_types  : tuple           = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.AdaptiveAvgPool2d, nn.Dropout2d,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
@@ -765,7 +765,7 @@ class SegFormerLiteConfig:
     decoder_wd     : float = 1e-2
     output_head_wd : float = 1e-2
 
-    shape_logger_types    : tuple     = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.Linear, nn.LayerNorm, nn.BatchNorm2d,
         nn.GELU, nn.ReLU, nn.SiLU, nn.Dropout, nn.Dropout2d,
     ))
@@ -828,7 +828,7 @@ class ConvNeXtUNetConfig:
     decoder_wd     : float = 5e-3
     output_head_wd : float = 5e-3
 
-    shape_logger_types    : tuple     = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.Linear, nn.LayerNorm,
         nn.GELU, nn.ReLU, nn.SiLU,
     ))
@@ -892,7 +892,7 @@ class DenseUNetConfig:
     decoder_wd     : float = 1e-4
     output_head_wd : float = 1e-4
 
-    shape_logger_types  : tuple           = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
@@ -956,7 +956,7 @@ class HRNetLiteConfig:
     decoder_wd     : float = 1e-4
     output_head_wd : float = 1e-4
 
-    shape_logger_types  : tuple = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.Dropout2d,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
@@ -1023,7 +1023,7 @@ class MultiResUNetConfig:
     decoder_wd     : float = 1e-4
     output_head_wd : float = 1e-4
 
-    shape_logger_types  : tuple           = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.ConvTranspose2d, nn.MaxPool2d, nn.Dropout2d,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
@@ -1087,7 +1087,7 @@ class FPNNetConfig:
     decoder_wd     : float = 1e-4
     output_head_wd : float = 1e-4
 
-    shape_logger_types  : tuple           = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.MaxPool2d, nn.Dropout2d,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
@@ -1154,7 +1154,7 @@ class U2NetLiteConfig:
     decoder_wd     : float = 1e-4
     output_head_wd : float = 1e-4
 
-    shape_logger_types  : tuple           = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.Dropout2d,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
@@ -1211,7 +1211,7 @@ class PixelMLPNetConfig:
     trunk_wd       : float = 1e-2
     output_head_wd : float = 1e-4
 
-    shape_logger_types  : tuple           = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.Dropout,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
@@ -1262,7 +1262,7 @@ class LocalCNNConfig:
     trunk_wd       : float = 1e-2
     output_head_wd : float = 1e-4
 
-    shape_logger_types  : tuple           = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.Dropout2d,
         nn.BatchNorm2d, nn.InstanceNorm2d, nn.GroupNorm,
         nn.ReLU, nn.LeakyReLU, nn.GELU, nn.ELU, nn.SiLU,
@@ -1318,7 +1318,7 @@ class NAFNetConfig:
     decoder_wd     : float = 1e-4
     output_head_wd : float = 1e-4
 
-    shape_logger_types  : tuple           = field(default_factory=lambda: (
+    shape_logger_types: tuple = field(default_factory=lambda: (
         nn.Conv2d, nn.PixelShuffle, nn.AdaptiveAvgPool2d,
         nn.LayerNorm, nn.Dropout,
     ))

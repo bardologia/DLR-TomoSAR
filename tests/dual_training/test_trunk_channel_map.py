@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import pytest
 
-from configuration.dataset             import InputConfig, Representation
-from pipelines.dual.training.pipeline  import TrunkChannelMap
+from configuration.dataset            import InputConfig, Representation
+from pipelines.dual.training.pipeline import TrunkChannelMap
 
 
 def test_full_stack_four_tracks_maps_trailing_ifg_block():

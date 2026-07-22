@@ -35,9 +35,9 @@ class ParameterCropper:
 
         self.logger.section(f"[Parameters Loaded: {split_name}]")
         self.logger.kv_table({
-            "Regions":      len(arrays),
-            "Channels":     int(arrays[0].shape[0]),
-            "Total pixels": f"{total_pixels:,}",
+            "Regions"      : len(arrays),
+            "Channels"     : int(arrays[0].shape[0]),
+            "Total pixels" : f"{total_pixels:,}",
         })
 
         return arrays

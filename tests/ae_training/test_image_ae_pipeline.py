@@ -9,20 +9,20 @@ import torch
 from torch.utils.data import DataLoader, TensorDataset
 
 from configuration.architectures.image_autoencoder import Conv2dImageAutoencoderConfig
-from configuration.training import ImageAeEntryConfig
-from configuration.training.general.runtime import ResourceConfig, TrainingLoopConfig
-from configuration.training.image_autoencoder import ImageAeLossConfig, ImageAeTrainerConfig
-from models.image_autoencoder import IMAGE_AE_CONFIG_REGISTRY
-from pipelines.image_autoencoder.training import pipeline as image_pipeline
-from pipelines.shared.config.run_metadata import TrainingRunMetadata
+from configuration.training                        import ImageAeEntryConfig
+from configuration.training.general.runtime        import ResourceConfig, TrainingLoopConfig
+from configuration.training.image_autoencoder      import ImageAeLossConfig, ImageAeTrainerConfig
+from models.image_autoencoder                      import IMAGE_AE_CONFIG_REGISTRY
+from pipelines.image_autoencoder.training          import pipeline as image_pipeline
+from pipelines.shared.config.run_metadata          import TrainingRunMetadata
 
 
 pytestmark = pytest.mark.slow
 
 
-IN_CHANNELS    = 2
-EMBEDDING_DIM  = 8
-PATCH          = 16
+IN_CHANNELS   = 2
+EMBEDDING_DIM = 8
+PATCH         = 16
 
 
 @pytest.fixture(autouse=True)

@@ -45,7 +45,7 @@ def test_spatial_flip_preserves_shape(tmp_path):
 def test_spatial_double_horizontal_flip_is_identity(tmp_path):
     x = np.random.default_rng(0).standard_normal((2, 8, 8)).astype(np.float32)
 
-    flipped = x[..., :, ::-1]
+    flipped  = x[..., :, ::-1]
     restored = flipped[..., :, ::-1]
 
     np.testing.assert_array_equal(restored, x)
