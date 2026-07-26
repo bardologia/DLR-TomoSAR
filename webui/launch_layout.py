@@ -687,18 +687,24 @@ class LaunchLayout:
                     {"kind": "fields", "title": "Physics geometry", "template": "geometry", "at": "geometry"},
                 ]},
                 {"key": "experiments", "title": "Experiments", "panels": [
-                    {"kind": "fields", "title": "Trunk trials", "groups": [
-                        {"title": None, "fields": [{"gate": "trials_enabled", "fields": [
-                            "trials_mode",
-                            "routing_trials.params_features", "routing_trials.existence_features",
-                            "routing_trials.trials",
-                            "ratio_trials.trials", "ratio_trials.match_tolerance",
-                        ]}]},
+                    {"kind": "special", "panel": "experiment_builder", "fields": [
+                        "trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "input_trials", "context_trials", "augmentation_trials",
+                        "head_trials.backbone", "head_trials.heads", "head_trials.matchings",
+                        "normalization_trials.initial_pass_mag", "normalization_trials.initial_ifg_phase", "normalization_trials.initial_out_amp", "normalization_trials.initial_out_sigma",
+                        "normalization_trials.final_pass_mag", "normalization_trials.final_ifg_phase", "normalization_trials.final_out_amp", "normalization_trials.final_out_sigma",
+                        "physics_trials.components", "physics_trials.weights", "physics_trials.curriculum_states", "physics_trials.include_baseline",
+                        "pair_trials.base_component", "pair_trials.base_weight", "pair_trials.components", "pair_trials.weights", "pair_trials.include_baseline",
+                        "secondary_trials.strategy", "secondary_trials.n_secondaries", "secondary_trials.n_trials", "secondary_trials.mean",
+                        "secondary_trials.sigma", "secondary_trials.block_step", "secondary_trials.spacing", "secondary_trials.seed",
+                        "patch_trials.sizes", "patch_trials.stride_ratio", "patch_trials.find_max_batch", "patch_trials.scale_lr",
+                        "reach_trials.rungs", "reach_trials.patch_size", "reach_trials.patch_stride", "reach_trials.in_channels", "reach_trials.match_tolerance",
+                        "routing_trials.params_features", "routing_trials.existence_features", "routing_trials.trials",
+                        "ratio_trials.trials", "ratio_trials.match_tolerance",
                     ]},
                     {"kind": "fields", "groups": [
                         {"title": "Fan-out execution", "fields": ["poll_interval_s"]},
                     ]},
-                    {"kind": "hidden", "fields": ["gpus_file"]},
+                    {"kind": "hidden", "fields": ["ablation_features", "ablation_include_full", "gpus_file"]},
                 ]},
                 {"key": "inference", "title": "Inference", "panels": [
                     {"kind": "fields", "groups": [{"title": "After training", "fields": ["infer_after"]}]},

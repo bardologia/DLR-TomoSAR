@@ -1,6 +1,100 @@
 from __future__ import annotations
 
-from models.dual import get_dual
+from models.dual                             import get_dual
+from pipelines.backbone.training.experiments import ContextTrialPlanner, HeadMatchingTrialPlanner, ReachTrialPlanner
+from pipelines.shared.model.model_builder    import ModelBuilder
+
+
+class DualContextTrialPlanner(ContextTrialPlanner):
+
+    def _settings(self, trial: dict) -> dict:
+        overrides = self._overrides(trial)
+        features  = overrides.pop("features", None)
+        features  = list(features) if features else []
+
+        settings = {
+            "params_backbone"    : trial["backbone"],
+            "existence_backbone" : trial["backbone"],
+            "model_overrides"    : {"params_features": features, "existence_features": features},
+        }
+
+        if overrides:
+            settings["params_overrides"]    = dict(overrides)
+            settings["existence_overrides"] = dict(overrides)
+
+        return settings
+
+
+class DualHeadMatchingTrialPlanner(HeadMatchingTrialPlanner):
+
+    def plan(self) -> list[tuple[str, dict]]:
+        plans = []
+
+        for head in self.trials.heads:
+            for matching in self.trials.matchings:
+                run_name  = f"hm-{head}-{matching}"
+                overrides = {
+                    "params_backbone"                    : self.trials.backbone,
+                    "existence_backbone"                 : self.trials.backbone,
+                    "curriculum.warmup.param_matching"   : matching,
+                    "curriculum.complete.param_matching" : matching,
+                }
+                plans.append((run_name, overrides))
+
+        return plans
+
+
+class DualReachTrialPlanner(ReachTrialPlanner):
+
+    def __init__(self, trials, registry_names: tuple, expected_in_channels: int, model_name: str, trunk_channels: tuple) -> None:
+        self.model_name     = model_name
+        self.trunk_channels = tuple(trunk_channels)
+
+        super().__init__(trials, registry_names, "set_pred", expected_in_channels)
+
+    def _trunk_features(self, rung: dict) -> list[int]:
+        features = rung.get("features")
+        return list(features) if features else []
+
+    def _parameters(self, rung: dict) -> int:
+        overrides = self._overrides(rung)
+        overrides.pop("features", None)
+        features = self._trunk_features(rung)
+        sizing   = ModelBuilder.image_size_override(rung["backbone"], self.trials.patch_size)
+
+        model, _ = get_dual(
+            self.model_name,
+            in_channels         = self.trials.in_channels,
+            params_backbone     = rung["backbone"],
+            existence_backbone  = rung["backbone"],
+            params_channels     = self.trunk_channels[0],
+            existence_channels  = self.trunk_channels[1],
+            params_features     = features,
+            existence_features  = features,
+            params_overrides    = {**overrides, **sizing},
+            existence_overrides = {**overrides, **sizing},
+        )
+
+        return sum(parameter.numel() for parameter in model.parameters())
+
+    def _settings(self, rung: dict) -> dict:
+        overrides = self._overrides(rung)
+        overrides.pop("features", None)
+        features = self._trunk_features(rung)
+
+        settings = {
+            "params_backbone"       : rung["backbone"],
+            "existence_backbone"    : rung["backbone"],
+            "training.patch_size"   : tuple(self.trials.patch_size),
+            "training.patch_stride" : tuple(self.trials.patch_stride),
+            "model_overrides"       : {"params_features": features, "existence_features": features},
+        }
+
+        if overrides:
+            settings["params_overrides"]    = dict(overrides)
+            settings["existence_overrides"] = dict(overrides)
+
+        return settings
 
 
 class DualRoutingTrialPlanner:

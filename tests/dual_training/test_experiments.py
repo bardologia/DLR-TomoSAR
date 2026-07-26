@@ -5,9 +5,11 @@ from pathlib import Path
 import pytest
 
 import pipelines.dual.training.launcher as dual_launcher
-from configuration.training              import DualEntryConfig, DualRatioTrialsConfig, DualRoutingTrialsConfig, dual_curriculum
-from configuration.training.dual         import _default_dual_ratio_trials, _default_dual_routing_trials
-from pipelines.dual.training.experiments import DualRatioTrialPlanner, DualRoutingTrialPlanner
+from configuration.training                  import DualEntryConfig, DualRatioTrialsConfig, DualRoutingTrialsConfig, dual_curriculum
+from configuration.training.backbone         import HeadMatchingTrialsConfig, ReachTrialsConfig
+from configuration.training.dual             import _default_dual_ratio_trials, _default_dual_routing_trials
+from configuration.training.general.ablation import AblationCatalog
+from pipelines.dual.training.experiments     import DualContextTrialPlanner, DualHeadMatchingTrialPlanner, DualRatioTrialPlanner, DualReachTrialPlanner, DualRoutingTrialPlanner
 from pipelines.dual.training.pipeline    import TrunkChannelMap
 from tools.runtime.config_cli            import ConfigCli
 
@@ -270,8 +272,9 @@ def test_dual_single_runner_rejects_trunk_fields_in_model_overrides():
 
 
 def test_dual_scheduler_houses_runs_in_routing_dir(tmp_path):
-    config        = DualEntryConfig()
-    config.logdir = tmp_path
+    config             = DualEntryConfig()
+    config.logdir      = tmp_path
+    config.trials_mode = "routing"
 
     scheduler = dual_launcher.DualTrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_dual.py"))
 
@@ -285,8 +288,9 @@ def test_dual_scheduler_houses_runs_in_routing_dir(tmp_path):
 
 
 def test_dual_scheduler_plans_the_trunk_input_grid(tmp_path):
-    config        = DualEntryConfig()
-    config.logdir = tmp_path
+    config             = DualEntryConfig()
+    config.logdir      = tmp_path
+    config.trials_mode = "routing"
 
     scheduler = dual_launcher.DualTrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_dual.py"))
 
@@ -317,9 +321,9 @@ def test_dual_scheduler_houses_ratio_runs_in_ratio_dir_and_plans_the_split_grid(
 def test_dual_scheduler_rejects_unknown_mode(tmp_path):
     config             = DualEntryConfig()
     config.logdir      = tmp_path
-    config.trials_mode = "context"
+    config.trials_mode = "bogus"
 
-    with pytest.raises(ValueError, match="Unknown trials_mode 'context'"):
+    with pytest.raises(ValueError, match="Unknown trials_mode 'bogus'"):
         dual_launcher.DualTrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_dual.py"))
 
 
@@ -446,3 +450,133 @@ def test_dual_launcher_fans_out_when_trials_enabled(monkeypatch):
     assert ran.get("scheduler_ran") is True
     assert ran["entry_script"] == entry
     assert "single_ran" not in ran
+
+
+def _scheduler(tmp_path, mode):
+    config             = DualEntryConfig()
+    config.logdir      = tmp_path
+    config.trials_mode = mode
+
+    return dual_launcher.DualTrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_dual.py"))
+
+
+def test_dual_scheduler_opens_every_backbone_mode():
+    modes = set(dual_launcher.DualTrainScheduler.MODE_SUBDIRS)
+
+    assert set(dual_launcher.TrainScheduler.MODE_SUBDIRS) <= modes
+    assert {"routing", "ratio"} <= modes
+
+
+def test_dual_scheduler_reuses_backbone_planners_for_shared_modes(tmp_path):
+    scheduler = _scheduler(tmp_path, "curriculum")
+
+    assert scheduler.runs_root == tmp_path / "curriculum"
+
+    plans = dict(scheduler.planner().plan())
+
+    assert "w-pL11_c-pL11-cos0.05" in plans
+    assert plans["w-pL11_c-pL11-cos0.05"]["curriculum.enabled"] is True
+
+
+def test_dual_context_planner_applies_the_rung_to_both_trunks():
+    rung    = {"label": "cnn09", "backbone": "local_cnn", "features": [8] * 10, "block_kernels": [3] * 2 + [1] * 8}
+    planner = DualContextTrialPlanner([rung], ("local_cnn",))
+
+    plans     = dict(planner.plan())
+    overrides = plans["ctx-cnn09"]
+
+    assert overrides["params_backbone"]     == "local_cnn"
+    assert overrides["existence_backbone"]  == "local_cnn"
+    assert overrides["model_overrides"]     == {"params_features": [8] * 10, "existence_features": [8] * 10}
+    assert overrides["params_overrides"]    == {"block_kernels": [3] * 2 + [1] * 8}
+    assert overrides["existence_overrides"] == {"block_kernels": [3] * 2 + [1] * 8}
+
+
+def test_dual_context_overrides_round_trip_through_the_cli(tmp_path):
+    scheduler          = _scheduler(tmp_path, "context")
+    run_name, override = scheduler.planner().plan()[1]
+
+    config = ConfigCli(DualEntryConfig()).apply(ConfigCli.to_argv(override))
+
+    assert run_name                  == "ctx-cnn09"
+    assert config.params_backbone    == "local_cnn"
+    assert config.existence_backbone == "local_cnn"
+    assert config.params_overrides   == {"block_kernels": [3] * 2 + [1] * 8}
+    assert config.model_overrides["params_features"] == config.model_overrides["existence_features"]
+
+
+def test_dual_head_planner_holds_set_pred_and_sweeps_matchings():
+    trials  = HeadMatchingTrialsConfig(backbone="unet_skip", heads=["set_pred"], matchings=["sorted_gt", "hungarian"])
+    planner = DualHeadMatchingTrialPlanner(trials, ("unet_skip",), ("set_pred",), ("sorted_gt", "hungarian"))
+
+    plans = dict(planner.plan())
+
+    assert list(plans) == ["hm-set_pred-sorted_gt", "hm-set_pred-hungarian"]
+    assert plans["hm-set_pred-hungarian"] == {
+        "params_backbone"                    : "unet_skip",
+        "existence_backbone"                 : "unet_skip",
+        "curriculum.warmup.param_matching"   : "hungarian",
+        "curriculum.complete.param_matching" : "hungarian",
+    }
+
+
+def test_dual_head_planner_rejects_heads_the_dual_model_lacks():
+    trials = HeadMatchingTrialsConfig(backbone="unet_skip", heads=["conv", "set_pred"], matchings=["hungarian"])
+
+    with pytest.raises(ValueError, match="registered heads"):
+        DualHeadMatchingTrialPlanner(trials, ("unet_skip",), ("set_pred",), ("hungarian",))
+
+
+def test_dual_reach_planner_counts_whole_dual_models_and_emits_trunk_settings():
+    rungs  = [
+        {"label": "cnn",  "backbone": "local_cnn", "features": [64] * 2},
+        {"label": "unet", "backbone": "unet",      "features": [8, 16]},
+    ]
+    trials = ReachTrialsConfig(rungs=rungs, match_tolerance=10.0)
+
+    planner = DualReachTrialPlanner(trials, ("local_cnn", "unet"), 9, "dual_resunet", (tuple(range(9)), tuple(range(9))))
+
+    assert set(planner.parameter_counts) == {"cnn", "unet"}
+    assert all(count > 0 for count in planner.parameter_counts.values())
+
+    plans     = dict(planner.plan())
+    overrides = plans["reach-cnn"]
+
+    assert overrides["params_backbone"]    == "local_cnn"
+    assert overrides["existence_backbone"] == "local_cnn"
+    assert overrides["model_overrides"]    == {"params_features": [64] * 2, "existence_features": [64] * 2}
+    assert overrides["training.patch_size"] == (32, 32)
+
+
+def test_dual_reach_default_rungs_hold_the_capacity_match():
+    config  = DualEntryConfig()
+    planner = DualReachTrialPlanner(config.reach_trials, ("local_cnn", "unet"), 9, "dual_resunet", (tuple(range(9)), tuple(range(9))))
+
+    assert set(planner.parameter_counts) == {"cnn33", "unet"}
+
+
+def test_dual_ablation_catalog_swaps_the_backbone_only_rungs():
+    features = {feature["label"]: feature for feature in AblationCatalog.dual_default_features()}
+
+    assert features["architecture_param_loss"]["enable"]["params_backbone"]     == "unet_skip"
+    assert features["architecture_param_loss"]["enable"]["existence_backbone"]  == "unet_skip"
+    assert features["architecture_param_loss"]["degrade"]["params_backbone"]    == "unet"
+    assert features["architecture_param_loss"]["degrade"]["existence_backbone"] == "unet"
+    assert list(features["lr_per_group"]["enable"]["model_overrides"]) == ["params_trunk_lr", "existence_trunk_lr", "output_head_lr"]
+
+    dual_order    = [feature["label"] for feature in AblationCatalog.dual_default_features()]
+    default_order = [feature["label"] for feature in AblationCatalog.default_features()]
+
+    assert dual_order == default_order
+
+
+def test_dual_ablation_override_paths_are_dual_entry_leaves():
+    config = DualEntryConfig()
+
+    for feature in config.ablation_features:
+        for overrides in (feature["enable"], feature["degrade"]):
+            for path in overrides:
+                node = config
+                for part in path.split(".")[:-1]:
+                    node = getattr(node, part)
+                assert hasattr(node, path.split(".")[-1]), path

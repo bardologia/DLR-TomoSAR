@@ -8,7 +8,8 @@ from configuration.dataset                      import AugmentationConfig, Input
 from configuration.inference.general            import InferenceConfig
 from configuration.sar.geometry_config          import GeometryConfig
 from configuration.normalization.general        import NormalizationConfig
-from configuration.training.backbone            import _default_inference, default_curriculum
+from configuration.training.backbone            import HeadMatchingTrialsConfig, NormalizationTrialsConfig, PairTrialsConfig, PatchTrialsConfig, PhysicsTrialsConfig, ReachTrialsConfig, SecondaryTrialsConfig, _default_augmentation_trials, _default_complete_losses, _default_context_trials, _default_inference, _default_input_trials, _default_presence_trials, _default_warmup_losses, default_curriculum
+from configuration.training.general.ablation    import AblationCatalog
 from configuration.training.general.loss        import LossCurriculumConfig, ParamMatching
 from configuration.training.general.runtime     import OverfitCheckConfig
 from configuration.training.general.pretraining import PretrainConfig
@@ -51,6 +52,21 @@ def _default_dual_ratio_trials() -> dict:
         "80-20" : {"params": [60, 124, 236, 444],        "existence": [28, 52, 116, 224]},
         "90-10" : {"params": [64, 128, 248, 472],        "existence": [24, 48, 84, 156]},
     }
+
+
+def _default_dual_head_trials() -> HeadMatchingTrialsConfig:
+    return HeadMatchingTrialsConfig(backbone="unet_skip", heads=["set_pred"], matchings=["sorted_gt", "hungarian"])
+
+
+def _default_dual_reach_rungs() -> list:
+    return [
+        {"label" : "cnn33", "backbone" : "local_cnn", "features" : [478] * 8, "dropout" : 0.15, "trunk_wd" : 1e-4},
+        {"label" : "unet",  "backbone" : "unet",      "dropout" : 0.15},
+    ]
+
+
+def _default_dual_reach_trials() -> ReachTrialsConfig:
+    return ReachTrialsConfig(rungs=_default_dual_reach_rungs())
 
 
 @dataclass
@@ -103,10 +119,26 @@ class DualEntryConfig:
     infer_after : bool            = False
     inference   : InferenceConfig = field(default_factory=_default_inference)
 
-    trials_enabled : bool                    = False
-    trials_mode    : str                     = "routing"
-    routing_trials : DualRoutingTrialsConfig = field(default_factory=DualRoutingTrialsConfig)
-    ratio_trials   : DualRatioTrialsConfig   = field(default_factory=DualRatioTrialsConfig)
+    trials_enabled       : bool                      = False
+    trials_mode          : str                       = "curriculum"
+    warmup_losses        : dict                      = field(default_factory=_default_warmup_losses)
+    complete_losses      : dict                      = field(default_factory=_default_complete_losses)
+    presence_trials      : dict                      = field(default_factory=_default_presence_trials)
+    physics_trials       : PhysicsTrialsConfig       = field(default_factory=PhysicsTrialsConfig)
+    pair_trials          : PairTrialsConfig          = field(default_factory=PairTrialsConfig)
+    secondary_trials     : SecondaryTrialsConfig     = field(default_factory=SecondaryTrialsConfig)
+    patch_trials         : PatchTrialsConfig         = field(default_factory=PatchTrialsConfig)
+    input_trials         : dict                      = field(default_factory=_default_input_trials)
+    context_trials       : list                      = field(default_factory=_default_context_trials)
+    reach_trials         : ReachTrialsConfig         = field(default_factory=_default_dual_reach_trials)
+    head_trials          : HeadMatchingTrialsConfig  = field(default_factory=_default_dual_head_trials)
+    augmentation_trials  : dict                      = field(default_factory=_default_augmentation_trials)
+    normalization_trials : NormalizationTrialsConfig = field(default_factory=NormalizationTrialsConfig)
+    routing_trials       : DualRoutingTrialsConfig   = field(default_factory=DualRoutingTrialsConfig)
+    ratio_trials         : DualRatioTrialsConfig     = field(default_factory=DualRatioTrialsConfig)
+
+    ablation_features     : list = field(default_factory=AblationCatalog.dual_default_features)
+    ablation_include_full : bool = True
 
     gpus            : list[int] = field(default_factory=lambda: [0, 1, 3])
     gpus_file       : str       = ""
