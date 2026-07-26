@@ -39,16 +39,16 @@ class RunNaming:
         return letters or "none"
 
     @classmethod
-    def stem(cls, model_name: str, head: str, loss: LossConfig, n_gaussians: int, augmentation: AugmentationConfig) -> str:
-        return "-".join((model_name, head, cls.matching_tag(loss), cls.gaussians_tag(n_gaussians), cls.augmentation_tag(augmentation), cls.presence_tag(loss)))
+    def stem(cls, model_name: str, head: str, loss: LossConfig, n_gaussians: int, augmentation: AugmentationConfig, extras: tuple = ()) -> str:
+        return "-".join((model_name, head, cls.matching_tag(loss), cls.gaussians_tag(n_gaussians), cls.augmentation_tag(augmentation), cls.presence_tag(loss), *extras))
 
     @classmethod
-    def tag(cls, model_name: str, head: str, loss: LossConfig, n_gaussians: int, augmentation: AugmentationConfig) -> str:
-        return f"{cls.stem(model_name, head, loss, n_gaussians, augmentation)}-{cls.loss_tag(loss)}"
+    def tag(cls, model_name: str, head: str, loss: LossConfig, n_gaussians: int, augmentation: AugmentationConfig, extras: tuple = ()) -> str:
+        return f"{cls.stem(model_name, head, loss, n_gaussians, augmentation, extras)}-{cls.loss_tag(loss)}"
 
     @classmethod
-    def training_tag(cls, model_name: str, head: str, curriculum: LossCurriculumConfig, n_gaussians: int, augmentation: AugmentationConfig) -> str:
-        return cls.tag(model_name, head, curriculum.active_stages()[-1], n_gaussians, augmentation)
+    def training_tag(cls, model_name: str, head: str, curriculum: LossCurriculumConfig, n_gaussians: int, augmentation: AugmentationConfig, extras: tuple = ()) -> str:
+        return cls.tag(model_name, head, curriculum.active_stages()[-1], n_gaussians, augmentation, extras)
 
     @classmethod
     def benchmark_unit(cls, model_key: str, component: str | None, loss: LossConfig, n_gaussians: int, augmentation: AugmentationConfig) -> str:

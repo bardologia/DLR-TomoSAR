@@ -34,10 +34,32 @@ class TrunkChannelMap:
 
         return input_config.channel_group_keys(counts[0], counts[0])
 
+    @classmethod
+    def group_label(cls, groups: tuple) -> str:
+        unknown = [group for group in groups if group not in cls.GROUPS]
+        if unknown:
+            raise ValueError(f"Unknown input groups {unknown}. Available: {list(cls.GROUPS)}")
+
+        ordered = tuple(group for group in cls.GROUPS if group in groups)
+        if not ordered:
+            raise ValueError("Cannot label an empty trunk input selection")
+
+        return "full" if ordered == cls.GROUPS else ordered[0]
+
 
 class DualTrainingPipeline(TrainingPipeline):
 
     MODEL_CONFIG_IO = DualModelConfigIO
+
+    def _build_model(self, in_channels: int, out_channels: int):
+        model, model_cfg = super()._build_model(in_channels, out_channels)
+
+        params_arm    = sum(p.numel() for name, p in model.named_parameters() if name.startswith(("trunk_params.", "gaussian_heads.")))
+        existence_arm = sum(p.numel() for name, p in model.named_parameters() if not name.startswith(("trunk_params.", "gaussian_heads.")))
+
+        self.logger.subsection(f"Params Trunk : {model_cfg.params_backbone} | input {'+'.join(model_cfg.params_input)} | channels {list(model_cfg.params_channels)} | features {list(model_cfg.params_features)} | {params_arm:,} params")
+        self.logger.subsection(f"Exist Trunk  : {model_cfg.existence_backbone} | input {'+'.join(model_cfg.existence_input)} | channels {list(model_cfg.existence_channels)} | features {list(model_cfg.existence_features)} | {existence_arm:,} params")
+        return model, model_cfg
 
     def _model_overrides(self, in_channels: int, out_channels: int) -> dict:
         model_config = self.model_config if self.model_config is not None else DualResUNetConfig()

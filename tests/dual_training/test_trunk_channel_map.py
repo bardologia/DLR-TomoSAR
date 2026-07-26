@@ -72,3 +72,20 @@ def test_inconsistent_channel_count_rejected():
 
     with pytest.raises(ValueError, match="unique track count"):
         TrunkChannelMap.resolve(input_config, in_channels=2, groups=("ifg",))
+
+
+def test_group_label_names_the_selection():
+    assert TrunkChannelMap.group_label(("pass", "ifg")) == "full"
+    assert TrunkChannelMap.group_label(("ifg", "pass")) == "full"
+    assert TrunkChannelMap.group_label(("pass",))       == "pass"
+    assert TrunkChannelMap.group_label(("ifg",))        == "ifg"
+
+
+def test_group_label_rejects_unknown_groups():
+    with pytest.raises(ValueError, match="Unknown input groups"):
+        TrunkChannelMap.group_label(("dem",))
+
+
+def test_group_label_rejects_empty_selection():
+    with pytest.raises(ValueError, match="empty trunk input"):
+        TrunkChannelMap.group_label(())

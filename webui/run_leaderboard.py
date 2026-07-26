@@ -14,6 +14,7 @@ class RunAxes:
 
     TIMESTAMP = re.compile(r"_(\d{8}_\d{6})")
     K_TAG     = re.compile(r"^K_(\d+)$")
+    INPUT_TAG = re.compile(r"^([a-z]+\.[a-z]+)-")
     LOSS_TAG  = re.compile(r"([a-z0-9_]+?)_(\d+(?:\.\d+)?(?:e-?\d+)?)(?:-|$)")
 
     @classmethod
@@ -31,7 +32,11 @@ class RunAxes:
         if k_match is None:
             return None
 
-        loss_tag = parts[6]
+        loss_tag    = parts[6]
+        input_match = cls.INPUT_TAG.match(loss_tag)
+        inputs      = input_match.group(1) if input_match else ""
+        loss_tag    = loss_tag[input_match.end():] if input_match else loss_tag
+
         losses   = []
         position = 0
         while position < len(loss_tag):
@@ -51,6 +56,7 @@ class RunAxes:
             "k"         : int(k_match.group(1)),
             "aug"       : parts[4],
             "presence"  : parts[5],
+            "inputs"    : inputs,
             "loss"      : loss_tag,
             "losses"    : losses,
             "timestamp" : timestamp,

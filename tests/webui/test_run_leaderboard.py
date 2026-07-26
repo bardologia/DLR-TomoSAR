@@ -383,3 +383,18 @@ def test_table_sorted_by_mtime_desc(tmp_path):
     result = RunLeaderboard(WebLogger()).table(str(tmp_path))
 
     assert [row["stamp"] for row in result["rows"]] == ["20260702_000000", "20260701_000000"]
+
+
+def test_axes_parse_dual_input_token():
+    axes = RunAxes.parse("dual_resunet-set_pred-hungarian-K_2-hv-A-full.ifg-param_l1_1_20260726_120000")
+
+    assert axes["model"]  == "dual_resunet"
+    assert axes["inputs"] == "full.ifg"
+    assert axes["loss"]   == "param_l1_1"
+    assert axes["losses"] == [{"name": "param_l1", "weight": 1.0}]
+
+
+def test_axes_parse_input_token_absent_on_single_trunk_names():
+    axes = RunAxes.parse(STANDARD_NAME)
+
+    assert axes["inputs"] == ""

@@ -11,6 +11,7 @@ from pipelines.dual.inference.pipeline    import DUAL_INFERENCE_COMPONENTS
 from pipelines.dual.training.experiments  import DualInputTrialPlanner, DualRatioTrialPlanner
 from pipelines.dual.training.pipeline     import DualTrainingPipeline, TrunkChannelMap
 from pipelines.shared.model.model_builder import ModelBuilder
+from pipelines.shared.training.run_naming import RunNaming
 from pipelines.shared.training.seed_sweep import SeedFanoutScheduler, SeedSet, SeedSweepRunner
 from tools.runtime.config_cli             import ConfigCli
 
@@ -26,6 +27,14 @@ class DualSingleTrainRunner(SingleTrainRunner):
     @property
     def model_head(self) -> str:
         return "set_pred"
+
+    @property
+    def label(self) -> str:
+        n_gaussians = self.factory.gaussian_config().n_default_gaussians
+        return RunNaming.training_tag(self.model_name, self.model_head, self.config.curriculum, n_gaussians, self.config.augmentation, extras=(self._input_tag(),))
+
+    def _input_tag(self) -> str:
+        return f"{TrunkChannelMap.group_label(tuple(self.config.params_input))}.{TrunkChannelMap.group_label(tuple(self.config.existence_input))}"
 
     def _model_config(self):
         trunk_overrides = {

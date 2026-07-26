@@ -84,3 +84,10 @@ def test_benchmark_unit_without_component_uses_the_full_tag():
 def test_compose_appends_the_suffix():
     assert RunNaming.compose("unet-conv-hungarian-K_3-hv-A-param_l1_1", "seed0") == "unet-conv-hungarian-K_3-hv-A-param_l1_1_seed0"
     assert RunNaming.compose("unet-conv-hungarian-K_3-hv-A-param_l1_1", None)    == "unet-conv-hungarian-K_3-hv-A-param_l1_1"
+
+
+def test_extras_slot_in_between_presence_and_loss():
+    loss = _loss(use_param_l1=True, weight_param_l1=1.0, use_active_normalization=True)
+
+    assert RunNaming.tag("dual_resunet", "set_pred", loss, 2, _aug(), extras=("full.ifg",)) == "dual_resunet-set_pred-hungarian-K_2-hv-A-full.ifg-param_l1_1"
+    assert RunNaming.tag("dual_resunet", "set_pred", loss, 2, _aug())                       == "dual_resunet-set_pred-hungarian-K_2-hv-A-param_l1_1"
