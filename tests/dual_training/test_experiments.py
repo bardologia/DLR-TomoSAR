@@ -230,7 +230,7 @@ def test_dual_ratio_overrides_round_trip_through_the_cli():
 
     assert config.model_overrides == {"params_features": TINY_LADDER, "existence_features": TINY_LADDER}
     assert config.params_input    == ["pass", "ifg"]
-    assert config.existence_input == ["ifg"]
+    assert config.existence_input == ["pass", "ifg"]
 
 
 def test_dual_ratio_default_catalog_holds_the_parity_budget_at_every_split():

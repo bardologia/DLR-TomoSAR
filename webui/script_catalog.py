@@ -45,7 +45,7 @@ class ScriptCatalog:
         "train_dual": {
             "title"     : "Train Dual",
             "category"  : "Training",
-            "purpose"   : "Train the dual-trunk set-prediction model: one trunk sees the full reduced stack and feeds the per-gaussian parameter heads, a second trunk sees only the interferogram channels and feeds the existence gate; each trunk is any backbone-zoo architecture. Shares the backbone dataset, loss curriculum, and trainer. Optionally fans out trunk-input trials across GPUs, one run per params/existence channel-group assignment on fixed half-width four-level trunks.",
+            "purpose"   : "Train the dual-trunk set-prediction model: the standard build routes the full reduced stack to both unet_skip trunks at a 90/10 parameter split, the large trunk feeding the per-gaussian parameter heads and the small trunk feeding the existence gate; each trunk is any backbone-zoo architecture with routable channel groups. Shares the backbone dataset, loss curriculum, and trainer. Optionally fans out trunk-input trials across GPUs, one run per params/existence channel-group assignment on fixed half-width four-level trunks.",
         },
         "infer_backbone": {
             "title"     : "Infer Backbone",

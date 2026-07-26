@@ -43,13 +43,22 @@ def test_registry_holds_dual_resunet():
     assert set(DUAL_MODEL_REGISTRY) == {"dual_resunet"}
 
 
-def test_default_trunks_are_three_and_two_levels():
+def test_default_build_is_the_ninety_ten_full_full_standard():
     model, config = get_dual("dual_resunet")
 
-    assert config.params_features    == [64, 128, 256]
-    assert config.existence_features == [64, 128]
-    assert len(model.trunk_params.encoder_blocks)    == 3
-    assert len(model.trunk_existence.encoder_blocks) == 2
+    assert config.params_backbone    == "unet_skip"
+    assert config.existence_backbone == "unet_skip"
+    assert config.params_channels    == tuple(range(9))
+    assert config.existence_channels == tuple(range(9))
+    assert config.params_features    == [64, 128, 248, 472]
+    assert config.existence_features == [24, 48, 84, 156]
+    assert len(model.trunk_params.encoder_blocks)    == 4
+    assert len(model.trunk_existence.encoder_blocks) == 4
+
+    params_arm = sum(p.numel() for name, p in model.named_parameters() if name.startswith(("trunk_params.", "gaussian_heads.")))
+    total      = sum(p.numel() for p in model.parameters())
+
+    assert abs(params_arm / total - 0.9) < 0.01
 
 
 def test_trunk_architectures_are_selectable():

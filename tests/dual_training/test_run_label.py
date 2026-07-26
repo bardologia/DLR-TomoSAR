@@ -20,10 +20,10 @@ def _runner(monkeypatch, **fields) -> DualSingleTrainRunner:
 def test_label_carries_the_default_trunk_routing(monkeypatch):
     runner = _runner(monkeypatch)
 
-    expected = RunNaming.training_tag("dual_resunet", "set_pred", runner.config.curriculum, 2, runner.config.augmentation, extras=("full.ifg",))
+    expected = RunNaming.training_tag("dual_resunet", "set_pred", runner.config.curriculum, 2, runner.config.augmentation, extras=("full.full",))
 
     assert runner.label == expected
-    assert "-full.ifg-" in runner.label
+    assert "-full.full-" in runner.label
 
 
 def test_label_follows_the_selected_inputs(monkeypatch):
@@ -35,4 +35,4 @@ def test_label_follows_the_selected_inputs(monkeypatch):
 def test_label_keeps_the_loss_tag_last(monkeypatch):
     runner = _runner(monkeypatch)
 
-    assert runner.label.split("-full.ifg-")[1] == RunNaming.loss_tag(runner.config.curriculum.active_stages()[-1])
+    assert runner.label.split("-full.full-")[1] == RunNaming.loss_tag(runner.config.curriculum.active_stages()[-1])

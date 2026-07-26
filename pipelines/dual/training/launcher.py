@@ -98,7 +98,7 @@ class DualTrainingLauncher:
     def run(self, argv: list[str] | None = None) -> None:
         argv = list(sys.argv[1:] if argv is None else argv)
 
-        cli    = ConfigCli(DualEntryConfig(), description="Train the dual-trunk set-prediction model (a full-stack trunk feeds the gaussian heads while an interferogram-only trunk feeds the existence gate; each trunk is any backbone-zoo architecture), or fan out trunk trials across GPUs")
+        cli    = ConfigCli(DualEntryConfig(), description="Train the dual-trunk set-prediction model (the full stack feeds both trunks by default, a 90 % trunk feeds the gaussian heads and a 10 % trunk feeds the existence gate; each trunk is any backbone-zoo architecture), or fan out trunk trials across GPUs")
         config = cli.apply(argv)
 
         CurriculumInheritance(config.curriculum, dual_curriculum(), cli.overrides).apply()

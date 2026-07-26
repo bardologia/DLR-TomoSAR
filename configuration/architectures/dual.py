@@ -11,14 +11,14 @@ class DualResUNetConfig:
     out_channels        : int       = 6
     params_per_gaussian : int       = 3
     head                : str       = "set_pred"
-    params_backbone     : str       = "resunet"
-    existence_backbone  : str       = "resunet"
+    params_backbone     : str       = "unet_skip"
+    existence_backbone  : str       = "unet_skip"
     params_input        : tuple     = ("pass", "ifg")
-    existence_input     : tuple     = ("ifg",)
+    existence_input     : tuple     = ("pass", "ifg")
     params_channels     : tuple     = (0, 1, 2, 3, 4, 5, 6, 7, 8)
-    existence_channels  : tuple     = (5, 6, 7, 8)
-    params_features     : list[int] = field(default_factory=lambda: [64, 128, 256])
-    existence_features  : list[int] = field(default_factory=lambda: [64, 128])
+    existence_channels  : tuple     = (0, 1, 2, 3, 4, 5, 6, 7, 8)
+    params_features     : list[int] = field(default_factory=lambda: [64, 128, 248, 472])
+    existence_features  : list[int] = field(default_factory=lambda: [24, 48, 84, 156])
     params_overrides    : dict      = field(default_factory=dict)
     existence_overrides : dict      = field(default_factory=dict)
     head_activation     : str       = "relu"
@@ -52,10 +52,10 @@ class DualResUNetConfig:
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
-            "params_backbone"    : {"type": "categorical",         "choices": ["resunet", "unet_skip", "unet"]},
-            "existence_backbone" : {"type": "categorical",         "choices": ["resunet", "unet_skip", "unet"]},
-            "params_features"    : {"type": "indexed_categorical", "choices": [[32, 64, 128], [64, 128, 256], [48, 96, 192]]},
-            "existence_features" : {"type": "indexed_categorical", "choices": [[32, 64], [64, 128], [48, 96]]},
+            "params_backbone"    : {"type": "categorical",         "choices": ["unet_skip", "resunet", "unet"]},
+            "existence_backbone" : {"type": "categorical",         "choices": ["unet_skip", "resunet", "unet"]},
+            "params_features"    : {"type": "indexed_categorical", "choices": [[48, 96, 184, 352], [64, 128, 248, 472]]},
+            "existence_features" : {"type": "indexed_categorical", "choices": [[48, 96, 184, 352], [24, 48, 84, 156]]},
         }
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:
