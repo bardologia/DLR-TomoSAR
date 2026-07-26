@@ -690,8 +690,8 @@ class LaunchLayout:
                     {"kind": "fields", "title": "Trunk trials", "groups": [
                         {"title": None, "fields": [{"gate": "trials_enabled", "fields": [
                             "trials_mode",
-                            "input_trials.params_features", "input_trials.existence_features",
-                            "input_trials.trials",
+                            "routing_trials.params_features", "routing_trials.existence_features",
+                            "routing_trials.trials",
                             "ratio_trials.trials", "ratio_trials.match_tolerance",
                         ]}]},
                     ]},

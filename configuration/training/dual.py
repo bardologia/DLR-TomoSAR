@@ -27,7 +27,7 @@ def _parity_resunet_features() -> list[int]:
     return [48, 96, 184, 352]
 
 
-def _default_dual_input_trials() -> dict:
+def _default_dual_routing_trials() -> dict:
     full   = ["pass", "ifg"]
     passes = ["pass"]
     ifg    = ["ifg"]
@@ -54,10 +54,10 @@ def _default_dual_ratio_trials() -> dict:
 
 
 @dataclass
-class DualInputTrialsConfig:
+class DualRoutingTrialsConfig:
     params_features    : list[int] = field(default_factory=_parity_resunet_features)
     existence_features : list[int] = field(default_factory=_parity_resunet_features)
-    trials             : dict      = field(default_factory=_default_dual_input_trials)
+    trials             : dict      = field(default_factory=_default_dual_routing_trials)
 
 
 @dataclass
@@ -103,10 +103,10 @@ class DualEntryConfig:
     infer_after : bool            = False
     inference   : InferenceConfig = field(default_factory=_default_inference)
 
-    trials_enabled : bool                  = False
-    trials_mode    : str                   = "input"
-    input_trials   : DualInputTrialsConfig = field(default_factory=DualInputTrialsConfig)
-    ratio_trials   : DualRatioTrialsConfig = field(default_factory=DualRatioTrialsConfig)
+    trials_enabled : bool                    = False
+    trials_mode    : str                     = "routing"
+    routing_trials : DualRoutingTrialsConfig = field(default_factory=DualRoutingTrialsConfig)
+    ratio_trials   : DualRatioTrialsConfig   = field(default_factory=DualRatioTrialsConfig)
 
     gpus            : list[int] = field(default_factory=lambda: [0, 1, 3])
     gpus_file       : str       = ""

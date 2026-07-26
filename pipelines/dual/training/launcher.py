@@ -8,7 +8,7 @@ from configuration.training               import CurriculumInheritance, DualEntr
 from models.dual                          import DUAL_CONFIG_REGISTRY
 from pipelines.backbone.training.launcher import SingleTrainRunner, TrainScheduler
 from pipelines.dual.inference.pipeline    import DUAL_INFERENCE_COMPONENTS
-from pipelines.dual.training.experiments  import DualInputTrialPlanner, DualRatioTrialPlanner
+from pipelines.dual.training.experiments  import DualRatioTrialPlanner, DualRoutingTrialPlanner
 from pipelines.dual.training.pipeline     import DualTrainingPipeline, TrunkChannelMap
 from pipelines.shared.model.model_builder import ModelBuilder
 from pipelines.shared.training.run_naming import RunNaming
@@ -58,16 +58,16 @@ class DualSingleTrainRunner(SingleTrainRunner):
 
 class DualTrainScheduler(TrainScheduler):
 
-    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "input_trials", "ratio_trials", "gpus", "gpus_file", "poll_interval_s")
+    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "routing_trials", "ratio_trials", "gpus", "gpus_file", "poll_interval_s")
 
     MODE_SUBDIRS = {
-        "input" : "input",
-        "ratio" : "ratio",
+        "routing" : "routing",
+        "ratio"   : "ratio",
     }
 
     def planner(self):
-        if self.config.trials_mode == "input":
-            return DualInputTrialPlanner(self.config.input_trials, self.config.model_overrides, TrunkChannelMap.GROUPS)
+        if self.config.trials_mode == "routing":
+            return DualRoutingTrialPlanner(self.config.routing_trials, self.config.model_overrides, TrunkChannelMap.GROUPS)
 
         if self.config.trials_mode == "ratio":
             n_secondaries      = len(self.config.paths.secondary_labels)
@@ -84,7 +84,7 @@ class DualTrainScheduler(TrainScheduler):
                 in_channels     = in_channels,
             )
 
-        raise ValueError(f"Unknown trials_mode '{self.config.trials_mode}', expected 'input' or 'ratio'")
+        raise ValueError(f"Unknown trials_mode '{self.config.trials_mode}', expected 'routing' or 'ratio'")
 
     def _model_key(self) -> str:
         return ModelBuilder.model_key(self.config.model_name, "set_pred")
