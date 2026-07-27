@@ -80,6 +80,7 @@ def _model_config():
 
     config.params_features     = [8, 16]
     config.existence_features  = [8]
+    config.existence_input     = ("ifg",)
     config.params_overrides    = {"bottleneck_factor": 1, "dropout": 0.0}
     config.existence_overrides = {"bottleneck_factor": 1, "dropout": 0.0}
 
