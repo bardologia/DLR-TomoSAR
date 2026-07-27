@@ -37,6 +37,13 @@ class JobDescriber:
             ("modes",     "fit_modes",          "list"),
             ("suffix",    "output_suffix",      "opt"),
         ],
+        "inject_external_params": [
+            ("datasets",  "dataset_filter",     "list", "all datasets"),
+            ("sources",   "source_files",       "list"),
+            ("order",     "source_order",       "text"),
+            ("slots",     "k_slots",            "opt"),
+            ("suffix",    "output_suffix",      "opt"),
+        ],
         "train_backbone": [
             ("dataset",         "paths.dataset_path",    "opt_tail"),
             ("params",          "paths.parameters_path", "opt_tail"),

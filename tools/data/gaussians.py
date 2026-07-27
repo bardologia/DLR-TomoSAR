@@ -129,6 +129,22 @@ class GaussianCurve:
         return curves
 
 
+class GaussianSlotSorter:
+    @staticmethod
+    def by_mean(parameters_array: np.ndarray, n_gaussians: int, activity_threshold: float) -> np.ndarray:
+        n_params, azimuth, range_ = parameters_array.shape
+        reshaped                  = parameters_array.reshape(n_gaussians, 3, azimuth, range_)
+
+        amps = reshaped[:, 0, :, :]
+        mus  = reshaped[:, 1, :, :]
+
+        sort_keys = np.where(amps > activity_threshold, mus, np.inf)
+        order     = np.argsort(sort_keys, axis=0)
+        ordered   = np.take_along_axis(reshaped, order[:, np.newaxis, :, :], axis=0)
+
+        return ordered.reshape(n_params, azimuth, range_)
+
+
 class GaussianHead:
     @staticmethod
     def total_channels(ppg: int, n_gaussians: int) -> int:

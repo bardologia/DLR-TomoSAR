@@ -17,6 +17,11 @@ class ScriptCatalog:
             "category"  : "Data",
             "purpose"   : "Fit per-pixel Gaussian mixtures to build the supervised parameter targets. Sweeps every permutation of the selected datasets, K values, lambda values, and fit modes.",
         },
+        "inject_external_params": {
+            "title"     : "Inject External Parameters",
+            "category"  : "Data",
+            "purpose"   : "Import Gaussian parameter cubes fitted outside this codebase and write them as a normal parameter run inside each selected dataset, ready to train against. Reads RAT cubes whose azimuth/range window is named in the filename, reorders their per-Gaussian channels into the amplitude/mean/sigma convention, stitches several files into one dataset crop, and refuses anything that leaves a pixel uncovered or puts a Gaussian outside the dataset height axis.",
+        },
         "train_backbone": {
             "title"     : "Train Backbone",
             "category"  : "Training",

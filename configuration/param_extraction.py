@@ -34,6 +34,19 @@ class FitMode:
         return tuple(component in parts for component in cls.COMPONENTS)
 
 
+class ChannelOrder:
+    COMPONENTS = ("amp", "mu", "sigma")
+
+    @classmethod
+    def positions(cls, order: str) -> Tuple[int, int, int]:
+        parts = order.split("_") if order else []
+
+        if sorted(parts) != sorted(cls.COMPONENTS):
+            raise ValueError(f"Unknown channel order '{order}'. An order is a permutation of {', '.join(cls.COMPONENTS)} joined with '_', e.g. 'mu_sigma_amp'")
+
+        return tuple(parts.index(component) for component in cls.COMPONENTS)
+
+
 @dataclass
 class FitSettings:
     max_fit_iterations : int       = 5000
@@ -172,3 +185,21 @@ class ParamExtractionInferenceConfig:
     run_tags   : list = field(default_factory=list)
 
     make_plots : bool = True
+
+
+@dataclass
+class InjectExternalParamsEntryConfig:
+    dataset_base_path : Path = Path("/ste/rnd/User/vice_vi/Dataset")
+    dataset_filter    : list = field(default_factory=list)
+
+    source_files   : list = field(default_factory=list)
+    source_windows : list = field(default_factory=list)
+    source_order   : str  = "mu_sigma_amp"
+
+    output_prefix : str = "params"
+    output_suffix : str = "external"
+    origin_note   : str = ""
+
+    k_slots            : int   = 0
+    activity_threshold : float = 1e-3
+    overwrite          : bool  = False

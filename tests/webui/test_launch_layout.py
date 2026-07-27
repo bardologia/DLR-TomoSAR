@@ -22,6 +22,7 @@ from configuration.comparison               import ComparisonEntryConfig
 from configuration.cross_validation.general import CrossValidationConfig
 from configuration.diagnostics              import ReportCollectionEntryConfig, TensorboardExportEntryConfig
 from configuration.inference                import BackboneInferenceEntryConfig, DualInferenceEntryConfig, ImageAeInferenceEntryConfig, ProfileAeInferenceEntryConfig, UnrolledInferenceEntryConfig
+from configuration.param_extraction         import ChannelOrder, InjectExternalParamsEntryConfig
 from configuration.patch_sweep.general      import PatchSweepConfig
 from configuration.training                 import BackboneEntryConfig, DualEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, ImageAeEntryConfig, UnrolledEntryConfig
 from configuration.tuning.general           import TuningEntryConfig
@@ -94,6 +95,19 @@ def test_follow_infer_map_covers_every_standalone_inference_family():
     expected = {key: key.replace("train_", "infer_") for key in layouts if key.startswith("train_") and key.replace("train_", "infer_") in layouts}
 
     assert pairs == expected
+
+
+def test_inject_external_params_layout_claims_every_config_field_exactly_once():
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(InjectExternalParamsEntryConfig())]
+
+    LaunchLayout().build("inject_external_params", leaves)
+
+
+def test_channel_order_choices_match_every_permutation():
+    for order in LaunchLayout.CH_CHANNEL_ORDER["options"]:
+        ChannelOrder.positions(order)
+
+    assert len(LaunchLayout.CH_CHANNEL_ORDER["options"]) == 6
 
 
 def test_compare_runs_layout_claims_every_config_field_exactly_once():

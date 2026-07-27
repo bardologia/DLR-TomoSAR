@@ -4,7 +4,7 @@ import gc
 from pathlib import Path
 
 from pipelines.processing.param_extraction.metrics  import FittingMetricsCalculator
-from pipelines.processing.param_extraction.io       import ParameterIO
+from pipelines.processing.param_extraction.io       import ParameterIO, ParameterRunMeta
 from pipelines.processing.param_extraction.plots    import FittingResultPlotter
 from pipelines.shared.orchestration.session_scheduler import SequentialSessionScheduler
 from tools.data.io                                  import FileIO
@@ -13,7 +13,7 @@ from tools.monitoring.logger                        import Logger
 
 class ParamRunInferencePipeline:
 
-    META_FILENAME    = "param_extraction_meta.json"
+    META_FILENAME    = ParameterRunMeta.FILENAME
     SUMMARY_FILENAME = "fit_metrics_summary.json"
 
     def __init__(self, run_dir: Path, logger: Logger, make_plots: bool = True) -> None:
@@ -106,7 +106,7 @@ class ParamInferenceTrialCollector:
         return [
             str(marker.parent.relative_to(self.params_dir))
             for marker in sorted(self.params_dir.rglob(ParamRunInferencePipeline.META_FILENAME))
-            if (marker.parent / "parameters.npy").exists()
+            if (marker.parent / "parameters.npy").exists() and not ParameterRunMeta.is_external(marker.parent)
         ]
 
     def collect(self) -> list[Path]:
@@ -118,6 +118,8 @@ class ParamInferenceTrialCollector:
 
             if not (run_dir / ParamRunInferencePipeline.META_FILENAME).exists():
                 raise FileNotFoundError(f"No {ParamRunInferencePipeline.META_FILENAME} under {run_dir}; cannot run parameter-extraction inference for trial '{tag}'.")
+
+            ParameterRunMeta.reject_external(run_dir, "be scored against the fit it never went through")
 
             self.logger.info(tag)
             run_dirs.append(run_dir)

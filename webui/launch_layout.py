@@ -45,9 +45,15 @@ class LaunchLayout:
     PICK_PARAMS   = {"kind": "dataset", "mode": "params", "datasetFrom": "paths.dataset_path"}
     PICK_DATASETS = {"kind": "dataset", "mode": "datasets", "multi": True, "baseFrom": "dataset_base_path", "validOnly": True}
 
-    MULTI_K      = {"kind": "multi", "numeric": True, "integer": True, "placeholder": "add K, Enter", "empty": "select at least one K"}
-    MULTI_LAMBDA = {"kind": "multi", "numeric": True, "placeholder": "add lambda, Enter", "empty": "select at least one lambda"}
-    MULTI_INT    = {"kind": "multi", "numeric": True, "integer": True, "placeholder": "add value, Enter", "empty": "add at least one value"}
+    MULTI_K       = {"kind": "multi", "numeric": True, "integer": True, "placeholder": "add K, Enter", "empty": "select at least one K"}
+    MULTI_LAMBDA  = {"kind": "multi", "numeric": True, "placeholder": "add lambda, Enter", "empty": "select at least one lambda"}
+    MULTI_INT     = {"kind": "multi", "numeric": True, "integer": True, "placeholder": "add value, Enter", "empty": "add at least one value"}
+    MULTI_PATHS   = {"kind": "multi", "placeholder": "add absolute file path, Enter", "empty": "name at least one external parameter file"}
+    MULTI_WINDOWS = {"kind": "multi", "placeholder": "add <az0>a<az1>a<rg0>a<rg1>, Enter"}
+
+    CH_CHANNEL_ORDER = {"kind": "choice", "options": [
+        "amp_mu_sigma", "amp_sigma_mu", "mu_amp_sigma", "mu_sigma_amp", "sigma_amp_mu", "sigma_mu_amp",
+    ]}
 
     MULTI_TRUNK_INPUT = {"kind": "multi", "empty": "select at least one channel group", "choices": [
         {"value": "pass", "label": "Passes (amplitudes)"},
@@ -479,6 +485,33 @@ class LaunchLayout:
                             "range_batch_size",
                             "gpu_pixel_batch_size",
                             {"path": "parameter_workers", "widget": NUM_WORKERS},
+                        ]},
+                    ]},
+                ]},
+            ],
+        },
+        "inject_external_params": {
+            "sections": [
+                {"key": "config", "title": "Configuration", "panels": [
+                    {"kind": "fields", "groups": [
+                        {"title": "Datasets", "fields": [
+                            "dataset_base_path",
+                            {"path": "dataset_filter", "widget": PICK_DATASETS},
+                        ]},
+                        {"title": "External sources", "fields": [
+                            {"path": "source_files", "widget": MULTI_PATHS},
+                            {"path": "source_windows", "widget": MULTI_WINDOWS},
+                            {"path": "source_order", "widget": CH_CHANNEL_ORDER},
+                        ]},
+                        {"title": "Output", "fields": [
+                            "output_prefix",
+                            "output_suffix",
+                            "origin_note",
+                            "overwrite",
+                        ]},
+                        {"title": "Slots", "fields": [
+                            "k_slots",
+                            "activity_threshold",
                         ]},
                     ]},
                 ]},

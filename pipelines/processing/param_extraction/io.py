@@ -10,13 +10,32 @@ from tools.data.io           import FileIO
 from tools.monitoring.logger import Logger
 
 
+class ParameterRunMeta:
+    FILENAME        = "param_extraction_meta.json"
+    EXTERNAL_SOURCE = "external"
+
+    @classmethod
+    def is_external(cls, run_dir: Path) -> bool:
+        meta_path = Path(run_dir) / cls.FILENAME
+
+        if not meta_path.is_file():
+            return False
+
+        return FileIO.load_json(meta_path).get("source") == cls.EXTERNAL_SOURCE
+
+    @classmethod
+    def reject_external(cls, run_dir: Path, action: str) -> None:
+        if cls.is_external(run_dir):
+            raise ValueError(f"Parameter run {run_dir} was injected from external files, not fitted here, so it carries no fit diagnostics and cannot {action}. Point this step at a run produced by extract_params.")
+
+
 class ExtractionMetadataManager:
     def __init__(self, config: ExtractionConfig, logger: Logger) -> None:
         self.config = config
         self.logger = logger
 
     def save_run_metadata(self, npy_path: Path, diagnostics_path: Path, tomogram_path: Path, height_range: tuple) -> Path:
-        meta_path = self.config.output_directory / "param_extraction_meta.json"
+        meta_path = self.config.output_directory / ParameterRunMeta.FILENAME
         ext       = self.config.fit_settings
 
         payload = {

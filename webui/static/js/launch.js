@@ -119,6 +119,15 @@ class LaunchView extends ConfigForm {
         { kind: "output", glyph: "params", label: "Params array",        sub: "amp, μ, σ, amp, μ, σ, …" },
       ],
     },
+    inject_external_params: {
+      title  : "Inject External Parameters",
+      summary: "Imports Gaussian parameter cubes fitted outside this codebase and writes them into a dataset as a normal parameter run, so a model can train against a collaborator's fit.",
+      flow   : [
+        { kind: "input",  glyph: "params", label: "External RAT cubes",  sub: "one per azimuth/range window" },
+        { kind: "model",  glyph: "fit",    label: "Reorder and stitch",  tag: "operation", sub: "onto the dataset crop" },
+        { kind: "output", glyph: "params", label: "Params array",        sub: "amp, μ, σ, amp, μ, σ, …" },
+      ],
+    },
     infer: {
       title  : "Inference",
       summary: "Runs a trained model over the image stack with a sliding window, stitches the predicted cube, and renders reports.",

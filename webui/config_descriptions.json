@@ -195,6 +195,22 @@
         "make_plots": "whether FittingResultPlotter renders diagnostic plots in addition to the JSON metrics summary"
       }
     },
+    "param_extraction::InjectExternalParamsEntryConfig": {
+      "summary": "Batch entry point that imports externally fitted Gaussian parameter cubes into preprocessed datasets as ready-to-train parameter runs",
+      "fields": {
+        "dataset_base_path": "root directory holding the preprocessed dataset runs that receive the external parameters",
+        "dataset_filter": "explicit dataset directory names to inject into; empty injects into every dataset under the base path",
+        "source_files": "absolute paths of the external RAT parameter cubes, each holding three channels per Gaussian over one azimuth/range window",
+        "source_windows": "explicit '<az_start>a<az_end>a<rg_start>a<rg_end>' extent per source file; empty reads each window from its filename",
+        "source_order": "order of the three channels inside each Gaussian triple of the source files, as a permutation of amp, mu and sigma joined with '_'",
+        "output_prefix": "leading token of the generated parameter-run subdirectory name, joined with the suffix",
+        "output_suffix": "trailing token of the generated parameter-run subdirectory name, distinguishing this import from the fitted runs beside it",
+        "origin_note": "free-text provenance recorded in the run metadata, naming who produced the external fit and how",
+        "k_slots": "number of Gaussian slots written per pixel; 0 keeps the slot count the sources carry, a larger value pads the remainder with empty slots",
+        "activity_threshold": "amplitude above which a Gaussian counts as active, driving the slot ordering and the height-convention check",
+        "overwrite": "toggle allowing an existing parameter run of the same name to be deleted and rewritten"
+      }
+    },
     "normalization/general::ChannelStrategy": {
       "summary": "Per-channel normalization recipe: fits a location/scale pair from pixel statistics, or returns a fixed constant for fixed_div_pi",
       "fields": {

@@ -84,6 +84,7 @@ class ProjectPaths:
     SCRIPT_DIRS = {
         "pre_process"                     : "processing",
         "extract_params"                  : "processing",
+        "inject_external_params"          : "processing",
         "generate_tomogram"               : "processing",
         "generate_interferograms"         : "processing",
         "train_backbone"                  : "training",

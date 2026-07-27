@@ -8,6 +8,7 @@ import numpy             as np
 
 from pipelines.comparison.metric_table             import MetricTableRenderer
 from pipelines.comparison.spatial_stats            import SpatialDispersion
+from pipelines.processing.param_extraction.io      import ParameterRunMeta
 from pipelines.shared.comparison.comparison_report import ComparisonReportBase
 from tools.data.io             import FileIO
 from tools.reporting.markdown  import MarkdownTable, ScalarFormatter
@@ -40,7 +41,7 @@ class ParamTrial:
 
 
 class ParamTrialCollector:
-    MARKER = "param_extraction_meta.json"
+    MARKER = ParameterRunMeta.FILENAME
 
     def __init__(self, params_dir: Path, run_tags: list[str], logger: Logger) -> None:
         self.params_dir = params_dir
@@ -48,7 +49,7 @@ class ParamTrialCollector:
         self.logger     = logger
 
     def _is_trial(self, run_dir: Path) -> bool:
-        return (run_dir / self.MARKER).exists() and (run_dir / "parameters.npy").exists()
+        return (run_dir / self.MARKER).exists() and (run_dir / "parameters.npy").exists() and not ParameterRunMeta.is_external(run_dir)
 
     def _discover_tags(self) -> list[str]:
         if self.run_tags:
@@ -57,7 +58,7 @@ class ParamTrialCollector:
         return [
             str(marker.parent.relative_to(self.params_dir))
             for marker in sorted(self.params_dir.rglob(self.MARKER))
-            if (marker.parent / "parameters.npy").exists()
+            if (marker.parent / "parameters.npy").exists() and not ParameterRunMeta.is_external(marker.parent)
         ]
 
     def _dataset_of(self, tag: str) -> str:
@@ -85,6 +86,8 @@ class ParamTrialCollector:
 
         trials = []
         for tag in self._discover_tags():
+            ParameterRunMeta.reject_external(self.params_dir / tag, "enter a Gaussian-fit comparison")
+
             if not self._is_trial(self.params_dir / tag):
                 self.logger.error(f"Not a parameter-extraction trial: {self.params_dir / tag}")
                 continue

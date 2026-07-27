@@ -382,7 +382,7 @@ class EquationLibrary:
                 {
                     "title" : "Component ordering by mean elevation",
                     "tex"   : r"\kappa_k = \begin{cases} \mu_k & a_k > 10^{-3} \\ +\infty & \text{otherwise} \end{cases}, \qquad \pi = \operatorname{argsort}_k\,\kappa_k",
-                    "note"  : "After fitting, active components are sorted by ascending mu and inactive slots pushed last (pipeline.py ParameterExtractor._sort_gaussians), giving GT a canonical storage order; the downstream training loss is permutation-invariant, matching predictions to these GT slots by optimal assignment.",
+                    "note"  : "After fitting, active components are sorted by ascending mu and inactive slots pushed last (gaussians.py GaussianSlotSorter.by_mean), giving GT a canonical storage order; the downstream training loss is permutation-invariant, matching predictions to these GT slots by optimal assignment.",
                     "vars"  : [
                         {"sym": r"\kappa_k", "desc": "sort key of slot k"},
                         {"sym": r"\mu_k",    "desc": "mean elevation of slot k (m)"},

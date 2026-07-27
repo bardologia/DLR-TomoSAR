@@ -9,6 +9,7 @@ import numpy as np
 from configuration.param_extraction              import ExtractionConfig
 from pipelines.processing.param_extraction.io    import ExtractionMetadataManager, ParameterIO
 from pipelines.processing.param_extraction.queue import ExtractionGroup
+from tools.data.gaussians                        import GaussianSlotSorter
 from tools.monitoring.logger                     import Logger
 
 
@@ -65,25 +66,11 @@ class ParameterExtractor:
         self.logger.subsection(f"Backend : JAX GPU (modes: {', '.join(modes)})")
         self.logger.subsection(f"Lambdas : {list(lambda_values)}")
 
-    @staticmethod
-    def _sort_gaussians(parameters_array: np.ndarray, n_gaussians: int, activity_threshold: float) -> np.ndarray:
-        n_params, Az, R = parameters_array.shape
-        reshaped        = parameters_array.reshape(n_gaussians, 3, Az, R)
-
-        amps = reshaped[:, 0, :, :]
-        mus  = reshaped[:, 1, :, :]
-
-        sort_keys    = np.where(amps > activity_threshold, mus, np.inf)
-        order        = np.argsort(sort_keys, axis=0)
-        out_reshaped = np.take_along_axis(reshaped, order[:, np.newaxis, :, :], axis=0)
-
-        return out_reshaped.reshape(n_params, Az, R)
-
     def run(self, tomogram_path: Path, height_range: Tuple[float, float]) -> Dict[tuple, Tuple[np.ndarray, dict]]:
         self.logger.section(f"[Extraction Start] Source: {tomogram_path.name}")
 
         results        = self._gpu_extractor.run(tomogram_path, height_range)
-        sorted_results = {key: (self._sort_gaussians(params, self.k_max, self.activity_threshold), diagnostics) for key, (params, diagnostics) in results.items()}
+        sorted_results = {key: (GaussianSlotSorter.by_mean(params, self.k_max, self.activity_threshold), diagnostics) for key, (params, diagnostics) in results.items()}
 
         self.logger.subsection("[Extraction Complete]")
         return sorted_results
