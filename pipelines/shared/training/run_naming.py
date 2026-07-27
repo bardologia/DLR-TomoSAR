@@ -38,6 +38,11 @@ class RunNaming:
         letters = ("A" if loss.use_active_normalization else "") + ("B" if loss.presence_balance else "")
         return letters or "none"
 
+    @staticmethod
+    def dual_model_tag(params_backbone: str, existence_backbone: str) -> str:
+        trunks = params_backbone if params_backbone == existence_backbone else f"{params_backbone}.{existence_backbone}"
+        return f"dual_{trunks}"
+
     @classmethod
     def stem(cls, model_name: str, head: str, loss: LossConfig, n_gaussians: int, augmentation: AugmentationConfig, extras: tuple = ()) -> str:
         return "-".join((model_name, head, cls.matching_tag(loss), cls.gaussians_tag(n_gaussians), cls.augmentation_tag(augmentation), cls.presence_tag(loss), *extras))

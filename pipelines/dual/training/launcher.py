@@ -31,9 +31,13 @@ class DualSingleTrainRunner(SingleTrainRunner):
         return "set_pred"
 
     @property
+    def trunk_tag(self) -> str:
+        return RunNaming.dual_model_tag(self.config.params_backbone, self.config.existence_backbone)
+
+    @property
     def label(self) -> str:
         n_gaussians = self.factory.gaussian_config().n_default_gaussians
-        return RunNaming.training_tag(self.model_name, self.model_head, self.config.curriculum, n_gaussians, self.config.augmentation, extras=(self._input_tag(),))
+        return RunNaming.training_tag(self.trunk_tag, self.model_head, self.config.curriculum, n_gaussians, self.config.augmentation, extras=(self._input_tag(),))
 
     def _input_tag(self) -> str:
         return f"{TrunkChannelMap.group_label(tuple(self.config.params_input))}.{TrunkChannelMap.group_label(tuple(self.config.existence_input))}"
@@ -104,7 +108,7 @@ class DualTrainScheduler(TrainScheduler):
         return (TrunkChannelMap.resolve(self.config.input, in_channels, self.config.params_input), TrunkChannelMap.resolve(self.config.input, in_channels, self.config.existence_input))
 
     def _model_key(self) -> str:
-        return ModelBuilder.model_key(self.config.model_name, "set_pred")
+        return ModelBuilder.model_key(RunNaming.dual_model_tag(self.config.params_backbone, self.config.existence_backbone), "set_pred")
 
 
 class DualTrainingLauncher:

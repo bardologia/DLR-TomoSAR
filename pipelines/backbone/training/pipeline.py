@@ -111,12 +111,15 @@ class TrainingPipeline:
         n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
 
         self.logger.section("[Model Built]")
-        self.logger.subsection(f"Architecture : {self.backbone_name}")
+        self.logger.subsection(f"Architecture : {self._architecture_label()}")
         self.logger.subsection(f"Head         : {model_cfg.head}")
         self.logger.subsection(f"In Channels  : {in_channels}")
         self.logger.subsection(f"Out Channels : {out_channels}")
         self.logger.subsection(f"Parameters   : {n_params:,}")
         return model, model_cfg
+
+    def _architecture_label(self) -> str:
+        return self.backbone_name
 
     def _model_overrides(self, in_channels: int, out_channels: int) -> dict:
         overrides = {"in_channels": in_channels, "out_channels": out_channels}

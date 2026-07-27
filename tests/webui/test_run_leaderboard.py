@@ -394,6 +394,17 @@ def test_axes_parse_dual_input_token():
     assert axes["losses"] == [{"name": "param_l1", "weight": 1.0}]
 
 
+def test_axes_parse_trunk_aware_dual_model_token():
+    axes = RunAxes.parse("dual_unet_skip-set_pred-hungarian-K_2-hv-A-full.full-param_l1_1_20260727_120000")
+
+    assert axes["model"]  == "dual_unet_skip"
+    assert axes["inputs"] == "full.full"
+
+    mixed = RunAxes.parse("dual_unet_skip.local_cnn-set_pred-hungarian-K_2-hv-A-full.ifg-param_l1_1_20260727_120000")
+
+    assert mixed["model"] == "dual_unet_skip.local_cnn"
+
+
 def test_axes_parse_input_token_absent_on_single_trunk_names():
     axes = RunAxes.parse(STANDARD_NAME)
 

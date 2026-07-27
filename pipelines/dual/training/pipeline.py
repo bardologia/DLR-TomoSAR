@@ -5,6 +5,7 @@ from models.dual                                import get_dual
 from pipelines.backbone.training.pipeline       import TrainingPipeline
 from pipelines.shared.config.config_persistence import DualModelConfigIO
 from pipelines.shared.model.model_builder       import ModelBuilder
+from pipelines.shared.training.run_naming       import RunNaming
 
 
 class TrunkChannelMap:
@@ -60,6 +61,10 @@ class DualTrainingPipeline(TrainingPipeline):
         self.logger.subsection(f"Params Trunk : {model_cfg.params_backbone} | input {'+'.join(model_cfg.params_input)} | channels {list(model_cfg.params_channels)} | features {list(model_cfg.params_features)} | {params_arm:,} params")
         self.logger.subsection(f"Exist Trunk  : {model_cfg.existence_backbone} | input {'+'.join(model_cfg.existence_input)} | channels {list(model_cfg.existence_channels)} | features {list(model_cfg.existence_features)} | {existence_arm:,} params")
         return model, model_cfg
+
+    def _architecture_label(self) -> str:
+        model_config = self.model_config if self.model_config is not None else DualResUNetConfig()
+        return RunNaming.dual_model_tag(model_config.params_backbone, model_config.existence_backbone)
 
     def _model_overrides(self, in_channels: int, out_channels: int) -> dict:
         model_config = self.model_config if self.model_config is not None else DualResUNetConfig()

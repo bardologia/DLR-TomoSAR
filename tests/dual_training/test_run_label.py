@@ -20,10 +20,23 @@ def _runner(monkeypatch, **fields) -> DualSingleTrainRunner:
 def test_label_carries_the_default_trunk_routing(monkeypatch):
     runner = _runner(monkeypatch)
 
-    expected = RunNaming.training_tag("dual_resunet", "set_pred", runner.config.curriculum, 2, runner.config.augmentation, extras=("full.full",))
+    expected = RunNaming.training_tag("dual_unet_skip", "set_pred", runner.config.curriculum, 2, runner.config.augmentation, extras=("full.full",))
 
     assert runner.label == expected
+    assert runner.label.startswith("dual_unet_skip-")
     assert "-full.full-" in runner.label
+
+
+def test_label_carries_the_selected_trunk_backbones(monkeypatch):
+    runner = _runner(monkeypatch, params_backbone="resunet", existence_backbone="resunet")
+
+    assert runner.label.startswith("dual_resunet-")
+
+
+def test_label_names_both_trunks_when_they_differ(monkeypatch):
+    runner = _runner(monkeypatch, params_backbone="unet_skip", existence_backbone="local_cnn")
+
+    assert runner.label.startswith("dual_unet_skip.local_cnn-")
 
 
 def test_label_follows_the_selected_inputs(monkeypatch):

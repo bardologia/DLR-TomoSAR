@@ -91,3 +91,12 @@ def test_extras_slot_in_between_presence_and_loss():
 
     assert RunNaming.tag("dual_resunet", "set_pred", loss, 2, _aug(), extras=("full.ifg",)) == "dual_resunet-set_pred-hungarian-K_2-hv-A-full.ifg-param_l1_1"
     assert RunNaming.tag("dual_resunet", "set_pred", loss, 2, _aug())                       == "dual_resunet-set_pred-hungarian-K_2-hv-A-param_l1_1"
+
+
+def test_dual_model_tag_collapses_matching_trunks():
+    assert RunNaming.dual_model_tag("unet_skip", "unet_skip") == "dual_unet_skip"
+    assert RunNaming.dual_model_tag("resunet", "resunet")     == "dual_resunet"
+
+
+def test_dual_model_tag_names_both_trunks_when_they_differ():
+    assert RunNaming.dual_model_tag("unet_skip", "local_cnn") == "dual_unet_skip.local_cnn"
