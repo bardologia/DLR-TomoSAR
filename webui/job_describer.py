@@ -46,8 +46,6 @@ class JobDescriber:
             ("inference after", "infer_after",           "flag"),
         ],
         "train_dual": [
-            ("params trunk",    "params_backbone",       "text"),
-            ("existence trunk", "existence_backbone",    "text"),
             ("params input",    "params_input",          "list"),
             ("existence input", "existence_input",       "list"),
             ("dataset",         "paths.dataset_path",    "opt_tail"),
@@ -202,10 +200,13 @@ class JobDescriber:
         return [part for part in (mode, model) if part]
 
     def _lead_train_dual(self, values: dict, used: set) -> list[str]:
-        used.update(("trials_enabled", "trials_mode", "model_name"))
+        used.update(("trials_enabled", "trials_mode", "model_name", "params_backbone", "existence_backbone"))
 
-        mode  = f"{values.get('trials_mode', '')} trials experiment".strip() if self._truthy(values.get("trials_enabled", "")) else "single training"
-        model = values.get("model_name", "")
+        mode      = f"{values.get('trials_mode', '')} trials experiment".strip() if self._truthy(values.get("trials_enabled", "")) else "single training"
+        params    = values.get("params_backbone", "")
+        existence = values.get("existence_backbone", "")
+        trunks    = params if params == existence else ".".join(part for part in (params, existence) if part)
+        model     = f"dual {trunks}" if trunks else ""
         return [part for part in (mode, model) if part]
 
     def _lead_train_jepa(self, values: dict, used: set) -> list[str]:
