@@ -4325,7 +4325,7 @@ class MultiValueField {
 
   build() {
     this.el           = document.createElement("div");
-    this.el.className = "picker multivalue";
+    this.el.className = "picker multivalue" + (this.spec.wide ? " multivalue--wide" : "");
 
     const chips     = document.createElement("div");
     chips.className = "multivalue__chips";
@@ -4334,7 +4334,7 @@ class MultiValueField {
 
     if (!this.spec.choices) {
       const entry     = document.createElement("input");
-      entry.className = "cfg-edit__input multivalue__entry";
+      entry.className = "cfg-edit__input multivalue__entry" + (this.spec.wide ? " multivalue__entry--wide" : "");
       entry.type      = "text";
       entry.spellcheck = false;
       entry.placeholder = this.spec.placeholder || "add value, Enter";
@@ -4429,7 +4429,9 @@ class MultiValueField {
       values.forEach((value) => {
         const chip      = document.createElement("span");
         chip.className  = "multivalue__chip";
+        chip.title      = String(value);
         const label     = document.createElement("span");
+        label.className = "multivalue__label";
         label.textContent = String(value);
         const remove    = document.createElement("button");
         remove.type     = "button";

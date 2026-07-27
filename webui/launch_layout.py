@@ -48,7 +48,7 @@ class LaunchLayout:
     MULTI_K       = {"kind": "multi", "numeric": True, "integer": True, "placeholder": "add K, Enter", "empty": "select at least one K"}
     MULTI_LAMBDA  = {"kind": "multi", "numeric": True, "placeholder": "add lambda, Enter", "empty": "select at least one lambda"}
     MULTI_INT     = {"kind": "multi", "numeric": True, "integer": True, "placeholder": "add value, Enter", "empty": "add at least one value"}
-    MULTI_PATHS   = {"kind": "multi", "placeholder": "add absolute file path, Enter", "empty": "name at least one external parameter file"}
+    MULTI_PATHS   = {"kind": "multi", "wide": True, "placeholder": "add absolute file path, Enter", "empty": "name at least one external parameter file"}
     MULTI_WINDOWS = {"kind": "multi", "placeholder": "add <az0>a<az1>a<rg0>a<rg1>, Enter"}
 
     CH_CHANNEL_ORDER = {"kind": "choice", "options": [
