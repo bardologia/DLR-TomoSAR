@@ -1,0 +1,36 @@
+% ================================================================ Close
+% ---------------------------------------------------------------- 44 Roadmap
+\begin{frame}{Roadmap}
+  \small
+  \begin{itemize}
+    \item \textbf{Physics-loss training at scale} --- the calibrated composite loss under
+          the warmup $\to$ complete curriculum (Act VI).
+    \item \textbf{JEPA studies} --- systematic autoencoder/backbone/provider sweeps
+          (Act VII).
+    \item \textbf{Vertically-structured validation scene} --- forest/buildings; the
+          near-flat urban scene cannot separate the slant-vs-height convention.
+    \item \textbf{Interleaved splits} --- fix the train$\to$val normalization shift from
+          spatial non-stationarity (Act II).
+    \item \textbf{Anchored $\mu$-band assignment} --- the next lever on slot imbalance
+          (Act III).
+  \end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------- 45 Take-home
+\begin{frame}{Take-home}
+  \small
+  \begin{enumerate}
+    \item \textbf{Amortisation works}: a fully-convolutional network replaces per-pixel
+          nonlinear fitting with one forward pass, and reconstructs the elevation
+          spectrum faithfully --- winner \textbf{UNet-skip set-pred + L1-curve}
+          (Charbonnier and param-L1 on the same backbone close behind) out of the
+          five-seed backbone $\times$ objective benchmark.
+    \item \textbf{The failure modes are understood and bounded}: slot imbalance measured
+          and mitigated, the residual reported; the network provably leans on spatial context
+          and learned priors beyond the per-pixel theory minimum.
+    \item \textbf{The path forward removes the label ceiling}: physics-constrained losses
+          (five terms, theory-verified, calibrated, curriculum-integrated) and JEPA
+          embedding pretraining --- both implemented, both awaiting their training
+          campaigns.
+  \end{enumerate}
+\end{frame}

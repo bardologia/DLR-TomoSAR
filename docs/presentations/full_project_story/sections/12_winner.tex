@@ -1,0 +1,95 @@
+% ---------------------------------------------------------------- 30 Winner vs baseline
+\begin{frame}{Winner vs baseline}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{1.02}
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\seedtag}{bbW}
+  \begin{tabular}{@{}l c c c@{}}
+    \toprule
+    metric & \shortstack{winner\\UNet-skip $\cdot$ L1-curve} & \shortstack{baseline\\UNet $\cdot$ param-MSE} & $\Delta$ \\
+    \midrule
+    curve $R^2$ $\uparrow$ & \seedpm{\hlval{good}{\textbf{0.756}}}{.012} & \seedpm{0.580}{.016} & \hlval{good}{+0.176} \\
+    PSNR [dB] $\uparrow$ & \seedpm{52.8}{.2} & \seedpm{50.4}{.2} & \hlval{good}{+2.4} \\
+    SSIM elevation $\uparrow$ & \seedpm{0.968}{.000} & \seedpm{0.960}{.000} & \hlval{good}{+0.007} \\
+    SSIM range $\uparrow$ & \seedpm{0.950}{.002} & \seedpm{0.934}{.004} & \hlval{good}{+0.016} \\
+    SSIM azimuth $\uparrow$ & \seedpm{0.961}{.001} & \seedpm{0.949}{.001} & \hlval{good}{+0.012} \\
+    per-pixel $R^2$ $\uparrow$ & \seedpm{\hlval{good}{\textbf{0.658}}}{.054} & \seedpm{-0.106}{.299} & \hlval{good}{+0.765} \\
+    profile cosine $\uparrow$ & \seedpm{\textbf{0.924}}{.007} & \seedpm{0.829}{.065} & \hlval{good}{+0.095} \\
+    \addlinespace[2pt]
+    matched F1 $\uparrow$ & \seedpm{0.889}{.002} & \seedpm{0.856}{.004} & \hlval{good}{+0.034} \\
+    matched recall $\uparrow$ & \seedpm{0.886}{.006} & \seedpm{\hlval{accent}{0.894}}{.002} & \hlval{accent}{-0.008} \\
+    matched precision $\uparrow$ & \seedpm{\textbf{0.893}}{.005} & \seedpm{0.820}{.006} & \hlval{good}{+0.073} \\
+    count exact $\uparrow$ & \seedpm{0.861}{.002} & \seedpm{0.845}{.008} & \hlval{good}{+0.016} \\
+    \addlinespace[2pt]
+    matched $\mu$ MAE $\downarrow$ & \seedpm{\hlval{good}{\textbf{1.49}}}{.04} & \seedpm{2.19}{.17} & \hlval{good}{-0.70} \\
+    matched $\sigma$ MAE $\downarrow$ & \seedpm{\textbf{0.77}}{.04} & \seedpm{0.81}{.01} & \hlval{good}{-0.04} \\
+    matched $a$ MAE $\downarrow$ & \seedpm{\textbf{0.241}}{.011} & \seedpm{0.307}{.011} & \hlval{good}{-0.066} \\
+    peak err mean $\downarrow$ & \seedpm{\textbf{1.29}}{.05} & \seedpm{1.67}{.16} & \hlval{good}{-0.38} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} runs: UNet-skip / UNet $\cdot$ set-pred $\cdot$ Hungarian
+   $\cdot$ $K{=}2$ $\cdot$ hv flips $\cdot$ presence A $\cdot$ patch $64{\times}32$
+   $\cdot$ five seeds each; held-out validation band. Cells: mean $\pm$ seed std;
+   \textbf{bold} $=$ best mean in row by the metric's arrow, marked only where best and worst differ by more than $5\%$. $\Delta$ $=$ winner
+   $-$ baseline on means; \textcolor{good}{green} $=$ improvement,
+   \textcolor{accent}{red} $=$ regression, coloured only past combined seed noise
+   $\sqrt{s_{\mathrm{w}}^2+s_{\mathrm{b}}^2}$, grey otherwise. $\mu$, $\sigma$,
+   peak in elevation units; $a$ in linear amplitude; cosine and per-pixel $R^2$
+   are per-pixel means; count exact $=$ fraction of pixels with the predicted
+   scatterer count correct.\par}
+    
+
+\end{frame}
+
+% ---------------------------------------------------------------- 31 Structural fidelity
+\begin{frame}{Winner under the microscope: structural fidelity}
+  \small
+  \pending[11.6cm]{tomogram range slice: GT / prediction / error (clipped at p99), plus
+  SSIM per axis --- regenerate from the board winner's inference run 20260720\_193330
+  (UNet-skip $\cdot$ L1-curve, seed 0; five-seed SSIM 0.968 / 0.950 / 0.961 on
+  elevation / range / azimuth)}
+  \begin{itemize}
+    \item Structure is faithfully reconstructed along all three axes; per-slice SSIM in
+          the figure title.
+  \end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------- 32 Reconstruction quality
+\begin{frame}{Winner under the microscope: profile reconstruction}
+  \small
+  \pending[11.6cm]{best-fit and worst-fit profile overlays: GT, prediction, individual
+  Gaussian components, signed residual --- from the board winner's inference run
+  20260720\_193330 (UNet-skip $\cdot$ L1-curve, seed 0)}
+  \begin{itemize}
+    \item Best-fit pixels are reconstructed almost exactly.
+    \item Errors concentrate on closely-spaced or low-amplitude components --- the heavy
+          negative tail behind the per-pixel mean.
+  \end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------- 33 Failure modes
+\begin{frame}{Failure modes, stated before anyone asks}
+  \small
+  Accuracy is strongest for the dominant low slots and degrades where valid pixels are
+  sparse (June winner run; regenerate from the board winner's run 20260720\_193330):
+  \begin{center}
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    slot & $\mu$ MAE & $\sigma$ MAE & n valid \\
+    \midrule
+    0 & 1.3  & 0.6 & 12.6\,M \\
+    1 & 3.7  & 0.7 & 6.6\,M \\
+    2 & 12.0 & 1.3 & 2.0\,M \\
+    3 & 14.7 & 1.1 & 1.2\,M \\
+    4 & 10.8 & 1.3 & 0.7\,M \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  \begin{itemize}
+    \item Inner-slot placeholder recall is the weakest detection link
+          (overall F1 0.834, precision 0.967, recall 0.733).
+    \item Ties back to Act III: the slot imbalance is mitigated, not solved.
+  \end{itemize}
+\end{frame}

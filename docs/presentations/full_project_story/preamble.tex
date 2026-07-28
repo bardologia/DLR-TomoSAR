@@ -1,0 +1,69 @@
+% --- Theme: clean, robust (no external fonts, compiles with tectonic) ---
+\usetheme{default}
+\usecolortheme{seahorse}
+\usefonttheme[onlymath]{serif}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{itemize items}[circle]
+\setbeamerfont{frametitle}{series=\bfseries}
+
+\definecolor{accent}{RGB}{176,48,82}
+\definecolor{ink}{RGB}{40,40,45}
+\definecolor{soft}{RGB}{120,120,128}
+\definecolor{good}{RGB}{30,110,70}
+\definecolor{argA}{RGB}{40,95,165}
+\definecolor{argB}{RGB}{190,140,20}
+\definecolor{argC}{RGB}{125,60,150}
+\setbeamercolor{frametitle}{fg=accent}
+\setbeamercolor{structure}{fg=accent}
+\setbeamercolor{normal text}{fg=ink}
+
+\usepackage{amsmath,amssymb}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,fit,backgrounds,calc,decorations.pathreplacing,patterns}
+\usepackage{booktabs}
+\usepackage{colortbl}
+\usepackage{eqparbox}
+
+\tikzset{
+  box/.style={draw=accent!70, rounded corners, thick, fill=accent!6,
+              inner sep=4pt, font=\scriptsize, align=center, minimum height=7mm},
+  gate/.style={draw=soft, rounded corners, thin, fill=black!3,
+              inner sep=3pt, font=\scriptsize, align=center},
+  ghost/.style={draw=soft!60, rounded corners, thin, fill=black!2,
+              inner sep=4pt, font=\scriptsize, align=center, minimum height=7mm, text=soft},
+  flow/.style={-{Stealth[length=2mm]}, accent!80, thick},
+}
+
+\newcommand{\pending}[2][10.8cm]{%
+  \begin{center}
+  \begin{tikzpicture}
+    \node[draw=soft, dashed, thick, rounded corners, fill=black!2,
+          text width=#1, align=center, inner sep=7pt, font=\scriptsize]
+      {\textbf{\textcolor{soft}{PENDING --- }}\textcolor{soft}{#2}};
+  \end{tikzpicture}
+  \end{center}}
+
+\newcommand{\act}[2]{%
+  \begin{frame}[plain]
+    \centering \vfill
+    {\Large\bfseries\color{accent} #1}\\[4pt]
+    {\small #2}
+    \vfill
+  \end{frame}}
+
+\newcommand{\subact}[2]{%
+  \begin{frame}[plain]
+    \centering \vfill
+    {\large\bfseries\color{accent} #1}\\[4pt]
+    {\small\color{soft} #2}
+    \vfill
+  \end{frame}}
+
+\newcommand{\redlast}[1]{\multicolumn{1}{>{\columncolor{accent!14}[\tabcolsep][0pt]}c@{}}{#1}}
+\newcommand{\seedtag}{g}
+\newcommand{\seedpm}[2]{\eqmakebox[\seedtag M][r]{#1}\,{\tiny\color{soft}$\pm$\eqmakebox[\seedtag S][l]{#2}}}
+\newcommand{\tintlast}[2]{\multicolumn{1}{>{\columncolor{#1}[\tabcolsep][0pt]}c@{}}{#2}}
+\newcommand{\hleq}[1]{{\setlength{\fboxsep}{1.5pt}\colorbox{accent!12}{$\displaystyle #1$}}}
+\newcommand{\hlval}[2]{{\setlength{\fboxsep}{1.2pt}\colorbox{#1}{\textcolor{white}{#2}}}}
+\newcommand{\tintfirst}[2]{\multicolumn{1}{@{}>{\columncolor{#1}[0pt][0pt]}l}{#2\hspace{5pt}}}
+\newcommand{\denomhl}[1]{{\setlength{\fboxsep}{1.5pt}\colorbox{accent!14}{$#1$}}}

@@ -1,0 +1,29 @@
+% ---------------------------------------------------------------- 1 Title
+\begin{frame}[plain]
+  \titlepage
+  \vspace{-1.2em}
+  \centering
+  \begin{tikzpicture}[node distance=6mm]
+    \node[box] (in)  {SAR stack\\{\scriptsize amplitudes + IFG phases}};
+    \node[box, right=of in] (net) {FCN};
+    \node[box, right=of net] (out) {$[a_k,\mu_k,\sigma_k]$\\per pixel};
+    \draw[flow] (in) -- (net);
+    \draw[flow] (net) -- (out);
+  \end{tikzpicture}
+  \\[2pt]
+  {\scriptsize One forward pass replaces per-pixel nonlinear fitting of the elevation spectrum.}
+\end{frame}
+
+% ---------------------------------------------------------------- 2 Outline
+\begin{frame}{Outline}
+  \small
+  \begin{enumerate}
+    \item \textbf{Problem} --- the tomographic elevation spectrum and its per-pixel cost
+    \item \textbf{Data \& ground truth} --- F-SAR stack, GPU-scale label generation, normalization
+    \item \textbf{Method} --- set matching, slot imbalance, training stability
+    \item \textbf{What does the network need?} --- context ladder, patch sizes, input ablation
+    \item \textbf{Benchmark} --- every backbone $\times$ every objective, one winner
+    \item \textbf{Physics-constrained losses} --- five terms, curriculum \hfill {\color{soft}(in progress)}
+    \item \textbf{JEPA pretraining} --- predicting profile embeddings \hfill {\color{soft}(in progress)}
+  \end{enumerate}
+\end{frame}

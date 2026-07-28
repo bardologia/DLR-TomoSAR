@@ -1,0 +1,1378 @@
+% ---------------------------------------------------------------- 13a Small-K failure example
+\begin{frame}{The small-$K$ failure, concretely ($K{=}2$)}
+  \small
+  \begin{columns}[c]
+    \begin{column}{0.42\textwidth}
+      \footnotesize
+      \begin{itemize}
+        \setlength{\itemsep}{10pt}
+        \item Most pixels hold ground + canopy --- the network internalises that
+              prior: slot 2 \emph{expects} a canopy.
+        \item Here a mid-height volume outshines the canopy. GT extraction keeps the
+              $K$ strongest components, so the volume \emph{becomes} the second
+              Gaussian --- the canopy leaves the label entirely.
+        \item The prior misfires: slot 2 lands at canopy height while the label holds
+              the volume --- a \textbf{capacity failure of small $K$}: the label
+              itself has no room for a third layer.
+        \item At larger $K$ a different failure appears: the sorting mechanism itself
+              (two frames ahead).
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.56\textwidth}
+      \centering
+      \begin{tikzpicture}[scale=0.9]
+    \useasboundingbox (-0.15,-6.0) rectangle (6.0,1.55);
+    \draw[good!35,densely dotted]   (2.6,-5.0) -- (2.6,0.95);
+    \draw[accent!35,densely dotted] (4.3,-5.0) -- (4.3,0.95);
+    \node[font=\tiny\bfseries,ink!80,anchor=west] at (0,1.35)
+      {1 --- the scene: three layers, the volume outshines the canopy};
+    \draw[->,soft] (0,0) -- (5.5,0) node[right,font=\tiny]{$z$};
+    \draw[->,soft] (0,0) -- (0,1.05);
+    \draw[ink!60,thick,domain=0.1:5.4,samples=100,smooth]
+      plot (\x,{0.95*exp(-(\x-1.0)^2/0.05)});
+    \draw[good,thick,domain=0.1:5.4,samples=100,smooth]
+      plot (\x,{0.72*exp(-(\x-2.6)^2/0.22)});
+    \draw[accent,thick,domain=0.1:5.4,samples=100,smooth]
+      plot (\x,{0.45*exp(-(\x-4.3)^2/0.16)});
+    \node[font=\tiny,ink!60,anchor=south] at (1.0,0.97)  {ground};
+    \node[font=\tiny,good,anchor=south]   at (2.6,0.74)  {volume};
+    \node[font=\tiny,accent,anchor=west]  at (4.62,0.5)  {canopy};
+    \node[font=\tiny,soft,fill=white,inner sep=0.5pt] at (2.75,-0.38)
+      {amplitude rank: ground $>$ volume $>$ canopy};
+    \node[font=\tiny\bfseries,ink!80,anchor=west] at (0,-1.15)
+      {2 --- the label: $K{=}2$ keeps the two strongest};
+    \draw[->,soft] (0,-2.5) -- (5.5,-2.5) node[right,font=\tiny]{$z$};
+    \draw[->,soft] (0,-2.5) -- (0,-1.45);
+    \draw[ink!60,thick,domain=0.1:5.4,samples=100,smooth]
+      plot (\x,{-2.5+0.95*exp(-(\x-1.0)^2/0.05)});
+    \draw[good,thick,domain=0.1:5.4,samples=100,smooth]
+      plot (\x,{-2.5+0.72*exp(-(\x-2.6)^2/0.22)});
+    \draw[accent!50,thin,dashed,domain=0.1:5.4,samples=100,smooth]
+      plot (\x,{-2.5+0.45*exp(-(\x-4.3)^2/0.16)});
+    \node[font=\tiny,accent!70,fill=white,inner sep=0.5pt] at (4.3,-2.88)
+      {3rd strongest --- dropped, no slot};
+    \node[font=\tiny\bfseries,ink!80,anchor=west] at (0,-3.65)
+      {3 --- the network: the ground + canopy prior misfires};
+    \draw[->,soft] (0,-5.0) -- (5.5,-5.0) node[right,font=\tiny]{$z$};
+    \draw[->,soft] (0,-5.0) -- (0,-3.95);
+    \draw[ink!60,thick,domain=0.1:5.4,samples=100,smooth]
+      plot (\x,{-5.0+0.95*exp(-(\x-1.0)^2/0.05)});
+    \draw[good!70,thick,densely dotted,domain=0.1:5.4,samples=100,smooth]
+      plot (\x,{-5.0+0.72*exp(-(\x-2.6)^2/0.22)});
+    \draw[accent,very thick,domain=0.1:5.4,samples=100,smooth]
+      plot (\x,{-5.0+0.5*exp(-(\x-4.3)^2/0.16)});
+    \node[font=\tiny,good!80,anchor=south,fill=white,inner sep=0.5pt] at (2.5,-4.2) {label target};
+    \node[font=\tiny,accent,anchor=south,fill=white,inner sep=0.5pt] at (4.5,-4.4)
+      {prior: canopy expected};
+    \draw[{Stealth[length=1.6mm]}-{Stealth[length=1.6mm]},accent,thick]
+      (2.68,-4.7) -- (4.22,-4.7);
+    \node[font=\tiny,accent,fill=white,inner sep=0.5pt] at (3.45,-5.25) {slot-2 error};
+    \node[font=\tiny,soft] at (2.75,-5.75)
+      {the label has no room for a third layer --- the miss is built into $K{=}2$};
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 13a-ii Output is a set, not a vector
+\begin{frame}{The output is a set, not a vector}
+  \small
+  Per pixel the network fills $K$ slots, each a triplet
+  $\theta_k = (a_k,\mu_k,\sigma_k)$ --- output channels with no intrinsic order.
+  \begin{center}
+  \begin{tikzpicture}
+    \foreach \i/\x in {1/0.8,2/2.6,3/4.4}
+      \node[font=\tiny,text=soft] at (\x,3.92) {slot \i};
+    \node[gate,align=center] (gtl) at (-1.62,3.1) {extracted GT\\ label};
+    \node[box]  (hdl) at (-1.62,0) {network\\ output};
+    \node[font=\tiny,text=soft,align=center] at (-1.62,1.55) {slot-wise squared\\ error $\ell_k = \lVert\hat\theta_k - \theta_k\rVert^2$};
+    \draw[flow] (gtl.east) -- (-0.06,3.1);
+    \draw[flow] (hdl.east) -- (-0.06,0);
+    \draw[accent!70,thin,rounded corners=2pt,fill=accent!4] (0.0,2.45) rectangle (1.6,3.75);
+    \draw[argA!70,thin,rounded corners=2pt,fill=argA!4]     (1.8,2.45) rectangle (3.4,3.75);
+    \draw[good!70,thin,rounded corners=2pt,fill=good!4]     (3.6,2.45) rectangle (5.2,3.75);
+    \foreach \x in {0.8,2.6,4.4} \draw[soft!40,thin] (\x-0.7,2.94) -- (\x+0.7,2.94);
+    \draw[accent,thick,domain=-0.62:0.62,samples=41,smooth,shift={(0.8,2.94)}]
+      plot (\x,{0.58*exp(-(\x+0.29)*(\x+0.29)/(2*0.108*0.108))});
+    \draw[argA,thick,domain=-0.62:0.62,samples=41,smooth,shift={(2.6,2.94)}]
+      plot (\x,{0.38*exp(-(\x-0.07)*(\x-0.07)/(2*0.18*0.18))});
+    \draw[good,thick,domain=-0.62:0.62,samples=41,smooth,shift={(4.4,2.94)}]
+      plot (\x,{0.29*exp(-(\x-0.43)*(\x-0.43)/(2*0.108*0.108))});
+    \node[font=\tiny,text=accent] at (0.8,2.68) {$(a_1,\;\mu_1,\;\sigma_1)$};
+    \node[font=\tiny,text=argA]   at (2.6,2.68) {$(a_2,\;\mu_2,\;\sigma_2)$};
+    \node[font=\tiny,text=good]   at (4.4,2.68) {$(a_3,\;\mu_3,\;\sigma_3)$};
+    \draw[argA!70,thin,rounded corners=2pt,fill=argA!4]     (0.0,-0.65) rectangle (1.6,0.65);
+    \draw[good!70,thin,rounded corners=2pt,fill=good!4]     (1.8,-0.65) rectangle (3.4,0.65);
+    \draw[accent!70,thin,rounded corners=2pt,fill=accent!4] (3.6,-0.65) rectangle (5.2,0.65);
+    \foreach \x in {0.8,2.6,4.4} \draw[soft!40,thin] (\x-0.7,-0.16) -- (\x+0.7,-0.16);
+    \draw[accent!45,thin,densely dotted,domain=-0.62:0.62,samples=41,smooth,shift={(0.8,-0.16)}]
+      plot (\x,{0.58*exp(-(\x+0.29)*(\x+0.29)/(2*0.108*0.108))});
+    \draw[argA,thick,domain=-0.62:0.62,samples=41,smooth,shift={(0.8,-0.16)}]
+      plot (\x,{0.38*exp(-(\x-0.07)*(\x-0.07)/(2*0.18*0.18))});
+    \draw[argA!50,thin,densely dotted,domain=-0.62:0.62,samples=41,smooth,shift={(2.6,-0.16)}]
+      plot (\x,{0.38*exp(-(\x-0.07)*(\x-0.07)/(2*0.18*0.18))});
+    \draw[good,thick,domain=-0.62:0.62,samples=41,smooth,shift={(2.6,-0.16)}]
+      plot (\x,{0.29*exp(-(\x-0.43)*(\x-0.43)/(2*0.108*0.108))});
+    \draw[good!55,thin,densely dotted,domain=-0.62:0.62,samples=41,smooth,shift={(4.4,-0.16)}]
+      plot (\x,{0.29*exp(-(\x-0.43)*(\x-0.43)/(2*0.108*0.108))});
+    \draw[accent,thick,domain=-0.62:0.62,samples=41,smooth,shift={(4.4,-0.16)}]
+      plot (\x,{0.58*exp(-(\x+0.29)*(\x+0.29)/(2*0.108*0.108))});
+    \draw[accent!80,thin,-{Stealth[length=1.4mm]}] (0.87,0.50) -- (0.58,0.50);
+    \draw[accent!80,thin,-{Stealth[length=1.4mm]}] (3.03,0.50) -- (2.72,0.50);
+    \draw[accent!80,thin,-{Stealth[length=1.4mm]}] (4.11,0.50) -- (4.76,0.50);
+    \node[font=\tiny,text=argA]   at (0.8,-0.42) {$(a_2,\;\mu_2,\;\sigma_2)$};
+    \node[font=\tiny,text=good]   at (2.6,-0.42) {$(a_3,\;\mu_3,\;\sigma_3)$};
+    \node[font=\tiny,text=accent] at (4.4,-0.42) {$(a_1,\;\mu_1,\;\sigma_1)$};
+    \foreach \x/\e in {0.8/{\ell_1},2.6/{\ell_2},4.4/{\ell_3}} {
+      \draw[accent!75,densely dashed,{Stealth[length=1.5mm]}-{Stealth[length=1.5mm]},thin]
+        (\x,2.43) -- (\x,0.68);
+      \node[font=\tiny,text=accent,fill=white,inner sep=1pt] at (\x,1.55) {$\e$}; }
+    \node[font=\tiny,text=soft]         at (5.66,1.85) {fixed slot-wise MSE};
+    \node[font=\scriptsize,text=accent] at (5.66,1.53) {$\ell_1{+}\ell_2{+}\ell_3 \gg 0$};
+    \node[font=\tiny,text=accent]       at (5.66,1.22) {on a perfect answer};
+    \draw[flow] (5.3,3.1) -- (6.25,3.1);
+    \draw[flow] (5.3,0.0) -- (6.25,0.0);
+    \node[font=\tiny,text=soft] at (7.9,4.00) {reconstructed profile $p(z)$};
+    \draw[soft!50,thin,rounded corners=2pt,fill=black!2] (6.35,2.35) rectangle (9.45,3.85);
+    \draw[soft!50,thin,rounded corners=2pt,fill=black!2] (6.35,-0.75) rectangle (9.45,0.75);
+    \foreach \dy in {2.55,-0.55} {
+      \begin{scope}[shift={(6.55,\dy)}]
+        \draw[->,soft!70,thin] (0,0) -- (2.70,0) node[above left,font=\tiny,inner sep=1pt]{$z$};
+        \draw[accent,thin,densely dashed,domain=0.05:2.7,samples=60,smooth]
+          plot (\x,{0.60*exp(-(\x-0.72)*(\x-0.72)/(2*0.216*0.216))});
+        \draw[argA,thin,densely dashed,domain=0.05:2.7,samples=60,smooth]
+          plot (\x,{0.40*exp(-(\x-1.44)*(\x-1.44)/(2*0.36*0.36))});
+        \draw[good,thin,densely dashed,domain=0.05:2.7,samples=60,smooth]
+          plot (\x,{0.30*exp(-(\x-2.16)*(\x-2.16)/(2*0.216*0.216))});
+        \draw[ink,thick,domain=0.05:2.7,samples=120,smooth]
+          plot (\x,{0.60*exp(-(\x-0.72)*(\x-0.72)/(2*0.216*0.216)) + 0.40*exp(-(\x-1.44)*(\x-1.44)/(2*0.36*0.36)) + 0.30*exp(-(\x-2.16)*(\x-2.16)/(2*0.216*0.216))});
+      \end{scope} }
+    \node[font=\large] at (7.9,1.67) {$=$};
+    \node[font=\tiny,text=ink] at (7.9,1.31) {the same profile};
+  \end{tikzpicture}
+  \end{center}
+  \vspace{2pt}
+  \centering
+  This is the \textbf{permutation-invariance problem} --- the loss must score the
+  set, not the slot order.
+\end{frame}
+
+% ---------------------------------------------------------------- 13b Sorting instability example
+\begin{frame}{The sorting instability, concretely ($K{=}3$)}
+  \small
+  \begin{columns}[c]
+    \begin{column}{0.42\textwidth}
+      \footnotesize
+      \begin{itemize}
+        \setlength{\itemsep}{10pt}
+        \item Almost every pixel holds two layers. Under $\mu$-sorting the head
+              \emph{specializes}: slot 1 learns the ground, slot 2 learns the canopy,
+              and slot 3 almost never sees an active Gaussian --- it learns silence.
+        \item A three-layer pixel reshuffles the targets: the volume drops into
+              slot 2 --- the canopy specialist --- and the canopy is pushed into
+              slot 3 --- the silent slot.
+        \item Habits win: slot 2 emits its usual canopy and misses the volume;
+              slot 3 stays silent and the canopy loses its predictor --- the rare
+              pixel is wrong in every slot at once.
+        \item The failure is scoring \emph{slots}; the way out is to score the
+              \emph{set} (next).
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.56\textwidth}
+      \centering
+      \begin{tikzpicture}[scale=0.95]
+    \useasboundingbox (-0.05,0.3) rectangle (7.95,6.55);
+    \node[font=\tiny\bfseries,ink!80] at (2.9,6.38) {slot 1};
+    \node[font=\tiny\bfseries,ink!80] at (4.9,6.38) {slot 2};
+    \node[font=\tiny\bfseries,ink!80] at (6.9,6.38) {slot 3};
+    \node[font=\tiny,ink!70,align=center]  at (2.9,6.02) {specialized in\\ground search};
+    \node[font=\tiny,accent,align=center]  at (4.9,6.02) {specialized in\\canopy search};
+    \node[font=\tiny,soft,align=center]    at (6.9,6.02) {non-specialized\\head};
+    % --- row 1: the diet and what each slot learns ---
+    \draw[soft!40,thin,rounded corners=2pt,fill=black!2] (0.24,4.64) rectangle (1.84,5.89);
+    \draw[soft!40,thin,rounded corners=2pt,fill=black!2] (0.17,4.57) rectangle (1.77,5.82);
+    \draw[soft!60,thin,rounded corners=2pt,fill=white]   (0.10,4.50) rectangle (1.70,5.75);
+    \draw[soft!40,thin] (0.24,4.68) -- (1.56,4.68);
+    \draw[ink!60,thick,domain=0.26:1.54,samples=60,smooth]
+      plot (\x,{4.68+0.65*exp(-(\x-0.5)^2/0.02)});
+    \draw[accent,thick,domain=0.26:1.54,samples=60,smooth]
+      plot (\x,{4.68+0.45*exp(-(\x-1.3)^2/0.03)});
+    \node[font=\tiny\bfseries,ink!80] at (0.9,4.26) {the standard case};
+    \draw[-{Stealth[length=1.3mm]},soft] (1.78,5.12) -- (2.02,5.12);
+    \draw[ink!40,thin,rounded corners=2pt,fill=black!4] (2.05,4.5) rectangle (3.75,5.75);
+    \draw[soft!40,thin] (2.18,4.68) -- (3.62,4.68);
+    \draw[ink!60,thick,domain=2.2:3.6,samples=60,smooth]
+      plot (\x,{4.68+0.65*exp(-(\x-2.45)^2/0.02)});
+    \node[font=\tiny,ink!60] at (2.9,4.26) {always: ground};
+    \draw[accent!60,thin,rounded corners=2pt,fill=accent!6] (4.05,4.5) rectangle (5.75,5.75);
+    \draw[soft!40,thin] (4.18,4.68) -- (5.62,4.68);
+    \draw[accent,thick,domain=4.2:5.6,samples=60,smooth]
+      plot (\x,{4.68+0.65*exp(-(\x-5.35)^2/0.02)});
+    \node[font=\tiny,accent] at (4.9,4.26) {always: canopy};
+    \draw[soft!60,thin,dashed,rounded corners=2pt,fill=black!2] (6.05,4.5) rectangle (7.75,5.75);
+    \draw[soft!40,thin] (6.18,4.68) -- (7.62,4.68);
+    \node[font=\tiny,soft] at (6.9,5.15) {never fed};
+    \node[font=\tiny,soft] at (6.9,4.26) {always: placeholder};
+    % --- the shove ---
+    \draw[accent!80,dashed,-{Stealth[length=1.6mm]}] (5.6,4.5) -- (5.6,3.5) -- (6.9,3.5) -- (6.9,2.79);
+    \node[font=\tiny,accent,anchor=west] at (5.74,3.94) {the canopy is pushed};
+    \node[font=\tiny,accent,anchor=west] at (5.74,3.72) {to the dead slot};
+    % --- row 2: the rare pixel, sorted targets vs habits ---
+    \draw[soft!60,thin,rounded corners=2pt,fill=white] (0.10,1.50) rectangle (1.70,2.75);
+    \draw[soft!40,thin] (0.24,1.68) -- (1.56,1.68);
+    \draw[ink!60,thick,domain=0.26:1.54,samples=60,smooth]
+      plot (\x,{1.68+0.65*exp(-(\x-0.5)^2/0.02)});
+    \draw[good,thick,domain=0.26:1.54,samples=60,smooth]
+      plot (\x,{1.68+0.5*exp(-(\x-0.9)^2/0.02)});
+    \draw[accent,thick,domain=0.26:1.54,samples=60,smooth]
+      plot (\x,{1.68+0.45*exp(-(\x-1.3)^2/0.03)});
+    \node[font=\tiny\bfseries,ink!80] at (0.9,1.26) {one rare pixel};
+    \draw[-{Stealth[length=1.3mm]},soft] (1.78,2.12) -- (2.02,2.12);
+    \draw[ink!40,thin,rounded corners=2pt,fill=black!4] (2.05,1.50) rectangle (3.75,2.75);
+    \draw[soft!40,thin] (2.18,1.68) -- (3.62,1.68);
+    \draw[ink!60,thick,domain=2.2:3.6,samples=60,smooth]
+      plot (\x,{1.68+0.65*exp(-(\x-2.45)^2/0.02)});
+    \node[font=\tiny,good] at (2.9,1.26) {match};
+    \draw[accent!60,thin,rounded corners=2pt,fill=accent!6] (4.05,1.50) rectangle (5.75,2.75);
+    \draw[soft!40,thin] (4.18,1.68) -- (5.62,1.68);
+    \draw[good!80,thick,densely dotted,domain=4.2:5.6,samples=60,smooth]
+      plot (\x,{1.68+0.6*exp(-(\x-4.9)^2/0.025)});
+    \draw[accent,very thick,domain=4.2:5.6,samples=60,smooth]
+      plot (\x,{1.68+0.6*exp(-(\x-5.35)^2/0.02)});
+    \node[font=\tiny,accent] at (4.9,1.26) {volume missed};
+    \draw[soft!60,thin,dashed,rounded corners=2pt,fill=black!2] (6.05,1.50) rectangle (7.75,2.75);
+    \draw[accent!80,thick,densely dotted,domain=6.2:7.6,samples=60,smooth]
+      plot (\x,{1.68+0.6*exp(-(\x-7.35)^2/0.02)});
+    \draw[soft,very thick] (6.18,1.68) -- (7.62,1.68);
+    \node[font=\tiny,accent] at (6.9,1.26) {canopy missed};
+    \node[font=\tiny,soft] at (3.95,0.78)
+      {dotted: the sorted target --- solid: the slot's habitual answer};
+    \node[font=\tiny,soft] at (3.95,0.46)
+      {one rare pixel, wrong in every slot --- the specialists were trained for a different label};
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 14 Hungarian full slide
+\begin{frame}{Hungarian matching}
+  \small
+  \begin{columns}[c]
+    \begin{column}{0.5\textwidth}
+      \begin{itemize}
+        \item Each Gaussian is a \textbf{point in $(a,\mu,\sigma)$ space}: prediction and
+              GT are two point sets; the matcher pairs them by distance and scores the
+              \emph{set}, not the slot layout.
+      \end{itemize}
+      \vspace{6pt}
+      \centering
+      \begin{tikzpicture}[scale=0.95, every node/.style={font=\tiny}]
+        \begin{scope}[on background layer]
+          \fill[soft!8] (0,0) -- (3.5,0) -- (2.8,-0.5) -- (-0.7,-0.5) -- cycle;
+          \draw[soft!30, thin] (0,0) -- (3.5,0) -- (2.8,-0.5) -- (-0.7,-0.5) -- cycle;
+        \end{scope}
+        \node[soft] at (0.95,-0.30) {$a{=}0$};
+        \draw[->,soft] (0,0) -- (3.6,0) node[right]{$\mu$};
+        \draw[->,soft] (0,0) -- (0,2.1) node[above]{$a$};
+        \draw[->,soft] (0,0) -- (-0.7,-0.5) node[below left]{$\sigma$};
+        \draw[accent, dashed, thick] (0.8,1.4) -- (1.25,1.15);
+        \draw[accent, dashed, thick] (2.05,0.55) -- (1.7,0.85);
+        \draw[soft, dashed, thick] (2.35,0.35) -- (2.35,-0.30);
+        \draw[soft, dotted, thick] (2.35,-0.30) -- (2.35,-0.74);
+        \fill[accent] (0.8,1.4) circle (2.2pt);
+        \fill[accent] (2.05,0.55) circle (2.2pt);
+        \draw[ink, thick] (1.25,1.15) circle (2.2pt);
+        \draw[ink, thick] (1.7,0.85) circle (2.2pt);
+        \draw[ink, thick] (2.35,0.35) circle (2.2pt);
+        \draw[soft!70, fill=white] (2.35,-0.30) circle (1.3pt);
+        \draw[soft, thick, fill=black!4] (2.23,-0.98) rectangle (2.47,-0.74);
+        \node[accent, anchor=south] at (0.8,1.55) {GT};
+        \node[ink, anchor=west] at (2.48,0.40) {predicted};
+        \node[soft, anchor=north] at (2.35,-1.02) {$\varnothing$ empty slot};
+      \end{tikzpicture}
+      \\ {\scriptsize Filled = active GT, open = predicted, $\varnothing$ = empty GT slot
+      (below $a{=}0$). Its match (grey) is zero-weighted, so $\hat\theta_3$ is free.}
+    \end{column}
+    \begin{column}{0.5\textwidth}
+      \centering
+      \[
+        \mathcal{L} \;=\; \min_{\pi \in S_K}\ \sum_{k=1}^{K} w_k
+          \left\| \hat\theta_{\pi(k)} - \theta_k \right\|^{2}
+        \qquad \theta_k = (a_k,\mu_k,\sigma_k)
+      \]
+      {\scriptsize $w_k=\mathbf{1}[a_k>\tau]$ --- GT \emph{active mask}: $1$ if present, $0$ if empty.}\\[15pt]
+      \begin{tikzpicture}[scale=0.92, transform shape, font=\tiny]
+        % ===================== cost matrix =====================
+        \node[text=soft] at (0.84,0.66) {GT $\theta_j$};
+        \node[text=soft] at (0.28,0.26) {$\theta_1$};
+        \node[text=soft] at (0.84,0.26) {$\theta_2$};
+        \node[text=soft] at (1.40,0.26) {$\varnothing$};
+        \node[text=soft, rotate=90] at (-0.74,-0.84) {pred $\hat\theta_i$};
+        \node[text=soft] at (-0.28,-0.28) {$\hat\theta_1$};
+        \node[text=soft] at (-0.28,-0.84) {$\hat\theta_2$};
+        \node[text=soft] at (-0.28,-1.40) {$\hat\theta_3$};
+        \fill[soft!12] (1.12,0) rectangle (1.68,-1.68);
+        \draw[step=0.56, soft!45, thin] (0,-1.68) grid (1.68,0);
+        \draw[soft!70] (0,-1.68) rectangle (1.68,0);
+        \node[text=ink]  at (0.28,-0.28) {0.9};
+        \node[text=ink]  at (0.84,-0.28) {0.2};
+        \node[text=soft] at (1.40,-0.28) {0.0};
+        \node[text=ink]  at (0.28,-0.84) {0.4};
+        \node[text=ink]  at (0.84,-0.84) {0.8};
+        \node[text=soft] at (1.40,-0.84) {0.0};
+        \node[text=ink]  at (0.28,-1.40) {0.6};
+        \node[text=ink]  at (0.84,-1.40) {0.5};
+        \node[text=soft] at (1.40,-1.40) {0.0};
+        \node[text=soft] at (0.84,-2.06) {cost $C_{ij}=w_j\lVert\hat\theta_i-\theta_j\rVert^{2}$};
+        % ===================== arrow =====================
+        \draw[flow] (1.98,-0.84) -- (3.18,-0.84);
+        \node[text=accent] at (2.58,-0.52) {$\pi^\star$};
+        \node[text=soft]   at (2.58,-1.14) {min cost};
+        % ===================== selected matching =====================
+        \begin{scope}[shift={(3.48,0)}]
+          \fill[soft!12]   (1.12,0)      rectangle (1.68,-1.68);
+          \fill[accent!16] (0.56,0)      rectangle (1.12,-0.56);
+          \fill[accent!16] (0,-0.56)     rectangle (0.56,-1.12);
+          \fill[soft!38]   (1.12,-1.12)  rectangle (1.68,-1.68);
+          \draw[step=0.56, soft!45, thin] (0,-1.68) grid (1.68,0);
+          \draw[soft!70] (0,-1.68) rectangle (1.68,0);
+          \node[text=soft]   at (0.28,-0.28) {0.9};
+          \node[text=accent] at (0.84,-0.28) {\textbf{0.2}};
+          \node[text=soft]   at (1.40,-0.28) {0.0};
+          \node[text=accent] at (0.28,-0.84) {\textbf{0.4}};
+          \node[text=soft]   at (0.84,-0.84) {0.8};
+          \node[text=soft]   at (1.40,-0.84) {0.0};
+          \node[text=soft]   at (0.28,-1.40) {0.6};
+          \node[text=soft]   at (0.84,-1.40) {0.5};
+          \node[text=soft]   at (1.40,-1.40) {\textbf{0.0}};
+          \node[text=accent] at (0.84,-2.06) {$\textstyle\sum C_{\pi^\star}=0.6$};
+        \end{scope}
+      \end{tikzpicture}\hspace*{2.5em}
+      \\[4pt] {\scriptsize Column $\varnothing$ is a placeholder GT ($w_j{=}0$) --- all-zero,
+      so the leftover prediction matches it for free:
+      $\hat\theta_1\!\to\!\theta_2,\ \hat\theta_2\!\to\!\theta_1,\ \hat\theta_3\!\to\!\varnothing$.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 15 DETR lineage
+\begin{frame}{Set-prediction lineage: DETR}
+  \small
+  \begin{columns}[c]
+    \begin{column}{0.54\textwidth}
+      DETR (Carion et al., ECCV 2020) framed detection as \textbf{direct set prediction}:
+      bipartite (Hungarian) matching \; + \; a per-element existence mechanism.
+      \textbf{The answer to the small-$K$ failure}: grow $K$ until every layer fits, and
+      let existence gates close the slots a pixel does not need.
+      \vspace{6pt}
+      \begin{itemize}
+        \item The gate replaces DETR's classification softmax: absence is encoded as
+              \emph{zero amplitude}, not a class --- the $3K$-channel contract is
+              unchanged.
+        \item Under \texttt{sorted\_gt} the gate merely relabels slots ---
+              \textbf{pair with Hungarian}.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \centering
+      \begin{tikzpicture}[node distance=4mm]
+        \node[box, minimum width=15mm] (bb) at (0,1.15)  {CNN backbone};
+        \node[box, minimum width=15mm] (tr) at (0,-0.15) {transformer\\enc.--dec.};
+        \node[gate]                    (qq) at (0,-1.75) {$N$ learned\\object queries};
+        \draw[flow] (bb) -- (tr);
+        \draw[flow] (qq) -- (tr);
+        \node[gate] (p1) at (2.15,1.15)  {$\hat c_1,\;\hat b_1$};
+        \node[gate] (p2) at (2.15,0)     {$\hat c_2,\;\hat b_2$};
+        \node[gate] (p3) at (2.15,-1.15) {$\hat c_3,\;\hat b_3$};
+        \node[font=\tiny,soft]     at (2.15,1.58)  {class $\hat c_k$ + box $\hat b_k$ per query};
+        \node[font=\tiny,black!50] at (2.15,-1.58) {$\hat c_3=\varnothing$: no object};
+        \draw[flow] (tr.east) -- (p1.west);
+        \draw[flow] (tr.east) -- (p2.west);
+        \draw[flow] (tr.east) -- (p3.west);
+        \fill[argA!12, rounded corners=2pt] ($(p1.east)+(0.12,0.2)$) rectangle (4.55,-1.35);
+        \coordinate (o1) at ($(p1.east)+(0.32,0)$);
+        \coordinate (o2) at ($(p2.east)+(0.32,0)$);
+        \coordinate (o3) at ($(p3.east)+(0.32,0)$);
+        \draw[soft, thin] (p1.east) -- (o1);
+        \draw[soft, thin] (p2.east) -- (o2);
+        \draw[soft, thin] (p3.east) -- (o3);
+        \node[font=\scriptsize,accent] (g1) at (4.87,0.9)  {GT 1};
+        \node[font=\scriptsize,accent] (g2) at (4.87,-0.9) {GT 2};
+        \node[font=\scriptsize,soft]   (g0) at (4.37,0)    {$\varnothing$};
+        \draw[soft, dashed, thick] (o1) -- (4.30,-0.85);
+        \draw[soft, dashed, thick] (o2) -- (4.30,0.85);
+        \draw[soft, dashed, thick] (o3) -- (4.20,0);
+        \fill[good]     (o1) circle (2.1pt);
+        \fill[good]     (o2) circle (2.1pt);
+        \fill[black!35] (o3) circle (2.1pt);
+        \fill[accent] (4.37,0.9)  circle (2.1pt);
+        \fill[accent] (4.37,-0.9) circle (2.1pt);
+        \node[font=\tiny,argA] at (3.95,-1.78) {Hungarian assignment};
+      \end{tikzpicture}
+      \\[4pt]
+      {\scriptsize DETR: every query emits a class and a box; absence is the explicit
+      class $\varnothing$ --- unmatched queries are trained onto $\varnothing$ and
+      leave the box loss.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 15a Set-prediction head mechanism
+\begin{frame}{Inside the set-prediction head --- gate, blend, match}
+  \small
+  \begin{columns}[T]
+    \begin{column}{0.56\textwidth}
+      \centering
+      \vspace{4pt}
+      \begin{tikzpicture}[font=\scriptsize, scale=0.86, transform shape,
+          exc/.style={-{Stealth[length=1.5mm]}, argA!85, semithick, densely dashed}]
+        \node[box, minimum height=27mm, minimum width=16mm] (bb) at (0,0) {backbone\\embedding};
+        \node[gate, minimum height=7mm] (h1) at (2.7,1.5)  {Gaussian\\head 1};
+        \node[gate, minimum height=7mm] (h2) at (2.7,0)    {Gaussian\\head 2};
+        \node[gate, minimum height=7mm] (h3) at (2.7,-1.5) {Gaussian\\head 3};
+        \node[box, draw=good!70, fill=good!12, text=ink, minimum height=6mm, minimum width=9mm] (g1) at (5.0,1.5)  {gate};
+        \node[box, draw=good!70, fill=good!12, text=ink, minimum height=6mm, minimum width=9mm] (g2) at (5.0,0)    {gate};
+        \node[box, draw=good!70, fill=good!12, text=ink, minimum height=6mm, minimum width=9mm] (g3) at (5.0,-1.5) {gate};
+        \node[gate, draw=accent!70, fill=accent!8, minimum height=6mm] (o1) at (7.1,1.5)  {$a_1,\mu_1,\sigma_1$};
+        \node[gate, draw=accent!70, fill=accent!8, minimum height=6mm] (o2) at (7.1,0)    {$a_2,\mu_2,\sigma_2$};
+        \node[gate, draw=accent!70, fill=accent!8, minimum height=6mm] (o3) at (7.1,-1.5) {$a_3,\mu_3,\sigma_3$};
+        \node[gate, minimum height=7mm] (eh)  at (2.3,-3.1) {existence\\head};
+        \node[gate, minimum height=6mm] (sig) at (4.2,-3.1) {$\sigma$};
+        \draw[flow] (bb.east) -- (h1.west);
+        \draw[flow] (bb.east) -- (h2.west);
+        \draw[flow] (bb.east) -- (h3.west);
+        \draw[flow] (bb.south) |- (eh.west);
+        \draw[flow] (h1.east) -- node[midway, above, font=\tiny, text=soft]{$\hat a_1$} (g1.west);
+        \draw[flow] (h2.east) -- node[midway, above, font=\tiny, text=soft]{$\hat a_2$} (g2.west);
+        \draw[flow] (h3.east) -- node[midway, above, font=\tiny, text=soft]{$\hat a_3$} (g3.west);
+        \draw[flow] (g1.east) -- node[midway, above, font=\tiny, text=accent]{$a_1$} (o1.west);
+        \draw[flow] (g2.east) -- node[midway, above, font=\tiny, text=accent]{$a_2$} (o2.west);
+        \draw[flow] (g3.east) -- node[midway, above, font=\tiny, text=accent]{$a_3$} (o3.west);
+        \draw[flow] (eh.east) -- (sig.west) node[midway, below, font=\tiny]{$e_1,e_2,e_3$};
+        \draw[exc, rounded corners=2pt] (4.10,-2.8) -- (4.10,0.75)  -| (g1.south);
+        \draw[exc, rounded corners=2pt] (4.20,-2.8) -- (4.20,-0.75) -| (g2.south);
+        \draw[exc, rounded corners=2pt] (4.30,-2.8) -- (4.30,-2.25) -| (g3.south);
+        \node[font=\tiny, text=argA, anchor=north] at (5.3,1.2)  {$g_1$};
+        \node[font=\tiny, text=argA, anchor=north] at (5.3,-0.3) {$g_2$};
+        \node[font=\tiny, text=argA, anchor=north] at (5.3,-1.8) {$g_3$};
+        \node[font=\tiny, text=argA, anchor=west] at ($(sig.east)+(0.12,0)$) {$g_k=\sigma(e_k)$ per slot};
+      \end{tikzpicture}
+      \\[8pt]
+      {\footnotesize each gate:\; $a_k = g_k\,\hat a_k + (1-g_k)\,a_{\mathrm{off},k}$}\\[1pt]
+      {\scriptsize\color{soft} $\mu_k,\sigma_k$ pass through $\cdot$ $a_{\mathrm{off}}$ learned per slot}
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \footnotesize
+      \textbf{The gate is a sigmoid} on the existence logit $e_k$:
+      \begin{itemize}\setlength{\itemsep}{5pt}
+        \item Open slots ($g_k\!\to\!1$): $a_k \approx \hat a_k$ --- the raw regression survives.
+        \item Closed slot ($g_k\!\to\!0$): $a_k \to a_{\mathrm{off},k}\approx 0$ \emph{whatever}
+              $\hat a_k$ is, collapsing onto the empty-set target at near-zero loss.
+        \item $e_k$ is internal --- the head still emits $3K$ channels $(a_k,\mu_k,\sigma_k)$;
+              $a_{\mathrm{off}}$ is a learned per-slot scalar (init $0$).
+      \end{itemize}
+      \vspace{8pt}
+      \centering
+      \begin{tikzpicture}[scale=0.82, font=\scriptsize]
+        \draw[soft!45, dashed] (-3.4,2.2) -- (3.6,2.2);
+        \draw[soft!45, dashed] (-3.4,1.1) -- (3.6,1.1);
+        \node[soft, font=\tiny, anchor=east] at (-0.1,2.2) {1};
+        \node[soft, font=\tiny, anchor=east] at (-0.1,1.1) {0.5};
+        \draw[->, soft] (-3.4,0) -- (3.7,0) node[right, font=\tiny]{$e_k$};
+        \draw[->, soft] (0,-0.15) -- (0,2.55) node[above, font=\tiny, text=good]{$g_k=\sigma(e_k)$};
+        \draw[accent, very thick, samples=90, domain=-6:6] plot ({\x*0.55},{2.2/(1+exp(-\x))});
+        \fill[good] (2.2,2.16) circle (1.7pt);
+        \node[good, font=\tiny, anchor=north west] at (1.55,2.02) {open: $g_k\!\to\!1$};
+        \fill[accent] (-2.75,0.04) circle (1.7pt);
+        \node[accent, font=\tiny, anchor=west] at (-3.35,0.62) {closed: $g_k\!\to\!0$};
+        \draw[accent!60, thin] (-2.75,0.1) -- (-2.55,0.5);
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 15b Hungarian 2x2
+\begin{frame}{Set prediction, controlled --- the head is the lever, not the matching}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{1.1}
+  \setlength{\tabcolsep}{5pt}
+  \renewcommand{\seedtag}{setA}
+  \begin{tabular}{@{}l cc !{\hspace{3pt}} cc@{}}
+    \toprule
+     & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c@{}}{set-pred head} \\
+    \cmidrule(lr){2-3}\cmidrule(l){4-5}
+    metric & sort & Hung & sort & Hung \\
+    \midrule
+    \multicolumn{5}{@{}l}{\emph{reconstruction (curve)}} \\
+    curve $R^2$ $\uparrow$  & \seedpm{0.569}{.008} & \seedpm{\textbf{0.603}}{.012} & \seedpm{0.536}{.026} & \seedpm{0.578}{.016} \\
+    curve MAE $\downarrow$  & \seedpm{0.0496}{.0008} & \seedpm{\textbf{0.0471}}{.0005} & \seedpm{0.0503}{.0016} & \seedpm{0.0480}{.0011} \\
+    PSNR [dB] $\uparrow$    & \seedpm{50.3}{.1} & \seedpm{50.7}{.1} & \seedpm{50.0}{.2} & \seedpm{50.4}{.2} \\
+    SSIM elev $\uparrow$    & \seedpm{0.9586}{.0006} & \seedpm{0.9601}{.0003} & \seedpm{0.9586}{.0010} & \seedpm{0.9598}{.0009} \\
+    SSIM range $\uparrow$   & \seedpm{0.9258}{.0021} & \seedpm{0.9277}{.0019} & \seedpm{0.9329}{.0039} & \seedpm{0.9342}{.0028} \\
+    SSIM azim $\uparrow$    & \seedpm{0.9461}{.0012} & \seedpm{0.9479}{.0007} & \seedpm{0.9471}{.0020} & \seedpm{0.9488}{.0014} \\
+    profile cos med $\uparrow$ & \seedpm{0.850}{.024} & \seedpm{0.854}{.022} & \seedpm{\textbf{0.904}}{.034} & \seedpm{0.896}{.033} \\
+    \addlinespace
+    \multicolumn{5}{@{}l}{\emph{detection (matched)}} \\
+    peak err mean $\downarrow$ & \seedpm{4.70}{.47} & \seedpm{4.80}{.52} & \seedpm{1.66}{.09} & \seedpm{\hlval{good}{\textbf{1.63}}}{.08} \\
+    \quad median $\downarrow$  & \seedpm{0.81}{.30} & \seedpm{1.07}{.37} & \seedpm{\textbf{0.67}}{.00} & \seedpm{\textbf{0.67}}{.00} \\
+    \quad p95 $\downarrow$     & \seedpm{15.44}{.47} & \seedpm{15.57}{.56} & \seedpm{6.71}{.47} & \seedpm{\hlval{good}{\textbf{6.04}}}{.47} \\
+    precision $\uparrow$   & \seedpm{0.821}{.008} & \seedpm{0.822}{.002} & \seedpm{0.816}{.005} & \seedpm{0.813}{.004} \\
+    recall $\uparrow$      & \seedpm{0.641}{.029} & \seedpm{0.642}{.045} & \seedpm{0.887}{.008} & \seedpm{\hlval{good}{\textbf{0.893}}}{.004} \\
+    matched F1 $\uparrow$  & \seedpm{0.720}{.020} & \seedpm{0.720}{.027} & \seedpm{0.850}{.006} & \seedpm{\textbf{0.851}}{.004} \\
+    count exact $\uparrow$ & \seedpm{0.595}{.034} & \seedpm{0.590}{.044} & \seedpm{\hlval{good}{\textbf{0.852}}}{.004} & \seedpm{0.841}{.004} \\
+    \quad under $\downarrow$ & \seedpm{0.327}{.036} & \seedpm{0.329}{.057} & \seedpm{0.018}{.005} & \seedpm{\hlval{good}{\textbf{0.017}}}{.004} \\
+    \quad over $\downarrow$  & \seedpm{\textbf{0.078}}{.004} & \seedpm{0.081}{.012} & \seedpm{\hlval{accent}{0.130}}{.005} & \seedpm{\hlval{accent}{0.143}}{.003} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (head $\times$ matching $=$ 2$\times$2); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the gate's detection lift; \textcolor{accent}{red} $=$ its over-count price. Peak median/p95: per-pixel peak-error distribution; profile cos med: median per-pixel cosine to the GT profile.\par}
+    
+
+\end{frame}
+
+% ---------------------------------------------------------------- 15c Head 2x2 by scatterer count
+\begin{frame}{The head by scatterer count --- the gate saturates $k{=}1$, layover pays}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{1.05}
+  \setlength{\tabcolsep}{5pt}
+  \renewcommand{\seedtag}{setB}
+  \begin{tabular}{@{}l cc !{\hspace{3pt}} cc@{}}
+    \toprule
+     & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c@{}}{set-pred head} \\
+    \cmidrule(lr){2-3}\cmidrule(l){4-5}
+    metric & sort & Hung & sort & Hung \\
+    \midrule
+    matched precision $\uparrow$ & \seedpm{0.821}{.008} & \seedpm{0.822}{.002} & \seedpm{0.816}{.005} & \seedpm{0.813}{.004} \\
+    \quad $k{=}1$                & \seedpm{0.853}{.008} & \seedpm{0.848}{.004} & \seedpm{0.849}{.005} & \seedpm{0.836}{.003} \\
+    \quad $k{=}2$                & \seedpm{0.782}{.007} & \seedpm{0.790}{.002} & \seedpm{0.759}{.014} & \seedpm{0.771}{.009} \\
+    \addlinespace
+    matched recall $\uparrow$    & \seedpm{0.641}{.029} & \seedpm{0.642}{.045} & \seedpm{0.887}{.008} & \seedpm{\textbf{0.893}}{.004} \\
+    \quad $k{=}1$                & \seedpm{0.620}{.046} & \seedpm{0.617}{.071} & \seedpm{\hlval{good}{\textbf{0.997}}}{.001} & \seedpm{\hlval{good}{\textbf{0.997}}}{.000} \\
+    \quad $k{=}2$                & \seedpm{0.672}{.008} & \seedpm{0.677}{.007} & \seedpm{0.731}{.019} & \seedpm{\textbf{0.744}}{.010} \\
+    \addlinespace
+    count acc $\mid$ pred $k{=}1$ $\uparrow$ & \seedpm{0.948}{.007} & \seedpm{0.951}{.013} & \seedpm{0.975}{.006} & \seedpm{0.977}{.004} \\
+    count acc $\mid$ pred $k{=}2$ $\uparrow$ & \seedpm{\textbf{0.733}}{.010} & \seedpm{0.725}{.026} & \seedpm{0.651}{.007} & \seedpm{\hlval{accent}{0.631}}{.005} \\
+    \addlinespace
+    matched $\mu$ MAE $\downarrow$ & \seedpm{2.30}{.08} & \seedpm{2.29}{.10} & \seedpm{\textbf{2.18}}{.09} & \seedpm{2.19}{.08} \\
+    \quad $k{=}1$                & \seedpm{0.59}{.04} & \seedpm{\textbf{0.56}}{.05} & \seedpm{0.59}{.10} & \seedpm{0.62}{.11} \\
+    \quad $k{=}2$                & \seedpm{\textbf{4.05}}{.08} & \seedpm{4.06}{.02} & \seedpm{\hlval{accent}{4.54}}{.11} & \seedpm{4.51}{.13} \\
+    \addlinespace
+    matched $\sigma$ MAE $\downarrow$ & \seedpm{0.87}{.03} & \seedpm{0.87}{.04} & \seedpm{\textbf{0.82}}{.03} & \seedpm{0.83}{.03} \\
+    \quad $k{=}1$                & \seedpm{0.25}{.01} & \seedpm{0.26}{.02} & \seedpm{\textbf{0.23}}{.01} & \seedpm{0.24}{.01} \\
+    \quad $k{=}2$                & \seedpm{1.51}{.01} & \seedpm{\textbf{1.50}}{.01} & \seedpm{1.70}{.06} & \seedpm{\hlval{accent}{1.71}}{.06} \\
+    \addlinespace
+    matched $a$ MAE $\downarrow$ & \seedpm{0.374}{.026} & \seedpm{0.380}{.033} & \seedpm{\textbf{0.306}}{.002} & \seedpm{0.311}{.004} \\
+    \quad $k{=}1$                & \seedpm{0.161}{.017} & \seedpm{0.180}{.026} & \seedpm{\hlval{good}{\textbf{0.114}}}{.004} & \seedpm{0.133}{.005} \\
+    \quad $k{=}2$                & \seedpm{0.593}{.022} & \seedpm{0.585}{.023} & \seedpm{0.590}{.006} & \seedpm{0.573}{.011} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (head $\times$ matching = column); held-out test, cells mean $\pm$ seed std over five seeded replicas; $k$ $=$ true scatterer count of the pixel. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the gate's $k{=}1$ saturation and amplitude win, \textcolor{accent}{red} $=$ the layover price. Precision rewards under-prediction --- rank on recall. count acc $\mid$ pred $k$: share of pixels claiming exactly $k$ scatterers whose true count is $k$. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
+    
+
+\end{frame}
+
+% ---------------------------------------------------------------- 15d Head 2x2: predicted stats vs GT
+\begin{frame}{The head, predicted statistics vs the GT --- the gate calibrates activity, pays in amplitude}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{0.95}
+  \setlength{\tabcolsep}{5pt}
+  \renewcommand{\seedtag}{setC}
+  \begin{tabular}{@{}l !{\color{white}\vrule width 2pt} c !{\color{white}\vrule width 2pt} cc !{\hspace{3pt}} cc@{}}
+    \toprule
+    & & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c@{}}{set-pred head} \\
+    \cmidrule(lr){3-4}\cmidrule(l){5-6}
+    prediction mean & \textcolor{good}{GT} & sort & Hung & sort & Hung \\
+    \midrule
+    \multicolumn{6}{@{}l}{\textcolor{soft}{\emph{slot 0 --- strongest scatterer; GT-active on every pixel}}} \\
+    \quad active frac         & 1.00    & \seedpm{0.69}{.03} & \seedpm{0.68}{.05} & \seedpm{\hlval{good}{\textbf{0.990}}}{.003} & \seedpm{\hlval{good}{\textbf{0.990}}}{.002} \\
+    \addlinespace[2pt]
+    \quad $a$ --- active      & 0.77    & \seedpm{0.90}{.03} & \seedpm{\textbf{0.87}}{.05} & \seedpm{\hlval{accent}{0.61}}{.01} & \seedpm{\hlval{accent}{0.58}}{.01} \\
+    \quad $\mu$ --- active    & $-4.89$ & \seedpm{$-3.92$}{.10} & \seedpm{$-3.66$}{.13} & \seedpm{\textbf{$-4.38$}}{.22} & \seedpm{$-4.13$}{.14} \\
+    \quad $\sigma$ --- active & 1.76    & \seedpm{1.48}{.05} & \seedpm{\textbf{1.50}}{.07} & \seedpm{1.34}{.03} & \seedpm{1.38}{.03} \\
+    \addlinespace
+    \multicolumn{6}{@{}l}{\textcolor{soft}{\emph{slot 1 --- second scatterer; GT-active on 26\% of pixels}}} \\
+    \quad active frac         & 0.260 & \seedpm{\textbf{0.299}}{.006} & \seedpm{0.304}{.015} & \seedpm{\hlval{accent}{0.380}}{.008} & \seedpm{\hlval{accent}{0.394}}{.005} \\
+    \addlinespace[2pt]
+    \quad $a$ --- active      & 1.43  & \seedpm{1.04}{.03} & \seedpm{\textbf{1.10}}{.02} & \seedpm{0.89}{.02} & \seedpm{0.94}{.03} \\
+    \addlinespace[2pt]
+    \quad $a$ --- inact.      & 0.00  & \seedpm{0.42}{.01} & \seedpm{0.52}{.07} & \seedpm{\hlval{good}{\textbf{0.30}}}{.02} & \seedpm{0.39}{.04} \\
+    \quad $\mu$ --- active    & 11.34 & \seedpm{\textbf{10.09}}{.33} & \seedpm{9.15}{.26} & \seedpm{9.77}{.50} & \seedpm{8.80}{.32} \\
+    \quad $\mu$ --- inact.    & ---   & \seedpm{4.09}{.31} & \seedpm{2.04}{.75} & \seedpm{2.57}{.37} & \seedpm{$-0.29$}{.37} \\
+    \quad $\sigma$ --- active & 3.53  & \seedpm{2.94}{.05} & \seedpm{\textbf{2.98}}{.06} & \seedpm{2.80}{.08} & \seedpm{2.78}{.05} \\
+    \quad $\sigma$ --- inact. & ---   & \seedpm{1.87}{.03} & \seedpm{1.76}{.05} & \seedpm{1.76}{.03} & \seedpm{1.70}{.03} \\
+    \addlinespace
+    \multicolumn{6}{@{}l}{\textcolor{soft}{\emph{distribution width --- std over GT-active pixels}}} \\
+    \quad $a$ --- slot 0      & 1.48  & \seedpm{\textbf{1.17}}{.03} & \seedpm{1.16}{.03} & \seedpm{0.91}{.01} & \seedpm{0.93}{.03} \\
+    \quad $\mu$ --- slot 0    & 3.30  & \seedpm{1.99}{.07} & \seedpm{2.13}{.11} & \seedpm{2.00}{.08} & \seedpm{\textbf{2.23}}{.16} \\
+    \quad $\sigma$ --- slot 0 & 2.84  & \seedpm{0.95}{.03} & \seedpm{1.03}{.04} & \seedpm{0.93}{.03} & \seedpm{\textbf{1.07}}{.03} \\
+    \quad $a$ --- slot 1      & 1.45  & \seedpm{0.83}{.04} & \seedpm{\textbf{0.91}}{.02} & \seedpm{0.77}{.03} & \seedpm{0.82}{.03} \\
+    \quad $\mu$ --- slot 1    & 16.24 & \seedpm{8.72}{.18} & \seedpm{8.88}{.13} & \seedpm{8.86}{.74} & \seedpm{\textbf{9.47}}{.21} \\
+    \quad $\sigma$ --- slot 1 & 4.01  & \seedpm{1.07}{.02} & \seedpm{\textbf{1.24}}{.05} & \seedpm{1.04}{.05} & \seedpm{1.15}{.05} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (head $\times$ matching = column); five seeded replicas per arm, cells mean $\pm$ seed std; means conditioned on the slot's GT activity mask. \textbf{bold} $=$ closest to the \textcolor{good}{GT} column, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the gate's activity and leakage wins, \textcolor{accent}{red} $=$ the slot-1 over-fire and the amplitude payment. Inactive GT slots define no $\mu$/$\sigma$ reference (---). Width rows: std of the prediction over GT-active pixels vs the GT's own std. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
+    
+
+\end{frame}
+
+% ---------------------------------------------------------------- 15e Head 2x2 at K=5
+\begin{frame}{Set prediction at $K{=}5$ --- the head still leads, and the matching now matters}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{1.1}
+  \setlength{\tabcolsep}{5pt}
+  \renewcommand{\seedtag}{khA}
+  \begin{tabular}{@{}l cc !{\hspace{3pt}} cc@{}}
+    \toprule
+     & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c@{}}{set-pred head} \\
+    \cmidrule(lr){2-3}\cmidrule(l){4-5}
+    metric & sort & Hung & sort & Hung \\
+    \midrule
+    \multicolumn{5}{@{}l}{\emph{reconstruction (curve)}} \\
+    curve $R^2$ $\uparrow$ & \seedpm{0.561}{.019} & \seedpm{\textbf{0.587}}{.012} & \seedpm{0.534}{.007} & \seedpm{0.566}{.016} \\
+    curve MAE $\downarrow$ & \seedpm{0.0554}{.0006} & \seedpm{\textbf{0.0521}}{.0005} & \seedpm{0.0565}{.0007} & \seedpm{0.0537}{.0008} \\
+    PSNR [dB] $\uparrow$ & \seedpm{49.7}{.2} & \seedpm{49.9}{.1} & \seedpm{49.4}{.1} & \seedpm{49.7}{.2} \\
+    SSIM elev $\uparrow$ & \seedpm{0.9530}{.0007} & \seedpm{0.9565}{.0005} & \seedpm{0.9527}{.0014} & \seedpm{0.9553}{.0020} \\
+    SSIM range $\uparrow$ & \seedpm{0.9234}{.0028} & \seedpm{0.9319}{.0039} & \seedpm{0.9296}{.0020} & \seedpm{0.9314}{.0026} \\
+    SSIM azim $\uparrow$ & \seedpm{0.9435}{.0011} & \seedpm{0.9475}{.0011} & \seedpm{0.9439}{.0013} & \seedpm{0.9466}{.0016} \\
+    profile cos med $\uparrow$ & \seedpm{0.838}{.041} & \seedpm{0.895}{.028} & \seedpm{\textbf{0.905}}{.012} & \seedpm{0.891}{.014} \\
+    \addlinespace
+    \multicolumn{5}{@{}l}{\emph{detection (matched)}} \\
+    peak err mean $\downarrow$ & \seedpm{4.83}{.71} & \seedpm{2.58}{1.51} & \seedpm{1.64}{.04} & \seedpm{\hlval{good}{\textbf{1.56}}}{.10} \\
+    \quad median $\downarrow$ & \seedpm{0.81}{.30} & \seedpm{\textbf{0.67}}{.00} & \seedpm{\textbf{0.67}}{.00} & \seedpm{\textbf{0.67}}{.00} \\
+    \quad p95 $\downarrow$ & \seedpm{15.44}{.47} & \seedpm{9.93}{4.26} & \seedpm{7.38}{.00} & \seedpm{\hlval{good}{\textbf{5.77}}}{.37} \\
+    precision $\uparrow$ & \seedpm{0.620}{.011} & \seedpm{\textbf{0.636}}{.038} & \seedpm{0.627}{.009} & \seedpm{0.573}{.027} \\
+    recall $\uparrow$ & \seedpm{\hlval{accent}{0.648}}{.040} & \seedpm{0.802}{.093} & \seedpm{0.867}{.006} & \seedpm{\hlval{good}{\textbf{0.886}}}{.003} \\
+    matched F1 $\uparrow$ & \seedpm{0.633}{.025} & \seedpm{0.709}{.058} & \seedpm{\textbf{0.728}}{.007} & \seedpm{0.696}{.020} \\
+    count exact $\uparrow$ & \seedpm{0.430}{.050} & \seedpm{0.574}{.131} & \seedpm{\textbf{0.651}}{.004} & \seedpm{0.588}{.062} \\
+    \quad under $\downarrow$ & \seedpm{0.320}{.055} & \seedpm{0.134}{.122} & \seedpm{0.031}{.002} & \seedpm{\hlval{good}{\textbf{0.027}}}{.004} \\
+    \quad over $\downarrow$ & \seedpm{\textbf{0.251}}{.008} & \seedpm{0.292}{.021} & \seedpm{0.318}{.006} & \seedpm{\hlval{accent}{0.385}}{.065} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ $K{=}5$ $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (head $\times$ matching $=$ 2$\times$2); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the gate's detection lift; \textcolor{accent}{red} $=$ the over-count price and the sorted-GT break. Peak median/p95: per-pixel peak-error distribution; profile cos med: median per-pixel cosine to the GT profile.\par}
+    
+
+\end{frame}
+
+% ---------------------------------------------------------------- 15f Head 2x2 at K=5 by scatterer count
+\begin{frame}{The $K{=}5$ head by scatterer count --- the gate saturates $k{=}1$, recall fades up the ladder}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{1.0}
+  \setlength{\tabcolsep}{5pt}
+  \renewcommand{\seedtag}{khB}
+  \begin{tabular}{@{}l cc !{\hspace{3pt}} cc@{}}
+    \toprule
+     & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c@{}}{set-pred head} \\
+    \cmidrule(lr){2-3}\cmidrule(l){4-5}
+    metric & sort & Hung & sort & Hung \\
+    \midrule
+    matched precision $\uparrow$ & \seedpm{0.620}{.011} & \seedpm{\textbf{0.636}}{.038} & \seedpm{0.627}{.009} & \seedpm{0.573}{.027} \\
+    \quad $k{=}1$ & \seedpm{0.711}{.018} & \seedpm{0.719}{.057} & \seedpm{\textbf{0.726}}{.008} & \seedpm{0.640}{.045} \\
+    \quad $k{=}2$ & \seedpm{\textbf{0.562}}{.011} & \seedpm{0.535}{.020} & \seedpm{0.525}{.009} & \seedpm{0.471}{.015} \\
+    \quad $k{=}3$ & \seedpm{0.549}{.009} & \seedpm{\textbf{0.574}}{.010} & \seedpm{0.519}{.016} & \seedpm{0.538}{.009} \\
+    \quad $k{=}4$ & \seedpm{0.421}{.002} & \seedpm{\textbf{0.525}}{.007} & \seedpm{0.419}{.014} & \seedpm{0.510}{.011} \\
+    \quad $k{=}5$ & \seedpm{0.393}{.014} & \seedpm{\textbf{0.470}}{.013} & \seedpm{0.394}{.010} & \seedpm{0.468}{.011} \\
+    \addlinespace
+    matched recall $\uparrow$ & \seedpm{0.648}{.040} & \seedpm{0.802}{.093} & \seedpm{0.867}{.006} & \seedpm{\textbf{0.886}}{.003} \\
+    \quad $k{=}1$ & \seedpm{0.643}{.070} & \seedpm{0.876}{.162} & \seedpm{\hlval{good}{\textbf{0.996}}}{.002} & \seedpm{0.994}{.002} \\
+    \quad $k{=}2$ & \seedpm{0.830}{.010} & \seedpm{0.862}{.011} & \seedpm{0.893}{.008} & \seedpm{\textbf{0.906}}{.009} \\
+    \quad $k{=}3$ & \seedpm{0.645}{.005} & \seedpm{0.718}{.010} & \seedpm{0.684}{.017} & \seedpm{\hlval{good}{\textbf{0.763}}}{.004} \\
+    \quad $k{=}4$ & \seedpm{0.375}{.008} & \seedpm{0.489}{.010} & \seedpm{0.421}{.015} & \seedpm{\textbf{0.527}}{.010} \\
+    \quad $k{=}5$ & \seedpm{0.233}{.003} & \seedpm{0.290}{.016} & \seedpm{0.281}{.010} & \seedpm{\textbf{0.327}}{.015} \\
+    \addlinespace
+    \multicolumn{5}{@{}l}{\emph{count acc $\mid$ pred $k$ $\uparrow$ --- share of pixels claiming exactly $k$ whose true count is $k$}} \\
+    \quad pred $k{=}1$ & \seedpm{0.948}{.010} & \seedpm{0.965}{.011} & \seedpm{0.973}{.005} & \seedpm{0.978}{.008} \\
+    \addlinespace[2pt]
+    \quad pred $k{=}2$ & \seedpm{\textbf{0.315}}{.016} & \seedpm{0.262}{.039} & \seedpm{0.251}{.006} & \seedpm{\hlval{accent}{0.173}}{.061} \\
+    \quad pred $k{=}3$ & \seedpm{\textbf{0.124}}{.008} & \seedpm{0.100}{.018} & \seedpm{0.095}{.008} & \seedpm{0.050}{.011} \\
+    \quad pred $k{=}4$ & \seedpm{\textbf{0.072}}{.006} & \seedpm{0.051}{.011} & \seedpm{0.047}{.005} & \seedpm{0.024}{.006} \\
+    \quad pred $k{=}5$ & \seedpm{\textbf{0.102}}{.012} & \seedpm{0.081}{.004} & \seedpm{0.075}{.005} & \seedpm{0.063}{.009} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ $K{=}5$ $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (head $\times$ matching $=$ 2$\times$2); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; $k$ $=$ true scatterer count of the pixel. \textcolor{good}{green} $=$ the $k{=}1$ saturation and the higher-rung wins; \textcolor{accent}{red} $=$ the unreliable claimed pairs. Precision rewards under-prediction --- read it alongside recall. count acc $\mid$ pred $k$: share of pixels claiming exactly $k$ scatterers whose true count is $k$.\par}
+    
+
+\end{frame}
+
+% ---------------------------------------------------------------- 15g Head 2x2 at K=5: component errors
+\begin{frame}{The $K{=}5$ components --- position pays for the crowd, the sorted arms keep the widths}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{1.0}
+  \setlength{\tabcolsep}{5pt}
+  \renewcommand{\seedtag}{khC}
+  \begin{tabular}{@{}l cc !{\hspace{3pt}} cc@{}}
+    \toprule
+     & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c@{}}{set-pred head} \\
+    \cmidrule(lr){2-3}\cmidrule(l){4-5}
+    metric & sort & Hung & sort & Hung \\
+    \midrule
+    matched $\mu$ MAE $\downarrow$ & \seedpm{2.30}{.14} & \seedpm{\textbf{1.90}}{.12} & \seedpm{2.05}{.06} & \seedpm{1.94}{.06} \\
+    \quad $k{=}1$ & \seedpm{0.69}{.09} & \seedpm{\textbf{0.63}}{.04} & \seedpm{0.65}{.05} & \seedpm{0.75}{.08} \\
+    \quad $k{=}2$ & \seedpm{\textbf{1.81}}{.04} & \seedpm{1.83}{.09} & \seedpm{1.99}{.05} & \seedpm{1.83}{.09} \\
+    \quad $k{=}3$ & \seedpm{4.24}{.10} & \seedpm{3.63}{.16} & \seedpm{4.32}{.11} & \seedpm{\textbf{3.60}}{.14} \\
+    \quad $k{=}4$ & \seedpm{7.88}{.20} & \seedpm{\hlval{good}{\textbf{6.48}}}{.13} & \seedpm{7.50}{.23} & \seedpm{6.55}{.25} \\
+    \quad $k{=}5$ & \seedpm{9.56}{.28} & \seedpm{9.16}{.23} & \seedpm{9.43}{.18} & \seedpm{9.48}{.26} \\
+    \addlinespace
+    matched $\sigma$ MAE $\downarrow$ & \seedpm{0.79}{.04} & \seedpm{0.79}{.05} & \seedpm{\hlval{good}{\textbf{0.70}}}{.01} & \seedpm{0.77}{.03} \\
+    \quad $k{=}1$ & \seedpm{0.35}{.03} & \seedpm{0.36}{.04} & \seedpm{\textbf{0.29}}{.01} & \seedpm{0.35}{.03} \\
+    \quad $k{=}2$ & \seedpm{\textbf{0.97}}{.01} & \seedpm{1.11}{.04} & \seedpm{1.00}{.00} & \seedpm{1.12}{.04} \\
+    \quad $k{=}3$ & \seedpm{\textbf{1.36}}{.01} & \seedpm{1.45}{.05} & \seedpm{1.41}{.01} & \seedpm{1.46}{.03} \\
+    \quad $k{=}4$ & \seedpm{\textbf{1.60}}{.01} & \seedpm{1.70}{.08} & \seedpm{1.70}{.00} & \seedpm{1.70}{.04} \\
+    \quad $k{=}5$ & \seedpm{\textbf{1.66}}{.01} & \seedpm{1.84}{.13} & \seedpm{1.83}{.01} & \seedpm{1.81}{.07} \\
+    \addlinespace
+    matched $a$ MAE $\downarrow$ & \seedpm{0.526}{.026} & \seedpm{0.564}{.050} & \seedpm{\hlval{good}{\textbf{0.442}}}{.008} & \seedpm{0.552}{.044} \\
+    \quad $k{=}1$ & \seedpm{0.172}{.015} & \seedpm{0.230}{.040} & \seedpm{\textbf{0.130}}{.007} & \seedpm{0.235}{.058} \\
+    \quad $k{=}2$ & \seedpm{\textbf{0.725}}{.023} & \seedpm{0.906}{.053} & \seedpm{0.744}{.014} & \seedpm{\hlval{accent}{0.920}}{.048} \\
+    \quad $k{=}3$ & \seedpm{\textbf{1.018}}{.020} & \seedpm{1.091}{.016} & \seedpm{1.024}{.013} & \seedpm{1.096}{.030} \\
+    \quad $k{=}4$ & \seedpm{1.067}{.015} & \seedpm{1.078}{.026} & \seedpm{1.038}{.011} & \seedpm{1.049}{.026} \\
+    \quad $k{=}5$ & \seedpm{0.988}{.015} & \seedpm{1.001}{.041} & \seedpm{\textbf{0.895}}{.007} & \seedpm{0.915}{.041} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ $K{=}5$ $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (head $\times$ matching $=$ 2$\times$2); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; $k$ $=$ true scatterer count of the pixel; component errors over matched pairs only. \textcolor{good}{green} $=$ the Hungarian $\mu$ buy and the sorted-arm component wins; \textcolor{accent}{red} $=$ the amplitude Hungarian pays. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
+    
+
+\end{frame}
+
+% ---------------------------------------------------------------- 15h Head 2x2 at K=5: predicted stats vs GT
+\begin{frame}{The $K{=}5$ head, predicted statistics vs the GT --- slot 0 calibrated, the tail over-fired}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{0.85}
+  \setlength{\tabcolsep}{5pt}
+  \renewcommand{\seedtag}{khD}
+  \begin{tabular}{@{}l !{\color{white}\vrule width 2pt} c !{\color{white}\vrule width 2pt} cc !{\hspace{3pt}} cc@{}}
+    \toprule
+    & & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c@{}}{set-pred head} \\
+    \cmidrule(lr){3-4}\cmidrule(l){5-6}
+    prediction mean & \textcolor{good}{GT} & sort & Hung & sort & Hung \\
+    \midrule
+    \multicolumn{6}{@{}l}{\textcolor{soft}{\emph{predicted active fraction --- share of pixels where the slot fires}}} \\
+    \quad slot 0 & 1.000 & \seedpm{0.701}{.054} & \seedpm{0.880}{.126} & \seedpm{\hlval{good}{\textbf{0.989}}}{.002} & \seedpm{0.983}{.004} \\
+    \quad slot 1 & 0.239 & \seedpm{0.319}{.009} & \seedpm{\textbf{0.278}}{.050} & \seedpm{0.385}{.005} & \seedpm{0.324}{.042} \\
+    \quad slot 2 & 0.085 & \seedpm{0.218}{.006} & \seedpm{\textbf{0.193}}{.065} & \seedpm{0.263}{.003} & \seedpm{0.234}{.046} \\
+    \quad slot 3 & 0.035 & \seedpm{\textbf{0.137}}{.005} & \seedpm{0.169}{.050} & \seedpm{0.162}{.013} & \seedpm{\hlval{accent}{0.239}}{.056} \\
+    \quad slot 4 & 0.015 & \seedpm{\textbf{0.060}}{.015} & \seedpm{0.207}{.068} & \seedpm{0.099}{.009} & \seedpm{\hlval{accent}{0.349}}{.087} \\
+    \addlinespace
+    \multicolumn{6}{@{}l}{\textcolor{soft}{\emph{$a$ --- predicted mean over GT-active pixels}}} \\
+    \quad slot 0 & 0.84 & \seedpm{\textbf{0.99}}{.08} & \seedpm{0.64}{.14} & \seedpm{0.67}{.01} & \seedpm{0.51}{.06} \\
+    \quad slot 1 & 1.67 & \seedpm{\textbf{0.94}}{.04} & \seedpm{0.67}{.07} & \seedpm{0.80}{.02} & \seedpm{0.67}{.05} \\
+    \quad slot 2 & 1.41 & \seedpm{0.30}{.02} & \seedpm{\textbf{0.71}}{.07} & \seedpm{0.26}{.02} & \seedpm{0.57}{.05} \\
+    \quad slot 3 & 0.97 & \seedpm{0.14}{.01} & \seedpm{\textbf{0.28}}{.05} & \seedpm{0.12}{.01} & \seedpm{0.23}{.02} \\
+    \quad slot 4 & 0.66 & \seedpm{0.09}{.01} & \seedpm{\textbf{0.21}}{.01} & \seedpm{0.07}{.01} & \seedpm{0.19}{.03} \\
+    \addlinespace
+    \multicolumn{6}{@{}l}{\textcolor{soft}{\emph{$a$ --- predicted mean over GT-inactive pixels (leakage)}}} \\
+    \quad slot 1 & 0.00 & \seedpm{0.65}{.02} & \seedpm{\textbf{0.26}}{.21} & \seedpm{0.46}{.01} & \seedpm{0.39}{.21} \\
+    \quad slot 2 & 0.00 & \seedpm{0.37}{.01} & \seedpm{0.40}{.18} & \seedpm{\textbf{0.29}}{.00} & \seedpm{0.40}{.12} \\
+    \quad slot 3 & 0.00 & \seedpm{0.17}{.01} & \seedpm{0.56}{.25} & \seedpm{\textbf{0.14}}{.00} & \seedpm{0.31}{.20} \\
+    \quad slot 4 & 0.00 & \seedpm{0.11}{.01} & \seedpm{0.58}{.39} & \seedpm{\textbf{0.07}}{.01} & \seedpm{0.41}{.31} \\
+    \addlinespace
+    \multicolumn{6}{@{}l}{\textcolor{soft}{\emph{distribution width --- std over GT-active pixels}}} \\
+    \quad $a$ --- slot 0 & 1.59 & \seedpm{\textbf{1.33}}{.07} & \seedpm{1.09}{.09} & \seedpm{1.04}{.02} & \seedpm{0.92}{.04} \\
+    \quad $\mu$ --- slot 0 & 3.02 & \seedpm{\textbf{2.47}}{.06} & \seedpm{2.37}{.05} & \seedpm{2.28}{.04} & \seedpm{2.39}{.12} \\
+    \quad $\sigma$ --- slot 0 & 1.72 & \seedpm{0.80}{.02} & \seedpm{0.71}{.11} & \seedpm{0.79}{.04} & \seedpm{\textbf{0.86}}{.10} \\
+    \quad $a$ --- slot 1 & 1.60 & \seedpm{0.82}{.02} & \seedpm{\textbf{0.87}}{.05} & \seedpm{0.75}{.01} & \seedpm{0.83}{.02} \\
+    \quad $\mu$ --- slot 1 & 11.09 & \seedpm{8.44}{.10} & \seedpm{8.83}{.10} & \seedpm{8.48}{.10} & \seedpm{\textbf{8.98}}{.15} \\
+    \quad $\sigma$ --- slot 1 & 2.30 & \seedpm{0.87}{.02} & \seedpm{1.28}{.03} & \seedpm{0.88}{.01} & \seedpm{\textbf{1.29}}{.04} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{1pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ $K{=}5$ $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (head $\times$ matching $=$ 2$\times$2); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test; means conditioned on the slot's GT activity mask. \textbf{bold} $=$ closest to the \textcolor{good}{GT} column, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the calibrated slot-0 gate, \textcolor{accent}{red} $=$ the over-fired tail slots. Width rows: std of the prediction over GT-active pixels vs the GT's own std, shown for slots 0--1 (tail slots in the report). $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
+    
+
+\end{frame}
+
+% ---------------------------------------------------------------- 16 Imbalance & collapse
+\begin{frame}{The imbalance failure (high $K$)}
+  \small
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \begin{columns}[c]
+    \begin{column}{0.42\textwidth}
+      \footnotesize
+      \begin{itemize}
+        \setlength{\itemsep}{10pt}
+        \item Hungarian + existence gates make large $K$ trainable --- and expose the
+              third failure: \textbf{most slots have nothing to match}.
+        \item The matcher hands slot $k$ a real scatterer (amplitude $a^{+}$) in a
+              fraction $\rho_k$ of cells, silence in the rest --- deep slots see
+              $\rho_k\approx0.01$. Mean-reduced, the slot's amplitude minimizes the
+              two-point mixture on the right (param-MSE).
+        \item The push outweighs the pull $99{:}1$; descent parks the slot at $1\%$
+              of the real amplitude --- \textbf{shrinking to effective silence is
+              the loss optimum}, not a training accident.
+        \item The working $K{=}2$ configuration mostly sidesteps the tail; the $K{=}5$
+              development confronts it head-on --- the answer (next).
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.56\textwidth}
+      \centering
+      {\footnotesize
+      \begin{align*}
+        \ell_k(\hat a)
+          &= \big(\hat a - a^{\text{match}}_k\big)^{2},
+             \qquad
+             a^{\text{match}}_k \;=\;
+             \begin{cases}
+               a^{+} & \text{with prob.\ } \rho_k \\
+               0     & \text{with prob.\ } 1-\rho_k
+             \end{cases} \\[3pt]
+        \mathrm E\big[\ell_k(\hat a)\big]
+          &= \rho_k\, \mathrm E\big[(\hat a - a^{+})^2\big] \;+\; (1-\rho_k)\,\hat a^{2} \\[3pt]
+        \partial_{\hat a}\,\mathrm E\big[\ell_k\big]
+          &= \underbrace{2\rho_k\,\big(\hat a - \mathrm E[a^{+}]\big)}_{\text{\scriptsize pull toward the target}}
+             \;+\; \underbrace{2\,(1-\rho_k)\,\hat a}_{\text{\scriptsize push toward silence}} \\[3pt]
+          &= 2\,\big(\hat a - \rho_k\,\mathrm E[a^{+}]\big)
+             \;\Longrightarrow\;
+             \hat a^{*}_k \;=\; \rho_k\,\mathrm E[a^{+}] \;\approx\; 0.01\,\mathrm E[a^{+}]
+      \end{align*}}
+      \vspace{2pt}
+
+      \begin{tikzpicture}[scale=0.92]
+    \useasboundingbox (-0.15,1.35) rectangle (6.95,4.85);
+    % --- death moments ---
+    \draw[soft!40,densely dotted] (1.35,1.50) -- (1.35,4.35);
+    \draw[soft!40,densely dotted] (2.15,1.50) -- (2.15,4.35);
+    \draw[soft!40,densely dotted] (3.20,1.50) -- (3.20,4.35);
+    % --- slot activity over training ---
+    \node[font=\tiny\bfseries,ink!80,anchor=west] at (0,4.66)
+      {slot activity over training --- the deep slots die, one by one};
+    \draw[->,soft] (0.3,1.95) -- (0.3,4.48);
+    \node[font=\tiny,soft,anchor=east] at (0.24,4.35) {1};
+    \node[font=\tiny,soft,anchor=east] at (0.24,1.95) {0};
+    \node[font=\tiny,soft,anchor=west] at (0.42,4.44) {share of pixels where the slot fires};
+    \draw[->,soft] (0.3,1.95) -- (6.6,1.95) node[right,font=\tiny]{steps};
+    \draw[ink!70,thick,domain=0.3:6.4,samples=120,smooth]
+      plot (\x,{4.23-0.60*exp(-\x/0.8)+0.018*sin(300*\x)});
+    \draw[ink!40,thick,domain=0.3:6.4,samples=120,smooth]
+      plot (\x,{2.67+0.60*exp(-\x/1.2)+0.018*sin(260*\x+40)});
+    \draw[accent!85,thick,domain=0.3:6.4,samples=120,smooth]
+      plot (\x,{1.95+0.72*exp(-\x*\x/2.0)});
+    \draw[accent!60,thick,domain=0.3:6.4,samples=120,smooth]
+      plot (\x,{1.95+0.62*exp(-\x*\x/0.9)});
+    \draw[accent!40,thick,domain=0.3:6.4,samples=120,smooth]
+      plot (\x,{1.95+0.53*exp(-\x*\x/0.4)});
+    \fill[accent!85] (3.20,1.97) circle (1.4pt);
+    \fill[accent!60] (2.15,1.97) circle (1.4pt);
+    \fill[accent!40] (1.35,1.97) circle (1.4pt);
+    \node[font=\tiny,ink!70,anchor=west] at (5.55,3.95) {slot 1};
+    \node[font=\tiny,ink!40,anchor=west] at (5.55,2.92) {slot 2};
+    \node[font=\tiny,accent,anchor=west,fill=white,inner sep=0.5pt] at (0.42,2.45) {slots 3--5};
+    \node[font=\tiny,accent,anchor=west,align=left,fill=white,inner sep=0.5pt] at (3.30,3.35)
+      {starved of real matches, each deep slot\\
+       slides to its optimum: silence --- for good};
+    \node[font=\tiny,soft,fill=white,inner sep=0.5pt] at (1.35,1.75) {slot 5 off};
+    \node[font=\tiny,soft,fill=white,inner sep=0.5pt] at (2.35,1.57) {slot 4 off};
+    \node[font=\tiny,soft,fill=white,inner sep=0.5pt] at (3.20,1.75) {slot 3 off};
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 17a Active normalization
+\begin{frame}{The answer to slot imbalance --- lever 1: active normalization}
+  \begin{columns}[c]
+    \begin{column}{0.40\textwidth}
+      \footnotesize
+      \emph{Active} slot $=$ the GT placed a real scatterer in it:
+      \[
+        m_{p,k} \;=\; \mathbf{1}\big[\,a^{\text{GT}}_{p,k} > \tau\,\big]
+      \]
+      \vspace{-8pt}
+      \begin{center}
+      {\scriptsize\color{soft} pixel $p$, slot $k$; $\tau = 10^{-3}$ linear
+       amplitude --- empty slots carry $a{=}0$. A \emph{pixel} is active when
+       any of its $K$ slots is.}
+      \end{center}
+      \vspace{18pt}
+      The lever --- one reduction, dividing by the \textbf{weight mass}, not
+      the cell count:
+      \[
+        \ell \;=\; \frac{\sum_{p,k} w_{p,k}\, e_{p,k}}{\sum_{p,k} w_{p,k}}
+      \]
+      \vspace{-8pt}
+      \begin{center}
+      {\scriptsize\color{soft} $e$ = matched error; $w$ per term: $a$ everywhere,
+       $\mu,\sigma$ masked by $m$ --- nothing to tune.}
+      \end{center}
+\end{column}
+    \begin{column}{0.58\textwidth}
+      \centering
+      \begin{tikzpicture}[scale=0.80, font=\tiny]
+
+        \node[text=soft, anchor=east] at (-0.25,4.58) {GT label};
+        \node[text=accent, anchor=south west, inner sep=1pt] at (0,5.12) {slot 1 --- active ($m{=}1$)};
+        \draw[accent!80, thin, fill=accent!6] (0,4.05) rectangle ++(2.0,1.05);
+        \draw[accent, semithick] (0.10,4.45)
+          .. controls (0.45,4.45) and (0.50,4.98) .. (0.75,4.98)
+          .. controls (1.00,4.98) and (1.05,4.45) .. (1.40,4.45) -- (1.90,4.45);
+        \node[text=accent] at (1.00,4.22) {$(a_1,\ \mu_1,\ \sigma_1)$};
+        \node[text=soft, anchor=south west, inner sep=1pt] at (3.9,5.12) {slot 2 --- placeholder ($m{=}0$)};
+        \draw[soft!70, thin, fill=black!3] (3.9,4.05) rectangle ++(2.0,1.05);
+        \draw[soft, semithick] (4.00,4.45) -- (5.80,4.45);
+        \node[text=soft] at (4.90,4.22) {$(0,\ \text{--},\ \text{--})$};
+
+        \node[text=soft, anchor=east] at (-0.25,2.28) {prediction};
+        \draw[ink!60, thin, fill=black!2] (0,1.75) rectangle ++(2.0,1.05);
+        \draw[ink, semithick] (0.10,2.15)
+          .. controls (0.40,2.15) and (0.44,2.68) .. (0.68,2.68)
+          .. controls (0.92,2.68) and (0.96,2.15) .. (1.30,2.15) -- (1.90,2.15);
+        \node[text=ink] at (1.00,1.92) {$(\hat a_1,\ \hat\mu_1,\ \hat\sigma_1)$};
+        \draw[ink!60, thin, fill=black!2] (3.9,1.75) rectangle ++(2.0,1.05);
+        \draw[ink, semithick] (4.00,2.15) -- (4.75,2.15)
+          .. controls (4.90,2.15) and (4.93,2.50) .. (5.08,2.50)
+          .. controls (5.23,2.50) and (5.26,2.15) .. (5.41,2.15) -- (5.80,2.15);
+        \node[text=ink] at (4.90,1.92) {$(\hat a_2,\ \hat\mu_2,\ \hat\sigma_2)$};
+
+        \draw[{Stealth[length=1.2mm]}-{Stealth[length=1.2mm]}, accent, thin] (0.40,4.00) -- (0.40,2.85);
+        \draw[{Stealth[length=1.2mm]}-{Stealth[length=1.2mm]}, accent, thin] (1.00,4.00) -- (1.00,2.85);
+        \draw[{Stealth[length=1.2mm]}-{Stealth[length=1.2mm]}, accent, thin] (1.60,4.00) -- (1.60,2.85);
+        \node[text=accent, anchor=west, inner sep=1.5pt] at (0.43,3.62) {$a$};
+        \node[text=accent, anchor=west, inner sep=1.5pt] at (1.03,3.62) {$\mu$};
+        \node[text=accent, anchor=west, inner sep=1.5pt] at (1.63,3.62) {$\sigma$};
+        \node[text=accent, anchor=east, align=right, inner sep=1.5pt] at (0.28,3.43) {all three\\supervised};
+
+        \draw[{Stealth[length=1.2mm]}-{Stealth[length=1.2mm]}, accent, thin] (4.30,4.00) -- (4.30,2.85);
+        \node[text=accent, anchor=west, inner sep=1.5pt] at (4.33,3.62) {$a$};
+        \node[text=accent, anchor=east, align=right, inner sep=1.5pt] at (4.20,3.35) {target $a{=}0$:\\switches it off};
+        \draw[soft!70, dashed, thin] (5.25,4.00) -- (5.25,2.85);
+        \draw[soft!70, dashed, thin] (5.70,4.00) -- (5.70,2.85);
+        \node[text=soft, anchor=west, inner sep=1.5pt] at (5.28,3.75) {$\mu$};
+        \node[text=soft, anchor=west, inner sep=1.5pt] at (5.73,3.75) {$\sigma$};
+        \draw[soft, semithick] (5.17,3.35) -- (5.33,3.51);
+        \draw[soft, semithick] (5.17,3.51) -- (5.33,3.35);
+        \draw[soft, semithick] (5.62,3.35) -- (5.78,3.51);
+        \draw[soft, semithick] (5.62,3.51) -- (5.78,3.35);
+        \node[text=soft, anchor=west, align=left, inner sep=1.5pt] at (5.98,3.43) {$\hat\mu_2, \hat\sigma_2$: no label\\to predict --- $w{=}0$};
+      \end{tikzpicture}
+      \\[2pt]
+      {\footnotesize
+      \begin{align*}
+        \ell_a      &= \frac{\sum_{p,k} \bigl(\hat a - a^{\text{GT}}\bigr)^{2}}{N_{\text{pix}}\,K} \\[-1pt]
+        \ell_\mu    &= \frac{\sum_{p,k} m\,\bigl(\hat\mu - \mu^{\text{GT}}\bigr)^{2}}{N_{\text{pix}}\,K}
+          \;\to\;
+          \frac{\sum_{p,k} m\,\bigl(\hat\mu - \mu^{\text{GT}}\bigr)^{2}}{\denomhl{\sum_{p,k} m}} \\[-1pt]
+        \ell_\sigma &= \frac{\sum_{p,k} m\,\bigl(\hat\sigma - \sigma^{\text{GT}}\bigr)^{2}}{N_{\text{pix}}\,K}
+          \;\to\;
+          \frac{\sum_{p,k} m\,\bigl(\hat\sigma - \sigma^{\text{GT}}\bigr)^{2}}{\denomhl{\sum_{p,k} m}}
+      \end{align*}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 17b Presence balance
+\begin{frame}{The answer to slot imbalance --- lever 2: presence balance}
+  \setlength{\abovedisplayskip}{3pt}
+  \setlength{\belowdisplayskip}{3pt}
+  \begin{columns}[c]
+    \begin{column}{0.44\textwidth}
+      \footnotesize
+      \begin{itemize}\setlength{\itemsep}{6pt}
+        \item \textbf{The imbalance is per slot}: sorting stacks the scatterers
+              early --- slot 1 nearly always active, the tail nearly never; one
+              batch-wide fraction cannot see the tail.
+        \item \textbf{Presence balance --- inverse class frequency, slot by
+              slot}: within every slot actives and empties carry half each:
+      \end{itemize}
+      \begin{align*}
+        w_{p,k} &= \frac{0.5}{f_k}\; m_{p,k} \;+\; \frac{0.5}{1-f_k}\;\big(1 - m_{p,k}\big) \\[2pt]
+        f_k     &= \operatorname{clip}\!\big(\langle m_{p,k} \rangle_p,\; \varepsilon,\; 1-\varepsilon\big)
+      \end{align*}
+      \vspace{-8pt}
+      \begin{center}
+      {\scriptsize\color{soft} $m$ as on lever 1; $f_k$ measured per batch
+       ($\approx \rho_k$), clipped at $\varepsilon = 10^{-3}$.\par}
+      \end{center}
+    \end{column}
+    \begin{column}{0.54\textwidth}
+      \centering
+      {\footnotesize
+      \begin{align*}
+        \mathrm E\big[w\,\ell_k\big]
+          &= f_k\tfrac{0.5}{f_k}\,\mathrm E\big[(\hat a{-}a^{+})^2\big] + (1{-}f_k)\tfrac{0.5}{1-f_k}\,\hat a^{2} \\[1pt]
+          &= \tfrac{1}{2}\,\mathrm E\big[(\hat a - a^{+})^2\big] \;+\; \tfrac{1}{2}\,\hat a^{2}
+      \end{align*}
+      \vspace{-2pt}
+      \begin{align*}
+        \partial_{\hat a}\,\mathrm E\big[w\,\ell_k\big]
+          &= \hat a - \mathrm E[a^{+}] \;+\; \hat a \\[1pt]
+        \hat a^{*}_k &:\;\; \rho_k\,\mathrm E[a^{+}] \;\to\; \textcolor{accent}{\tfrac{1}{2}}\,\mathrm E[a^{+}]
+      \end{align*}}
+
+      \vspace{15pt}
+
+      \begin{tikzpicture}[scale=0.82]
+        \foreach \i [evaluate=\i as \j using {int(\i+1)}] in {0,...,7}
+          \node[font=\tiny, scale=0.7, text=soft!75] at (\i*0.56+0.20,6.74) {$\mathrm{px}_{\j}$};
+
+        \node[font=\tiny, anchor=east] at (-0.15,6.35) {slot 1};
+        \foreach \i in {0,...,7} {
+          \draw[accent!80, thin, fill=accent!10] (\i*0.56,6.10) rectangle ++(0.40,0.50);
+          \draw[accent, semithick] (\i*0.56+0.04,6.20)
+            .. controls (\i*0.56+0.11,6.20) and (\i*0.56+0.12,6.52) .. (\i*0.56+0.20,6.52)
+            .. controls (\i*0.56+0.28,6.52) and (\i*0.56+0.29,6.20) .. (\i*0.56+0.36,6.20);
+        }
+        \node[font=\tiny, text=soft, anchor=west, align=left] at (4.50,6.35)
+          {$f_1 \to 1$ --- clipped\\no empties left to balance};
+
+        \node[font=\tiny, anchor=east] at (-0.15,5.65) {slot 2};
+        \foreach \i in {0,2,3,6} {
+          \draw[accent!80, thin, fill=accent!10] (\i*0.56,5.40) rectangle ++(0.40,0.50);
+          \draw[accent, semithick] (\i*0.56+0.04,5.50)
+            .. controls (\i*0.56+0.11,5.50) and (\i*0.56+0.12,5.82) .. (\i*0.56+0.20,5.82)
+            .. controls (\i*0.56+0.28,5.82) and (\i*0.56+0.29,5.50) .. (\i*0.56+0.36,5.50);
+        }
+        \foreach \i in {1,4,5,7} {
+          \draw[soft!50, thin, fill=black!2] (\i*0.56,5.40) rectangle ++(0.40,0.50);
+          \draw[soft!80, semithick] (\i*0.56+0.04,5.50) -- (\i*0.56+0.36,5.50);
+        }
+        \node[font=\tiny, text=soft, anchor=west, align=left] at (4.50,5.65)
+          {moderate $f_2$\\already near balance};
+
+        \node[font=\tiny, anchor=east] at (-0.15,4.95) {slot 3};
+        \foreach \i in {4} {
+          \draw[accent!80, thin, fill=accent!10] (\i*0.56,4.70) rectangle ++(0.40,0.50);
+          \draw[accent, semithick] (\i*0.56+0.04,4.80)
+            .. controls (\i*0.56+0.11,4.80) and (\i*0.56+0.12,5.12) .. (\i*0.56+0.20,5.12)
+            .. controls (\i*0.56+0.28,5.12) and (\i*0.56+0.29,4.80) .. (\i*0.56+0.36,4.80);
+        }
+        \foreach \i in {0,1,2,3,5,6,7} {
+          \draw[soft!50, thin, fill=black!2] (\i*0.56,4.70) rectangle ++(0.40,0.50);
+          \draw[soft!80, semithick] (\i*0.56+0.04,4.80) -- (\i*0.56+0.36,4.80);
+        }
+        \node[font=\tiny, text=accent, anchor=west, align=left] at (4.50,4.95)
+          {$f_3 \ll 1$\\the tail --- balanced below};
+
+
+        \node[font=\tiny, text=accent, anchor=south west] at (-0.02,4.13) {active};
+        \node[font=\tiny, text=soft, anchor=south] at (2.42,4.13) {empty};
+        \node[font=\tiny, anchor=east] at (-0.25,3.93) {uniform $w$};
+        \fill[accent!70] (0,3.75)    rectangle (0.44,4.11);
+        \fill[black!8]   (0.44,3.75) rectangle (4.4,4.11);
+        \draw[soft, thin] (0,3.75)   rectangle (4.4,4.11);
+        \node[font=\tiny, text=soft, anchor=west, align=left] at (4.57,3.93)
+          {the empty majority\\owns the tail slot};
+
+        \draw[flow] (0.22,3.69) -- (0.22,2.85);
+        \node[font=\tiny, text=accent, anchor=west] at (0.32,3.25) {$\times\;0.5/f_3$};
+        \draw[-{Stealth[length=2mm]}, soft, thick] (3.00,3.69) -- (3.00,2.85);
+        \node[font=\tiny, text=soft, anchor=west] at (3.10,3.25) {$\times\;0.5/(1{-}f_3)$};
+
+        \node[font=\tiny, anchor=east] at (-0.25,2.58) {balanced $w$};
+        \fill[accent!70] (0,2.40)   rectangle (2.2,2.76);
+        \fill[black!8]   (2.2,2.40) rectangle (4.4,2.76);
+        \draw[soft, thin] (0,2.40)  rectangle (4.4,2.76);
+        \node[font=\tiny, text=white] at (1.10,2.58) {half};
+        \node[font=\tiny, text=soft]  at (3.30,2.58) {half};
+        \node[font=\tiny, text=accent!90, anchor=west, align=left] at (4.57,2.58)
+          {the lone scatterer\\now carries half};
+
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 18 Two levers re-measured
+\begin{frame}{The two levers, re-measured under Hungarian matching --- A stays free, B now costs recall}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{0.86}
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\seedtag}{setD}
+  \begin{tabular}{@{}l c c c c@{}}
+    \toprule
+    metric & none & $+$A & $+$B & $+$AB \\
+    \midrule
+    \multicolumn{5}{@{}l}{\emph{reconstruction (curve)}} \\
+    curve $R^2$ $\uparrow$  & \seedpm{0.578}{.016} & \seedpm{0.579}{.017} & \seedpm{0.553}{.011} & \seedpm{0.558}{.014} \\
+    curve MAE $\downarrow$  & \seedpm{0.0480}{.0011} & \seedpm{0.0479}{.0008} & \seedpm{0.0493}{.0008} & \seedpm{0.0489}{.0007} \\
+    PSNR [dB] $\uparrow$    & \seedpm{50.41}{.17} & \seedpm{50.43}{.17} & \seedpm{50.16}{.11} & \seedpm{50.21}{.14} \\
+    SSIM elev $\uparrow$    & \seedpm{0.9598}{.0009} & \seedpm{0.9600}{.0007} & \seedpm{0.9589}{.0007} & \seedpm{0.9592}{.0006} \\
+    SSIM range $\uparrow$   & \seedpm{0.9342}{.0028} & \seedpm{0.9346}{.0025} & \seedpm{0.9308}{.0027} & \seedpm{0.9319}{.0018} \\
+    SSIM azim $\uparrow$    & \seedpm{0.9488}{.0014} & \seedpm{0.9491}{.0011} & \seedpm{0.9466}{.0011} & \seedpm{0.9471}{.0008} \\
+    profile cos med $\uparrow$ & \seedpm{0.896}{.033} & \seedpm{0.892}{.042} & \seedpm{0.883}{.038} & \seedpm{0.891}{.035} \\
+    peak err mean $\downarrow$ & \seedpm{\textbf{1.63}}{.08} & \seedpm{\textbf{1.63}}{.11} & \seedpm{1.72}{.16} & \seedpm{1.67}{.10} \\
+    \quad median $\downarrow$  & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} \\
+    \quad p95 $\downarrow$     & \seedpm{\textbf{6.04}}{.47} & \seedpm{6.31}{.37} & \seedpm{6.44}{.60} & \seedpm{6.31}{.37} \\
+    \addlinespace
+    \multicolumn{5}{@{}l}{\emph{detection (matched)}} \\
+    precision $\uparrow$   & \seedpm{0.813}{.004} & \seedpm{0.816}{.003} & \seedpm{0.813}{.011} & \seedpm{0.814}{.009} \\
+    recall $\uparrow$      & \seedpm{0.893}{.004} & \seedpm{0.893}{.003} & \seedpm{\hlval{accent}{0.879}}{.007} & \seedpm{\hlval{accent}{0.882}}{.004} \\
+    matched F1 $\uparrow$  & \seedpm{0.851}{.004} & \seedpm{0.853}{.002} & \seedpm{0.845}{.008} & \seedpm{0.846}{.005} \\
+    count exact $\uparrow$ & \seedpm{0.841}{.004} & \seedpm{0.841}{.009} & \seedpm{0.843}{.022} & \seedpm{0.844}{.017} \\
+    \quad under $\downarrow$ & \seedpm{\textbf{0.017}}{.004} & \seedpm{0.019}{.004} & \seedpm{0.026}{.008} & \seedpm{0.023}{.002} \\
+    \quad over $\downarrow$  & \seedpm{0.142}{.003} & \seedpm{0.140}{.006} & \seedpm{\textbf{0.131}}{.017} & \seedpm{0.133}{.015} \\
+    \addlinespace
+    \multicolumn{5}{@{}l}{\emph{seed-to-seed spread (std over 5 seeds)} $\downarrow$} \\
+    curve $R^2$  & .016 & .017 & \textbf{.011} & .014 \\
+    SSIM range   & .0028 & .0025 & .0027 & \textbf{.0018} \\
+    curve MAE    & .0011 & .0008 & .0008 & \textbf{.0007} \\
+    profile cos med & \textbf{.033} & .042 & .038 & .035 \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{0pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (presence lever = column); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. $+$A active normalization, $+$B presence balance, $+$AB both. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; spread rows compare the seed stds themselves; \textcolor{accent}{red} $=$ B's recall price --- A moves nothing past noise. Peak median/p95: per-pixel peak-error distribution; profile cos med: median per-pixel cosine to the GT profile.\par}
+    
+
+\end{frame}
+
+% ---------------------------------------------------------------- 18b Levers by scatterer count
+\begin{frame}{The levers by scatterer count --- B's cost lives in the second scatterer}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{1.11}
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\seedtag}{setE}
+  \begin{tabular}{@{}l c c c c@{}}
+    \toprule
+    metric & none & $+$A & $+$B & $+$AB \\
+    \midrule
+    matched precision $\uparrow$ & \seedpm{0.813}{.004} & \seedpm{0.816}{.003} & \seedpm{0.813}{.011} & \seedpm{0.814}{.009} \\
+    \quad $k{=}1$                & \seedpm{0.836}{.003} & \seedpm{0.839}{.005} & \seedpm{0.847}{.017} & \seedpm{0.846}{.015} \\
+    \quad $k{=}2$                & \seedpm{0.771}{.009} & \seedpm{0.776}{.009} & \seedpm{\hlval{accent}{0.754}}{.007} & \seedpm{\hlval{accent}{0.757}}{.008} \\
+    \addlinespace
+    matched recall $\uparrow$    & \seedpm{0.893}{.004} & \seedpm{0.893}{.003} & \seedpm{\hlval{accent}{0.879}}{.007} & \seedpm{\hlval{accent}{0.882}}{.004} \\
+    \quad $k{=}1$                & \seedpm{0.997}{.000} & \seedpm{0.997}{.001} & \seedpm{0.992}{.009} & \seedpm{0.996}{.001} \\
+    \addlinespace[2pt]
+    \quad $k{=}2$                & \seedpm{0.744}{.010} & \seedpm{0.744}{.007} & \seedpm{\hlval{accent}{0.719}}{.007} & \seedpm{\hlval{accent}{0.721}}{.010} \\
+    \addlinespace
+    count acc $\mid$ pred $k{=}1$ $\uparrow$ & \seedpm{0.977}{.004} & \seedpm{0.975}{.006} & \seedpm{0.970}{.005} & \seedpm{0.970}{.005} \\
+    count acc $\mid$ pred $k{=}2$ $\uparrow$ & \seedpm{0.631}{.005} & \seedpm{0.634}{.012} & \seedpm{0.646}{.030} & \seedpm{0.643}{.027} \\
+    \addlinespace
+    matched $\mu$ MAE $\downarrow$ & \seedpm{2.19}{.08} & \seedpm{\textbf{2.15}}{.09} & \seedpm{2.27}{.12} & \seedpm{2.23}{.07} \\
+    \quad $k{=}1$                & \seedpm{\textbf{0.62}}{.11} & \seedpm{0.63}{.15} & \seedpm{0.66}{.15} & \seedpm{0.63}{.15} \\
+    \quad $k{=}2$                & \seedpm{4.51}{.13} & \seedpm{\textbf{4.41}}{.19} & \seedpm{4.64}{.16} & \seedpm{4.60}{.11} \\
+    \addlinespace
+    matched $\sigma$ MAE $\downarrow$ & \seedpm{0.83}{.03} & \seedpm{0.82}{.04} & \seedpm{0.83}{.02} & \seedpm{0.81}{.02} \\
+    \quad $k{=}1$                & \seedpm{0.24}{.01} & \seedpm{0.24}{.01} & \seedpm{0.24}{.01} & \seedpm{0.23}{.01} \\
+    \quad $k{=}2$                & \seedpm{1.71}{.06} & \seedpm{1.69}{.09} & \seedpm{1.70}{.06} & \seedpm{1.67}{.04} \\
+    \addlinespace
+    matched $a$ MAE $\downarrow$ & \seedpm{0.311}{.004} & \seedpm{0.315}{.009} & \seedpm{0.317}{.012} & \seedpm{0.316}{.012} \\
+    \quad $k{=}1$                & \seedpm{0.133}{.005} & \seedpm{0.134}{.010} & \seedpm{0.136}{.012} & \seedpm{0.133}{.009} \\
+    \quad $k{=}2$                & \seedpm{0.573}{.011} & \seedpm{0.582}{.008} & \seedpm{0.585}{.012} & \seedpm{0.589}{.019} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (presence lever = column); held-out test, cells mean $\pm$ seed std over five seeded replicas; $k$ $=$ true scatterer count of the pixel. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; \textcolor{accent}{red} $=$ B's $k{=}2$ cost. Precision rewards under-prediction --- rank on recall. count acc $\mid$ pred $k$: share of pixels claiming exactly $k$ scatterers whose true count is $k$. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
+    
+
+\end{frame}
+
+% ---------------------------------------------------------------- 18c Levers: predicted stats vs GT
+\begin{frame}{The levers, predicted statistics vs the GT --- the head sets the distribution, B trims the empties}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{0.95}
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\seedtag}{setF}
+  \begin{tabular}{@{}l !{\color{white}\vrule width 2pt} c !{\color{white}\vrule width 2pt} c c c c@{}}
+    \toprule
+    prediction mean & \textcolor{good}{GT} & none & $+$A & $+$B & $+$AB \\
+    \midrule
+    \multicolumn{6}{@{}l}{\textcolor{soft}{\emph{slot 0 --- strongest scatterer; GT-active on every pixel}}} \\
+    \quad active frac         & 1.00    & \seedpm{0.990}{.002} & \seedpm{0.989}{.004} & \seedpm{0.983}{.008} & \seedpm{0.986}{.004} \\
+    \quad $a$ --- active      & 0.77    & \seedpm{0.58}{.01} & \seedpm{0.58}{.02} & \seedpm{0.58}{.01} & \seedpm{0.58}{.01} \\
+    \quad $\mu$ --- active    & $-4.89$ & \seedpm{$-4.13$}{.14} & \seedpm{\textbf{$-4.15$}}{.18} & \seedpm{$-3.91$}{.18} & \seedpm{$-3.93$}{.16} \\
+    \quad $\sigma$ --- active & 1.76    & \seedpm{1.38}{.03} & \seedpm{1.37}{.02} & \seedpm{1.34}{.03} & \seedpm{1.35}{.02} \\
+    \addlinespace
+    \multicolumn{6}{@{}l}{\textcolor{soft}{\emph{slot 1 --- second scatterer; GT-active on 26\% of pixels}}} \\
+    \quad active frac         & 0.260 & \seedpm{0.394}{.005} & \seedpm{0.389}{.004} & \seedpm{\hlval{good}{0.380}}{.016} & \seedpm{0.381}{.013} \\
+    \quad $a$ --- active      & 1.43  & \seedpm{0.94}{.03} & \seedpm{0.93}{.03} & \seedpm{0.96}{.01} & \seedpm{0.94}{.03} \\
+    \quad $a$ --- inact.      & 0.00  & \seedpm{0.39}{.04} & \seedpm{0.40}{.04} & \seedpm{0.35}{.04} & \seedpm{\hlval{good}{\textbf{0.34}}}{.02} \\
+    \quad $\mu$ --- active    & 11.34 & \seedpm{8.80}{.32} & \seedpm{8.65}{.40} & \seedpm{8.89}{.48} & \seedpm{8.63}{.44} \\
+    \quad $\mu$ --- inact.    & ---   & \seedpm{$-0.29$}{.37} & \seedpm{$-0.37$}{.40} & \seedpm{1.23}{.68} & \seedpm{1.09}{.56} \\
+    \quad $\sigma$ --- active & 3.53  & \seedpm{2.78}{.05} & \seedpm{2.77}{.06} & \seedpm{2.73}{.10} & \seedpm{2.69}{.09} \\
+    \quad $\sigma$ --- inact. & ---   & \seedpm{1.70}{.03} & \seedpm{1.70}{.05} & \seedpm{1.62}{.07} & \seedpm{1.60}{.08} \\
+    \addlinespace
+    \multicolumn{6}{@{}l}{\textcolor{soft}{\emph{distribution width --- std over GT-active pixels}}} \\
+    \quad $a$ --- slot 0      & 1.48  & \seedpm{0.93}{.03} & \seedpm{0.92}{.03} & \seedpm{0.92}{.03} & \seedpm{0.93}{.03} \\
+    \quad $\mu$ --- slot 0    & 3.30  & \seedpm{2.23}{.16} & \seedpm{2.21}{.17} & \seedpm{\textbf{2.49}}{.07} & \seedpm{2.44}{.16} \\
+    \quad $\sigma$ --- slot 0 & 2.84  & \seedpm{\textbf{1.07}}{.03} & \seedpm{1.05}{.03} & \seedpm{1.01}{.04} & \seedpm{1.01}{.04} \\
+    \quad $a$ --- slot 1      & 1.45  & \seedpm{0.82}{.03} & \seedpm{0.81}{.02} & \seedpm{0.84}{.02} & \seedpm{0.83}{.02} \\
+    \quad $\mu$ --- slot 1    & 16.24 & \seedpm{\textbf{9.47}}{.21} & \seedpm{9.41}{.62} & \seedpm{9.00}{.55} & \seedpm{8.88}{.45} \\
+    \quad $\sigma$ --- slot 1 & 4.01  & \seedpm{1.15}{.05} & \seedpm{1.15}{.07} & \seedpm{1.14}{.06} & \seedpm{1.12}{.07} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (presence lever = column); five seeded replicas per arm, cells mean $\pm$ seed std; means conditioned on the slot's GT activity mask. \textbf{bold} $=$ closest to the \textcolor{good}{GT} column, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the empty-slot trim B buys. Inactive GT slots define no $\mu$/$\sigma$ reference (---). Width rows: std of the prediction over GT-active pixels vs the GT's own std. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
+    
+
+\end{frame}
+
+% ---------------------------------------------------------------- 18d Levers at K=5
+\begin{frame}{The levers at $K{=}5$ --- A stays free, B now pays in the curve}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{0.86}
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\seedtag}{kpA}
+  \begin{tabular}{@{}l c c c c@{}}
+    \toprule
+    metric & none & $+$A & $+$B & $+$AB \\
+    \midrule
+    \multicolumn{5}{@{}l}{\emph{reconstruction (curve)}} \\
+    curve $R^2$ $\uparrow$ & \seedpm{0.566}{.016} & \seedpm{\textbf{0.572}}{.010} & \seedpm{\hlval{accent}{0.473}}{.040} & \seedpm{0.481}{.029} \\
+    curve MAE $\downarrow$ & \seedpm{0.0537}{.0008} & \seedpm{\textbf{0.0533}}{.0007} & \seedpm{0.0646}{.0028} & \seedpm{0.0637}{.0025} \\
+    PSNR [dB] $\uparrow$ & \seedpm{49.71}{.16} & \seedpm{49.77}{.11} & \seedpm{48.88}{.33} & \seedpm{48.94}{.25} \\
+    SSIM elev $\uparrow$ & \seedpm{0.9553}{.0020} & \seedpm{0.9559}{.0014} & \seedpm{0.9388}{.0032} & \seedpm{0.9398}{.0025} \\
+    SSIM range $\uparrow$ & \seedpm{0.9314}{.0026} & \seedpm{0.9326}{.0021} & \seedpm{0.9084}{.0050} & \seedpm{0.9103}{.0035} \\
+    SSIM azim $\uparrow$ & \seedpm{0.9466}{.0016} & \seedpm{0.9473}{.0012} & \seedpm{0.9288}{.0036} & \seedpm{0.9300}{.0033} \\
+    profile cos med $\uparrow$ & \seedpm{0.891}{.014} & \seedpm{0.899}{.030} & \seedpm{0.859}{.027} & \seedpm{0.865}{.035} \\
+    peak err mean $\downarrow$ & \seedpm{1.56}{.10} & \seedpm{\textbf{1.50}}{.10} & \seedpm{1.89}{.12} & \seedpm{1.85}{.16} \\
+    \quad median $\downarrow$ & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} \\
+    \quad p95 $\downarrow$ & \seedpm{\textbf{5.77}}{.37} & \seedpm{\textbf{5.77}}{.37} & \seedpm{\hlval{accent}{7.92}}{.88} & \seedpm{7.79}{.60} \\
+    \addlinespace
+    \multicolumn{5}{@{}l}{\emph{detection (matched)}} \\
+    precision $\uparrow$ & \seedpm{0.573}{.027} & \seedpm{\textbf{0.575}}{.019} & \seedpm{\hlval{accent}{0.483}}{.036} & \seedpm{0.502}{.027} \\
+    recall $\uparrow$ & \seedpm{0.886}{.003} & \seedpm{0.889}{.004} & \seedpm{0.878}{.011} & \seedpm{0.880}{.003} \\
+    matched F1 $\uparrow$ & \seedpm{0.696}{.020} & \seedpm{\textbf{0.698}}{.013} & \seedpm{\hlval{accent}{0.622}}{.029} & \seedpm{0.639}{.022} \\
+    count exact $\uparrow$ & \seedpm{0.588}{.062} & \seedpm{\textbf{0.589}}{.063} & \seedpm{0.445}{.202} & \seedpm{0.529}{.122} \\
+    \quad under $\downarrow$ & \seedpm{0.027}{.004} & \seedpm{0.025}{.005} & \seedpm{0.025}{.010} & \seedpm{\textbf{0.023}}{.004} \\
+    \quad over $\downarrow$ & \seedpm{\textbf{0.385}}{.065} & \seedpm{0.386}{.067} & \seedpm{0.529}{.209} & \seedpm{0.448}{.126} \\
+    \addlinespace
+    \multicolumn{5}{@{}l}{\emph{seed-to-seed spread (std over 5 seeds)} $\downarrow$} \\
+    curve $R^2$  & .016 & \textbf{.010} & \hlval{accent}{.040} & .029 \\
+    count exact  & \textbf{.062} & .063 & \hlval{accent}{.202} & .122 \\
+    count over   & \textbf{.065} & .067 & \hlval{accent}{.209} & .126 \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{2pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}5$ $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (presence lever $=$ column); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. $+$A active normalization, $+$B presence balance, $+$AB both; the none arm $=$ the $K{=}5$ set-pred$\cdot$Hungarian heads arm. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; spread rows compare the seed stds themselves; \textcolor{accent}{red} $=$ B's curve and precision price and its seed destabilization --- A stays free. Peak median/p95: per-pixel peak-error distribution; profile cos med: median per-pixel cosine to the GT profile.\par}
+    
+
+\end{frame}
+
+% ---------------------------------------------------------------- 18e Levers at K=5 by scatterer count
+\begin{frame}{The $K{=}5$ levers by scatterer count --- precision pays everywhere, the tail payoff never lands}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{1.0}
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\seedtag}{kpB}
+  \begin{tabular}{@{}l c c c c@{}}
+    \toprule
+    metric & none & $+$A & $+$B & $+$AB \\
+    \midrule
+    matched precision $\uparrow$ & \seedpm{0.573}{.027} & \seedpm{\textbf{0.575}}{.019} & \seedpm{\hlval{accent}{0.483}}{.036} & \seedpm{0.502}{.027} \\
+    \quad $k{=}1$ & \seedpm{0.640}{.045} & \seedpm{\textbf{0.643}}{.036} & \seedpm{\hlval{accent}{0.521}}{.067} & \seedpm{0.554}{.049} \\
+    \quad $k{=}2$ & \seedpm{0.471}{.015} & \seedpm{\textbf{0.473}}{.008} & \seedpm{0.415}{.007} & \seedpm{0.416}{.012} \\
+    \quad $k{=}3$ & \seedpm{0.538}{.009} & \seedpm{\textbf{0.540}}{.007} & \seedpm{0.478}{.005} & \seedpm{0.478}{.012} \\
+    \quad $k{=}4$ & \seedpm{\textbf{0.510}}{.011} & \seedpm{\textbf{0.510}}{.007} & \seedpm{0.466}{.013} & \seedpm{0.469}{.010} \\
+    \quad $k{=}5$ & \seedpm{\textbf{0.468}}{.011} & \seedpm{0.467}{.005} & \seedpm{0.439}{.017} & \seedpm{0.441}{.006} \\
+    \addlinespace
+    matched recall $\uparrow$ & \seedpm{0.886}{.003} & \seedpm{0.889}{.004} & \seedpm{0.878}{.011} & \seedpm{0.880}{.003} \\
+    \quad $k{=}1$ & \seedpm{0.994}{.002} & \seedpm{0.996}{.002} & \seedpm{0.987}{.008} & \seedpm{0.991}{.003} \\
+    \quad $k{=}2$ & \seedpm{0.906}{.009} & \seedpm{0.908}{.011} & \seedpm{0.902}{.016} & \seedpm{0.897}{.007} \\
+    \quad $k{=}3$ & \seedpm{0.763}{.004} & \seedpm{0.767}{.005} & \seedpm{\hlval{accent}{0.734}}{.016} & \seedpm{\hlval{accent}{0.733}}{.012} \\
+    \quad $k{=}4$ & \seedpm{0.527}{.010} & \seedpm{0.535}{.011} & \seedpm{0.514}{.027} & \seedpm{0.519}{.014} \\
+    \addlinespace[2pt]
+    \quad $k{=}5$ & \seedpm{0.327}{.015} & \seedpm{0.339}{.013} & \seedpm{0.336}{.033} & \seedpm{\textbf{0.344}}{.016} \\
+    \addlinespace
+    \multicolumn{5}{@{}l}{\emph{count acc $\mid$ pred $k$ $\uparrow$ --- share of pixels claiming exactly $k$ whose true count is $k$}} \\
+    \quad pred $k{=}1$ & \seedpm{0.978}{.008} & \seedpm{0.977}{.006} & \seedpm{0.972}{.012} & \seedpm{0.976}{.005} \\
+    \quad pred $k{=}2$ & \seedpm{\textbf{0.173}}{.061} & \seedpm{0.161}{.050} & \seedpm{0.108}{.070} & \seedpm{0.116}{.051} \\
+    \quad pred $k{=}3$ & \seedpm{0.050}{.011} & \seedpm{\textbf{0.057}}{.009} & \seedpm{0.032}{.008} & \seedpm{0.033}{.005} \\
+    \quad pred $k{=}4$ & \seedpm{\textbf{0.024}}{.006} & \seedpm{0.023}{.004} & \seedpm{0.009}{.003} & \seedpm{0.010}{.002} \\
+    \quad pred $k{=}5$ & \seedpm{0.063}{.009} & \seedpm{\textbf{0.065}}{.006} & \seedpm{0.039}{.003} & \seedpm{0.041}{.005} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{2pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}5$ $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (presence lever $=$ column); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. $+$A active normalization, $+$B presence balance, $+$AB both; the none arm $=$ the $K{=}5$ set-pred$\cdot$Hungarian heads arm. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; $k$ $=$ true scatterer count of the pixel. \textcolor{accent}{red} $=$ B's precision price and the wrong-way $k{=}3$. Precision rewards under-prediction --- read it alongside recall. count acc $\mid$ pred $k$: share of pixels claiming exactly $k$ scatterers whose true count is $k$.\par}
+    
+
+\end{frame}
+
+% ---------------------------------------------------------------- 18f Levers at K=5: component errors
+\begin{frame}{The $K{=}5$ lever components --- B buys amplitude, pays in position and width}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{1.0}
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\seedtag}{kpC}
+  \begin{tabular}{@{}l c c c c@{}}
+    \toprule
+    metric & none & $+$A & $+$B & $+$AB \\
+    \midrule
+    matched $\mu$ MAE $\downarrow$ & \seedpm{\textbf{1.94}}{.06} & \seedpm{1.97}{.07} & \seedpm{\hlval{accent}{2.14}}{.07} & \seedpm{2.11}{.12} \\
+    \quad $k{=}1$ & \seedpm{0.75}{.08} & \seedpm{\textbf{0.71}}{.14} & \seedpm{0.88}{.10} & \seedpm{0.82}{.12} \\
+    \quad $k{=}2$ & \seedpm{\textbf{1.83}}{.09} & \seedpm{1.90}{.05} & \seedpm{1.99}{.08} & \seedpm{1.99}{.11} \\
+    \quad $k{=}3$ & \seedpm{\textbf{3.60}}{.14} & \seedpm{3.72}{.07} & \seedpm{3.86}{.14} & \seedpm{3.87}{.15} \\
+    \quad $k{=}4$ & \seedpm{6.55}{.25} & \seedpm{6.59}{.25} & \seedpm{6.67}{.17} & \seedpm{6.63}{.18} \\
+    \quad $k{=}5$ & \seedpm{9.48}{.26} & \seedpm{9.40}{.23} & \seedpm{9.71}{.17} & \seedpm{9.64}{.10} \\
+    \addlinespace
+    matched $\sigma$ MAE $\downarrow$ & \seedpm{\textbf{0.77}}{.03} & \seedpm{0.78}{.02} & \seedpm{0.83}{.02} & \seedpm{\hlval{accent}{0.85}}{.04} \\
+    \quad $k{=}1$ & \seedpm{\textbf{0.35}}{.03} & \seedpm{\textbf{0.35}}{.03} & \seedpm{0.39}{.02} & \seedpm{0.41}{.04} \\
+    \quad $k{=}2$ & \seedpm{\textbf{1.12}}{.04} & \seedpm{1.13}{.03} & \seedpm{1.18}{.03} & \seedpm{1.20}{.05} \\
+    \quad $k{=}3$ & \seedpm{\textbf{1.46}}{.03} & \seedpm{1.47}{.03} & \seedpm{1.54}{.02} & \seedpm{1.56}{.04} \\
+    \quad $k{=}4$ & \seedpm{\textbf{1.70}}{.04} & \seedpm{1.73}{.03} & \seedpm{1.76}{.06} & \seedpm{1.79}{.03} \\
+    \quad $k{=}5$ & \seedpm{1.81}{.07} & \seedpm{1.87}{.05} & \seedpm{1.83}{.08} & \seedpm{1.87}{.04} \\
+    \addlinespace
+    matched $a$ MAE $\downarrow$ & \seedpm{0.552}{.044} & \seedpm{0.540}{.038} & \seedpm{0.485}{.019} & \seedpm{\hlval{good}{\textbf{0.469}}}{.014} \\
+    \quad $k{=}1$ & \seedpm{0.235}{.058} & \seedpm{0.228}{.053} & \seedpm{0.231}{.020} & \seedpm{\textbf{0.219}}{.008} \\
+    \quad $k{=}2$ & \seedpm{0.920}{.048} & \seedpm{0.901}{.038} & \seedpm{0.822}{.048} & \seedpm{\textbf{0.790}}{.030} \\
+    \quad $k{=}3$ & \seedpm{1.096}{.030} & \seedpm{1.075}{.020} & \seedpm{0.901}{.028} & \seedpm{\textbf{0.892}}{.039} \\
+    \quad $k{=}4$ & \seedpm{1.049}{.026} & \seedpm{1.029}{.020} & \seedpm{0.800}{.041} & \seedpm{\textbf{0.798}}{.049} \\
+    \quad $k{=}5$ & \seedpm{0.915}{.041} & \seedpm{0.883}{.033} & \seedpm{0.638}{.050} & \seedpm{\hlval{good}{\textbf{0.627}}}{.050} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{2pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}5$ $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (presence lever $=$ column); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. $+$A active normalization, $+$B presence balance, $+$AB both; the none arm $=$ the $K{=}5$ set-pred$\cdot$Hungarian heads arm. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; $k$ $=$ true scatterer count of the pixel; component errors over matched pairs only. \textcolor{good}{green} $=$ the amplitude B buys; \textcolor{accent}{red} $=$ the position and width it pays. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
+    
+
+\end{frame}
+
+% ---------------------------------------------------------------- 18g Levers at K=5: predicted stats vs GT
+\begin{frame}{The $K{=}5$ levers, predicted statistics vs the GT --- B re-brightens the tail, then over-fires it}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{0.85}
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\seedtag}{kpD}
+  \begin{tabular}{@{}l !{\color{white}\vrule width 2pt} c !{\color{white}\vrule width 2pt} c c c c@{}}
+    \toprule
+    prediction mean & \textcolor{good}{GT} & none & $+$A & $+$B & $+$AB \\
+    \midrule
+    \multicolumn{6}{@{}l}{\textcolor{soft}{\emph{predicted active fraction --- share of pixels where the slot fires}}} \\
+    \quad slot 0 & 1.000 & \seedpm{0.983}{.004} & \seedpm{0.987}{.003} & \seedpm{0.983}{.008} & \seedpm{0.986}{.003} \\
+    \quad slot 1 & 0.239 & \seedpm{\textbf{0.324}}{.042} & \seedpm{0.325}{.037} & \seedpm{0.349}{.030} & \seedpm{0.347}{.022} \\
+    \addlinespace[2pt]
+    \quad slot 2 & 0.085 & \seedpm{0.234}{.046} & \seedpm{\textbf{0.233}}{.054} & \seedpm{0.335}{.032} & \seedpm{0.327}{.025} \\
+    \quad slot 3 & 0.035 & \seedpm{0.239}{.056} & \seedpm{\textbf{0.235}}{.047} & \seedpm{\hlval{accent}{0.432}}{.229} & \seedpm{0.339}{.052} \\
+    \quad slot 4 & 0.015 & \seedpm{0.349}{.087} & \seedpm{\textbf{0.345}}{.081} & \seedpm{\hlval{accent}{0.410}}{.097} & \seedpm{0.414}{.131} \\
+    \addlinespace
+    \multicolumn{6}{@{}l}{\textcolor{soft}{\emph{$a$ --- predicted mean over GT-active pixels}}} \\
+    \quad slot 0 & 0.84 & \seedpm{0.51}{.06} & \seedpm{0.52}{.06} & \seedpm{0.53}{.03} & \seedpm{\textbf{0.55}}{.01} \\
+    \quad slot 1 & 1.67 & \seedpm{0.67}{.05} & \seedpm{0.67}{.07} & \seedpm{0.85}{.04} & \seedpm{\textbf{0.87}}{.03} \\
+    \quad slot 2 & 1.41 & \seedpm{0.57}{.05} & \seedpm{0.58}{.05} & \seedpm{\textbf{0.76}}{.04} & \seedpm{0.71}{.06} \\
+    \quad slot 3 & 0.97 & \seedpm{0.23}{.02} & \seedpm{0.23}{.03} & \seedpm{\hlval{good}{\textbf{0.59}}}{.06} & \seedpm{0.58}{.06} \\
+    \quad slot 4 & 0.66 & \seedpm{0.19}{.03} & \seedpm{0.18}{.03} & \seedpm{\hlval{good}{\textbf{0.54}}}{.05} & \seedpm{0.53}{.05} \\
+    \addlinespace
+    \multicolumn{6}{@{}l}{\textcolor{soft}{\emph{$a$ --- predicted mean over GT-inactive pixels (leakage)}}} \\
+    \quad slot 1 & 0.00 & \seedpm{0.39}{.21} & \seedpm{0.37}{.18} & \seedpm{0.26}{.07} & \seedpm{\textbf{0.25}}{.08} \\
+    \quad slot 2 & 0.00 & \seedpm{0.40}{.12} & \seedpm{0.40}{.11} & \seedpm{0.40}{.02} & \seedpm{\textbf{0.38}}{.07} \\
+    \quad slot 3 & 0.00 & \seedpm{\textbf{0.31}}{.20} & \seedpm{0.32}{.22} & \seedpm{0.43}{.10} & \seedpm{0.45}{.06} \\
+    \quad slot 4 & 0.00 & \seedpm{0.41}{.31} & \seedpm{\textbf{0.39}}{.30} & \seedpm{0.51}{.10} & \seedpm{0.54}{.10} \\
+    \addlinespace
+    \multicolumn{6}{@{}l}{\textcolor{soft}{\emph{distribution width --- std over GT-active pixels}}} \\
+    \quad $a$ --- slot 0 & 1.59 & \seedpm{0.92}{.04} & \seedpm{0.94}{.04} & \seedpm{0.94}{.04} & \seedpm{0.96}{.04} \\
+    \quad $\mu$ --- slot 0 & 3.02 & \seedpm{2.39}{.12} & \seedpm{2.39}{.13} & \seedpm{2.83}{.21} & \seedpm{\textbf{2.84}}{.12} \\
+    \quad $\sigma$ --- slot 0 & 1.72 & \seedpm{0.86}{.10} & \seedpm{0.91}{.08} & \seedpm{0.87}{.13} & \seedpm{\textbf{0.93}}{.11} \\
+    \quad $a$ --- slot 1 & 1.60 & \seedpm{0.83}{.02} & \seedpm{0.84}{.05} & \seedpm{0.81}{.04} & \seedpm{0.84}{.05} \\
+    \quad $\mu$ --- slot 1 & 11.09 & \seedpm{8.98}{.15} & \seedpm{8.99}{.11} & \seedpm{\textbf{9.55}}{.24} & \seedpm{\textbf{9.55}}{.33} \\
+    \quad $\sigma$ --- slot 1 & 2.30 & \seedpm{1.29}{.04} & \seedpm{\textbf{1.31}}{.03} & \seedpm{1.15}{.01} & \seedpm{1.21}{.10} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{0pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}5$ $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (presence lever $=$ column); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test; means conditioned on the slot's GT activity mask. $+$A active normalization, $+$B presence balance, $+$AB both; the none arm $=$ the $K{=}5$ set-pred$\cdot$Hungarian heads arm. \textbf{bold} $=$ closest to the \textcolor{good}{GT} column, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the tail amplitudes B re-brightens, \textcolor{accent}{red} $=$ the tail gates it over-fires. Width rows: prediction std over GT-active pixels vs the GT's own (slots 0--1; tail slots in the report). $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
+    
+
+\end{frame}

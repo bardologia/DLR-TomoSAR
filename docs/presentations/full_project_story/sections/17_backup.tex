@@ -1,0 +1,65 @@
+% ---------------------------------------------------------------- B1 Old benchmark
+\begin{frame}{Backup --- earlier capacity-matched benchmark (10 models, param-L1)}
+  \small
+  \begin{center}
+  \begin{tabular}{@{}lccccc@{}}
+    \toprule
+    trial & MSE & MAE & RMSE & $R^2$ & PSNR (dB) \\
+    \midrule
+    \textbf{resunet} & \textbf{0.0866} & \textbf{0.0667} & \textbf{0.2943} & \textbf{0.593} & 52.86 \\
+    unetplusplus     & 0.0946 & 0.0682 & 0.3076 & 0.555 & 52.48 \\
+    attention\_unet  & 0.0975 & 0.0703 & 0.3122 & 0.542 & 52.35 \\
+    swin\_unet       & 0.0996 & 0.0699 & 0.3157 & 0.532 & 52.25 \\
+    unet             & 0.0999 & 0.0694 & 0.3161 & 0.530 & 52.24 \\
+    linknet          & 0.1022 & 0.0707 & 0.3196 & 0.520 & 52.14 \\
+    unet\_multihead  & 0.1073 & 0.0719 & 0.3275 & 0.496 & 51.93 \\
+    unet\_pergaussian& 0.1140 & 0.0746 & 0.3376 & 0.464 & 51.67 \\
+    unetr            & 0.1234 & 0.0786 & 0.3513 & 0.420 & 51.32 \\
+    transunet        & 0.1237 & 0.0740 & 0.3516 & 0.419 & 51.32 \\
+    \bottomrule
+  \end{tabular}
+  \\[3pt]
+  {\scriptsize\color{soft} \textbf{bold} $=$ best in column, marked only where best and
+   worst differ by more than $5\%$.\par}
+  \end{center}
+\end{frame}
+
+% ---------------------------------------------------------------- B2 Engineering nuggets
+\begin{frame}{Backup --- engineering nuggets}
+  \small
+  \begin{itemize}
+    \item \textbf{JEPA embedding norm}: a bare L2 projection caused a gradient explosion
+          during JEPA transfer; the learnable LayerNorm variant shipped as default.
+    \item \textbf{Hungarian without scipy}: exact enumeration of all $K! \le 720$
+          permutations, vectorised across the batch, keeps the matcher on-GPU and
+          differentiability trivial.
+    \item \textbf{Capon-cycle numerics}: Hermitian-symmetrised loaded covariance,
+          \texttt{complex64}, spectrum via \texttt{linalg.solve} rather than an explicit
+          inverse; diagonal loading $\epsilon\bar\sigma$ with $\epsilon = 10^{-2}$.
+    \item \textbf{Per-pixel covariance synthesis} wraps each track-pair in gradient
+          checkpointing to bound activation memory.
+  \end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------- B3 Per-pixel metrics
+\begin{frame}{Backup --- per-pixel metric detail (June winner run)}
+  \small
+  \begin{center}
+  \begin{tabular}{@{}lcc@{}}
+    \toprule
+    metric & mean & median \\
+    \midrule
+    per-pixel $R^2$        & 0.6025 & 0.7538 \\
+    per-pixel cosine       & 0.8738 & 0.9193 \\
+    peak error (elev.\ units) & 2.00 & 0.671 \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  \begin{itemize}
+    \item The mean is sensitive to the heavy negative tail (poorly-reconstructed
+          pixels); a strong median with a collapsed mean signals tail failure, not
+          typical-case failure.
+    \item $\mu$-ordering rate 0.956, permutation consensus 0.988.
+  \end{itemize}
+\end{frame}
+

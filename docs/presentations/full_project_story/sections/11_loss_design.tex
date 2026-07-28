@@ -1,0 +1,296 @@
+% ---------------------------------------------------------------- 29b Why param losses win
+\begin{frame}{Why parameter losses win: the composition ambiguity}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \small
+      A curve loss supervises only the \textbf{composition} $\sum_k a_k\, g_k(z)$ ---
+      the model never sees the components it must actually emit.
+      \begin{itemize}
+        \item Many different parameter changes produce the same curve change: widen one
+              Gaussian, or raise its neighbour; shift $\mu$, or trade amplitudes.
+        \item The gradient distributes credit \emph{ambiguously} across slots --- the
+              composition is many-to-one in the parameters.
+        \item A parameter loss (after Hungarian pairing) supervises each Gaussian
+              \textbf{directly}: unambiguous per-slot credit assignment.
+      \end{itemize}
+      {\scriptsize\color{accent} The curve is what we care about --- but the better route
+      to a good curve is supervising its constituents.\par}
+    \end{column}
+    \begin{column}{0.48\textwidth}
+      \centering
+      \begin{tikzpicture}[scale=1.0]
+        \draw[->,soft] (0,0) -- (3.4,0) node[right,font=\scriptsize]{$z$};
+        \draw[->,soft] (0,0) -- (0,2.0) node[above,font=\scriptsize]{$p(z)$};
+        \draw[accent,very thick,domain=0.1:3.3,samples=70,smooth]
+          plot (\x,{1.0*exp(-(\x-1.2)^2/(2*0.25)) + 0.8*exp(-(\x-2.0)^2/(2*0.2))});
+        \draw[soft,thin,domain=0.1:3.3,samples=60,smooth]
+          plot (\x,{1.0*exp(-(\x-1.2)^2/(2*0.25))});
+        \draw[soft,thin,domain=0.1:3.3,samples=60,smooth]
+          plot (\x,{0.8*exp(-(\x-2.0)^2/(2*0.2))});
+        \draw[soft,dashed,domain=0.1:3.3,samples=60,smooth]
+          plot (\x,{1.15*exp(-(\x-1.32)^2/(2*0.34))});
+        \draw[soft,dashed,domain=0.1:3.3,samples=60,smooth]
+          plot (\x,{0.55*exp(-(\x-2.12)^2/(2*0.12))});
+      \end{tikzpicture}
+      \\ {\scriptsize Two different component sets (solid vs dashed) compose nearly the
+      same profile (thick): a curve loss can barely tell them apart.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 29c Credit routing
+\begin{frame}{Two ways to route the error signal}
+  \centering
+  \begin{tikzpicture}
+    \node[anchor=north west, draw=accent!35, fill=accent!4, rounded corners, thick,
+          inner sep=5pt] at (0,0)
+      {\begin{minipage}[t][64mm][t]{79mm}
+        {\scriptsize\bfseries\color{accent} curve-space loss --- one residual,
+         broadcast to every slot}\\[1pt]
+        {\footnotesize
+        \setlength\abovedisplayskip{3pt}\setlength\belowdisplayskip{3pt}%
+        \setlength\abovedisplayshortskip{3pt}\setlength\belowdisplayshortskip{3pt}%
+        {\tiny\color{soft}\textbf{differentiate} --- the loss
+         $\ell_{\text{curve}} = \sum_n \big(\hat p(\xi_n) - p^{\text{gt}}(\xi_n)\big)^2$
+         sees only the composition; one shared residual factor:}
+        \[
+          \textstyle
+          \frac{\partial \ell_{\text{curve}}}{\partial \hat\theta_k}
+            = 2 \sum_n \underbrace{r(\xi_n)}_{\text{same for every } k}
+              \frac{\partial \hat p(\xi_n)}{\partial \hat\theta_k},
+          \qquad
+          r = \hat p - p^{\text{gt}}
+        \]
+
+        {\tiny\color{soft}\textbf{project} --- each derivative is the slot's own
+         kernel $g_k$ times a low-order polynomial $q_\theta$:}
+        \[
+          \textstyle
+          \begin{aligned}
+            \frac{\partial \hat p}{\partial \hat a_k}    &= g_k, \\
+            \frac{\partial \hat p}{\partial \hat\mu_k}    &= \hat a_k\, g_k\, \frac{\xi - \hat\mu_k}{\hat\sigma_k^{2}}, \\
+            \frac{\partial \hat p}{\partial \hat\sigma_k} &= \hat a_k\, g_k\, \frac{(\xi - \hat\mu_k)^{2}}{\hat\sigma_k^{3}}
+          \end{aligned}
+        \]
+        \[
+          \textstyle
+          \Longrightarrow\;\;
+          \frac{\partial \ell_{\text{curve}}}{\partial \hat\theta_k}
+            = 2\,\big\langle\, r,\; q_{\theta}\, g_k \,\big\rangle
+          \quad\text{--- \textbf{no slot identity} in the error signal}
+        \]
+        }
+      \end{minipage}};
+    \node[anchor=north west, draw=good!40, fill=good!4, rounded corners, thick,
+          inner sep=5pt] at (8.6,0)
+      {\begin{minipage}[t][64mm][t]{45mm}
+        {\scriptsize\bfseries\color{good} parameter-space loss --- $K$ private
+         errors}\\[1pt]
+        {\footnotesize
+        {\tiny\color{soft}\textbf{match, then differentiate} ---
+         $\pi$ supplies identity:}
+        \vspace{3pt}
+        \[
+          \ell_{\text{param}} = \sum_k w_k\, \big|\hat\theta_{\pi(k)} - \theta_k\big|
+        \]
+        \vspace{2pt}
+        \[
+          \frac{\partial \ell_{\text{param}}}{\partial \hat\theta_{\pi(k)}}
+            = w_k\,\operatorname{sign}\!\big(\hat\theta_{\pi(k)} - \theta_k\big)
+        \]
+        \vspace{3pt}
+
+        the Jacobian is \textbf{diagonal}: each Gaussian corrects its \emph{own}
+        error --- no shared factor, no credit dispute.
+        }
+      \end{minipage}};
+    \node[font=\tiny, text=soft] (a1) at (3.0,-5.25)  {slot 1};
+    \node[font=\tiny, text=soft] (a2) at (3.0,-5.7)   {slot 2};
+    \node[font=\tiny, text=soft] (aK) at (3.0,-6.15)  {slot $K$};
+    \node[gate, draw=accent!60, fill=accent!10, font=\tiny] (rr) at (5.1,-5.7) {$r$};
+    \draw[-{Stealth[length=1.3mm]}, accent!80, dashed, thin] (rr.west) -- (a1.east);
+    \draw[-{Stealth[length=1.3mm]}, accent!80, dashed, thin] (rr.west) -- (a2.east);
+    \draw[-{Stealth[length=1.3mm]}, accent!80, dashed, thin] (rr.west) -- (aK.east);
+    \node[font=\tiny, text=accent] at (4.05,-6.5) {broadcast};
+    \node[font=\tiny, text=soft] (b1) at (9.7,-5.25)  {slot 1};
+    \node[font=\tiny, text=soft] (b2) at (9.7,-5.7)   {slot 2};
+    \node[font=\tiny, text=soft] (bK) at (9.7,-6.15)  {slot $K$};
+    \node[gate, draw=good!60, fill=good!8, font=\tiny, inner sep=1.5pt]
+      (f1) at (11.6,-5.25)  {$\hat\theta_1{-}\theta_{\pi(1)}$};
+    \node[gate, draw=good!60, fill=good!8, font=\tiny, inner sep=1.5pt]
+      (f2) at (11.6,-5.7)   {$\hat\theta_2{-}\theta_{\pi(2)}$};
+    \node[gate, draw=good!60, fill=good!8, font=\tiny, inner sep=1.5pt]
+      (fK) at (11.6,-6.15)  {$\hat\theta_K{-}\theta_{\pi(K)}$};
+    \draw[-{Stealth[length=1.3mm]}, good!80, dashed, thin] (f1.west) -- (b1.east);
+    \draw[-{Stealth[length=1.3mm]}, good!80, dashed, thin] (f2.west) -- (b2.east);
+    \draw[-{Stealth[length=1.3mm]}, good!80, dashed, thin] (fK.west) -- (bK.east);
+    \node[font=\tiny, text=good] at (10.65,-6.5) {matched};
+  \end{tikzpicture}
+  \\[4pt]
+  {\scriptsize\color{accent} The composition is many-to-one in the parameters: the
+  broadcast cannot name the slot that must fix the error --- the matching can.\par}
+\end{frame}
+
+% ---------------------------------------------------------------- 29d Overlap geometry
+\begin{frame}{Overlap degenerates the broadcast --- the matched loss stays diagonal}
+  \begin{columns}[T]
+    \begin{column}{0.54\textwidth}
+      \centering
+      \begin{tikzpicture}[xscale=1.28, yscale=1.28]
+        \fill[accent!7] (1.5,-0.8) rectangle (3.6,1.5);
+        \draw[->,soft] (0,0) -- (5.3,0) node[right,font=\scriptsize]{$\xi$};
+        \draw[ink!75,thick,domain=0.2:5.1,samples=80,smooth]
+          plot (\x,{1.3*exp(-(\x-2.35)^2/0.32)});
+        \draw[ink!75,thick,dashed,domain=0.2:5.1,samples=80,smooth]
+          plot (\x,{1.18*exp(-(\x-2.7)^2/0.29)});
+        \draw[accent,very thick,domain=0.2:5.1,samples=100,smooth]
+          plot (\x,{0.5*exp(-(\x-2.1)^2/0.3) - 0.55*exp(-(\x-2.95)^2/0.33) + 0.15*exp(-(\x-4.35)^2/0.5)});
+        \node[font=\tiny,text=ink] at (1.55,1.0) {$g_i$};
+        \node[font=\tiny,text=ink] at (3.55,0.9) {$g_j$};
+        \node[font=\tiny,text=accent] at (4.65,0.5) {residual $r$};
+        \draw[decorate,decoration={brace,mirror,amplitude=4pt},soft] (1.5,-0.95) -- (3.6,-0.95)
+          node[midway,below=5pt,font=\tiny,text=soft]{overlapping kernels read $r$ through the same window};
+      \end{tikzpicture}
+      \\[16pt]
+      {\scriptsize
+       $\partial\ell/\partial\hat\theta_i = 2\langle r,\,q\,g_i\rangle
+        \;\approx\; 2\langle r,\,q\,g_j\rangle = \partial\ell/\partial\hat\theta_j$
+       \\[4pt] --- the two slots' gradients become \textbf{collinear}.}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \centering
+      \parbox[t]{0.48\linewidth}{\centering
+        \begin{tikzpicture}[scale=0.75]
+          \draw[->,soft] (-1.8,0) -- (1.9,0) node[right,font=\tiny]{$\hat\theta_i$};
+          \draw[->,soft] (0,-1.8) -- (0,1.9) node[above,font=\tiny]{$\hat\theta_j$};
+          \foreach \a/\b in {1.65/0.28, 1.25/0.19, 0.85/0.12, 0.47/0.06}
+            \draw[soft, rotate around={-45:(0,0)}] (0,0) ellipse ({\a} and \b);
+          \draw[accent, dashed, {Stealth[length=1.4mm]}-{Stealth[length=1.4mm]}] (-1.3,1.3) -- (1.3,-1.3);
+          \foreach \p in {-0.8,0,0.8} \fill[accent] (\p,-\p) circle (1.6pt);
+        \end{tikzpicture}
+        \\[8pt]
+        {\tiny curve loss near overlap: a \textcolor{accent}{\textbf{flat valley}}\\
+         --- every dot fits equally well}}
+      \hfill
+      \parbox[t]{0.48\linewidth}{\centering
+        \begin{tikzpicture}[scale=0.75]
+          \draw[->,soft] (-1.8,0) -- (1.9,0) node[right,font=\tiny]{$\hat\theta_i$};
+          \draw[->,soft] (0,-1.8) -- (0,1.9) node[above,font=\tiny]{$\hat\theta_j$};
+          \foreach \s in {1.55, 1.14, 0.73, 0.32}
+            \draw[soft] (\s,0) -- (0,\s) -- (-\s,0) -- (0,-\s) -- cycle;
+          \fill[good] (0,0) circle (1.8pt);
+        \end{tikzpicture}
+        \\[8pt]
+        {\tiny param-L1: \textcolor{good}{\textbf{one minimum}}\\
+         --- each slot pulled to its target}}
+    \end{column}
+  \end{columns}
+  \vspace{8pt}
+  {\scriptsize\color{accent} The grid made this mechanism measurable: on the grid
+  average every parameter-space objective beats every curve-space objective; the
+  set-pred head is what lets the robust curve losses recover.\par}
+\end{frame}
+
+% ---------------------------------------------------------------- 29e Ambiguity vs set prediction
+\begin{frame}{Does the ambiguity argument survive set prediction?}
+  \small
+  How much does moving from a curve loss to a parameter loss buy, per head?
+  \begin{center}
+  \scriptsize
+  \begin{tabular}{@{}lc@{}}
+    \toprule
+    head & advantage of param over curve losses (composite) \\
+    \midrule
+    sorted conv regression   & \textcolor{accent}{$\mathbf{+0.13}$} --- all 11 backbones agree \\
+    \addlinespace[2pt]
+    Hungarian set prediction & \textcolor{good}{$\mathbf{+0.02}$} --- within noise, all 3 backbones \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  \vspace{2pt}
+  One cell makes the mechanism visible --- same backbone, same loss, only the head
+  changes (leaderboard ranks, out of 124):
+  \begin{center}
+  \scriptsize
+  \begin{tabular}{@{}lccc@{}}
+    \toprule
+    ResUNet + Huber-curve & curve fit & component shape & peak location \\
+    \midrule
+    sorted head   & 3rd & \textcolor{accent}{102nd} & \textcolor{accent}{102nd} \\
+    \addlinespace[2pt]
+    set-pred head & 1st & \textcolor{good}{52nd}  & \textcolor{good}{29th}  \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  {\scriptsize\color{accent} The argument stands, with a scope: it describes the sorted
+  column of the grid. Set prediction changes who supplies slot identity, not whether
+  identity is needed.\par}
+\end{frame}
+
+% ---------------------------------------------------------------- 29f Gradient view of the rescue
+\begin{frame}{How set prediction closes the gap: the gradient view}
+  \begin{columns}[T]
+    \begin{column}{0.56\textwidth}
+      \centering
+      {\footnotesize
+      \[
+        \hat p(\xi) = \sum_k \sigma(\hat e_k)\, \hat a_k\, g_k(\xi)
+        \qquad \text{{\tiny\color{soft}gated composition}}
+      \]
+      \vspace{-6pt}
+      \[
+        \ell = \ell_{\text{curve}}(\hat p)
+             + \lambda \sum_k \mathrm{BCE}\big(\sigma(\hat e_{\pi(k)}),\, e_k\big),
+        \quad \pi = \mathrm{assign}(\hat\theta, \theta)
+      \]
+      \vspace{-6pt}
+      \[
+        \frac{\partial \ell}{\partial \hat e_{\pi(k)}}
+          = \underbrace{2\big\langle r,\, q_e\, g_{\pi(k)} \big\rangle}_{\text{broadcast}}
+          + \underbrace{\lambda\big(\sigma(\hat e_{\pi(k)}) - e_k\big)}_{\textbf{diagonal}}
+      \]
+      {\tiny\color{soft} $\sigma(\cdot)$ = logistic gate (distinct from the width
+       $\hat\sigma_k$); $q_e = \sigma'(\hat e)\,\hat a$ --- the gating path;
+       $\partial\ell/\partial\hat\theta_k = 2\langle r, q_\theta g_k\rangle$ stays a
+       broadcast, exactly as before.\par}
+      }
+      \vspace{4pt}
+
+      \begin{tikzpicture}[scale=0.62]
+        \draw[->,soft] (-2.2,0) -- (2.3,0) node[right,font=\tiny]{$\hat\theta_i$};
+        \draw[->,soft] (0,-2.0) -- (0,2.1) node[above,font=\tiny]{$\hat\theta_j$};
+        \foreach \a/\b in {1.85/0.30, 1.40/0.21, 0.95/0.13, 0.52/0.07}
+          \draw[soft, rotate around={-45:(0,0)}] (0,0) ellipse ({\a} and \b);
+        \draw[accent, dashed] (-1.45,1.45) -- (1.45,-1.45);
+        \foreach \p in {-0.95,-0.35,0.3}
+          \draw[-{Stealth[length=1.5mm]}, good, thick] (\p,-\p) -- (\p+0.4,-\p-0.4);
+        \fill[good] (1.1,-1.1) circle (2.2pt);
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.44\textwidth}
+      \small
+      The gated head adds \textbf{one supervised coordinate per slot}: an existence
+      gate $\sigma(\hat e_k)$, assigned to its target $e_k$ by a slot assignment $\pi$
+      (sorted or Hungarian --- identical at $K{=}2$).
+      \begin{itemize}
+        \item The curve term is unchanged --- its error signal still carries no slot
+              identity.
+        \item The presence term is \textbf{diagonal}: one private error per slot ---
+              the same structure the param loss enjoys, restricted to one coordinate.
+        \item That coordinate breaks the tie. The degenerate points on the curve
+              valley differ in \emph{cardinality} (a split occupies an extra active
+              slot), so the presence gradient is nonzero exactly along the flat
+              direction: the valley tilts toward the correct-cardinality solution
+              (figure).
+        \item $\pi$ is recomputed from prediction--target proximity every step, so the
+              private errors follow the slots. A sorted assignment is wired by GT rank
+              instead: when slots drift, it pulls them toward the wrong targets (the
+              $K{=}3$ instability).
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \vspace{2pt}
+  {\scriptsize\color{accent} The coordinate comes from the gated \emph{head}, not the
+  matcher: at $K{=}2$ sorted and Hungarian assign it identically (runs are bit-identical),
+  so the head breaks the tie --- Hungarian's edge is the $K{\ge}3$ insurance.\par}
+\end{frame}

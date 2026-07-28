@@ -3,7 +3,7 @@ runs/
 results
 result_storage/
 test_data/
-presentations/
+/presentations/
 scripts/sweep_results/
 notebooks/figures/
 *.pt

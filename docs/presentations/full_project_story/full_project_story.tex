@@ -1,0 +1,58 @@
+\documentclass[aspectratio=169,9pt]{beamer}
+
+\input{preamble}
+
+\title{\textbf{DLR-TomoSAR --- The Full Project}}
+\subtitle{Amortising tomographic inversion with deep networks:\\ from per-pixel fitting to physics-constrained learning}
+\date{\small July 2026}
+\author{}
+
+\begin{document}
+
+\input{sections/00_front}
+\input{sections/01_overview}
+
+\act{I \ \ Problem}{signal model \; $\cdot$ \; Gaussian mixture \; $\cdot$ \; amortisation}
+
+\input{sections/02_signal_model}
+
+\act{II \ \ Data \& ground truth}{F-SAR stack \; $\cdot$ \; GPU label generation \; $\cdot$ \; heavy-tailed normalization}
+
+\input{sections/03_dataset_labels}
+\input{sections/04_representation}
+
+\act{III \ \ Training method}{set matching \; $\cdot$ \; slot imbalance \; $\cdot$ \; stability}
+\subact{Failure modes}{exponential loss \; $\cdot$ \; permutation invariance \; $\cdot$ \; capacity \; $\cdot$ \; sorting \; $\cdot$ \; class imbalance \; $\cdot$ \; overfitting}
+
+\input{sections/05_stability}
+\input{sections/06_set_prediction}
+\input{sections/07_augmentation}
+
+\act{IV \ \ What does the network actually need?}{context ladder \; $\cdot$ \; patch sizes \; $\cdot$ \; amplitude-only}
+
+\input{sections/08_context_information}
+\input{sections/09_error_theory}
+
+\act{V \ \ Benchmark}{run-health tooling \; $\cdot$ \; every backbone $\times$ every objective \; $\cdot$ \; one winner \; $\cdot$ \; dual trunks}
+
+\input{sections/10_benchmark_board}
+\input{sections/11_loss_design}
+\input{sections/11b_l1_vs_mse}
+\input{sections/12_winner}
+\input{sections/12b_dual}
+
+\act{VI \ \ Physics-constrained losses}{five terms \; $\cdot$ \; curriculum \; $\cdot$ \; \textcolor{soft}{results pending}}
+
+\input{sections/13_physics_losses}
+\input{sections/14_unrolled}
+
+\act{VII \ \ JEPA pretraining direction}{predict in representation space \; $\cdot$ \; \textcolor{soft}{results pending}}
+
+\input{sections/15_jepa}
+\input{sections/16_close}
+
+\act{Backup}{}
+
+\input{sections/17_backup}
+
+\end{document}

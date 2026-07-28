@@ -1,0 +1,191 @@
+% ---------------------------------------------------------------- 4 Signal model
+\begin{frame}{The tomographic signal model}
+  \setlength{\abovedisplayskip}{5pt}
+  \setlength{\belowdisplayskip}{5pt}
+  \setlength{\abovedisplayshortskip}{3pt}
+  \setlength{\belowdisplayshortskip}{3pt}
+  \begin{columns}[T]
+    \begin{column}{0.55\textwidth}
+      \small
+      Each track's baseline $b_i$ sets its vertical wavenumber:
+      \[
+        k_z^{(i)} = \frac{4\pi\, b_i}{\lambda\, r_0\, \sin\theta}
+      \]
+      Each pixel is a Fourier sample of the reflectivity $u(z)$:
+      \[
+        g_i = \int u(z)\, e^{\,j\,k_z^{(i)} z}\, dz
+      \]
+      Coherences sample the spectrum of $p(z)=\mathrm{E}\,|u(z)|^2$:
+      \[
+        \gamma_{ij} \;=\; \frac{\int p(z)\, e^{\,j\,(k_z^{(i)}-k_z^{(j)})\, z}\, dz}{\int p(z)\, dz}
+      \]
+      Classical inversion scans $\mathbf{a}(z)$ over the sample covariance $\hat{\mathbf{R}}$:
+      \par\vspace{7pt}
+      \[
+        \mathbf{a}(z)=\big[e^{\,j k_z^{(1)} z}\!,\dots,e^{\,j k_z^{(N)} z}\big]^{\top}
+      \]
+      \par\vspace{2pt}
+      \[
+        \hat p_{\mathrm{BF}}(z)=\tfrac{1}{N^2}\,\mathbf{a}^{\mathsf H}(z)\,\hat{\mathbf{R}}\,\mathbf{a}(z)
+        \quad
+        \hat p_{\mathrm{Capon}}(z)=\big[\mathbf{a}^{\mathsf H}(z)\,\hat{\mathbf{R}}^{-1}\,\mathbf{a}(z)\big]^{-1}
+      \]
+    \end{column}
+    \begin{column}{0.43\textwidth}
+      \centering
+      \begin{tikzpicture}[scale=0.8]
+        \coordinate (cell) at (3.9,1.15);
+        \foreach \p in {(0.00,4.55),(0.30,4.40),(0.82,4.14),(1.00,4.05),(1.52,3.79)}
+          \draw[soft!50, thin] \p -- (cell);
+        \draw[soft, dashed, thin] (0,4.55) -- (0,3.35);
+        \draw[soft, thin] (0,3.85) arc[start angle=-90, end angle=-41, radius=0.7];
+        \node[font=\scriptsize, text=soft] at (0.42,3.62) {$\theta$};
+        \foreach \p in {(0.00,4.55),(0.30,4.40),(0.82,4.14),(1.00,4.05),(1.52,3.79)}
+          \fill[accent] \p circle (1.7pt);
+        \draw[decorate, decoration={brace, amplitude=3pt, raise=3pt}, soft]
+          (0.00,4.55) -- (1.52,3.79)
+          node[midway, above right=5pt and 2pt, font=\scriptsize, text=soft] {$\Delta b$};
+        \node[font=\scriptsize, text=soft, anchor=south west] at (0.10,4.90) {$N$ tracks, baselines $b_i$};
+        \draw[soft, thick] (2.6,0.25) -- (5.2,0.25);
+        \node[font=\scriptsize, text=soft, anchor=north east] at (5.2,0.18) {ground};
+        \draw[->, soft] (3.9,0.25) -- (3.9,3.25) node[above, font=\scriptsize] {$z$};
+        \draw[accent, thick, smooth, samples=60, domain=0.15:2.75, variable=\z]
+          plot ({3.9+0.8*exp(-(\z-0.55)^2/0.05)+0.5*exp(-(\z-1.75)^2/0.16)},{0.25+\z});
+        \fill[ink] (cell) circle (1.3pt);
+        \node[font=\scriptsize, text=accent] at (4.85,2.35) {$p(z)$};
+        \node[font=\scriptsize, text=soft, anchor=east] at (3.05,0.72) {resolution cell};
+        \draw[soft, thin] (3.10,0.72) -- (3.80,1.08);
+      \end{tikzpicture}
+      \\[1pt]
+      {\scriptsize The aperture $\Delta b$ sets the Rayleigh resolution
+       $\delta_z = \lambda r_0 \sin\theta / (2\Delta b)$.}
+      \\[8pt]
+      \begin{tikzpicture}[scale=0.8]
+        \draw[->, soft] (0,0) -- (5.0,0) node[right, font=\scriptsize] {$k_z^{(i)}\!-k_z^{(j)}$};
+        \foreach \x in {0.0,0.35,0.9,1.15,2.05,2.75,3.0,3.55,4.1,4.5}
+          \draw[accent, thick] (\x,-0.1) -- (\x,0.15);
+      \end{tikzpicture}
+      \\[1pt]
+      {\scriptsize Finite, irregular sampling of the Fourier axis ---\\
+       tomography inverts it back to $p(z)$.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 5 Gaussian mixture
+\begin{frame}{Parameterising the spectrum --- and its classical cost}
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \begin{columns}[T]
+    \begin{column}{0.52\textwidth}
+      \small
+      The elevation power spectrum at each pixel is modelled as a $K$-Gaussian mixture:
+      \[
+        p(z)=\sum_{k=1}^{K} a_k\,\exp\!\Big(\!-\tfrac{(z-\mu_k)^2}{2\sigma_k^2}\Big)
+      \]
+      \begin{center}
+      \begin{tabular}{@{}r@{\hskip 8pt}l@{}}
+        $a_k$      & backscattered power of scatterer $k$ \\
+        $\mu_k$    & its elevation in the cell            \\
+        $\sigma_k$ & its vertical spread                  \\
+      \end{tabular}
+      \end{center}
+      \vspace{1pt}
+      {\footnotesize Working configuration: $K{=}2$ --- covers 93.9\% of active pixels;
+       the $K{=}5$ extension for the multi-scatterer tail is in development.}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \centering
+      \begin{tikzpicture}[scale=0.95]
+        \draw[->,soft] (-0.05,0) -- (5.15,0) node[right,font=\scriptsize]{$z$};
+        \draw[->,soft] (0,-0.05) -- (0,1.9) node[above,font=\scriptsize]{$p(z)$};
+        \draw[accent!50,semithick,densely dashed,domain=0.05:5.0,samples=90,smooth]
+          plot (\x,{1.50*exp(-(\x-1.45)^2/(2*0.42*0.42))});
+        \draw[accent!50,semithick,densely dashed,domain=0.05:5.0,samples=90,smooth]
+          plot (\x,{0.90*exp(-(\x-3.00)^2/(2*0.60*0.60))});
+        \draw[accent,thick,domain=0.05:5.0,samples=140,smooth]
+          plot (\x,{1.50*exp(-(\x-1.45)^2/(2*0.42*0.42)) + 0.90*exp(-(\x-3.00)^2/(2*0.60*0.60))});
+        \draw[soft,dotted] (1.45,0) -- (1.45,1.50);
+        \draw[soft,dotted] (1.45,1.50) -- (0.55,1.50);
+        \draw[{Stealth[length=1.4mm]}-{Stealth[length=1.4mm]},soft,thin] (0.55,0.02) -- (0.55,1.48);
+        \node[font=\scriptsize,text=ink,anchor=east] at (0.48,0.76) {$a_1$};
+        \node[font=\scriptsize,text=ink,anchor=north] at (1.45,-0.06) {$\mu_1$};
+        \draw[soft,dotted] (3.00,0) -- (3.00,0.90);
+        \node[font=\scriptsize,text=ink,anchor=north] at (3.00,-0.06) {$\mu_2$};
+        \draw[{Stealth[length=1.4mm]}-{Stealth[length=1.4mm]},soft,thin] (3.02,0.546) -- (3.60,0.546);
+        \node[font=\scriptsize,text=ink] at (3.34,0.34) {$\sigma_2$};
+      \end{tikzpicture}
+      \\[1pt]
+      {\scriptsize \textcolor{accent}{Mixture $p(z)$} and its
+       \textcolor{accent!60}{components (dashed)} --- three numbers per scatterer
+       describe the whole profile.}
+    \end{column}
+  \end{columns}
+  \vspace{16pt}
+  \centering
+  \begin{tikzpicture}
+    \draw[soft,thin,fill=white] (0,-0.5) rectangle ++(1.0,1.0);
+    \draw[black!10,step=0.2,shift={(0,-0.5)}] (0,0) grid (1.0,1.0);
+    \fill[accent] (0.4,-0.1) rectangle ++(0.2,0.2);
+    \node[font=\scriptsize,text=soft,anchor=north] at (0.5,-0.6) {every pixel};
+    \draw[flow] (1.2,0) -- (1.7,0);
+    \node[gate,anchor=west,minimum height=9mm] (fit) at (1.8,0)
+      {nonlinear least-squares fit\\{\tiny initialise $\to$ iterate $\to$ converge}};
+    \draw[flow] (fit.east) ++(0.1,0) -- ++(0.5,0);
+    \node[gate,anchor=west,minimum height=9mm] (rep) at ([xshift=7mm]fit.east)
+      {repeated at every pixel of the scene\\{\tiny independent --- nothing shared between neighbours}};
+    \draw[flow] (rep.east) ++(0.1,0) -- ++(0.5,0);
+    \node[box,anchor=west,minimum height=9mm] (btl) at ([xshift=7mm]rep.east)
+      {at scene scale\\\textbf{the bottleneck}};
+  \end{tikzpicture}
+  \\[2pt]
+  {\scriptsize The classical route restarts an iterative fit at every pixel ---
+   the cost the amortised network removes (next).}
+\end{frame}
+
+% ---------------------------------------------------------------- 6 Amortisation
+\begin{frame}{The amortisation idea}
+  \small
+  Train a fully-convolutional network to emit all $3K$ parameters directly,
+  for every pixel of a patch at once:
+  \[
+    f_\theta:\ \mathbb{R}^{C_\text{in}\times P\times P}\ \longrightarrow\ \mathbb{R}^{3K\times P\times P}
+  \]
+  \begin{center}
+  \begin{tikzpicture}
+    \begin{scope}[on background layer]
+      \draw[accent!35,dashed,thin] (1.3,1.1) -- (5.65,0.8);
+      \draw[accent!35,dashed,thin] (1.3,0.3) -- (5.65,0.6);
+    \end{scope}
+    \foreach \i in {3,2,1} \draw[soft,thin,fill=black!2] (0.1*\i,0.1*\i) rectangle ++(1.6,1.6);
+    \draw[soft,thin,fill=white] (0,0) rectangle (1.6,1.6);
+    \draw[black!10,step=0.2] (0,0) grid (1.6,1.6);
+    \fill[accent] (0.8,0.6) rectangle ++(0.2,0.2);
+    \draw[accent!80,dashed,thin] (0.5,0.3) rectangle ++(0.8,0.8);
+    \node[font=\scriptsize,anchor=south] at (0.95,1.95) {input patch};
+    \node[font=\scriptsize,anchor=north] at (0.95,-0.22) {$C_\text{in}\times P\times P$};
+    \draw[flow] (2.05,0.7) -- (2.55,0.7);
+    \foreach \x/\h in {2.65/1.7,3.05/1.3,3.45/1.3,3.85/1.7}
+      \draw[accent!70,thick,fill=accent!6,rounded corners=1pt] (\x,0.8-\h/2) rectangle ++(0.26,\h);
+    \node[font=\scriptsize,anchor=north] at (3.38,-0.22) {$f_\theta$ --- fully-convolutional};
+    \draw[flow] (4.25,0.7) -- (4.75,0.7);
+    \foreach \i in {4,3,2,1} \draw[soft,thin,fill=black!2] (4.85+0.1*\i,0.1*\i) rectangle ++(1.6,1.6);
+    \draw[soft,thin,fill=white] (4.85,0) rectangle ++(1.6,1.6);
+    \draw[black!10,step=0.2,shift={(4.85,0)}] (0,0) grid (1.6,1.6);
+    \fill[accent] (5.65,0.6) rectangle ++(0.2,0.2);
+    \node[font=\scriptsize,anchor=south] at (5.85,2.05) {parameter maps $[a_k,\mu_k,\sigma_k]$};
+    \node[font=\scriptsize,anchor=north] at (5.85,-0.22) {$3K\times P\times P$};
+  \end{tikzpicture}
+  \\[2pt]
+  {\scriptsize \textcolor{accent}{One pixel}'s parameters draw on its
+   \textcolor{accent!80}{spatial context window (dashed)}; the whole patch is decoded in a single pass.}
+  \end{center}
+  \begin{itemize}
+    \item One forward pass replaces per-pixel iterative optimisation.
+    \item The network sees a \textbf{spatial context window}, not an isolated pixel ---
+          whether that context matters is a question the theory does not answer
+          (Act IV measures it).
+    \item Supervision: parameter maps produced by the classical fit (next act) ---
+          with everything that implies about label quality (Act VI).
+  \end{itemize}
+\end{frame}

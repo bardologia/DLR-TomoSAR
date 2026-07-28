@@ -1,0 +1,440 @@
+% ---------------------------------------------------------------- 34 Why constrain
+\begin{frame}{Why constrain the solution space}
+  \small
+  \begin{itemize}
+    \item The labels are classical fits: the network's ceiling is the label quality ---
+          and Act IV showed the network happily leans on statistical shortcuts.
+    \item Physics terms restrict predictions to profiles \textbf{consistent with the SAR
+          signal model}:
+    \begin{itemize}
+      \item today --- as a regularizer: physical quantities recomputed from the predicted
+            profile must match those of the GT profile;
+      \item next --- as self-supervision against the \emph{measured} covariance itself,
+            removing the label ceiling entirely.
+    \end{itemize}
+    \item Five terms implemented and theory-tested; every one differentiable end-to-end
+          through the Gaussian-mixture curve reconstruction.
+  \end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------- 35 Forward operator
+\begin{frame}{The shared forward operator}
+  \small
+  All terms use the vertical wavenumber and the steering matrix on the elevation grid:
+  \[
+    \boxed{\;k_z^{(i)} = \frac{4\pi\, b_i}{\lambda\, r_0\, s}, \qquad
+    A_{in} = e^{\,j\, k_z^{(i)}\, \xi_n}\;}
+  \]
+  \begin{itemize}
+    \item Geometry resolved from campaign track parameters --- not nominal defaults:
+          per-pass perpendicular baselines, look angle, slant range.
+    \item \textbf{Per-pixel $k_z$ field} for range/azimuth-varying geometry, built at
+          preprocessing and threaded dataset $\to$ trainer $\to$ loss.
+    \item Steering sign settled empirically ($+k_z$: median peak error 0.67\,m, within
+          one Rayleigh cell).
+  \end{itemize}
+\end{frame}
+
+% ---------------------------------------------------------------- 36 Data-consistency terms
+\begin{frame}{Data-consistency terms (the ranked top two)}
+  \setlength{\abovedisplayskip}{3pt}
+  \setlength{\belowdisplayskip}{3pt}
+  \begin{columns}[T]
+    \begin{column}{0.46\textwidth}
+      \begin{minipage}[t][0.78\textheight][s]{\linewidth}
+      \centering
+      \textbf{Coherence re-synthesis}\\[1pt]
+      {\footnotesize\color{soft} coherence domain}
+      \par\vfill
+      \[
+        \gamma_P(k_z^{(i)}) = \frac{\sum_n P(\xi_n)\, e^{j k_z^{(i)} \xi_n}}{\sum_n P(\xi_n)}
+      \]
+      \[
+        \ell_{\text{coh}} = \Big\langle \tfrac{1}{N_s}\textstyle\sum_i
+          \big| \gamma_P(k_z^{(i)}) - \gamma_T(k_z^{(i)}) \big|^2 \Big\rangle
+      \]
+      \par\vfill
+      \begin{tikzpicture}[scale=0.70]
+        \draw[->,soft] (-0.05,0) -- (3.55,0) node[right,font=\tiny]{$k_z^{(i)}$};
+        \draw[->,soft] (0,-0.05) -- (0,1.55) node[above,font=\tiny]{$|\gamma|$};
+        \draw[accent,semithick,domain=0.05:3.3,samples=60,smooth] plot (\x,{1.3*exp(-\x*\x/3.2)});
+        \foreach \x/\d in {0.35/0.12, 0.9/-0.10, 1.45/0.11, 2.0/-0.09, 2.55/0.10, 3.05/-0.08} {
+          \draw[good!70,thin] (\x,{1.3*exp(-\x*\x/3.2)}) -- (\x,{1.3*exp(-\x*\x/3.2)+\d});
+          \fill[good] (\x,{1.3*exp(-\x*\x/3.2)+\d}) circle (1.5pt);
+        }
+      \end{tikzpicture}
+      \\[4pt]
+      {\scriptsize \textcolor{accent}{$\gamma_P$ from the predicted mixture} pulled onto
+       \textcolor{good}{the target coherences}, baseline by baseline.}
+      \par\vfill
+      {\footnotesize Cloude 2006 (PCT); same Fourier kernel as gamma-Net (Qian et al.).}
+      \end{minipage}
+    \end{column}
+    \begin{column}{0.02\textwidth}
+      \centering
+      \textcolor{soft!40}{\rule{0.4pt}{0.74\textheight}}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \begin{minipage}[t][0.78\textheight][s]{\linewidth}
+      \centering
+      \textbf{Covariance matching}\\[1pt]
+      {\footnotesize\color{soft} covariance domain}
+      \par\vfill
+      \[
+        \mathbf{R}[P] = \mathbf{A}\,\mathrm{diag}(P)\,\mathbf{A}^{H} \Delta\xi
+      \]
+      \[
+        \ell_{\text{cov}} = \Big\langle
+          \tfrac{\| \mathbf{R}[P] - \mathbf{R}[T] \|_F^2}{\| \mathbf{R}[T] \|_F^2} \Big\rangle
+      \]
+      \par\vfill
+      \begin{tikzpicture}[scale=1.2]
+        \foreach \i/\j/\c in {0/2/70,1/2/35,2/2/15,0/1/35,1/1/70,2/1/35,0/0/15,1/0/35,2/0/70}
+          \fill[accent!\c] (\i*0.34,\j*0.34) rectangle ++(0.32,0.32);
+        \draw[soft,thin] (-0.02,-0.02) rectangle (1.02,1.02);
+        \node[font=\scriptsize,anchor=north] at (0.5,-0.1) {$\mathbf{R}[P]$};
+        \draw[{Stealth[length=1.5mm]}-{Stealth[length=1.5mm]},accent,semithick] (1.35,0.5) -- (2.05,0.5);
+        \node[font=\scriptsize,text=accent,anchor=south] at (1.7,0.58) {$\|\cdot\|_F$};
+        \begin{scope}[shift={(2.4,0)}]
+          \foreach \i/\j/\c in {0/2/60,1/2/40,2/2/20,0/1/40,1/1/60,2/1/28,0/0/20,1/0/28,2/0/60}
+            \fill[good!\c] (\i*0.34,\j*0.34) rectangle ++(0.32,0.32);
+          \draw[soft,thin] (-0.02,-0.02) rectangle (1.02,1.02);
+          \node[font=\scriptsize,anchor=north] at (0.5,-0.1) {$\mathbf{R}[T]$};
+        \end{scope}
+      \end{tikzpicture}
+      \\[4pt]
+      {\scriptsize \textcolor{accent}{Synthesised} vs \textcolor{good}{target} covariance ---
+       structure and relative scale, entry by entry.}
+      \par\vfill
+      {\footnotesize COMET (Ottersten, Stoica, Roy 1998); TomoSAR: Cros \& Ferro-Famil 2025;
+       CS fidelity: Berenger et al. 2023.}
+      \end{minipage}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 37a Descriptor terms
+\begin{frame}{Descriptor terms: moments and total power}
+  \setlength{\abovedisplayskip}{3pt}
+  \setlength{\belowdisplayskip}{3pt}
+  \begin{columns}[T]
+    \begin{column}{0.46\textwidth}
+      \centering
+      \textbf{Moments}\\[1pt]
+      {\footnotesize\color{soft} mass \; $\cdot$ \; phase-centre $\bar z$ \; $\cdot$ \; spread $\sigma_z$}
+      \\[6pt]
+      \[
+        m = \textstyle\sum_n P(\xi_n)\,\Delta\xi
+      \]
+      \[
+        \bar z = \tfrac{\sum_n \xi_n P(\xi_n)}{\sum_n P(\xi_n)}, \qquad
+        \sigma_z^2 = \tfrac{\sum_n (\xi_n-\bar z)^2 P(\xi_n)}{\sum_n P(\xi_n)}
+      \]
+      \vspace{15pt}
+      \begin{tikzpicture}[scale=0.9]
+        \draw[->,soft] (-0.05,0) -- (4.35,0) node[right,font=\scriptsize]{$z$};
+        \draw[->,soft] (0,-0.05) -- (0,1.75) node[above,font=\scriptsize]{$P(z)$};
+        \fill[accent!10] plot[domain=0.05:4.15,samples=80,smooth]
+          (\x,{1.3*exp(-(\x-1.3)^2/(2*0.38*0.38))+0.55*exp(-(\x-2.9)^2/(2*0.5*0.5))})
+          -- (4.15,0) -- (0.05,0) -- cycle;
+        \begin{scope}
+          \clip plot[domain=0.05:4.15,samples=80,smooth]
+            (\x,{1.3*exp(-(\x-1.3)^2/(2*0.38*0.38))+0.55*exp(-(\x-2.9)^2/(2*0.5*0.5))})
+            -- (4.15,0) -- (0.05,0) -- cycle;
+          \draw[accent!30,very thin,step=0.16] (0,0) grid (4.2,1.6);
+        \end{scope}
+        \draw[accent,thick,domain=0.05:4.15,samples=100,smooth]
+          plot (\x,{1.3*exp(-(\x-1.3)^2/(2*0.38*0.38))+0.55*exp(-(\x-2.9)^2/(2*0.5*0.5))});
+        \draw[ink,dotted,thick] (1.8,0) -- (1.8,1.5);
+        \node[font=\scriptsize,text=ink,anchor=north] at (1.8,-0.06) {$\bar z$};
+        \draw[{Stealth[length=1.4mm]}-{Stealth[length=1.4mm]},soft,thin] (0.95,1.28) -- (2.65,1.28);
+        \node[font=\scriptsize,text=ink,anchor=south] at (1.8,1.33) {$\sigma_z$};
+      \end{tikzpicture}
+      \\[2pt]
+      {\scriptsize Centroid and spread are bias-robust \emph{ratios}
+       (Cros \& Ferro-Famil 2025).}
+    \end{column}
+    \begin{column}{0.02\textwidth}
+      \centering
+      \textcolor{soft!40}{\rule{0.4pt}{0.58\textheight}}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \centering
+      \textbf{Total power}\\[1pt]
+      {\footnotesize\color{soft} the one absolute-power quantity}
+      \\[6pt]
+      \[
+        P_{\text{tot}}[\,\cdot\,] = \textstyle\sum_n (\,\cdot\,)(\xi_n)\,\Delta\xi
+      \]
+      \[
+        \ell_{\text{pow}} = \Big\langle \big( P_{\text{tot}}[P] - P_{\text{tot}}[T] \big)^2 \Big\rangle
+      \]
+      \vspace{15pt}
+      \begin{tikzpicture}[scale=0.9]
+        \draw[->,soft] (-0.05,0) -- (4.35,0) node[right,font=\scriptsize]{scene position};
+        \draw[->,soft] (0,-0.05) -- (0,1.75) node[above,font=\scriptsize]{$P_{\text{tot}}$};
+        \draw[soft,densely dashed] (0,1.4) -- (4.15,1.4);
+        \node[font=\tiny,text=soft,anchor=south west] at (0.08,1.43) {true level};
+        \draw[accent,thick,domain=0.05:4.15,samples=120,smooth]
+          plot (\x,{0.82+0.26*sin(\x*110)+0.12*sin(\x*260+70)});
+        \node[font=\tiny,text=accent,anchor=west] at (0.25,0.28)
+          {$P_{\text{tot}}[T]$ --- bias varies with the scene};
+        \draw[{Stealth[length=1.3mm]}-{Stealth[length=1.3mm]},soft,thin] (3.9,1.07) -- (3.9,1.4);
+        \node[font=\tiny,text=ink,anchor=east] at (3.83,1.2) {$\sim$2\,dB};
+      \end{tikzpicture}
+      \\[2pt]
+      {\scriptsize The target $P_{\text{tot}}[T]$ is not the true power: its bias moves with
+       scene content (Lopez-Dekker \& Mallorqui 2010) --- the loss would imprint that bias.}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 37b Estimator cycle
+\begin{frame}{The estimator-cycle term: Capon cycle}
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \small
+  Push the prediction through the \emph{same estimator} that produced the ground truth:
+  \[
+    \hat T_P(\xi_n) = \big( \mathbf{a}^{H}(\xi_n)
+      (\mathbf{R}[P] + \epsilon\bar\sigma\mathbf{I})^{-1} \mathbf{a}(\xi_n) \big)^{-1}
+  \]
+  \vspace{8pt}
+  \begin{center}
+  \begin{tikzpicture}
+    \draw[soft,thin] (0,0) -- (1.8,0);
+    \draw[accent,thick,domain=0.08:1.72,samples=70,smooth]
+      plot (\x,{0.62*exp(-(\x-0.6)^2/(2*0.11*0.11))+0.38*exp(-(\x-1.2)^2/(2*0.13*0.13))});
+    \node[font=\scriptsize,text=soft,anchor=north] at (0.9,-0.12) {predicted profile $P$};
+    \draw[flow] (1.95,0.45) -- (3.9,0.45);
+    \node[font=\scriptsize,text=soft,anchor=south] at (2.92,0.58)
+      {$\mathbf{R}[P]=\mathbf{A}\,\mathrm{diag}(P)\,\mathbf{A}^{H}$};
+    \begin{scope}[shift={(4.1,-0.06)}]
+      \foreach \i/\j/\c in {0/2/70, 1/2/35, 2/2/15, 0/1/35, 1/1/70, 2/1/35, 0/0/15, 1/0/35, 2/0/70}
+        \fill[accent!\c] (\i*0.34,\j*0.34) rectangle ++(0.32,0.32);
+      \draw[soft,thin] (-0.02,-0.02) rectangle (1.02,1.02);
+    \end{scope}
+    \node[font=\scriptsize,text=soft,anchor=north] at (4.61,-0.12) {synthesised covariance};
+    \draw[flow] (5.27,0.45) -- (7.95,0.45);
+    \node[font=\scriptsize,text=soft,anchor=south,align=center] at (6.61,0.58)
+      {Capon --- \emph{the same estimator}\\\emph{that produced the GT}};
+    \draw[soft,thin] (8.1,0) -- (9.9,0);
+    \draw[accent,thick,domain=8.18:9.82,samples=70,smooth]
+      plot (\x,{0.50*exp(-(\x-8.7)^2/(2*0.19*0.19))+0.30*exp(-(\x-9.3)^2/(2*0.22*0.22))});
+    \node[font=\scriptsize,text=soft,anchor=north,align=center] at (9.0,-0.12)
+      {re-estimated\\spectrum $\hat T_P$};
+    \draw[{Stealth[length=1.6mm]}-{Stealth[length=1.6mm]},accent,semithick] (10.05,0.45) -- (10.75,0.45);
+    \node[font=\scriptsize,text=accent,anchor=south] at (10.4,0.55) {$\ell$};
+    \draw[soft,thin] (10.9,0) -- (12.7,0);
+    \draw[good,thick,domain=10.98:12.62,samples=70,smooth]
+      plot (\x,{0.50*exp(-(\x-11.5)^2/(2*0.19*0.19))+0.30*exp(-(\x-12.1)^2/(2*0.22*0.22))});
+    \node[font=\scriptsize,text=soft,anchor=north,align=center] at (11.8,-0.12)
+      {Capon tomogram $T$\\(ground truth)};
+    \draw[accent!70,dashed,-{Stealth[length=1.8mm]}] (11.8,-0.95) -- (0.9,-0.95) -- (0.9,-0.62);
+    \node[font=\scriptsize,text=accent!80,anchor=north] at (6.35,-1.02)
+      {gradient --- differentiable end-to-end};
+  \end{tikzpicture}
+  \end{center}
+  \vspace{6pt}
+  \begin{itemize}
+    \item Absorbs the Capon bias and the PSF \textbf{by construction}.
+    \item Costs an $N_s\times N_s$ solve per pixel --- the most expensive of the five.
+  \end{itemize}
+  \vspace{2pt}
+  {\scriptsize\color{soft} Cycle-consistency lineage: Yaman 2020, Lu 2021,
+   Vella \& Mota 2020, Angermann 2023.\par}
+\end{frame}
+
+% ---------------------------------------------------------------- 38 Curriculum motivation
+\begin{frame}{Why the physics terms need a curriculum}
+  \small
+  The physics terms are the most sensitive consumers of the reconstructed profile ---
+  and at random initialisation they see only noise:
+  \begin{center}
+  \begin{tikzpicture}[node distance=9mm]
+    \node[gate, text width=27mm] (init) {\textbf{untrained network}\\{\tiny predicted profiles are noise}};
+    \node[gate, text width=40mm, right=of init] (fwd)  {\textbf{physics forward operators}\\{\tiny $\mathbf{R}[P]$, Capon solve --- \mbox{ill-conditioned} on unphysical profiles}};
+    \node[gate, text width=34mm, right=of fwd]  (grad) {\textbf{huge, unstable losses}\\{\tiny gradients drown the useful signal}};
+    \draw[flow] (init) -- (fwd);
+    \draw[flow] (fwd) -- (grad);
+  \end{tikzpicture}
+  \end{center}
+  \vspace{-2pt}
+  \begin{center}
+  \begin{tikzpicture}
+    \fill[black!4] (0,0)   rectangle (3.6,2.7);
+    \fill[good!6]  (3.6,0) rectangle (11.6,2.7);
+    \node[font=\tiny, text=soft, anchor=north west]           at (0.08,2.62) {\textbf{warmup stage} --- param-L1 only};
+    \node[font=\tiny, text=good!80!black, anchor=north west]  at (3.68,2.62) {\textbf{complete stage} --- full composite, physics terms enter};
+    \node[font=\tiny\itshape, text=soft, anchor=north east]   at (11.52,2.62) {schematic};
+    \draw[soft, dashed] (3.6,-0.35) -- (3.6,2.7);
+    \node[font=\tiny, text=soft, anchor=north] at (3.6,-0.4) {swap (default epoch 15)};
+    \draw[->, soft] (0,0) -- (12.0,0)  node[right, font=\scriptsize] {epoch};
+    \draw[->, soft] (0,0) -- (0,2.85)  node[above, font=\scriptsize] {loss};
+    \draw[accent!35, very thin] plot coordinates
+      {(0.20,1.94) (0.23,1.80) (0.27,1.83) (0.30,1.83) (0.34,1.94) (0.37,2.14) (0.41,2.08)
+       (0.44,1.96) (0.48,1.86) (0.51,1.90) (0.54,1.92) (0.58,1.84) (0.61,1.91) (0.65,1.84)
+       (0.68,2.00) (0.72,2.08) (0.75,2.13) (0.79,2.02) (0.82,2.05) (0.85,2.01) (0.89,1.97)
+       (0.92,1.95) (0.96,1.86) (0.99,1.80) (1.03,1.96) (1.06,1.96) (1.10,2.00) (1.13,2.09)
+       (1.16,1.91) (1.20,1.89) (1.23,1.96) (1.27,2.02) (1.30,1.99) (1.34,2.09) (1.37,2.08)
+       (1.41,1.95) (1.44,1.90) (1.47,2.03) (1.51,2.07) (1.54,1.89) (1.58,2.07) (1.61,2.10)
+       (1.65,2.19) (1.68,2.09) (1.72,2.04) (1.75,1.94) (1.78,2.20) (1.82,2.12) (1.85,2.22)
+       (1.89,2.08) (1.92,2.08) (1.96,1.92) (1.99,1.95) (2.03,2.08) (2.06,1.96) (2.09,2.09)
+       (2.13,2.10) (2.16,1.99) (2.20,1.98) (2.23,1.97) (2.27,2.00) (2.30,1.98) (2.34,1.94)
+       (2.37,1.97) (2.40,1.92) (2.44,1.87) (2.47,1.95) (2.51,2.07) (2.54,1.93) (2.58,1.99)
+       (2.61,1.96) (2.65,1.92) (2.68,2.05) (2.71,2.01) (2.75,2.16) (2.78,2.05) (2.82,2.08)
+       (2.85,2.05) (2.89,1.99) (2.92,2.07) (2.96,2.05) (2.99,2.10) (3.02,2.08) (3.06,1.97)
+       (3.09,2.00) (3.13,2.03) (3.16,2.12) (3.20,2.01) (3.23,2.02) (3.27,1.89) (3.30,2.01)
+       (3.33,1.94) (3.37,1.83) (3.40,1.92) (3.44,2.34) (3.47,2.19) (3.51,2.01) (3.54,1.95)
+       (3.58,1.89) (3.61,1.97) (3.64,1.93) (3.68,1.91) (3.71,2.02) (3.74,1.96) (3.78,2.03)
+       (3.81,1.94) (3.84,1.88) (3.88,2.34) (3.91,2.31) (3.94,2.13) (3.98,2.03) (4.01,2.02)
+       (4.04,2.03) (4.08,2.03) (4.11,2.18) (4.14,2.01) (4.18,1.88) (4.21,1.85) (4.25,1.80)
+       (4.28,1.96) (4.31,2.04) (4.35,1.94) (4.38,1.85) (4.41,1.88) (4.45,2.05) (4.48,1.78)
+       (4.51,2.25) (4.55,2.01) (4.58,2.07) (4.61,1.93) (4.65,1.91) (4.68,1.81) (4.71,1.80)
+       (4.75,2.00) (4.78,2.34) (4.81,2.17) (4.85,1.98) (4.88,2.12) (4.91,1.98) (4.95,1.95)
+       (4.98,1.94) (5.01,1.93) (5.05,1.84) (5.08,1.88) (5.11,1.91) (5.15,2.04) (5.18,2.15)
+       (5.21,2.05) (5.25,1.93) (5.28,1.93) (5.32,1.88) (5.35,1.84) (5.38,1.88) (5.42,1.81)
+       (5.45,1.92) (5.48,1.91) (5.52,1.94) (5.55,1.92) (5.58,1.86) (5.62,1.80) (5.65,1.84)
+       (5.68,1.83) (5.72,1.89) (5.75,1.90) (5.78,1.79) (5.82,1.85) (5.85,1.76) (5.88,1.77)
+       (5.92,1.81) (5.95,1.68) (5.98,1.79) (6.02,1.85) (6.05,1.86) (6.08,1.84) (6.12,1.84)
+       (6.15,1.78) (6.18,1.81) (6.22,1.80) (6.25,1.85) (6.28,2.12) (6.32,2.01) (6.35,1.95)
+       (6.39,1.87) (6.42,1.84) (6.45,1.91) (6.49,1.76) (6.52,1.86) (6.55,1.89) (6.59,1.91)
+       (6.62,1.93) (6.65,1.86) (6.69,1.85) (6.72,1.92) (6.75,1.94) (6.79,1.93) (6.82,1.78)
+       (6.85,1.87) (6.89,1.98) (6.92,2.02) (6.95,1.98) (6.99,1.81) (7.02,1.92) (7.05,1.89)
+       (7.09,1.68) (7.12,1.80) (7.15,1.71) (7.19,1.68) (7.22,1.72) (7.25,1.90) (7.29,1.87)
+       (7.32,1.90) (7.35,2.04) (7.39,2.11) (7.42,2.00) (7.46,1.93) (7.49,1.81) (7.52,1.79)
+       (7.56,1.87) (7.59,1.92) (7.62,1.92) (7.66,2.00) (7.69,1.89) (7.72,1.89) (7.76,1.96)
+       (7.79,1.98) (7.82,2.04) (7.86,2.02) (7.89,2.34) (7.92,2.23) (7.96,1.98) (7.99,1.80)
+       (8.02,1.90) (8.06,1.89) (8.09,1.93) (8.12,1.78) (8.16,1.82) (8.19,1.81) (8.22,1.79)
+       (8.26,1.66) (8.29,1.76) (8.32,1.91) (8.36,1.96) (8.39,1.90) (8.42,1.92) (8.46,1.99)
+       (8.49,1.74) (8.52,1.82) (8.56,1.93) (8.59,2.34) (8.63,2.33) (8.66,2.24) (8.69,2.09)
+       (8.73,2.06) (8.76,2.08) (8.79,1.98) (8.83,1.97) (8.86,2.05) (8.89,2.18) (8.93,2.08)
+       (8.96,2.03) (8.99,2.02) (9.03,2.12) (9.06,2.06) (9.09,2.15) (9.13,2.00) (9.16,1.98)
+       (9.19,1.97) (9.23,2.05) (9.26,2.12) (9.29,1.94) (9.33,1.89) (9.36,1.97) (9.39,1.94)
+       (9.43,1.84) (9.46,2.01) (9.49,2.06) (9.53,2.08) (9.56,2.02) (9.59,2.11) (9.63,2.05)
+       (9.66,2.14) (9.70,2.01) (9.73,1.95) (9.76,2.01) (9.80,1.96) (9.83,2.06) (9.86,2.08)
+       (9.90,1.99) (9.93,2.02) (9.96,2.01) (10.00,2.11) (10.03,2.03) (10.06,2.01) (10.10,2.14)
+       (10.13,2.29) (10.16,2.34) (10.20,2.24) (10.23,2.18) (10.26,2.26) (10.30,2.17) (10.33,2.04)
+       (10.36,2.07) (10.40,2.11) (10.43,2.03) (10.46,1.91) (10.50,1.87) (10.53,2.02) (10.56,1.99)
+       (10.60,2.02) (10.63,2.07) (10.66,2.14) (10.70,2.09) (10.73,2.14) (10.77,2.04) (10.80,2.04)
+       (10.83,1.98) (10.87,2.13) (10.90,2.12) (10.93,2.05) (10.97,2.04) (11.00,2.05) (11.03,2.14)
+       (11.07,1.99) (11.10,1.96) (11.13,1.99) (11.17,2.26) (11.20,2.28) (11.23,2.19) (11.27,2.22)
+       (11.30,2.34)};
+    \draw[accent, semithick] plot coordinates
+      {(0.20,1.94) (0.34,1.92) (0.48,1.94) (0.61,1.93) (0.75,1.95) (0.89,1.96) (1.03,1.95)
+       (1.16,1.96) (1.30,1.96) (1.44,1.97) (1.58,1.98) (1.72,2.00) (1.85,2.03) (1.99,2.03)
+       (2.13,2.03) (2.27,2.02) (2.40,2.01) (2.54,2.00) (2.68,1.99) (2.82,2.01) (2.96,2.02)
+       (3.09,2.02) (3.23,2.03) (3.37,2.00) (3.51,2.03) (3.64,2.01) (3.78,2.00) (3.91,2.03)
+       (4.04,2.03) (4.18,2.03) (4.31,2.01) (4.45,1.99) (4.58,2.00) (4.71,1.97) (4.85,2.00)
+       (4.98,2.00) (5.11,1.98) (5.25,1.99) (5.38,1.97) (5.52,1.95) (5.65,1.93) (5.78,1.91)
+       (5.92,1.89) (6.05,1.87) (6.18,1.86) (6.32,1.88) (6.45,1.88) (6.59,1.88) (6.72,1.88)
+       (6.85,1.88) (6.99,1.89) (7.12,1.88) (7.25,1.85) (7.39,1.88) (7.52,1.88) (7.66,1.89)
+       (7.79,1.90) (7.92,1.96) (8.06,1.94) (8.19,1.92) (8.32,1.89) (8.46,1.90) (8.59,1.92)
+       (8.73,1.97) (8.86,1.98) (8.99,2.00) (9.13,2.02) (9.26,2.02) (9.39,2.00) (9.53,2.00)
+       (9.66,2.02) (9.80,2.01) (9.93,2.02) (10.06,2.02) (10.20,2.07) (10.33,2.09) (10.46,2.08)
+       (10.60,2.06) (10.73,2.07) (10.87,2.06) (11.00,2.06) (11.13,2.05) (11.27,2.09)};
+    \node[font=\tiny, text=accent, anchor=north east] at (11.3,1.52)
+      {\textbf{physics from epoch 0} --- gradients drown, never converges};
+    \draw[soft!45, very thin] plot coordinates
+      {(0.20,1.50) (0.23,1.50) (0.25,1.46) (0.28,1.39) (0.31,1.35) (0.33,1.30) (0.36,1.31)
+       (0.38,1.39) (0.41,1.34) (0.44,1.30) (0.46,1.32) (0.49,1.33) (0.52,1.31) (0.54,1.24)
+       (0.57,1.24) (0.60,1.27) (0.62,1.18) (0.65,1.16) (0.67,1.07) (0.70,1.03) (0.73,0.97)
+       (0.75,1.01) (0.78,0.98) (0.81,1.03) (0.83,1.06) (0.86,1.07) (0.89,0.96) (0.91,0.97)
+       (0.94,1.00) (0.96,1.02) (0.99,0.96) (1.02,0.97) (1.04,0.95) (1.07,0.94) (1.10,1.01)
+       (1.12,0.98) (1.15,0.99) (1.18,1.03) (1.20,1.00) (1.23,1.00) (1.25,1.00) (1.28,1.00)
+       (1.31,0.95) (1.33,0.96) (1.36,1.02) (1.39,0.94) (1.41,0.98) (1.44,0.98) (1.47,0.95)
+       (1.49,1.03) (1.52,1.04) (1.54,0.97) (1.57,0.96) (1.60,0.98) (1.62,0.96) (1.65,0.97)
+       (1.68,0.96) (1.70,0.97) (1.73,1.01) (1.76,0.96) (1.78,0.95) (1.81,0.92) (1.83,0.92)
+       (1.86,0.87) (1.89,0.86) (1.91,0.86) (1.94,0.90) (1.97,0.93) (1.99,0.87) (2.02,0.85)
+       (2.04,0.88) (2.07,0.81) (2.10,0.81) (2.12,0.82) (2.15,0.87) (2.18,0.89) (2.20,0.87)
+       (2.23,0.86) (2.26,0.85) (2.28,0.90) (2.31,0.87) (2.33,0.86) (2.36,0.87) (2.39,0.86)
+       (2.41,0.85) (2.44,0.81) (2.47,0.82) (2.49,0.81) (2.52,0.85) (2.55,0.87) (2.57,0.86)
+       (2.60,0.88) (2.62,0.85) (2.65,0.88) (2.68,0.87) (2.70,0.88) (2.73,0.82) (2.76,0.83)
+       (2.78,0.78) (2.81,0.72) (2.84,0.74) (2.86,0.73) (2.89,0.76) (2.91,0.84) (2.94,0.81)
+       (2.97,0.79) (2.99,0.80) (3.02,0.82) (3.05,0.81) (3.07,0.81) (3.10,0.83) (3.13,0.84)
+       (3.15,0.80) (3.18,0.80) (3.20,0.80) (3.23,0.77) (3.26,0.79) (3.28,0.77) (3.31,0.81)
+       (3.34,0.81) (3.36,0.81) (3.39,0.79) (3.42,0.79) (3.44,0.73) (3.47,0.71) (3.49,0.75)
+       (3.52,0.69) (3.55,0.75) (3.57,0.71) (3.60,0.75)};
+    \draw[soft, semithick] plot coordinates
+      {(0.20,1.50) (0.28,1.48) (0.36,1.44) (0.44,1.41) (0.52,1.39) (0.60,1.35) (0.67,1.29)
+       (0.75,1.21) (0.83,1.16) (0.91,1.12) (0.99,1.08) (1.07,1.05) (1.15,1.03) (1.23,1.03)
+       (1.31,1.01) (1.39,1.00) (1.47,0.99) (1.54,1.00) (1.62,0.99) (1.70,0.98) (1.78,0.98)
+       (1.86,0.96) (1.94,0.94) (2.02,0.92) (2.10,0.90) (2.18,0.89) (2.26,0.88) (2.33,0.88)
+       (2.41,0.87) (2.49,0.86) (2.57,0.86) (2.65,0.86) (2.73,0.86) (2.81,0.84) (2.89,0.81)
+       (2.97,0.81) (3.05,0.81) (3.13,0.82) (3.20,0.81) (3.28,0.80) (3.36,0.80) (3.44,0.80)
+       (3.52,0.77) (3.60,0.76)};
+    \draw[good, dotted, thick] (3.60,0.76) -- (3.60,1.29);
+    \draw[good!40, very thin] plot coordinates
+      {(3.60,1.29) (3.63,1.32) (3.66,1.28) (3.70,1.11) (3.73,1.20) (3.76,1.27) (3.79,1.21)
+       (3.83,1.14) (3.86,1.09) (3.89,1.00) (3.92,1.07) (3.95,1.01) (3.99,0.99) (4.02,0.93)
+       (4.05,0.89) (4.08,0.82) (4.12,0.92) (4.15,0.91) (4.18,0.97) (4.21,0.95) (4.24,0.89)
+       (4.28,0.87) (4.31,0.84) (4.34,0.84) (4.37,0.83) (4.41,0.81) (4.44,0.75) (4.47,0.73)
+       (4.50,0.84) (4.53,0.80) (4.57,0.75) (4.60,0.78) (4.63,0.85) (4.66,0.77) (4.70,0.76)
+       (4.73,0.74) (4.76,0.67) (4.79,0.73) (4.82,0.74) (4.86,0.75) (4.89,0.72) (4.92,0.75)
+       (4.95,0.72) (4.99,0.72) (5.02,0.68) (5.05,0.64) (5.08,0.72) (5.11,0.70) (5.15,0.72)
+       (5.18,0.72) (5.21,0.70) (5.24,0.68) (5.28,0.71) (5.31,0.70) (5.34,0.69) (5.37,0.69)
+       (5.40,0.73) (5.44,0.75) (5.47,0.74) (5.50,0.71) (5.53,0.65) (5.57,0.69) (5.60,0.72)
+       (5.63,0.70) (5.66,0.71) (5.69,0.72) (5.73,0.73) (5.76,0.74) (5.79,0.70) (5.82,0.74)
+       (5.86,0.67) (5.89,0.69) (5.92,0.69) (5.95,0.71) (5.98,0.75) (6.02,0.76) (6.05,0.69)
+       (6.08,0.62) (6.11,0.65) (6.15,0.61) (6.18,0.61) (6.21,0.63) (6.24,0.58) (6.27,0.52)
+       (6.31,0.55) (6.34,0.56) (6.37,0.56) (6.40,0.57) (6.44,0.55) (6.47,0.52) (6.50,0.53)
+       (6.53,0.52) (6.56,0.49) (6.60,0.53) (6.63,0.54) (6.66,0.56) (6.69,0.54) (6.73,0.53)
+       (6.76,0.51) (6.79,0.50) (6.82,0.52) (6.85,0.51) (6.89,0.54) (6.92,0.55) (6.95,0.62)
+       (6.98,0.56) (7.02,0.59) (7.05,0.58) (7.08,0.57) (7.11,0.53) (7.14,0.52) (7.18,0.55)
+       (7.21,0.55) (7.24,0.55) (7.27,0.54) (7.31,0.58) (7.34,0.57) (7.37,0.50) (7.40,0.49)
+       (7.43,0.45) (7.47,0.38) (7.50,0.41) (7.53,0.48) (7.56,0.49) (7.59,0.47) (7.63,0.46)
+       (7.66,0.51) (7.69,0.52) (7.72,0.53) (7.76,0.53) (7.79,0.53) (7.82,0.55) (7.85,0.56)
+       (7.88,0.56) (7.92,0.52) (7.95,0.54) (7.98,0.51) (8.01,0.55) (8.05,0.51) (8.08,0.51)
+       (8.11,0.51) (8.14,0.48) (8.17,0.53) (8.21,0.57) (8.24,0.54) (8.27,0.56) (8.30,0.56)
+       (8.34,0.48) (8.37,0.49) (8.40,0.50) (8.43,0.50) (8.46,0.48) (8.50,0.48) (8.53,0.48)
+       (8.56,0.52) (8.59,0.53) (8.63,0.52) (8.66,0.56) (8.69,0.53) (8.72,0.51) (8.75,0.46)
+       (8.79,0.52) (8.82,0.54) (8.85,0.55) (8.88,0.56) (8.92,0.55) (8.95,0.54) (8.98,0.53)
+       (9.01,0.51) (9.04,0.51) (9.08,0.55) (9.11,0.55) (9.14,0.54) (9.17,0.51) (9.21,0.49)
+       (9.24,0.54) (9.27,0.54) (9.30,0.53) (9.33,0.51) (9.37,0.48) (9.40,0.48) (9.43,0.51)
+       (9.46,0.49) (9.50,0.49) (9.53,0.48) (9.56,0.49) (9.59,0.45) (9.62,0.45) (9.66,0.44)
+       (9.69,0.48) (9.72,0.46) (9.75,0.48) (9.79,0.52) (9.82,0.51) (9.85,0.49) (9.88,0.49)
+       (9.91,0.49) (9.95,0.47) (9.98,0.48) (10.01,0.54) (10.04,0.52) (10.08,0.51) (10.11,0.47)
+       (10.14,0.49) (10.17,0.45) (10.20,0.43) (10.24,0.48) (10.27,0.46) (10.30,0.49) (10.33,0.53)
+       (10.37,0.53) (10.40,0.53) (10.43,0.57) (10.46,0.54) (10.49,0.51) (10.53,0.47) (10.56,0.47)
+       (10.59,0.52) (10.62,0.53) (10.66,0.50) (10.69,0.47) (10.72,0.46) (10.75,0.47) (10.78,0.47)
+       (10.82,0.48) (10.85,0.49) (10.88,0.48) (10.91,0.48) (10.95,0.48) (10.98,0.48) (11.01,0.49)
+       (11.04,0.54) (11.07,0.54) (11.11,0.53) (11.14,0.47) (11.17,0.48) (11.20,0.43) (11.24,0.41)
+       (11.27,0.45) (11.30,0.47)};
+    \draw[good, semithick] plot coordinates
+      {(3.60,1.29) (3.73,1.27) (3.86,1.23) (3.99,1.16) (4.12,1.07) (4.24,1.02) (4.37,0.96)
+       (4.50,0.90) (4.63,0.86) (4.76,0.82) (4.89,0.79) (5.02,0.76) (5.15,0.74) (5.28,0.73)
+       (5.40,0.72) (5.53,0.71) (5.66,0.71) (5.79,0.71) (5.92,0.71) (6.05,0.72) (6.18,0.68)
+       (6.31,0.64) (6.44,0.62) (6.56,0.58) (6.69,0.57) (6.82,0.55) (6.95,0.55) (7.08,0.56)
+       (7.21,0.55) (7.34,0.56) (7.47,0.52) (7.59,0.50) (7.72,0.50) (7.85,0.52) (7.98,0.52)
+       (8.11,0.52) (8.24,0.52) (8.37,0.52) (8.50,0.51) (8.63,0.51) (8.75,0.51) (8.88,0.52)
+       (9.01,0.53) (9.14,0.53) (9.27,0.53) (9.40,0.52) (9.53,0.51) (9.66,0.49) (9.79,0.49)
+       (9.91,0.49) (10.04,0.50) (10.17,0.49) (10.30,0.48) (10.43,0.50) (10.56,0.50) (10.69,0.50)
+       (10.82,0.49) (10.95,0.49) (11.07,0.50) (11.20,0.49)};
+    \node[font=\tiny, text=good, anchor=south east] at (11.3,0.68)
+      {\textbf{physics at the swap} --- enter tamed, composite converges};
+  \end{tikzpicture}
+  \end{center}
+\end{frame}
+
+% ---------------------------------------------------------------- 39 Swap mechanics + status
+\begin{frame}{Swap mechanics, calibration --- and status}
+  \small
+  Each detail is an anticipated failure mode:
+  \begin{itemize}
+    \item \textbf{Resets at the swap}: LR schedule origin, LR warmup, Adam moments,
+          early-stopping counters --- optimizer state calibrated to the old loss is stale
+          under the new one.
+    \item \textbf{Checkpoint-baseline reset}: best-loss tracking restarts across the
+          non-comparable loss scales --- otherwise the pre-swap best could never be
+          beaten.
+    \item \textbf{Stage inheritance}: the complete stage is the base configuration,
+          warmup a derived pre-phase materialised at launch --- the stages cannot drift.
+    \item \textbf{Loss-scale probe}: every active term run at unit weight over probe
+          batches, IQR-filtered, folded into the per-term weights --- physics terms enter
+          at calibrated magnitude, not guessed weights.
+  \end{itemize}
+  \begin{block}{\small Status}
+    \small Implemented, SAR-theory-verified, geometry wired end-to-end ---
+    \textbf{training results pending}.
+  \end{block}
+\end{frame}

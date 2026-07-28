@@ -1,0 +1,260 @@
+% ---------------------------------------------------------------- 13-i Why clamp --- the exponential overflow
+\begin{frame}{Why clamp the output --- the exponential overflows}
+  \small
+  \begin{columns}[c]
+    \begin{column}{0.54\textwidth}
+      \begin{center}
+        \begin{tikzpicture}
+          \node[font=\scriptsize, text=soft] at (0,0.58)   {physical};
+          \node[font=\scriptsize, text=soft] at (2.7,0.58) {log space};
+          \node[font=\scriptsize, text=soft] at (5.4,0.58) {normalized};
+
+          \node (n0) at (0,0)   {$p$};
+          \node (n1) at (2.7,0) {$u$};
+          \node (n2) at (5.4,0) {$y$};
+          \draw[-{Stealth[length=1.8mm]}, ink] (n0) -- (n1) node[midway, above=-1.5pt, font=\scriptsize] {$\log(1+\,\cdot\,)$};
+          \draw[-{Stealth[length=1.8mm]}, ink] (n1) -- (n2) node[midway, above=-1.5pt, font=\scriptsize] {$(\,\cdot\,-m)/s$};
+          \node[font=\scriptsize, text=good] (ncap) at (2.7,-0.52) {normalize --- dataset build, once: input is ground truth, \emph{bounded}};
+
+          \node (d0) at (0,-1.42)   {$p$};
+          \node (d1) at (2.7,-1.42) {$z$};
+          \node (d2) at (5.4,-1.42) {$\hat y$};
+          \draw[{Stealth[length=1.8mm]}-, ink] (d0) -- (d1) node[midway, above=-1.5pt, font=\scriptsize] {$e^{(\cdot)}-1$};
+          \draw[{Stealth[length=1.8mm]}-, ink] (d1) -- (d2) node[midway, above=-1.5pt, font=\scriptsize] {$s\,\cdot\,+m$};
+          \node[font=\scriptsize, text=accent] (dcap) at (2.7,-1.94) {denormalize --- every prediction: input is $\hat y$, \emph{any} real};
+
+          \begin{scope}[on background layer]
+            \node[fill=good!10, rounded corners=3pt, inner sep=3pt,
+                  fit=(n0)(n1)(n2)(ncap)(dcap.west |- ncap.center)(dcap.east |- ncap.center)] {};
+            \node[fill=accent!10, rounded corners=3pt, inner sep=3pt,
+                  fit=(d0)(d1)(d2)(dcap)(ncap.west |- dcap.center)(ncap.east |- dcap.center)] {};
+          \end{scope}
+        \end{tikzpicture}
+      \end{center}
+      {\scriptsize $p\!\in\!\{a,\sigma\}$ ($\mu$ skips the log --- linear both ways);\;
+       $m,s$: fixed channel shift \& scale. Composed:\; $p = e^{s\hat y + m}-1$.}
+
+      \vspace{4pt}
+      \begin{center}
+        $\displaystyle
+         \begin{aligned}
+           \hat y \to \infty \ &\Longrightarrow\ z \to \infty \\[2pt]
+           &\Longrightarrow\ p = e^{z}-1 \to \infty \\[2pt]
+           &\Longrightarrow\ \mathcal{L} \to \infty \\[2pt]
+           &\Longrightarrow\ \nabla_{\!\theta}\mathcal{L} = \mathrm{NaN}
+         \end{aligned}$
+      \end{center}
+      {\scriptsize $\mathcal{L}$: training loss,\; $\theta$: weights. One overflowing pixel
+       $\Rightarrow$ every weight NaN $\Rightarrow$ \textbf{no} training.}
+    \end{column}
+    \begin{column}{0.46\textwidth}
+      \begin{center}
+        $\boxed{\ p \;=\; e^{\min(z,\,h)}-1 \ \le\ p_{\max}\ }$
+      \end{center}
+      {\scriptsize $h=\log(1+p_{\max})$,\; $p_{\max}$: physical ceiling. The front-end
+       \texttt{clamp} toggle --- off $\Rightarrow$ overflow returns.}
+
+      \vspace{6pt}
+      \begin{center}
+      \begin{tikzpicture}[scale=0.66]
+        \draw[->, soft] (-1.25,0) -- (3.0,0) node[right, font=\scriptsize] {$z = s\hat y + m$};
+        \draw[->, soft] (0,-0.2) -- (0,3.95) node[above, font=\scriptsize] {$p$};
+        \draw[accent, thick, domain=-1.1:2.1, smooth, samples=60] plot (\x, {0.5*(exp(\x)-1)});
+        \draw[good, thick, domain=-1.1:1.3, smooth, samples=40] plot (\x, {0.5*(exp(\x)-1)});
+        \draw[good, thick] (1.3,1.331) -- (2.85,1.331);
+        \draw[soft, dotted] (1.3,0) -- (1.3,1.331);
+        \draw[soft, dotted] (0,1.331) -- (1.3,1.331);
+        \node[soft, font=\scriptsize, anchor=north] at (1.3,-0.04) {$h$};
+        \node[soft, font=\scriptsize, anchor=east] at (-0.05,1.331) {$p_{\max}$};
+        \node[accent, font=\scriptsize, anchor=west] at (2.15,3.0) {no gate: $e^{z}\!\to\!\infty$};
+        \node[good, font=\scriptsize, anchor=south] at (2.0,1.42) {gated};
+      \end{tikzpicture}
+      \end{center}
+      \centering
+      {\scriptsize\itshape unbounded $e^{z}$ (red) vs.\ exponent gated at $h$ (green)}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 13-ii Leaky clamp
+\begin{frame}{The leaky clamp --- stability keystone}
+  \small
+  \begin{columns}[c]
+    \begin{column}{0.44\textwidth}
+      One unphysical parameter (negative $\sigma$, runaway $a$, off-grid $\mu$)
+      poisons every loss term downstream; a hard clamp fixes the forward pass but
+      kills the gradient. The leaky clamp bounds the value \emph{and} keeps a slope.
+      \vspace{12pt}
+      \begin{center}
+      {\scriptsize\itshape forward pass --- the clamp guards the loss path}\\[8pt]
+      \begin{tikzpicture}
+        \node[box] (m) at (0,0)        {model $\hat y$\\{\scriptsize (norm)}};
+        \node[box] (d) at (0,-1.45)    {denorm\\{\scriptsize $\to$ physical}};
+        \node[box, fill=accent!16] (c) at (1.75,-2.6) {leaky clamp\\{\scriptsize bounds}};
+        \node[box] (r) at (3.5,-1.45)  {renorm\\{\scriptsize $\to$ norm}};
+        \node[gate] (l) at (3.5,0)     {loss};
+        \begin{scope}[on background layer]
+          \node[draw=good!70, fill=good!6, rounded corners, inner sep=6pt, fit=(d)(c)(r)] (stab) {};
+        \end{scope}
+        \draw[flow] (m) -- (d);
+        \draw[flow] (d.south) |- (c.west);
+        \draw[flow] (c.east) -| (r.south);
+        \draw[flow] (r) -- (l);
+        \draw[-{Stealth[length=2mm]}, accent, thick, dashed] (m.east) -- (l.west)
+          node[midway, above=1pt, font=\scriptsize, text=accent] {unstable loss};
+        \node[draw=good!70, fill=good!10, rounded corners, inner sep=2.5pt,
+              font=\scriptsize, text=good] at (stab.south) {stable loss};
+      \end{tikzpicture}
+      \end{center}
+    \end{column}
+    \begin{column}{0.54\textwidth}
+      \centering
+      $\boxed{\ \tilde x = \mathrm{clamp}(x) + \lambda\,\big(x-\mathrm{clamp}(x)\big)\ }$\\[5pt]
+      {\scriptsize $a\!\in\![0,a_{\max}]$,\; $\mu\!\in\![x_{\min},x_{\max}]$,\;
+       $\sigma\!\in\![\tfrac12 x_\text{step},\tfrac12 x_\text{range}]$}
+
+      \vspace{12pt}
+      {\scriptsize\itshape one outlier prediction $x$ (pushed off physical bounds)}\\[3pt]
+      {\scriptsize
+      \renewcommand{\arraystretch}{1.1}
+      \setlength{\tabcolsep}{6pt}
+      \begin{tabular}{@{}lll@{}}
+        \toprule
+        on the outlier & loss & gradient $\partial\mathcal{L}/\partial x$ \\
+        \midrule
+        no clamp   & \textcolor{accent}{$\infty$ / NaN} & \textcolor{accent}{poisons all terms} \\
+        hard clamp & \textcolor{good}{bounded}          & \textcolor{accent}{$0$ --- slot dies} \\
+        \rowcolor{good!12} leaky clamp & \textcolor{good}{bounded}
+                   & \textcolor{good}{$\lambda\!>\!0$ --- keeps signal} \\
+        \bottomrule
+      \end{tabular}}
+
+      \vspace{12pt}
+      \begin{minipage}[t]{0.49\linewidth}
+        \centering
+        \begin{tikzpicture}[scale=0.66]
+          \draw[->, soft] (-0.5,0) -- (3.9,0) node[right, font=\scriptsize] {$x$};
+          \draw[->, soft] (0,-0.1) -- (0,2.9) node[above, font=\scriptsize] {$\tilde x$};
+          \draw[soft, dotted] (0.8,0) -- (0.8,0.8);
+          \draw[soft, dotted] (2.4,0) -- (2.4,2.4);
+          \node[font=\scriptsize, text=soft, anchor=north] at (0.8,-0.05) {$x_{\min}$};
+          \node[font=\scriptsize, text=soft, anchor=north] at (2.4,-0.05) {$x_{\max}$};
+          \draw[soft, thick, dashed] (-0.4,0.8) -- (0.8,0.8) -- (2.4,2.4) -- (3.7,2.4);
+          \draw[accent, thick] (-0.4,0.62) -- (0.8,0.8) -- (2.4,2.4) -- (3.7,2.595);
+          \node[font=\scriptsize, text=accent, rotate=45] at (1.25,1.75) {slope $1$};
+          \node[font=\scriptsize, text=accent, anchor=south] at (3.05,2.62) {slope $\lambda$};
+        \end{tikzpicture}
+        \\[2pt]
+        {\scriptsize value: \textcolor{accent}{training, leaky} vs
+         \textcolor{soft}{inference, hard ($\lambda=0$)}}
+      \end{minipage}\hfill
+      \begin{minipage}[t]{0.49\linewidth}
+        \centering
+        \begin{tikzpicture}[scale=0.66]
+          \draw[->, soft] (-0.5,0) -- (3.9,0) node[right, font=\scriptsize] {$x$};
+          \draw[->, soft] (0,-0.1) -- (0,2.9) node[above, font=\scriptsize] {$d\tilde x/dx$};
+          \draw[soft, dotted] (0.8,0) -- (0.8,2.0);
+          \draw[soft, dotted] (2.4,0) -- (2.4,2.0);
+          \node[font=\scriptsize, text=soft, anchor=north] at (0.8,-0.05) {$x_{\min}$};
+          \node[font=\scriptsize, text=soft, anchor=north] at (2.4,-0.05) {$x_{\max}$};
+          \draw[soft, dotted] (0,2.0) -- (0.8,2.0);
+          \node[font=\scriptsize, text=soft, anchor=east] at (-0.05,2.0) {$1$};
+          \node[font=\scriptsize, text=accent, anchor=east] at (-0.42,0.3) {$\lambda$};
+          \draw[soft, thick, dashed] (-0.4,0.04) -- (0.8,0.04);
+          \draw[soft, thick, dashed] (2.4,0.04) -- (3.7,0.04);
+          \draw[accent, thick] (-0.4,0.3) -- (0.8,0.3);
+          \draw[accent, thick] (0.8,2.0) -- (2.4,2.0);
+          \draw[accent, thick] (2.4,0.3) -- (3.7,0.3);
+          \draw[soft, thick, dashed] (0.8,2.0) -- (2.4,2.0);
+          \draw[accent, thin, dotted] (0.8,0.3) -- (0.8,2.0);
+          \draw[accent, thin, dotted] (2.4,0.3) -- (2.4,2.0);
+        \end{tikzpicture}
+        \\[2pt]
+        {\scriptsize gradient: never zero --- saturated slots keep receiving signal}
+      \end{minipage}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 13-iii Warmup + adaptive gradient clipping
+\begin{frame}{LR warmup and adaptive gradient clipping}
+  \small
+  \begin{columns}[c]
+    \begin{column}{0.36\textwidth}
+      \hspace*{5mm}\begin{minipage}{\dimexpr\linewidth-5mm\relax}
+      \footnotesize
+      \begin{itemize}
+        \item A linear \textbf{warmup} over the first 200 steps tames the early,
+              high-variance gradients, then epoch-level cosine annealing down to
+              $\eta_{\min}$.
+              {\scriptsize\[\begin{aligned}
+                 \eta(t,s)        &= \eta_0 \, F_{\cos}(t)\, f_{\text{warm}}(s)\\[6pt]
+                 f_{\text{warm}}(s) &= 0.1 + 0.9\,\min\!\big(1,\ s/t_{\text{warm}}\big)\\[6pt]
+                 F_{\cos}(t)       &= \tfrac12\big(1+\cos(\pi (t-t_{\text{warm}})/T)\big)
+               \end{aligned}\]}
+      \end{itemize}
+      \end{minipage}
+    \end{column}
+    \begin{column}{0.62\textwidth}
+      \hspace*{2mm}%
+      \begin{tikzpicture}[scale=0.9]
+    \useasboundingbox (-1.05,-0.85) rectangle (7.5,2.6);
+    \draw[->,soft] (0,0) -- (6.6,0) node[right,font=\scriptsize]{step};
+    \draw[->,soft] (0,0) -- (0,2.3) node[above,font=\scriptsize]{$\eta/\eta_0$};
+    \draw[soft,dashed] (0.7,0) -- (0.7,2.0);
+    \draw[soft,dotted] (0,2.0) -- (0.7,2.0);
+    \draw[accent,very thick] (0,0.2) -- (0.7,2.0);
+    \draw[accent,very thick,domain=0.7:6.4,samples=90,smooth]
+      plot (\x,{2.0*0.5*(1+cos(180*(\x-0.7)/5.7))});
+    \node[font=\scriptsize,soft,anchor=east]  at (-0.08,2.0)  {$\eta_0$};
+    \node[font=\scriptsize,soft,anchor=east]  at (-0.08,0.2)  {$0.1\,\eta_0$};
+    \node[font=\scriptsize,soft,anchor=north] at (0.7,-0.08)  {$t_{\text{warm}}$};
+    \node[font=\scriptsize,soft,anchor=north] at (5.5,-0.08)  {$\eta_{\min}$};
+    \draw[decorate,decoration={brace,amplitude=3pt,mirror},soft] (0.72,-0.5) -- (6.4,-0.5);
+    \node[font=\scriptsize,soft,anchor=north] at (3.56,-0.52) {annealing over $T$};
+    \node[font=\scriptsize,accent,anchor=west] at (1.15,2.15) {linear warmup};
+    \draw[accent!60,thin] (1.12,2.1) -- (0.42,1.3);
+    \node[font=\scriptsize,accent,anchor=west] at (3.55,1.62) {cosine annealing};
+    \draw[accent!60,thin] (3.52,1.57) -- (3.1,1.26);
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
+  \vspace{6pt}
+  \begin{columns}[c]
+    \begin{column}{0.36\textwidth}
+      \hspace*{5mm}\begin{minipage}{\dimexpr\linewidth-5mm\relax}
+      \footnotesize
+      \begin{itemize}
+        \item Rolling window of the last 200 global gradient norms, threshold
+              recomputed every step as the p95 of the window --- the first $\sim$200
+              steps only observe; this avoids starving the gradients ---
+              a training insurance.
+              {\scriptsize\[\begin{aligned}
+                 \tau_t  &= \mathrm{p95}\big(\{\lVert g\rVert\}_{t-200:t}\big)\\[6pt]
+                 g       &\leftarrow g \cdot \min\!\big(1,\ \tau_t/\lVert g\rVert\big)
+               \end{aligned}\]}
+      \end{itemize}
+      \end{minipage}
+    \end{column}
+    \begin{column}{0.62\textwidth}
+      \hspace*{2mm}%
+      \begin{tikzpicture}[scale=0.9]
+    \useasboundingbox (-1.05,-0.85) rectangle (7.5,2.6);
+    \fill[black!4] (0,0) rectangle (0.695,1.9);
+    \draw[->,soft] (0,0) -- (6.7,0) node[right,font=\scriptsize]{step};
+    \draw[->,soft] (0,0) -- (0,2.0) node[above,font=\scriptsize]{$\lVert g \rVert$};
+    \draw[soft,thin] plot coordinates {(0.000,0.863) (0.050,1.105) (0.099,1.209) (0.149,0.941) (0.198,0.818) (0.248,0.993) (0.298,1.074) (0.347,1.175) (0.397,0.805) (0.447,0.788) (0.496,1.076) (0.546,1.028) (0.595,1.207) (0.645,1.096) (0.695,0.914) (0.744,0.882) (0.794,1.379) (0.843,0.866) (0.893,0.794) (0.943,0.744) (0.992,0.900) (1.042,0.900) (1.091,0.826) (1.141,0.857) (1.191,0.898) (1.240,0.953) (1.290,1.009) (1.340,0.870) (1.389,0.627) (1.439,0.928) (1.488,0.656) (1.538,0.795) (1.588,0.641) (1.637,0.807) (1.687,0.707) (1.736,0.824) (1.786,1.341) (1.836,0.779) (1.885,0.893) (1.935,0.628) (1.984,0.736) (2.034,0.852) (2.084,0.750) (2.133,0.803) (2.183,0.765) (2.233,0.637) (2.282,0.814) (2.332,0.649) (2.381,0.992) (2.431,0.674) (2.481,0.811) (2.530,0.723) (2.580,0.837) (2.629,0.649) (2.679,1.794) (2.729,0.936) (2.778,0.862) (2.828,0.774) (2.878,0.713) (2.927,0.612) (2.977,0.780) (3.026,0.740) (3.076,0.889) (3.126,0.640) (3.175,0.740) (3.225,0.731) (3.274,0.702) (3.324,0.690) (3.374,0.685) (3.423,0.602) (3.473,0.560) (3.522,0.616) (3.572,0.718) (3.622,0.829) (3.671,0.758) (3.721,0.764) (3.771,0.728) (3.820,0.716) (3.870,0.657) (3.919,0.719) (3.969,0.841) (4.019,0.599) (4.068,0.563) (4.118,0.857) (4.167,0.649) (4.217,0.727) (4.267,0.713) (4.316,0.515) (4.366,0.909) (4.416,0.815) (4.465,0.629) (4.515,0.688) (4.564,0.620) (4.614,0.526) (4.664,0.593) (4.713,0.639) (4.763,1.112) (4.812,0.671) (4.862,0.603) (4.912,0.739) (4.961,0.525) (5.011,0.672) (5.060,0.705) (5.110,0.562) (5.160,0.441) (5.209,0.507) (5.259,0.607) (5.309,0.634) (5.358,0.745) (5.408,0.494) (5.457,0.579) (5.507,0.640) (5.557,0.561) (5.606,0.393) (5.656,0.652) (5.705,0.828) (5.755,0.670) (5.805,0.491) (5.854,0.532) (5.904,0.587) (5.953,0.842) (6.003,0.623) (6.053,0.574) (6.102,0.721) (6.152,0.554) (6.202,0.754) (6.251,0.501) (6.301,0.517) (6.350,0.625) (6.400,0.698)};
+    \draw[accent,very thick] plot coordinates {(0.695,1.208) (0.744,1.208) (0.794,1.208) (0.843,1.268) (0.893,1.268) (0.943,1.268) (0.992,1.268) (1.042,1.268) (1.091,1.268) (1.141,1.268) (1.191,1.268) (1.240,1.268) (1.290,1.268) (1.340,1.195) (1.389,1.139) (1.439,1.139) (1.488,1.139) (1.538,0.973) (1.588,0.973) (1.637,0.973) (1.687,0.973) (1.736,0.973) (1.786,0.973) (1.836,1.125) (1.885,1.125) (1.935,1.125) (1.984,1.125) (2.034,1.072) (2.084,1.072) (2.133,1.072) (2.183,1.050) (2.233,1.050) (2.282,1.050) (2.332,1.050) (2.381,1.050) (2.431,1.114) (2.481,1.114) (2.530,0.928) (2.580,0.928) (2.629,0.901) (2.679,0.901) (2.729,1.273) (2.778,1.273) (2.828,1.273) (2.878,1.273) (2.927,1.273) (2.977,1.273) (3.026,1.273) (3.076,1.273) (3.126,1.237) (3.175,1.237) (3.225,1.237) (3.274,1.237) (3.324,1.237) (3.374,1.237) (3.423,0.905) (3.473,0.871) (3.522,0.818) (3.572,0.818) (3.622,0.818) (3.671,0.850) (3.721,0.850) (3.771,0.850) (3.820,0.787) (3.870,0.787) (3.919,0.787) (3.969,0.787) (4.019,0.833) (4.068,0.833) (4.118,0.833) (4.167,0.847) (4.217,0.847) (4.267,0.847) (4.316,0.847) (4.366,0.847) (4.416,0.875) (4.465,0.875) (4.515,0.875) (4.564,0.875) (4.614,0.875) (4.664,0.875) (4.713,0.875) (4.763,0.875) (4.812,0.980) (4.862,0.980) (4.912,0.980) (4.961,0.980) (5.011,0.980) (5.060,0.980) (5.110,0.919) (5.160,0.870) (5.209,0.870) (5.259,0.870) (5.309,0.870) (5.358,0.870) (5.408,0.873) (5.457,0.873) (5.507,0.741) (5.557,0.741) (5.606,0.741) (5.656,0.719) (5.705,0.719) (5.755,0.774) (5.805,0.774) (5.854,0.774) (5.904,0.774) (5.953,0.774) (6.003,0.833) (6.053,0.833) (6.102,0.833) (6.152,0.833) (6.202,0.833) (6.251,0.833) (6.301,0.833) (6.350,0.833)};
+    \draw[accent,dotted,very thick] (2.679,1.794) -- (2.679,0.92);
+    \draw[soft,dashed] (0.695,0) -- (0.695,1.9);
+    \draw[soft!60,thin] (3.35,1.68) -- (2.74,1.79);
+    \node[font=\tiny,soft,anchor=west]  at (3.4,1.66)   {spike clipped to the threshold};
+    \node[font=\tiny,soft,anchor=north] at (0.35,-0.06) {observe only};
+    \node[font=\tiny,soft,anchor=north] at (1.75,-0.3)  {window full};
+    \draw[soft!60,thin] (1.35,-0.32) -- (0.7,-0.04);
+    \node[font=\tiny,accent,anchor=west] at (5.35,1.35) {rolling p95 threshold};
+    \draw[accent!60,thin] (5.32,1.30) -- (5.06,1.00);
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
+\end{frame}

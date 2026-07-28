@@ -1,0 +1,199 @@
+% ---------------------------------------------------------------- 39a Unrolled context
+\begin{frame}{Context: where does the physics live?}
+  \small
+  Three places the SAR signal model can enter a learned inversion --- the project now
+  covers all three:
+  \begin{center}
+  \begin{tikzpicture}
+    \node[gate, text width=34mm, minimum height=19mm] (zoo) at (0,0)
+      {\textbf{in the labels}\\[2pt]{\scriptsize model zoo backbones (Act V)}\\{\tiny classical fits supervise a generic network --- it learns the inversion from scratch; $10^{5}$--$10^{7}$ params}};
+    \node[gate, text width=34mm, minimum height=19mm] (phys) at (4.6,0)
+      {\textbf{in the loss}\\[2pt]{\scriptsize physics-constrained terms (Act VI)}\\{\tiny predictions must re-synthesise coherences and covariances; the network is unchanged}};
+    \node[box, text width=34mm, minimum height=19mm] (unr) at (9.2,0)
+      {\textbf{in the architecture}\\[2pt]{\scriptsize the unrolled solver (next)}\\{\tiny the exact operator inside every layer; learned: $\alpha_\ell,\theta_\ell,\mathcal{P}_\ell$ --- $\sim$1.4k params}};
+    \draw[flow] (zoo) -- (phys);
+    \draw[flow] (phys) -- (unr);
+    \fill[accent!70] ($(zoo.south)+(-1.7,-0.55)$)  rectangle ($(zoo.south)+(1.6,-0.35)$);
+    \fill[good!60]   ($(zoo.south)+(1.6,-0.55)$)   rectangle ($(zoo.south)+(1.7,-0.35)$);
+    \fill[accent!70] ($(phys.south)+(-1.7,-0.55)$) rectangle ($(phys.south)+(1.2,-0.35)$);
+    \fill[good!60]   ($(phys.south)+(1.2,-0.55)$)  rectangle ($(phys.south)+(1.7,-0.35)$);
+    \fill[accent!70] ($(unr.south)+(-1.7,-0.55)$)  rectangle ($(unr.south)+(-1.4,-0.35)$);
+    \fill[good!60]   ($(unr.south)+(-1.4,-0.55)$)  rectangle ($(unr.south)+(1.7,-0.35)$);
+    \node[font=\tiny, text=accent, anchor=north] at ($(zoo.south)+(-0.05,-0.6)$) {learned from data};
+    \node[font=\tiny, text=good!80!black, anchor=north] at ($(unr.south)+(0.15,-0.6)$) {fixed physics};
+  \end{tikzpicture}
+  \end{center}
+  \vspace{2pt}
+  The unrolled family probes the far end of the axis --- \textbf{the question it
+  answers}: how much of the zoo's capacity is spent re-learning physics we already know?
+\end{frame}
+
+% ---------------------------------------------------------------- 39b Unrolled: solver becomes network
+\begin{frame}{The unrolled model: the solver becomes the network}
+  \centering
+  \begin{tikzpicture}
+    \begin{scope}[on background layer]
+      \fill[accent!5,rounded corners=3pt] (1.3,0.10)  rectangle (12.9,2.55);
+      \fill[good!7,rounded corners=3pt]   (1.3,-0.10) rectangle (12.9,-2.55);
+      \draw[soft!50,dotted] (-0.9,0) -- (12.9,0);
+    \end{scope}
+    \node[font=\scriptsize,text=accent!80,anchor=east] at (12.9,2.72)  {classical CS inversion --- one loop, hand-tuned};
+    \node[font=\scriptsize,text=good!80,anchor=east]   at (12.9,-2.72) {unrolled network --- the same loop, cut open};
+    \node[gate, text width=16mm] (in) at (0,0) {coherences $y$\\per-pixel $k_z$};
+    \node[box, text width=23mm] (init) at (3.1,1.35)  {matched-filter init\\{\tiny $s^{0}=\mathrm{ReLU}(A^{H}y/T)$}};
+    \node[box, text width=24mm] (grad) at (6.6,1.35)  {data-fidelity gradient step\\{\tiny fixed step $\alpha$}};
+    \node[box, text width=20mm] (thr)  at (10.0,1.35) {soft-threshold\\{\tiny fixed $\theta$, sparsify}};
+    \draw[flow] (in.east) -- ++(0.4,0) |- (init.west);
+    \draw[flow] (init) -- (grad);
+    \draw[flow] (grad) -- (thr);
+    \draw[flow] (thr.north) -- ++(0,0.45) -| (grad.north);
+    \node[font=\tiny, text=soft, anchor=south] at (8.3,2.17) {iterate until convergence};
+    \node[box, text width=17mm] (st1) at (2.9,-1.35) {stage 1\\{\tiny $\alpha_1,\ \theta_1,\ \mathcal{P}_1$}};
+    \node[box, text width=17mm] (st2) at (5.3,-1.35) {stage 2\\{\tiny $\alpha_2,\ \theta_2,\ \mathcal{P}_2$}};
+    \node[font=\small, text=soft] (dots) at (7.15,-1.35) {$\cdots$};
+    \node[box, text width=17mm] (stL) at (9.0,-1.35) {stage $L$\\{\tiny $\alpha_L,\ \theta_L,\ \mathcal{P}_L$}};
+    \node[box, draw=good!70, fill=good!8, text width=22mm] (out) at (11.6,-1.35) {reflectivity profile\\{\tiny $s^{L}\ge 0$, $N$ elevation bins}};
+    \draw[soft,thin] (11.0,-2.35) -- (12.2,-2.35);
+    \draw[good,semithick] plot[domain=11.05:12.15,samples=50] (\x,{-2.35+0.35*exp(-(\x-11.45)^2/0.008)+0.22*exp(-(\x-11.85)^2/0.006)});
+    \draw[flow] (in.east) -- ++(0.4,0) |- (st1.west);
+    \draw[flow] (st1) -- (st2);
+    \draw[flow] (st2) -- (dots);
+    \draw[flow] (dots) -- (stL);
+    \draw[flow] (stL) -- (out);
+    \node[font=\tiny, text=soft, anchor=north] at (5.9,-2.15)
+      {the operator $A$ inside every stage is built from the pixel's $k_z$ --- exact physics, zero parameters};
+    \node[font=\scriptsize, fill=white, inner sep=2.5pt] at (7.0,0)
+      {each iteration becomes a layer --- step, threshold and prox become per-stage \textbf{learned} parameters};
+  \end{tikzpicture}
+  \\[2pt]
+  \vspace{-4pt}
+  \[
+    r^{\ell} \;=\; s^{\ell} + \alpha_\ell\,\mathrm{Re}\!\big[A^{H}(y - A s^{\ell})\big]/L_{\mathrm{lip}},
+    \qquad
+    s^{\ell+1} \;=\; \mathrm{ReLU}\!\big(\mathcal{P}_\ell(r^{\ell}) - \theta_\ell\big)
+  \]
+  {\scriptsize $\gamma$-Net lineage (Qian et al., IEEE TGRS 2022); LISTA (Gregor \& LeCun 2010); ISTA-Net (Zhang \& Ghanem 2018).
+   $\mathcal{P}_\ell$: per-pixel residual 1D convolution along elevation; $L_{\mathrm{lip}} = TN\,\mathrm{d}z^{2}$ normalises the step.
+   Default $L{=}8$: $\sim$1.4k parameters.}
+\end{frame}
+
+% ---------------------------------------------------------------- 39b2 Unrolled: gamma-Net adaptation, setting
+\begin{frame}{Adapting $\gamma$-Net --- a different unknown, a per-pixel operator}
+  \centering
+  \begin{tikzpicture}
+    \begin{scope}[on background layer]
+      \fill[accent!5,rounded corners=3pt] (1.0,0.10)  rectangle (13.3,2.55);
+      \fill[good!7,rounded corners=3pt]   (1.0,-0.10) rectangle (13.3,-2.55);
+      \draw[soft!50,dotted] (1.0,0) -- (13.3,0);
+    \end{scope}
+    \node[font=\scriptsize,text=accent!80,anchor=east] at (13.3,2.72)  {$\gamma$-Net --- one scene geometry, weights learned};
+    \node[font=\scriptsize,text=good!80,anchor=east]   at (13.3,-2.72) {this project --- per-pixel geometry, physics exact, scalars learned};
+    \node[gate, text width=20mm] (gin) at (2.6,1.4)  {single-look stack $g \in \mathbb{C}^{T}$\\{\tiny one complex look per track}};
+    \node[box, text width=22mm] (R)   at (5.9,1.4)  {fixed steering matrix $\mathbf{R}$\\{\tiny one geometry for the whole scene}};
+    \node[box, text width=24mm] (W)   at (9.3,1.4)  {learned layer weights $\mathbf{W}^{\ell}$\\{\tiny coupled: $\mathbf{W}_{2}^{\ell} = \mathbf{I} - \mathbf{W}_{1}^{\ell}\mathbf{R}$}};
+    \node[box, text width=17mm] (gout) at (12.3,1.4) {complex $\hat{\gamma}$\\{\tiny sparse, phase kept}};
+    \draw[flow] (gin) -- (R);
+    \draw[flow] (R) -- (W);
+    \draw[flow] (W) -- (gout);
+    \node[gate, text width=20mm] (yin) at (2.6,-1.4)  {coherences $y \in \mathbb{C}^{T}$ + $k_z(x)$\\{\tiny second-order data}};
+    \node[box, text width=22mm] (A)   at (5.9,-1.4)  {operator $A(x)$ from the pixel's $k_z$\\{\tiny exact, zero learned entries}};
+    \node[box, text width=24mm] (sc)  at (9.3,-1.4)  {learned scalars $\alpha_\ell,\ \theta_\ell$ + prox $\mathcal{P}_\ell$\\{\tiny no learned matrices}};
+    \node[box, draw=good!70, fill=good!8, text width=17mm] (sout) at (12.3,-1.4) {profile $s \ge 0$\\{\tiny phase averaged out}};
+    \draw[flow] (yin) -- (A);
+    \draw[flow] (A) -- (sc);
+    \draw[flow] (sc) -- (sout);
+    \node[font=\scriptsize, fill=white, inner sep=2.5pt] at (7.15,0)
+      {a fixed matrix can be learned --- an operator that changes at every pixel cannot};
+  \end{tikzpicture}
+  \\[2pt]
+  \vspace{-2pt}
+  \[
+    \text{$\gamma$-Net inverts}\quad g \;=\; \mathbf{R}\,\gamma + \varepsilon,\quad \gamma \in \mathbb{C}^{N}
+    \qquad\quad
+    \text{this project inverts}\quad y \;=\; A(x)\,s,\quad s \in \mathbb{R}_{\ge 0}^{N}
+  \]
+  {\scriptsize $g$: one complex look per track (first-order); $y$: per-track coherences
+   (second-order) --- averaging interferograms cancels the speckle phase, so the
+   recoverable object is the power profile $s$, not the complex reflectivity $\gamma$.
+   $\varepsilon$: measurement noise; $T$: tracks; $N$: elevation bins;
+   $\mathcal{P}_\ell$: per-pixel residual 1D convolution along elevation.\par}
+\end{frame}
+
+% ---------------------------------------------------------------- 39b3 Unrolled: gamma-Net adaptation, mechanisms
+\begin{frame}{Adapting $\gamma$-Net --- mechanism by mechanism}
+  \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{2.05}
+  \setlength{\tabcolsep}{3pt}
+  \begin{tabular}{@{}l l c l l@{}}
+    \toprule
+    mechanism & $\gamma$-Net (Qian et al. 2022) & & this project & why \\
+    \midrule
+    iteration       & \textcolor{soft}{gradient step $\to$ shrinkage, $L$ stages} & $=$   & \textcolor{soft}{kept} & the unrolling premise itself \\
+    supervision     & \textcolor{soft}{train on simulated measurements}           & $=$   & \textcolor{soft}{kept} & the exact operator generates the pairs \\
+    \addlinespace
+    unknown         & complex reflectivity $\gamma \in \mathbb{C}^{N}$            & $\to$ & \textbf{power profile $s \in \mathbb{R}_{\ge 0}^{N}$} & speckle phase averages out of coherences \\
+    measurements    & single-look stack $g$                                       & $\to$ & \textbf{per-track coherences $y$}                     & the pipeline is second-order end to end \\
+    operator        & one fixed $\mathbf{R}$, scene-wide                          & $\to$ & \textbf{\textcolor{good}{$A(x)$ from the pixel's $k_z$}} & airborne geometry varies across the scene \\
+    learned weights & $\mathbf{W}^{\ell}$ per stage, coupled to $\mathbf{R}$      & $\to$ & \textbf{\textcolor{accent}{none --- scalars $\alpha_\ell,\ \theta_\ell$}} & a per-pixel matrix cannot be learned \\
+    shrinkage       & support selection + piecewise-linear function               & $\to$ & \textbf{\textcolor{accent}{prox $\mathcal{P}_\ell$, then $\mathrm{ReLU}(\,\cdot - \theta_\ell)$}} & the prior must respect $s \ge 0$ \\
+    model order     & Bayesian information criterion after inversion              & $\to$ & \textbf{downstream parameter extraction}              & the pipeline already fits $K$ scatterers \\
+    \bottomrule
+  \end{tabular}
+  \\[8pt]
+  {\small The contract every change preserves: \textbf{the physics stays exact inside
+   the network --- only the prior is learned.}}
+  \\[5pt]
+  {\tiny\color{soft} support selection: the largest-magnitude entries bypass the
+   threshold at each stage; piecewise-linear function: $\gamma$-Net's learned
+   replacement for soft-thresholding; coupled weights:
+   $\mathbf{W}_{2}^{\ell} = \mathbf{I} - \mathbf{W}_{1}^{\ell}\mathbf{R}$ halves the
+   free parameters per stage. $\gamma$-Net reaches its accuracy at 12 stages; default
+   here $L = 8$. \textcolor{good}{green} = exact physics carried by the operator
+   \quad$\cdot$\quad \textcolor{accent}{red} = learned \quad$\cdot$\quad
+   \textcolor{soft}{grey} = kept from $\gamma$-Net.\par}
+\end{frame}
+
+% ---------------------------------------------------------------- 39c Unrolled: training + purpose
+\begin{frame}{Training the unrolled model against the exact operator}
+  \centering
+  \begin{tikzpicture}
+    \begin{scope}[on background layer]
+      \fill[accent!5,rounded corners=3pt] (1.3,0.10)  rectangle (12.9,2.55);
+      \fill[good!7,rounded corners=3pt]   (1.3,-0.10) rectangle (12.9,-2.55);
+      \draw[soft!50,dotted] (-0.9,0) -- (12.9,0);
+    \end{scope}
+    \node[font=\scriptsize,text=accent!80,anchor=east] at (12.9,2.72)  {synthesis --- ground truth through the exact forward physics};
+    \node[font=\scriptsize,text=good!80,anchor=east]   at (12.9,-2.72) {inversion --- the unrolled network runs it backwards};
+    \node[gate, text width=17mm] (gt) at (0,0) {GT params\\{\tiny $[a_k,\mu_k,\sigma_k]$ per pixel}};
+    \node[box, text width=22mm] (prof)  at (3.1,1.4) {profile $s$\\{\tiny Gaussian mixture on the elevation grid}};
+    \draw[soft,thin] (2.5,2.05) -- (3.7,2.05);
+    \draw[accent,semithick] plot[domain=2.55:3.65,samples=50] (\x,{2.05+0.32*exp(-(\x-2.95)^2/0.008)+0.2*exp(-(\x-3.35)^2/0.006)});
+    \node[box, text width=22mm] (fwd)   at (6.6,1.4) {forward operator\\{\tiny $y = A s$, per-pixel $k_z$}};
+    \node[box, text width=22mm] (noise) at (10.0,1.4) {complex noise (optional)\\{\tiny breaks the inverse crime}};
+    \node[box, fill=accent!16, text width=22mm] (net)  at (10.0,-1.4) {GammaNet\\{\tiny $L$ unrolled stages}};
+    \node[box, text width=22mm] (pred)  at (6.6,-1.4) {predicted profile $\hat{s}$\\{\tiny nonnegative, $N$ bins}};
+    \node[box, text width=22mm] (loss)  at (3.1,-1.4) {power-masked L1\\{\tiny peak-position MAE monitored}};
+    \draw[flow] (gt.east) -- ++(0.4,0) |- (prof.west);
+    \draw[flow] (prof) -- (fwd);
+    \draw[flow] (fwd) -- (noise);
+    \draw[flow] (noise.south) -- (net.north);
+    \node[font=\tiny, text=soft, anchor=west] at (10.15,0) {coherences $y$ + $k_z$};
+    \draw[flow] (net) -- (pred);
+    \draw[flow] (pred) -- (loss);
+    \draw[flow, dashed] (prof.south) -- (loss.north);
+    \node[font=\tiny, text=soft, anchor=east] at (2.95,0) {compare};
+  \end{tikzpicture}
+  \\[2pt]
+  \footnotesize
+  Phase 1 (implemented): learn to invert the \emph{exact} operator on synthesised
+  coherences. Phase 2 (pending): measured covariances from the stack --- no label ceiling.
+  \\[1pt]
+  {\scriptsize Isolated family --- own registry, trainer and entry point
+   (\texttt{train\_unrolled}); optimizer splits steps/thresholds from the prox; no AMP,
+   the operator is complex-valued.}
+  \\[1pt]
+  \textbf{Why it exists}: the physics-native comparison point --- if $\sim$1.4k
+  parameters of encoded physics match capacity-matched vision backbones, those
+  backbones are mostly re-learning known physics.
+\end{frame}

@@ -1,0 +1,356 @@
+% ---------------------------------------------------------------- 29j L1 vs MSE: the label laws this pipeline builds
+\begin{frame}{Why param-L1 beats param-MSE --- the label laws this pipeline manufactures}
+  \setlength{\abovedisplayskip}{5pt}
+  \setlength{\belowdisplayskip}{5pt}
+  \small
+  The param loss runs after the matcher, in normalised parameter space, under
+  this head's supervision rule:
+  \[
+  \begin{aligned}
+    & \ell_{\text{param}} \;=\; \textstyle\sum_k \sum_{p\in\{a,\mu,\sigma\}} m^{(p)}_k\,\ell\big(\hat\theta^{(p)}_{\pi(k)},\,\theta^{(p)}_k\big)\\[3pt]
+    & m^{(a)}_k \;=\; 1 \ \ \text{always}, \qquad m^{(\mu)}_k \;=\; m^{(\sigma)}_k \;=\; \mathbf 1\big[\,a^{\text{gt}}_k > 10^{-3}\,\big]
+  \end{aligned}
+  \]
+  \vfill
+  \begin{columns}[c]
+    \begin{column}{0.49\textwidth}
+      \small
+      \begin{itemize}
+        \item \textbf{The amplitude law is spike-and-slab by construction.}
+      \end{itemize}
+      \[
+      \begin{aligned}
+        & a \;=\; 0 \ \ (\text{empty slot}), \qquad a \;>\; 0 \ \ (\text{occupied})\\[3pt]
+        \Longrightarrow\;\; & p(a\,|\,x) \;=\; \Pr(a{=}0\,|\,x)\,p(a\,|\,a{=}0,x)\\[1pt]
+        & \hspace{3.4em} + \Pr(a{>}0\,|\,x)\,p(a\,|\,a{>}0,x)\\[3pt]
+        \Longrightarrow\;\; & p(a\,|\,a{=}0,x) \;=\; \delta(a), \quad p(a\,|\,a{>}0,x) \ \text{a density}\\[3pt]
+        \Longrightarrow\;\; & \hleq{p(a\,|\,x) \;=\; \Pr(a{=}0\,|\,x)\,\delta(a)}\\[1pt]
+        & \hspace{3.4em}\hleq{{}+ \Pr(a{>}0\,|\,x)\,p(a\,|\,a{>}0,x)}
+      \end{aligned}
+      \]
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      \small
+      \begin{itemize}
+        \item \textbf{The position law is two-valued where layover strikes.}
+      \end{itemize}
+      \[
+      \begin{aligned}
+        & \text{two-scatterer cell: } \mu \in \{\mu_1,\,\mu_2\}, \qquad \mu_1 < \mu_2\\[3pt]
+        \Longrightarrow\;\; & p(\mu\,|\,x) \;=\; \Pr(\mu{=}\mu_1\,|\,x)\,\delta(\mu{-}\mu_1)\\[1pt]
+        & \hspace{3.4em} + \Pr(\mu{=}\mu_2\,|\,x)\,\delta(\mu{-}\mu_2)\\[3pt]
+        \Longrightarrow\;\; & \hleq{\mu_2{-}\mu_1 \ \text{--- set by the scene, not the model}}
+      \end{aligned}
+      \]
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 29k L1 vs MSE: MSE trains the mean
+\begin{frame}{Why param-L1 beats param-MSE --- MSE trains the conditional mean}
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \small
+  \begin{itemize}
+    \item \textbf{One instrument from decision theory:} training drives the
+          output $c$ to the minimiser of the conditional risk
+          $R(c\,|\,x) = \mathrm E[\,\ell(c,\theta)\,|\,x\,] = \int \ell(c,\theta)\,p(\theta\,|\,x)\,d\theta$.
+          Evaluate it for the squared loss, one manipulation per line:
+  \end{itemize}
+  \[
+  \begin{aligned}
+    & \ell(c,\theta) \;=\; (c-\theta)^2
+        && \text{\scriptsize\color{soft} the loss}\\[4pt]
+    \Longrightarrow\;\; & R(c\,|\,x) \;=\; \mathrm E\big[\,(c-\theta)^2\,\big|\,x\,\big]
+        && \text{\scriptsize\color{soft} plug $\ell$ into the risk}\\[4pt]
+    \Longrightarrow\;\; & (c-\theta)^2 \;=\; c^2 - 2\,c\,\theta + \theta^2
+        && \text{\scriptsize\color{soft} expand the square}\\[4pt]
+    \Longrightarrow\;\; & R(c\,|\,x) \;=\; \mathrm E\big[\,c^2 - 2\,c\,\theta + \theta^2\,\big|\,x\,\big]
+        && \text{\scriptsize\color{soft} inside the expectation}\\[4pt]
+    \Longrightarrow\;\; & R(c\,|\,x) \;=\; c^2 - 2\,c\,\mathrm E[\theta\,|\,x] + \mathrm E[\theta^2\,|\,x]
+        && \text{\scriptsize\color{soft} linearity of $\mathrm E$; $c$ is a constant given $x$}\\[4pt]
+    \Longrightarrow\;\; & \tfrac{dR}{dc} \;=\; 2\,c - 2\,\mathrm E[\theta\,|\,x]
+        && \text{\scriptsize\color{soft} differentiate in $c$; $\mathrm E[\theta^2\,|\,x]$ is constant}\\[4pt]
+    \Longrightarrow\;\; & \hleq{\tfrac{dR}{dc} \;=\; 0 \;\;\Longleftrightarrow\;\; c^* \;=\; \mathrm E[\theta\,|\,x]}
+        && \text{\scriptsize\color{soft} set the slope to zero: the conditional mean}
+  \end{aligned}
+  \]
+\end{frame}
+
+% ---------------------------------------------------------------- 29k2 L1 vs MSE: L1 trains the median
+\begin{frame}{Why param-L1 beats param-MSE --- L1 trains the conditional median}
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \small
+  \begin{itemize}
+    \item \textbf{The same conditional risk}, evaluated for the absolute loss:
+  \end{itemize}
+  \[
+  \begin{aligned}
+    & \ell(c,\theta) \;=\; |c-\theta|
+        && \text{\scriptsize\color{soft} the loss}\\[4pt]
+    \Longrightarrow\;\; & R(c\,|\,x) \;=\; \textstyle\int |c-\theta|\,p(\theta\,|\,x)\,d\theta
+        && \text{\scriptsize\color{soft} plug $\ell$ into the risk}\\[4pt]
+    \Longrightarrow\;\; & |c-\theta| \;=\; c-\theta \ \ (\theta<c), \qquad \theta-c \ \ (\theta>c)
+        && \text{\scriptsize\color{soft} resolve the absolute value}\\[4pt]
+    \Longrightarrow\;\; & R(c\,|\,x) \;=\; \textstyle\int_{\theta<c}(c{-}\theta)\,p\,d\theta + \textstyle\int_{\theta>c}(\theta{-}c)\,p\,d\theta
+        && \text{\scriptsize\color{soft} split the integral at $c$}\\[4pt]
+    \Longrightarrow\;\; & \tfrac{d}{dc}\textstyle\int_{\theta<c}(c{-}\theta)\,p\,d\theta \;=\; \textstyle\int_{\theta<c}p\,d\theta + (c{-}c)\,p(c)
+        && \text{\scriptsize\color{soft} Leibniz: integrand, plus the moving boundary}\\[4pt]
+    \Longrightarrow\;\; & \tfrac{d}{dc}\textstyle\int_{\theta>c}(\theta{-}c)\,p\,d\theta \;=\; -\textstyle\int_{\theta>c}p\,d\theta - (c{-}c)\,p(c)
+        && \text{\scriptsize\color{soft} the same on the upper piece}\\[4pt]
+    \Longrightarrow\;\; & (c{-}c)\,p(c) \;=\; 0
+        && \text{\scriptsize\color{soft} both boundary terms vanish}\\[4pt]
+    \Longrightarrow\;\; & \tfrac{dR}{dc} \;=\; \Pr(\theta{<}c\,|\,x) - \Pr(\theta{>}c\,|\,x)
+        && \text{\scriptsize\color{soft} the two masses remain}\\[4pt]
+    \Longrightarrow\;\; & \tfrac{dR}{dc} \;=\; 0 \;\;\Longleftrightarrow\;\; \Pr(\theta{<}c^*\,|\,x) \;=\; \Pr(\theta{>}c^*\,|\,x)
+        && \text{\scriptsize\color{soft} set the slope to zero: the masses balance}\\[4pt]
+    \Longrightarrow\;\; & \hleq{c^* \;=\; \operatorname{med}[\theta\,|\,x]}
+        && \text{\scriptsize\color{soft} equal mass on both sides: the median}
+  \end{aligned}
+  \]
+\end{frame}
+
+% ---------------------------------------------------------------- 29l L1 vs MSE: amplitude mean
+\begin{frame}{Why param-L1 beats param-MSE --- amplitude: integrate the mean over the law}
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \small
+  \begin{itemize}
+    \item \textbf{Param-MSE trains the amplitude toward $\mathrm E[a\,|\,x]$};
+          evaluate it on the spike-and-slab law, one manipulation per line:
+  \end{itemize}
+  \[
+  \begin{aligned}
+    & \mathrm E[a\,|\,x] \;=\; \textstyle\int a\,p(a\,|\,x)\,da
+        && \text{\scriptsize\color{soft} the mean target, on the amplitude coordinate}\\[4pt]
+    \Longrightarrow\;\; & \mathrm E[a\,|\,x] \;=\; \textstyle\int a\,\big[\Pr(a{=}0\,|\,x)\,\delta(a) + \Pr(a{>}0\,|\,x)\,p(a\,|\,a{>}0,x)\big]\,da
+        && \text{\scriptsize\color{soft} insert the spike-and-slab law}\\[4pt]
+    \Longrightarrow\;\; & \mathrm E[a\,|\,x] \;=\; \Pr(a{=}0\,|\,x)\textstyle\int a\,\delta(a)\,da\\[1pt]
+    & \hspace{3.4em} + \Pr(a{>}0\,|\,x)\textstyle\int a\,p(a\,|\,a{>}0,x)\,da
+        && \text{\scriptsize\color{soft} linearity: pull the weights out}\\[4pt]
+    \Longrightarrow\;\; & \textstyle\int a\,\delta(a)\,da \;=\; 0
+        && \text{\scriptsize\color{soft} sifting property of the point mass}\\[4pt]
+    \Longrightarrow\;\; & \textstyle\int a\,p(a\,|\,a{>}0,x)\,da \;=\; \mathrm E[a\,|\,a{>}0,x]
+        && \text{\scriptsize\color{soft} the slab integral is its own conditional mean}\\[4pt]
+    \Longrightarrow\;\; & \mathrm E[a\,|\,x] \;=\; \Pr(a{>}0\,|\,x)\,\mathrm E[a\,|\,a{>}0,x]
+        && \text{\scriptsize\color{soft} evaluate}\\[4pt]
+    \Longrightarrow\;\; & \hleq{c^*_{\text{MSE}} \;=\; \Pr(a{>}0\,|\,x)\,\mathrm E[a\,|\,a{>}0,x]}
+        && \text{\scriptsize\color{soft} the occupied mean, dimmed by the posterior weight}\\[4pt]
+    \Longrightarrow\;\; & 0 \;<\; c^*_{\text{MSE}} \;<\; \mathrm E[a\,|\,a{>}0,x]
+        && \text{\scriptsize\color{soft} both weights are strictly inside $(0,1)$: a hedge}
+  \end{aligned}
+  \]
+\end{frame}
+
+% ---------------------------------------------------------------- 29l2 L1 vs MSE: amplitude median
+\begin{frame}{Why param-L1 beats param-MSE --- amplitude: read the median off the CDF}
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \small
+  \begin{itemize}
+    \item \textbf{Param-L1 trains the amplitude toward
+          $\operatorname{med}[a\,|\,x]$}; read it off the spike-and-slab law,
+          case by case:
+  \end{itemize}
+  \[
+  \begin{aligned}
+    & \operatorname{med}[a\,|\,x]: \ \text{any } m \ \text{with } \Pr(a \le m\,|\,x) \ge \tfrac12 \ \text{and } \Pr(a \ge m\,|\,x) \ge \tfrac12
+        && \text{\scriptsize\color{soft} the L1 target: the median's definition}\\[4pt]
+    \Longrightarrow\;\; & \Pr(a \le m\,|\,x) \;=\; \Pr(a{=}0\,|\,x)\\[1pt]
+    & \hspace{3.4em} + \Pr(a{>}0\,|\,x)\,\Pr(a \le m\,|\,a{>}0,x)
+        && \text{\scriptsize\color{soft} the mixture's CDF: spike plus slab share}\\[4pt]
+    \Longrightarrow\;\; & \text{test } m{=}0: \quad \Pr(a \le 0\,|\,x) \;=\; \Pr(a{=}0\,|\,x), \qquad \Pr(a \ge 0\,|\,x) \;=\; 1
+        && \text{\scriptsize\color{soft} the CDF at $0$: no slab mass there}\\[4pt]
+    \Longrightarrow\;\; & \Pr(a{=}0\,|\,x) \;\ge\; \tfrac12 \;\;\Longrightarrow\;\; \operatorname{med}[a\,|\,x] \;=\; 0
+        && \text{\scriptsize\color{soft} both conditions hold: the empty truth}\\[4pt]
+    \Longrightarrow\;\; & \Pr(a{=}0\,|\,x) \;<\; \tfrac12: \ \text{the spike cannot reach } \tfrac12
+        && \text{\scriptsize\color{soft} case split: the slab supplies the rest}\\[4pt]
+    \Longrightarrow\;\; & \Pr(a \le \operatorname{med}\,|\,a{>}0,x) \;=\; \tfrac{1/2 \,-\, \Pr(a{=}0\,|\,x)}{\Pr(a{>}0\,|\,x)}
+        && \text{\scriptsize\color{soft} set the CDF to $\tfrac12$: the slab's share}\\[4pt]
+    \Longrightarrow\;\; & \operatorname{med}[a\,|\,x] \ \text{is a quantile of } p(a\,|\,a{>}0,x)
+        && \text{\scriptsize\color{soft} an amplitude occupied slots actually take}\\[4pt]
+    \Longrightarrow\;\; & \hleq{c^*_{\text{L1}} \;\in\; \{0\} \,\cup\, \operatorname{supp} p(a\,|\,a{>}0,x)}
+        && \text{\scriptsize\color{soft} zero, or a real occupied amplitude}
+  \end{aligned}
+  \]
+\end{frame}
+
+% ---------------------------------------------------------------- 29l3 L1 vs MSE: position mean
+\begin{frame}{Why param-L1 beats param-MSE --- position: the mean lands between the modes}
+  \setlength{\abovedisplayskip}{4pt}
+  \setlength{\belowdisplayskip}{4pt}
+  \small
+  \begin{itemize}
+    \item \textbf{The same two targets, now on the two-valued position law.}
+          First the mean, one manipulation per line:
+  \end{itemize}
+  \[
+  \begin{aligned}
+    & \mathrm E[\mu\,|\,x] \;=\; \textstyle\int \mu\,p(\mu\,|\,x)\,d\mu
+        && \text{\scriptsize\color{soft} the mean target, on the position coordinate}\\[4pt]
+    \Longrightarrow\;\; & \mathrm E[\mu\,|\,x] \;=\; \textstyle\int \mu\,\big[\Pr(\mu{=}\mu_1\,|\,x)\,\delta(\mu{-}\mu_1) + \Pr(\mu{=}\mu_2\,|\,x)\,\delta(\mu{-}\mu_2)\big]\,d\mu
+        && \text{\scriptsize\color{soft} insert the position law}\\[4pt]
+    \Longrightarrow\;\; & \mathrm E[\mu\,|\,x] \;=\; \Pr(\mu{=}\mu_1\,|\,x)\,\mu_1 + \Pr(\mu{=}\mu_2\,|\,x)\,\mu_2
+        && \text{\scriptsize\color{soft} linearity, then sifting --- as for the amplitude}\\[4pt]
+    \Longrightarrow\;\; & \mathrm E[\mu\,|\,x] - \mu_1 \;=\; \big(\Pr(\mu{=}\mu_1\,|\,x) - 1\big)\,\mu_1 + \Pr(\mu{=}\mu_2\,|\,x)\,\mu_2
+        && \text{\scriptsize\color{soft} subtract $\mu_1$ from both sides}\\[4pt]
+    \Longrightarrow\;\; & \Pr(\mu{=}\mu_1\,|\,x) - 1 \;=\; -\Pr(\mu{=}\mu_2\,|\,x)
+        && \text{\scriptsize\color{soft} the two masses sum to one}\\[4pt]
+    \Longrightarrow\;\; & \mathrm E[\mu\,|\,x] - \mu_1 \;=\; \Pr(\mu{=}\mu_2\,|\,x)\,(\mu_2 - \mu_1)
+        && \text{\scriptsize\color{soft} collect}\\[4pt]
+    \Longrightarrow\;\; & \mu_2 - \mathrm E[\mu\,|\,x] \;=\; \Pr(\mu{=}\mu_1\,|\,x)\,(\mu_2 - \mu_1)
+        && \text{\scriptsize\color{soft} the same three lines, started from $\mu_2$}\\[4pt]
+    \Longrightarrow\;\; & \text{both gaps} > 0 \;\;\Longrightarrow\;\; \mu_1 \;<\; \mathrm E[\mu\,|\,x] \;<\; \mu_2
+        && \text{\scriptsize\color{soft} the mean is strictly between the modes}\\[4pt]
+    \Longrightarrow\;\; & \hleq{\min_j \big|\mathrm E[\mu\,|\,x] - \mu_j\big| \;=\; \min_j \Pr(\mu{=}\mu_j\,|\,x)\cdot(\mu_2{-}\mu_1)}
+        && \text{\scriptsize\color{soft} the nearer mode carries the smaller mass}
+  \end{aligned}
+  \]
+\end{frame}
+
+% ---------------------------------------------------------------- 29m3 L1 vs MSE: the tail's share of the gradient
+\begin{frame}{Why param-L1 beats param-MSE --- the tail's share of the gradient}
+  \setlength{\abovedisplayskip}{5pt}
+  \setlength{\belowdisplayskip}{5pt}
+  \small
+  Define the tail's share of the batch pull, then evaluate it population by
+  population (tail $=$ the $\varepsilon N$ pinned coordinates, core
+  $=$ the $(1{-}\varepsilon)N$ learning ones):
+  \[
+    S \;=\; \frac{\sum_{i\,\in\,\text{tail}} \big|\partial\ell/\partial c_i\big|}{\sum_{i\,\in\,\text{tail}} \big|\partial\ell/\partial c_i\big| \;+\; \sum_{i\,\in\,\text{core}} \big|\partial\ell/\partial c_i\big|}
+  \]
+  \vfill
+  \begin{columns}[c]
+    \begin{column}{0.49\textwidth}
+      \small
+      \begin{itemize}
+        \item \textbf{MSE --- sum the slopes.}
+      \end{itemize}
+      \[
+      \begin{aligned}
+        & \text{tail: } \varepsilon N \ \text{terms, each } 2\,|r_i| \approx 2R\\[3pt]
+        \Longrightarrow\;\; & \textstyle\sum_{\text{tail}} \;=\; \varepsilon N\cdot 2R\\[3pt]
+        & \text{core: } (1{-}\varepsilon)N \ \text{terms, each } 2\,|r_i| \approx 2\sigma_r\\[3pt]
+        \Longrightarrow\;\; & \textstyle\sum_{\text{core}} \;=\; (1{-}\varepsilon)\,N\cdot 2\sigma_r\\[3pt]
+        \Longrightarrow\;\; & S_{\text{MSE}} \;=\; \tfrac{\varepsilon N\cdot 2R}{\varepsilon N\cdot 2R \;+\; (1{-}\varepsilon)\,N\cdot 2\sigma_r}\\[3pt]
+        \Longrightarrow\;\; & \hleq{S_{\text{MSE}} \;=\; \tfrac{\varepsilon R}{\varepsilon R + (1{-}\varepsilon)\,\sigma_r}} \quad \text{(cancel } 2N\text{)}
+      \end{aligned}
+      \]
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      \small
+      \begin{itemize}
+        \item \textbf{L1 --- the same sums, then the limit.}
+      \end{itemize}
+      \[
+      \begin{aligned}
+        & \text{every term: } \big|\tfrac{\partial\ell}{\partial c_i}\big| \;=\; 1\\[3pt]
+        \Longrightarrow\;\; & \textstyle\sum_{\text{tail}} \;=\; \varepsilon N, \qquad \textstyle\sum_{\text{core}} \;=\; (1{-}\varepsilon)\,N\\[3pt]
+        \Longrightarrow\;\; & S_{\text{L1}} \;=\; \tfrac{\varepsilon N}{\varepsilon N + (1{-}\varepsilon)\,N} \;=\; \tfrac{\varepsilon N}{N} \;=\; \varepsilon\\[3pt]
+        & \text{training succeeds: } \sigma_r \to 0\\[3pt]
+        \Longrightarrow\;\; & (1{-}\varepsilon)\,\sigma_r \to 0\\[3pt]
+        \Longrightarrow\;\; & \hleq{S_{\text{MSE}} \;\to\; \tfrac{\varepsilon R}{\varepsilon R} \;=\; 1, \qquad S_{\text{L1}} \;=\; \varepsilon \ \text{always}}
+      \end{aligned}
+      \]
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 29o L1 vs MSE: the checks
+\begin{frame}{Why param-L1 beats param-MSE --- the checks: Huber as a gap probe, and the gate}
+  \small
+  \begin{itemize}
+    \item \textbf{Huber interpolates the two losses:} quadratic inside
+          $\delta$, linear outside --- configured here at $\delta = 0.5$
+          (normalised units). If the tail story is right, every cell must
+          order MSE $\le$ Huber $\le$ L1, and Huber's share of the gap,
+          $\frac{\text{Huber}-\text{MSE}}{\text{L1}-\text{MSE}}$, reads
+          out where each cell's tail gaps sit against $\delta$:
+  \end{itemize}
+  \begin{center}
+  \scriptsize
+  \renewcommand{\arraystretch}{1.15}
+  \setlength{\tabcolsep}{6pt}
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    grid cell & p-MSE & p-Huber & p-L1 & Huber's share \\
+    \midrule
+    ResUNet conv$\cdot$sorted           & 0.937 & 0.961 & 0.982 & 53\,\% \\
+    ResUNet conv$\cdot$Hungarian        & 0.924 & 0.961 & \textbf{0.982} & 64\,\% \\
+    ResUNet set-pred$\cdot$Hungarian    & 0.939 & 0.972 & \textbf{0.988} & 67\,\% \\
+    Att-UNet conv$\cdot$sorted          & 0.855 & 0.853 & \textbf{0.936} & $-2$\,\% \\
+    Att-UNet conv$\cdot$Hungarian       & 0.849 & 0.849 & \textbf{0.921} & 0\,\% \\
+    Att-UNet set-pred$\cdot$Hungarian   & 0.892 & 0.913 & \textbf{0.942} & 42\,\% \\
+    DeepLabV3+ conv$\cdot$sorted        & 0.856 & 0.971 & \textbf{0.983} & 91\,\% \\
+    DeepLabV3+ set-pred$\cdot$Hungarian & 0.934 & 0.984 & \textbf{0.992} & 86\,\% \\
+    \bottomrule
+  \end{tabular}
+  \end{center}
+  {\scriptsize \textbf{bold} $=$ best in row, marked only where best and worst
+  differ by more than $5\%$. The ordering holds in seven of eight cells (the exception is
+  a $0.002$ gap). The share column splits by regime: where the tail gaps
+  exceed $\delta$, Huber is L1-like and recovers most of the gap
+  (53--91\,\%); both ungated Att-UNet rows recover none --- Huber behaved as
+  pure MSE, which the tail story can only read as tail gaps sitting
+  \emph{inside} $\delta = 0.5$. That is a prediction the residual histograms
+  must confirm, not a fit. The gate is the second check: it cut the
+  amplitude hedge architecturally (the amplitude frames), so the gated rows must lose
+  the hedge's backbone-dependent part --- and they do: L1$-$MSE collapses to
+  a uniform $0.049$--$0.058$ band on the three set-pred rows, while the
+  ungated rows scatter from $0.045$ to $0.127$. The surviving band is the
+  position-and-matcher tail no gate can remove.\par}
+\end{frame}
+
+% ---------------------------------------------------------------- 29p L1 vs MSE: what the checks cannot yet say
+\begin{frame}{Why param-L1 beats param-MSE --- what the checks cannot yet say}
+  \small
+  The ordering is established; the mechanism split is not. What the table
+  measures, and the runs that close the case:
+  \vfill
+  \begin{columns}[c]
+    \begin{column}{0.49\textwidth}
+      \small
+      \begin{itemize}
+        \item \textbf{What the table does and does not measure.}
+        \begin{itemize}\setlength{\itemsep}{4pt}
+        \item {\scriptsize the score is the comparison's min--max composite:
+              shared anchors, rank units --- \emph{orderings} across cells
+              are meaningful, gap \emph{sizes} are not physical units;}
+        \item {\scriptsize one seed per cell --- the $0.002$ violation has no
+              seed spread behind it; the real evidence is the sign test: the
+              ordering holds in seven of eight independent cells;}
+        \item {\scriptsize the optimum half prices a \emph{fixed} label law;
+              the Hungarian matcher re-derives the target from the prediction
+              each step --- the hedge pricing is exact for sorted,
+              an approximation for Hungarian. The Hungarian gaps are not
+              smaller, so the gradient half must carry
+              weight there.}
+        \end{itemize}
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.49\textwidth}
+      \small
+      \begin{itemize}
+        \item \textbf{The runs that close it.}
+        \begin{itemize}\setlength{\itemsep}{4pt}
+        \item {\scriptsize matched-residual histograms per objective (the
+              loss-pair sweep emits them): $\sigma_r$, $R$, $\varepsilon$
+              become measurements instead of assumed scales;
+              excess kurtosis is the direct tail read; where the tail mass
+              sits against $\delta = 0.5$ adjudicates the Att-UNet rows;}
+        \item {\scriptsize the sweep's weight axis: param-MSE at larger $w$
+              lowers its noise floor ($2w|r| = \eta$ parks at
+              $|r| = \eta/2w$) but moves no wrong target --- if a retuned
+              weight closes the gap, the floor and fade
+              carried the result; if the gap survives every $w$, the hedge
+              did.}
+        \end{itemize}
+      \end{itemize}
+    \end{column}
+  \end{columns}
+  \vfill
+  {\scriptsize\color{soft} Two mechanisms drive one ordering --- hedge at
+  the optimum, floor-and-fade in the gradient; the sweep's histograms and
+  weight axis are what separates them.\par}
+\end{frame}
