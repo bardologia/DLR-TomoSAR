@@ -391,8 +391,9 @@ def test_dual_launcher_fans_multi_seed_runs_across_the_pool(monkeypatch):
 
     class FakeFanout:
         @classmethod
-        def for_runner(cls, config, cli_overrides, entry_script, runner_factory, base_label=None):
+        def for_runner(cls, config, cli_overrides, entry_script, runner_factory, base_label=None, infer_at_end=False):
             ran["for_runner"] = (entry_script, runner_factory)
+            ran["infer_at_end"] = infer_at_end
             return cls()
         def run(self):
             ran["fanout_ran"] = True
@@ -433,6 +434,8 @@ def test_dual_launcher_fans_out_when_trials_enabled(monkeypatch):
     class FakeConfig:
         trials_enabled = True
         curriculum     = dual_curriculum()
+        infer_after    = False
+        infer_at_end   = False
 
     class FakeCli:
         def __init__(self, config, description):

@@ -107,7 +107,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
             pipeline = self._pipeline(self.config.logdir)
             results  = pipeline.run(probe_config=self._probe_config(), resolved_entry_config=self.config)
 
-        if self.config.infer_after and not self.unit_resume.skip_inference():
+        if (self.config.infer_after or self.config.infer_at_end) and not self.unit_resume.skip_inference():
             self._run_inference(self.run_directory)
 
         return results
@@ -115,7 +115,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
 
 class TrainScheduler:
 
-    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "physics_trials", "pair_trials", "secondary_trials", "patch_trials", "input_trials", "context_trials", "reach_trials", "head_trials", "augmentation_trials", "normalization_trials", "ablation_features", "ablation_include_full", "gpus", "gpus_file", "poll_interval_s")
+    SCHEDULER_FIELDS = ("trials_enabled", "trials_mode", "warmup_losses", "complete_losses", "presence_trials", "physics_trials", "pair_trials", "secondary_trials", "patch_trials", "input_trials", "context_trials", "reach_trials", "head_trials", "augmentation_trials", "normalization_trials", "ablation_features", "ablation_include_full", "infer_at_end", "gpus", "gpus_file", "poll_interval_s")
 
     MODE_SUBDIRS = {
         "curriculum"    : "curriculum",
@@ -141,9 +141,10 @@ class TrainScheduler:
         if config.trials_mode not in self.MODE_SUBDIRS:
             raise ValueError(f"Unknown trials_mode '{config.trials_mode}', expected one of {sorted(self.MODE_SUBDIRS)}")
 
-        self.runs_root    = Path(config.logdir) / self.MODE_SUBDIRS[config.trials_mode]
-        self.log_dir      = self.runs_root / "batch_train_logs"
-        self.results_path = self.log_dir / "train_scheduler_results.json"
+        self.runs_root          = Path(config.logdir) / self.MODE_SUBDIRS[config.trials_mode]
+        self.log_dir            = self.runs_root / "batch_train_logs"
+        self.results_path       = self.log_dir / "train_scheduler_results.json"
+        self.infer_results_path = self.log_dir / "infer_scheduler_results.json"
 
         self.forward_overrides = {path: value for path, value in cli_overrides.items() if path.split(".")[0] not in self.SCHEDULER_FIELDS}
 
@@ -191,7 +192,8 @@ class TrainScheduler:
         return [(SeedSet.run_name(base, seed), {**overrides, "seed": seed, "seeds": (seed,)}) for base, overrides in experiments for seed in seeds]
 
     def _job(self, run_name: str, overrides: dict) -> GpuJob:
-        argv = ConfigCli.to_argv({**self.forward_overrides, **overrides, "run_name": run_name, "logdir": str(self.runs_root)})
+        batched = {"infer_after": False} if self.config.infer_at_end else {}
+        argv    = ConfigCli.to_argv({**self.forward_overrides, **overrides, **batched, "run_name": run_name, "logdir": str(self.runs_root)})
 
         return GpuJob(
             name     = run_name,
@@ -201,6 +203,41 @@ class TrainScheduler:
 
     def _model_key(self) -> str:
         return ModelBuilder.model_key(self.config.backbone_name, self.config.backbone_head)
+
+    def _inference_job(self, run_name: str, overrides: dict) -> GpuJob:
+        argv = ConfigCli.to_argv({**self.forward_overrides, **overrides, "infer_after": True, "resume": True, "run_name": run_name, "logdir": str(self.runs_root)})
+
+        return GpuJob(
+            name     = run_name,
+            command  = [sys.executable, str(self.entry_script), "--trial"] + argv,
+            log_path = self.log_dir / f"{run_name}_infer.log",
+        )
+
+    def _run_inference_pass(self, units: list[tuple[str, dict]], training_results: list[dict]) -> list[dict]:
+        trained = {result["name"] for result in training_results if result["status"] == "DONE"}
+        todo    = [(run_name, overrides) for run_name, overrides in units if run_name in trained]
+
+        self.logger.section("Batched inference")
+        self.logger.kv_table({
+            "Eligible" : len(todo),
+            "Skipped"  : len(units) - len(todo),
+            "GPUs"     : self.config.gpus,
+            "Log dir"  : str(self.log_dir),
+        }, title="Configuration")
+
+        for run_name, _ in units:
+            if run_name not in trained:
+                self.logger.warning(f"{run_name}: training failed, inference skipped")
+
+        if not todo:
+            return []
+
+        jobs    = [self._inference_job(run_name, overrides) for run_name, overrides in todo]
+        names   = [run_name for run_name, _ in todo]
+        results = self.stage._order_results(self.stage._run_queue(jobs), names)
+
+        self.stage._write_results(results, self.infer_results_path)
+        return results
 
     def run(self) -> None:
         planner     = self.planner()
@@ -219,6 +256,7 @@ class TrainScheduler:
             "GPUs"          : self.config.gpus,
             "GPU pool file" : str(self.stage.pool_file),
             "Infer after"   : self.config.infer_after,
+            "Infer at end"  : self.config.infer_at_end,
             "Resume"        : self.config.resume,
             "CLI overrides" : self.forward_overrides or "—",
             "Log dir"       : str(self.log_dir),
@@ -230,17 +268,31 @@ class TrainScheduler:
 
         self.stage._write_results(results, self.results_path)
 
+        infer_results = self._run_inference_pass(units, results) if self.config.infer_at_end else []
+
         self.logger.section("Summary")
         rows = [{"Trial": r["name"], "Status": r["status"], "Duration": f"{r['duration_s'] / 60:.1f} min"} for r in results]
         self.logger.metrics_table(rows, columns=["Trial", "Status", "Duration"])
 
-        failed = [r for r in results if r["status"] != "DONE"]
-        self.stage._log_failures(failed)
+        if infer_results:
+            self.logger.subsection("Batched inference")
+            infer_rows = [{"Trial": r["name"], "Status": r["status"], "Duration": f"{r['duration_s'] / 60:.1f} min"} for r in infer_results]
+            self.logger.metrics_table(infer_rows, columns=["Trial", "Status", "Duration"])
+
+        failed       = [r for r in results if r["status"] != "DONE"]
+        infer_failed = [r for r in infer_results if r["status"] != "DONE"]
+        self.stage._log_failures(failed + infer_failed)
 
         self.logger.close()
 
+        problems = []
         if failed:
-            raise SystemExit(f"{len(failed)} of {len(results)} training trials failed; see {self.results_path}")
+            problems.append(f"{len(failed)} of {len(results)} training trials failed")
+        if infer_failed:
+            problems.append(f"{len(infer_failed)} of {len(infer_results)} inference jobs failed")
+
+        if problems:
+            raise SystemExit("; ".join(problems) + f"; see {self.log_dir}")
 
 
 class BackboneTrainingLauncher:
@@ -256,6 +308,9 @@ class BackboneTrainingLauncher:
 
         CurriculumInheritance(config.curriculum, default_curriculum(), cli.overrides).apply()
 
+        if config.infer_after and config.infer_at_end:
+            raise SystemExit("infer_after and infer_at_end are mutually exclusive; infer_after runs inference inside each training job, infer_at_end batches inference after every training finishes")
+
         trial_parser = argparse.ArgumentParser(add_help=False)
         trial_parser.add_argument("--trial", action="store_true")
         trial, _ = trial_parser.parse_known_args(argv)
@@ -266,7 +321,7 @@ class BackboneTrainingLauncher:
             if trial.trial or len(seeds) == 1:
                 SeedSweepRunner(config, SingleTrainRunner).run()
             else:
-                SeedFanoutScheduler.for_runner(config, cli.overrides, self.entry_script, SingleTrainRunner).run()
+                SeedFanoutScheduler.for_runner(config, cli.overrides, self.entry_script, SingleTrainRunner, infer_at_end=config.infer_at_end).run()
             return
 
         TrainScheduler(config=config, cli_overrides=cli.overrides, entry_script=self.entry_script).run()

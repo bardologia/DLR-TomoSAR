@@ -628,7 +628,7 @@ class LaunchLayout:
                     {"kind": "hidden", "fields": ["ablation_features", "ablation_include_full", "gpus_file"]},
                 ]},
                 {"key": "inference", "title": "Inference", "panels": [
-                    {"kind": "fields", "groups": [{"title": "After training", "fields": ["infer_after"]}]},
+                    {"kind": "fields", "groups": [{"title": "After training", "fields": ["infer_after", "infer_at_end"]}]},
                     {"kind": "fields", "title": "Inference run", "template": "inference_full", "at": "inference"},
                 ]},
             ],
@@ -804,7 +804,7 @@ class LaunchLayout:
                     {"kind": "hidden", "fields": ["ablation_features", "ablation_include_full", "gpus_file"]},
                 ]},
                 {"key": "inference", "title": "Inference", "panels": [
-                    {"kind": "fields", "groups": [{"title": "After training", "fields": ["infer_after"]}]},
+                    {"kind": "fields", "groups": [{"title": "After training", "fields": ["infer_after", "infer_at_end"]}]},
                     {"kind": "fields", "title": "Inference run", "template": "inference_full", "at": "inference"},
                 ]},
             ],

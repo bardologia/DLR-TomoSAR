@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 import pipelines.backbone.training.launcher as backbone_pipeline
 from configuration.training    import BackboneEntryConfig, default_curriculum
 from pipelines.shared.training import training_launcher as mod
@@ -121,8 +123,9 @@ def test_backbone_launcher_fans_multi_seed_runs_across_the_pool(monkeypatch):
 
     class FakeFanout:
         @classmethod
-        def for_runner(cls, config, cli_overrides, entry_script, runner_factory, base_label=None):
+        def for_runner(cls, config, cli_overrides, entry_script, runner_factory, base_label=None, infer_at_end=False):
             ran["for_runner"] = (entry_script, runner_factory)
+            ran["infer_at_end"] = infer_at_end
             return cls()
         def run(self):
             ran["fanout_ran"] = True
@@ -163,6 +166,8 @@ def test_backbone_launcher_fans_out_when_trials_enabled(monkeypatch):
     class FakeConfig:
         trials_enabled = True
         curriculum     = default_curriculum()
+        infer_after    = False
+        infer_at_end   = False
 
     class FakeCli:
         def __init__(self, config, description):
@@ -343,6 +348,127 @@ def test_scheduler_run_dispatches_per_seed_jobs(tmp_path, monkeypatch):
 
     assert [job.name for job in captured["jobs"]] == ["aug-on/seed0", "aug-on/seed1", "aug-off/seed0", "aug-off/seed1"]
     assert scheduler.results_path.is_file()
+
+
+def test_scheduler_batched_mode_holds_back_trial_inference(tmp_path):
+    config              = BackboneEntryConfig()
+    config.logdir       = tmp_path
+    config.trials_mode  = "augmentation"
+    config.infer_at_end = True
+
+    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={"infer_at_end": "True"}, entry_script=Path("/entry/train_backbone.py"))
+
+    assert scheduler.forward_overrides == {}
+
+    argv = scheduler._job("aug-on", {}).command
+    assert argv[argv.index("--infer_after") + 1] == "false"
+
+
+def test_scheduler_inference_jobs_resume_into_inference_only(tmp_path):
+    config              = BackboneEntryConfig()
+    config.logdir       = tmp_path
+    config.trials_mode  = "augmentation"
+    config.infer_at_end = True
+
+    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_backbone.py"))
+
+    job  = scheduler._inference_job("aug-on", {})
+    argv = job.command
+
+    assert "--trial" in argv
+    assert argv[argv.index("--infer_after") + 1] == "true"
+    assert argv[argv.index("--resume") + 1]      == "true"
+    assert job.log_path                          == tmp_path / "augmentation" / "batch_train_logs" / "aug-on_infer.log"
+
+
+def test_scheduler_run_batches_inference_after_all_trials(tmp_path, monkeypatch):
+    config              = BackboneEntryConfig()
+    config.logdir       = tmp_path
+    config.trials_mode  = "augmentation"
+    config.seeds        = [0]
+    config.infer_at_end = True
+
+    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_backbone.py"))
+
+    queues = []
+
+    def fake_run_queue(jobs):
+        queues.append(jobs)
+        return [{"name": job.name, "gpu": 0, "status": "DONE", "returncode": 0, "duration_s": 60.0, "log_file": str(job.log_path)} for job in jobs]
+
+    monkeypatch.setattr(scheduler.stage, "_run_queue", fake_run_queue)
+
+    scheduler.run()
+
+    assert [job.name for job in queues[0]] == ["aug-on", "aug-off"]
+    assert [job.name for job in queues[1]] == ["aug-on", "aug-off"]
+    assert all(job.command[job.command.index("--infer_after") + 1] == "false" for job in queues[0])
+    assert all(job.command[job.command.index("--infer_after") + 1] == "true" for job in queues[1])
+    assert scheduler.results_path.is_file()
+    assert scheduler.infer_results_path.is_file()
+
+
+def test_scheduler_batched_inference_skips_failed_trainings(tmp_path, monkeypatch):
+    config              = BackboneEntryConfig()
+    config.logdir       = tmp_path
+    config.trials_mode  = "augmentation"
+    config.seeds        = [0]
+    config.infer_at_end = True
+
+    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_backbone.py"))
+
+    queues = []
+
+    def fake_run_queue(jobs):
+        queues.append(jobs)
+        first_pass = len(queues) == 1
+        return [{"name": job.name, "gpu": 0, "status": "FAILED" if first_pass and job.name == "aug-off" else "DONE", "returncode": 0, "duration_s": 60.0, "log_file": str(job.log_path)} for job in jobs]
+
+    monkeypatch.setattr(scheduler.stage, "_run_queue", fake_run_queue)
+
+    with pytest.raises(SystemExit, match="1 of 2 training trials failed"):
+        scheduler.run()
+
+    assert [job.name for job in queues[1]] == ["aug-on"]
+
+
+def test_scheduler_without_batched_mode_runs_a_single_queue(tmp_path, monkeypatch):
+    config             = BackboneEntryConfig()
+    config.logdir      = tmp_path
+    config.trials_mode = "augmentation"
+    config.seeds       = [0]
+
+    scheduler = backbone_pipeline.TrainScheduler(config=config, cli_overrides={}, entry_script=Path("/entry/train_backbone.py"))
+
+    queues = []
+
+    def fake_run_queue(jobs):
+        queues.append(jobs)
+        return [{"name": job.name, "gpu": 0, "status": "DONE", "returncode": 0, "duration_s": 60.0, "log_file": str(job.log_path)} for job in jobs]
+
+    monkeypatch.setattr(scheduler.stage, "_run_queue", fake_run_queue)
+
+    scheduler.run()
+
+    assert len(queues) == 1
+    assert all("--infer_after" not in job.command for job in queues[0])
+    assert not scheduler.infer_results_path.exists()
+
+
+def test_backbone_launcher_rejects_both_inference_flags(monkeypatch):
+    class FakeCli:
+        def __init__(self, config, description):
+            self.overrides = {}
+        def apply(self, argv):
+            config              = BackboneEntryConfig()
+            config.infer_after  = True
+            config.infer_at_end = True
+            return config
+
+    monkeypatch.setattr(backbone_pipeline, "ConfigCli", FakeCli)
+
+    with pytest.raises(SystemExit, match="mutually exclusive"):
+        backbone_pipeline.BackboneTrainingLauncher(entry_script=Path("/entry/train_backbone.py")).run([])
 
 
 def test_scheduler_houses_each_mode_in_its_own_dir(tmp_path):

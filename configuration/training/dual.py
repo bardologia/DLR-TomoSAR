@@ -116,8 +116,9 @@ class DualEntryConfig:
 
     overfit_check : OverfitCheckConfig = field(default_factory=OverfitCheckConfig)
 
-    infer_after : bool            = False
-    inference   : InferenceConfig = field(default_factory=_default_inference)
+    infer_after  : bool            = False
+    infer_at_end : bool            = False
+    inference    : InferenceConfig = field(default_factory=_default_inference)
 
     trials_enabled       : bool                      = False
     trials_mode          : str                       = "curriculum"

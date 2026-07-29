@@ -154,6 +154,62 @@ def test_run_fans_out_one_job_per_seed_and_writes_ordered_results(tmp_path):
     assert [r["name"] for r in results] == ["exp/seed3", "exp/seed0", "exp/seed17"]
 
 
+def test_batched_fanout_holds_back_inline_inference(tmp_path):
+    config    = _Config(run_name="exp", seeds=[3, 0, 17], logdir=tmp_path)
+    scheduler = SeedFanoutScheduler.for_runner(config, {"infer_at_end": "True"}, Path("/entry/train.py"), _factory([]), infer_at_end=True)
+
+    assert scheduler.forward_overrides == {}
+
+    argv = scheduler._job("exp/seed3", 3).command
+    assert argv[argv.index("--infer_after") + 1] == "false"
+
+    infer_job  = scheduler._inference_job("exp/seed3", 3)
+    infer_argv = infer_job.command
+
+    assert infer_argv[infer_argv.index("--infer_after") + 1] == "true"
+    assert infer_argv[infer_argv.index("--resume") + 1]      == "true"
+    assert infer_job.log_path                                == scheduler.log_dir / "seed3_infer.log"
+
+
+def test_batched_fanout_runs_inference_after_all_seeds(tmp_path):
+    config    = _Config(run_name="exp", seeds=[3, 0], logdir=tmp_path)
+    scheduler = SeedFanoutScheduler.for_runner(config, {}, Path("/entry/train.py"), _factory([]), infer_at_end=True)
+
+    queues = []
+
+    def fake_queue(jobs):
+        queues.append(jobs)
+        return [{"name": job.name, "gpu": 0, "status": "DONE", "returncode": 0, "duration_s": 60.0, "log_file": str(job.log_path)} for job in jobs]
+
+    scheduler.stage._run_queue = fake_queue
+    scheduler.run()
+
+    assert [job.name for job in queues[0]] == ["exp/seed3", "exp/seed0"]
+    assert [job.name for job in queues[1]] == ["exp/seed3", "exp/seed0"]
+    assert all(job.command[job.command.index("--infer_after") + 1] == "false" for job in queues[0])
+    assert all(job.command[job.command.index("--infer_after") + 1] == "true" for job in queues[1])
+    assert scheduler.infer_results_path.is_file()
+
+
+def test_batched_fanout_skips_inference_for_failed_seeds(tmp_path):
+    config    = _Config(run_name="exp", seeds=[3, 0], logdir=tmp_path)
+    scheduler = SeedFanoutScheduler.for_runner(config, {}, Path("/entry/train.py"), _factory([]), infer_at_end=True)
+
+    queues = []
+
+    def fake_queue(jobs):
+        queues.append(jobs)
+        first_pass = len(queues) == 1
+        return [{"name": job.name, "gpu": 0, "status": "FAILED" if first_pass and job.name == "exp/seed0" else "DONE", "returncode": 0, "duration_s": 60.0, "log_file": str(job.log_path)} for job in jobs]
+
+    scheduler.stage._run_queue = fake_queue
+
+    with pytest.raises(SystemExit, match="1 of 2 seed runs failed"):
+        scheduler.run()
+
+    assert [job.name for job in queues[1]] == ["exp/seed3"]
+
+
 def test_run_raises_when_a_seed_fails(tmp_path):
     scheduler = _scheduler(tmp_path)
 

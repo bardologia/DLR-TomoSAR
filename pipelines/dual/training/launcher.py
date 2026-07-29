@@ -124,6 +124,9 @@ class DualTrainingLauncher:
 
         CurriculumInheritance(config.curriculum, dual_curriculum(), cli.overrides).apply()
 
+        if config.infer_after and config.infer_at_end:
+            raise SystemExit("infer_after and infer_at_end are mutually exclusive; infer_after runs inference inside each training job, infer_at_end batches inference after every training finishes")
+
         trial_parser = argparse.ArgumentParser(add_help=False)
         trial_parser.add_argument("--trial", action="store_true")
         trial, _ = trial_parser.parse_known_args(argv)
@@ -134,7 +137,7 @@ class DualTrainingLauncher:
             if trial.trial or len(seeds) == 1:
                 SeedSweepRunner(config, DualSingleTrainRunner).run()
             else:
-                SeedFanoutScheduler.for_runner(config, cli.overrides, self.entry_script, DualSingleTrainRunner).run()
+                SeedFanoutScheduler.for_runner(config, cli.overrides, self.entry_script, DualSingleTrainRunner, infer_at_end=config.infer_at_end).run()
             return
 
         DualTrainScheduler(config=config, cli_overrides=cli.overrides, entry_script=self.entry_script).run()
