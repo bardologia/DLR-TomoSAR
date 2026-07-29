@@ -147,6 +147,7 @@ class StatusBoard {
   }
 
   async _pollGuardHistory() {
+    if (this._serverDown) return;
     let data;
     try {
       data = await window.apiGet("/api/gpu-guard/history?limit=100");
@@ -158,6 +159,7 @@ class StatusBoard {
   }
 
   async _poll() {
+    if (this._serverDown) return;
     if (this._polling) return;
     this._polling = true;
 
@@ -174,6 +176,7 @@ class StatusBoard {
   }
 
   async _pollJobs() {
+    if (this._serverDown) return;
     let data;
     try {
       data = await window.apiGet("/api/jobs");
@@ -236,6 +239,7 @@ class StatusBoard {
       `<div class="strip__actions">` +
       `<button type="button" class="impact__arm" id="sb-detach" title="Detach the backend from your terminal (retroactive nohup): RAM protection and all monitors survive SSH logout">keep-alive: --</button>` +
       `<button type="button" class="impact__arm" id="sb-impact-arm" title="When armed, auto-nukes all your processes if you slow other users too much">auto-nuke: --</button>` +
+      `<button type="button" class="impact__arm" id="sb-kill-ui" title="Stop ONLY this web console's server process: running and detached jobs survive and are re-adopted on the next start, but queued launches, watchdogs and TensorBoard viewers die with it">kill front end</button>` +
       `<button type="button" class="wd__nuke" id="sb-nuke" title="Kill every process running under your user">` +
       `<span class="wd__nuke-sym" aria-hidden="true">&#9762;</span><span class="wd__nuke-txt">NUKE</span>` +
       `</button>` +
@@ -388,6 +392,7 @@ class StatusBoard {
     this._wireNuke();
     this._wireImpactArm();
     this._wireDetach();
+    this._wireKillUi();
     this._wireNotify();
 
     this.schedule = new GpuWeekPanel();
@@ -453,6 +458,33 @@ class StatusBoard {
     btn.classList.toggle("is-safe", !!srv.detached);
     btn.disabled = !!srv.detached;
     if (srv.detached) btn.title = `backend detached (pid ${srv.pid}) — output continues in ${srv.log_path}`;
+  }
+
+  _wireKillUi() {
+    const btn = document.getElementById("sb-kill-ui");
+    if (!btn) return;
+
+    btn.addEventListener("click", async () => {
+      const ok = window.confirm("Kill the front end: this stops ONLY the web console server. Running jobs keep going and are re-adopted on the next start; queued launches and TensorBoard viewers are lost. Continue?");
+      if (!ok) return;
+
+      btn.disabled = true;
+      try {
+        const res = await window.apiPost("/api/system/shutdown");
+        if (res && res.ok) {
+          this._serverDown = true;
+          btn.textContent = "front end: down";
+          btn.classList.add("is-armed");
+          window.toast(`front end stopped (pid ${res.pid}) — running jobs keep going; restart it from the terminal (webui/run.sh)`, "ok");
+        } else {
+          window.toast(`shutdown failed: ${(res && res.error) || "unknown error"}`, "error");
+          btn.disabled = false;
+        }
+      } catch (e) {
+        window.toast("shutdown failed: network error", "error");
+        btn.disabled = false;
+      }
+    });
   }
 
   _wireNotify() {

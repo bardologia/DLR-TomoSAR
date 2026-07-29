@@ -53,6 +53,20 @@ def server():
     proc.wait(timeout=10)
 
 
+def test_shutdown_stops_only_the_front_end_process(server):
+    port, proc = server
+
+    result = _post(port, "/api/system/shutdown")
+    assert result["ok"] is True
+    assert result["pid"] == proc.pid
+
+    deadline = time.monotonic() + 15.0
+    while time.monotonic() < deadline and proc.poll() is None:
+        time.sleep(0.2)
+
+    assert proc.poll() == 0
+
+
 def test_detach_survives_hangup(server):
     port, proc = server
 

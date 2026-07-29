@@ -533,6 +533,11 @@ class RequestRouter:
             self._send_json(handler, result, 200 if result.get("ok") else 500)
             return
 
+        if path == "/api/system/shutdown":
+            self._send_json(handler, {"ok": True, **self.detacher.state()})
+            self.detacher.shutdown()
+            return
+
         if path == "/api/impact/arm":
             result = self.contention.arm(bool(body.get("armed")))
             self._send_json(handler, result)

@@ -869,6 +869,7 @@ class ServerDetacher:
         self.log_path  = paths.logs_dir / self.LOG_NAME
         self.requested = threading.Event()
         self.applied   = threading.Event()
+        self.stopping  = threading.Event()
 
     def state(self) -> dict:
         return {"detached": self.applied.is_set(), "pid": os.getpid(), "log_path": str(self.log_path)}
@@ -879,6 +880,10 @@ class ServerDetacher:
             if not self.applied.wait(self.APPLY_TIMEOUT_S):
                 return {"ok": False, "error": "detach was not applied by the main thread"}
         return {"ok": True, **self.state()}
+
+    def shutdown(self) -> None:
+        self.stopping.set()
+        self.requested.set()
 
     def _apply(self) -> None:
         self.paths.logs_dir.mkdir(parents=True, exist_ok=True)
@@ -899,6 +904,9 @@ class ServerDetacher:
         while True:
             self.requested.wait()
             self.requested.clear()
+            if self.stopping.is_set():
+                self.logger.warning(f"front end shutdown requested from the console (pid {os.getpid()}); running jobs are their own session leaders and keep going")
+                return
             if not self.applied.is_set():
                 self._apply()
                 self.applied.set()
