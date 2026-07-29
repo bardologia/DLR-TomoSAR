@@ -155,9 +155,7 @@ class LaunchLayout:
             "normalization.out_amp": "fixed_bounds",
             "normalization.out_mu": "fixed_bounds",
             "normalization.out_sigma": "fixed_bounds",
-            "normalization.clamp_output": "True",
-            "normalization.clamp_leaky_slope": "0.0",
-            "normalization.param_clamp_leaky_slope": "0.0",
+            "normalization.clamp_output": "False",
             "trials_enabled": "False",
         },
     }

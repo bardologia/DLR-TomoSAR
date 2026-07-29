@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 import torch
 
+from configuration.normalization            import OutputClampConfig
 from configuration.training.backbone        import default_curriculum
 from configuration.training.general.loss    import LossConfig, ParamMatching
 from pipelines.backbone.training.loss       import Loss
@@ -209,6 +210,19 @@ def test_prepare_clamps_prediction_so_invalid_identical_params_are_nonzero():
     out    = loss(params, params.clone())
 
     assert out["total_loss"].item() > 0.0
+
+
+def test_prepare_skips_the_physical_clamp_when_clamp_output_is_disabled():
+    cfg  = LossConfig(use_param_l1=True, weight_param_l1=1.0)
+    norm = identity_normalizer(6)
+    norm.stats.clamp = OutputClampConfig(enabled=False)
+
+    loss   = build_loss(n_gaussians=2, loss_cfg=cfg, norm_stats=norm)
+    params = param_tensor(2, 2, 6, 6, seed=30)
+
+    out    = loss(params, params.clone())
+
+    assert out["total_loss"].item() == pytest.approx(0.0, abs=1e-6)
 
 
 def test_prepare_reads_clamp_knobs_from_stats():

@@ -121,7 +121,7 @@ class RunLoader:
 
         return ckpt, x_axis, meta
 
-    def _wrap_model(self, model, device: str, norm_stats: Stats, x_axis: np.ndarray, amp_max: float) -> ModelWrapper:
+    def _wrap_model(self, model, device: str, norm_stats: Stats, x_axis: np.ndarray, amp_max: float | None) -> ModelWrapper:
         return ModelWrapper(
             model               = model,
             device              = device,
@@ -223,7 +223,7 @@ class RunLoader:
 
         model.eval()
         norm_stats = Stats.load(self.run_directory / "meta", self.logger)
-        model      = self._wrap_model(model, device, norm_stats, x_axis, norm_stats.clamp.amp_max)
+        model      = self._wrap_model(model, device, norm_stats, x_axis, norm_stats.clamp.amp_max if norm_stats.clamp.enabled else None)
 
         dataset, grid, region, global_crop, arrays = self._build_dataset(
             dataset_config = dataset_config,

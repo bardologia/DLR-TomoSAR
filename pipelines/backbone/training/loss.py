@@ -163,13 +163,16 @@ class Loss:
         clamp_cfg   = self.norm_stats.stats.clamp
         leaky_slope = clamp_cfg.leaky_slope
 
-        pred_params_phys = GaussianClamp.apply(
-            self.norm_stats.denormalize_output(pred_params.float(), leaky_slope=leaky_slope),
-            x_axis      = self.x_axis,
-            amp_max     = clamp_cfg.amp_max,
-            ppg         = self.gaussian_cfg.params_per_gaussian,
-            leaky_slope = clamp_cfg.param_leaky_slope,
-        )
+        pred_params_phys = self.norm_stats.denormalize_output(pred_params.float(), leaky_slope=leaky_slope)
+
+        if clamp_cfg.enabled:
+            pred_params_phys = GaussianClamp.apply(
+                pred_params_phys,
+                x_axis      = self.x_axis,
+                amp_max     = clamp_cfg.amp_max,
+                ppg         = self.gaussian_cfg.params_per_gaussian,
+                leaky_slope = clamp_cfg.param_leaky_slope,
+            )
 
         pred_params_norm = self.norm_stats.normalize_output(pred_params_phys, leaky_slope=leaky_slope)
 

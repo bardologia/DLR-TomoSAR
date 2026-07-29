@@ -104,9 +104,8 @@ def test_legacy_mode_preset_pins_the_legacy_normalization():
     assert preset["normalization.out_mu"]     == "fixed_bounds"
     assert preset["normalization.out_sigma"]  == "fixed_bounds"
 
-    assert preset["normalization.clamp_output"]            == "True"
-    assert preset["normalization.clamp_leaky_slope"]       == "0.0"
-    assert preset["normalization.param_clamp_leaky_slope"] == "0.0"
+    assert preset["normalization.clamp_output"] == "False"
+    assert "normalization.clamp_leaky_slope" not in preset
 
 
 def test_legacy_mode_preset_pins_the_legacy_optimization():
