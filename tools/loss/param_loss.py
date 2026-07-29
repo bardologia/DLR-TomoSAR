@@ -115,7 +115,7 @@ class LegacyParamLoss:
         pred = LegacyParamLoss._scale(pred_phys, bounds_min, bounds_max)
         gt   = LegacyParamLoss._scale(gt_phys, bounds_min, bounds_max)
 
-        present = (pred[:, 1, 0:1] > amp_thr).to(pred.dtype).detach()
+        present = ((pred[:, 1, 0:1] > amp_thr) & (pred[:, 1, 2:3] >= 0.0)).to(pred.dtype).detach()
         absent  = 1.0 - present
 
         sq_first  = (pred[:, 0] - gt[:, 0]) ** 2

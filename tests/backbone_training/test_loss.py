@@ -544,6 +544,18 @@ def test_legacy_predicted_present_slot2_receives_gradient():
     assert torch.isfinite(pred.grad).all().item()
 
 
+def test_legacy_negative_scaled_width_masks_slot2_despite_present_amplitude():
+    loss = build_loss(n_gaussians=2, loss_cfg=_legacy_zero_floor_cfg())
+
+    pred = _legacy_pred(2.0, 2.0)
+    pred[0, 5] = 1.0
+
+    out_a = loss(pred, _legacy_gt((1.0, 44.0, 6.0)))
+    out_b = loss(pred.clone(), _legacy_gt((1.5, 60.0, 9.0)))
+
+    assert out_a["total_loss"].item() == pytest.approx(out_b["total_loss"].item(), rel=1e-6)
+
+
 def test_legacy_negative_amp_floor_keeps_the_gate_on_at_zero_amplitude():
     bounds_min = (-0.2, 0.0, 2.0, -0.2, 0.0, 2.0)
     bounds_max = (1.0, 80.0, 10.0, 1.0, 80.0, 10.0)

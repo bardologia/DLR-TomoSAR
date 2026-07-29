@@ -89,6 +89,12 @@ def test_legacy_mode_preset_pins_every_loss_term_flag():
 def test_legacy_mode_preset_pins_the_legacy_normalization():
     preset = LaunchLayout.LEGACY_MODE["preset"]
 
+    assert preset["input.use_primary"]                   == "False"
+    assert preset["input.use_secondaries"]               == "False"
+    assert preset["input.use_interferograms"]            == "True"
+    assert preset["input.interferograms_representation"] == "mag_angle"
+    assert preset["input.use_dem"]                       == "False"
+
     assert preset["normalization.pass_mag"]   == "fixed_log1p"
     assert preset["normalization.pass_phase"] == "fixed_angle_01"
     assert preset["normalization.ifg_mag"]    == "fixed_log1p"
