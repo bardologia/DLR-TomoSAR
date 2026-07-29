@@ -9,7 +9,7 @@ class LayoutError(Exception):
 
 class LaunchLayout:
 
-    NORM_PRESETS = ["min_max", "min_max_log1p", "robust_iqr", "robust_iqr_log1p", "fixed_div_pi", "zscore", "zscore_log1p"]
+    NORM_PRESETS = ["min_max", "min_max_log1p", "robust_iqr", "robust_iqr_log1p", "fixed_div_pi", "zscore", "zscore_log1p", "fixed_log1p", "fixed_angle_01", "fixed_bounds"]
 
     GPU_ONE  = {"kind": "gpu"}
     GPU_MANY = {"kind": "gpu", "multi": True}
@@ -142,13 +142,13 @@ class LaunchLayout:
             "backbone_name": "unet",
             "backbone_head": "conv",
             "model_overrides": "{'all_groups_lr': 1e-05, 'all_groups_wd': 0.0, 'features': [64, 128, 256, 512], 'bottleneck_factor': 2, 'dropout': 0.0, 'normalization': 'none', 'conv_bias': True}",
-            "normalization.pass_mag": "zscore_log1p",
-            "normalization.pass_phase": "min_max",
-            "normalization.ifg_mag": "zscore_log1p",
-            "normalization.ifg_phase": "min_max",
-            "normalization.out_amp": "zscore",
-            "normalization.out_mu": "zscore",
-            "normalization.out_sigma": "zscore",
+            "normalization.pass_mag": "fixed_log1p",
+            "normalization.pass_phase": "fixed_angle_01",
+            "normalization.ifg_mag": "fixed_log1p",
+            "normalization.ifg_phase": "fixed_angle_01",
+            "normalization.out_amp": "fixed_bounds",
+            "normalization.out_mu": "fixed_bounds",
+            "normalization.out_sigma": "fixed_bounds",
             "normalization.clamp_output": "True",
             "normalization.clamp_leaky_slope": "0.0",
             "normalization.param_clamp_leaky_slope": "0.0",
@@ -315,6 +315,8 @@ class LaunchLayout:
                 {"path": "out_mu",     "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "zscore, per-slot"}},
                 {"path": "out_sigma",  "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "robust_iqr_log1p, per-slot"}},
                 {"path": "dem",        "widget": {"kind": "choice", "options": ["default"] + NORM_PRESETS, "default_label": "zscore, per-slot"}},
+                "fixed_out_bounds_min",
+                "fixed_out_bounds_max",
             ]},
             {"title": "Clamp", "fields": [
                 {"gate": "clamp_output", "fields": ["clamp_floor", "clamp_ceil"]},

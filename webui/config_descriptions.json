@@ -214,8 +214,9 @@
     "normalization/general::ChannelStrategy": {
       "summary": "Per-channel normalization recipe: fits a location/scale pair from pixel statistics, or returns a fixed constant for fixed_div_pi",
       "fields": {
-        "norm_method": "Statistic used to fit offset/scale: min_max_p999, robust_iqr, fixed_div_pi, or zscore",
-        "apply_log1p": "Whether to log1p-compress non-negative values before fitting and before applying the location-scale statistics, default False"
+        "norm_method": "Statistic used to fit offset/scale: min_max_p999, robust_iqr, or zscore fitted from data; fixed_div_pi, fixed_log1p (raw log1p, offset 0 scale 1), and fixed_angle_01 (maps -pi..pi to 0..1) are data-free constants; fixed_bounds resolves per output channel from the configured fixed_out_bounds",
+        "apply_log1p": "Whether to log1p-compress non-negative values before fitting and before applying the location-scale statistics, default False",
+        "bounds": "Per-channel (min tuple, max tuple) pair attached at resolution time for the fixed_bounds method; never persisted, always rebuilt from NormalizationConfig.fixed_out_bounds"
       }
     },
     "normalization/general::OutputClampConfig": {
@@ -242,6 +243,8 @@
         "out_mu": "Override preset for the output Gaussian mean/height channel; default keeps the output_strategy/per_slot choice",
         "out_sigma": "Override preset for the output Gaussian width channel; default keeps the output_strategy/per_slot choice",
         "dem": "Override preset for the DEM elevation channel; default keeps the input_strategy/per_slot choice",
+        "fixed_out_bounds_min": "Lower fixed min-max bounds used when an output channel selects the fixed_bounds preset, ordered amp, mu, sigma per Gaussian slot (length 3*n_gaussians); defaults are the legacy DataTomoSARfromRAT_spock constants and match the loss legacy_bounds_min",
+        "fixed_out_bounds_max": "Upper fixed min-max bounds used when an output channel selects the fixed_bounds preset, ordered amp, mu, sigma per Gaussian slot; each entry must exceed its fixed_out_bounds_min counterpart",
         "clamp_output": "Gates only the clamp_floor/clamp_ceil bound applied when decompressing log1p output channels (out/amp, out/sigma by default); the GaussianClamp amp/mu/sigma physical-range clamp always applies regardless, default True",
         "clamp_floor": "Lower bound of the physical value used when decompressing log1p-transformed output channels (out/amp, out/sigma by default), active only when clamp_output is True, default 0.0",
         "clamp_ceil": "Upper bound of the physical value used when decompressing log1p-transformed output channels (out/amp, out/sigma by default), active only when clamp_output is True, default 200.0",

@@ -22,6 +22,7 @@ from configuration.normalization         import (
     OutputClampConfig,
 )
 from configuration.normalization.general import _SLOT_STRATEGIES
+from configuration.training.general.loss import LossConfig
 from tools.data.representation           import Representation
 from tests.configuration._helpers        import make_split_regions
 
@@ -107,6 +108,25 @@ def test_normalization_config_per_channel_override_wins_over_global():
     assert cfg.strategy("input", "pass/mag")             == _SLOT_STRATEGIES["pass/mag"]
 
 
+def test_normalization_config_attaches_bounds_to_fixed_bounds_strategy():
+    cfg   = NormalizationConfig(out_mu="fixed_bounds")
+    strat = cfg.strategy("output", "out/mu")
+
+    assert strat.norm_method is NormMethod.FIXED_BOUNDS
+    assert strat.bounds == (tuple(cfg.fixed_out_bounds_min), tuple(cfg.fixed_out_bounds_max))
+
+    plain = cfg.strategy("output", "out/amp")
+    assert plain.bounds is None
+
+
+def test_fixed_out_bounds_defaults_match_the_loss_legacy_bounds():
+    norm = NormalizationConfig()
+    loss = LossConfig()
+
+    assert norm.fixed_out_bounds_min == loss.legacy_bounds_min
+    assert norm.fixed_out_bounds_max == loss.legacy_bounds_max
+
+
 def test_normalization_clamp_round_trips_through_dict():
     cfg   = NormalizationConfig(clamp_output=False, clamp_floor=0.0, clamp_ceil=50.0, clamp_leaky_slope=0.2, param_clamp_leaky_slope=0.4, amp_max=500.0)
     clamp = cfg.clamp()
@@ -176,12 +196,14 @@ def test_profile_dataset_config_defaults():
 def test_norm_method_enum_values():
     assert {m.value for m in NormMethod} == {
         "min_max_p999", "robust_iqr", "fixed_div_pi", "zscore",
+        "fixed_log1p", "fixed_angle_01", "fixed_bounds",
     }
 
 
 @pytest.mark.parametrize("preset_name", [
     "MIN_MAX", "MIN_MAX_LOG1P", "ROBUST_IQR", "ROBUST_IQR_LOG1P",
     "FIXED_DIV_PI", "ZSCORE", "ZSCORE_LOG1P",
+    "FIXED_LOG1P", "FIXED_ANGLE_01", "FIXED_BOUNDS",
 ])
 def test_presets_are_channel_strategies(preset_name):
     preset = getattr(Presets, preset_name)

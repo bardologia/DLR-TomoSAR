@@ -8,20 +8,37 @@ import numpy as np
 
 
 class NormMethod(Enum):
-    MIN_MAX_P999 = "min_max_p999"
-    ROBUST_IQR   = "robust_iqr"
-    FIXED_DIV_PI = "fixed_div_pi"
-    ZSCORE       = "zscore"
+    MIN_MAX_P999   = "min_max_p999"
+    ROBUST_IQR     = "robust_iqr"
+    FIXED_DIV_PI   = "fixed_div_pi"
+    ZSCORE         = "zscore"
+    FIXED_LOG1P    = "fixed_log1p"
+    FIXED_ANGLE_01 = "fixed_angle_01"
+    FIXED_BOUNDS   = "fixed_bounds"
 
 
 @dataclass
 class ChannelStrategy:
     norm_method : NormMethod
     apply_log1p : bool = False
+    bounds      : Optional[tuple] = None
+
+    @property
+    def data_free(self) -> bool:
+        return self.norm_method in (NormMethod.FIXED_DIV_PI, NormMethod.FIXED_LOG1P, NormMethod.FIXED_ANGLE_01)
 
     def fit(self, flat: np.ndarray) -> tuple[float, float]:
         if self.norm_method is NormMethod.FIXED_DIV_PI:
             return 0.0, float(np.pi)
+
+        if self.norm_method is NormMethod.FIXED_LOG1P:
+            return 0.0, 1.0
+
+        if self.norm_method is NormMethod.FIXED_ANGLE_01:
+            return -float(np.pi), 2.0 * float(np.pi)
+
+        if self.norm_method is NormMethod.FIXED_BOUNDS:
+            raise ValueError("fixed_bounds is resolved per output channel by the stats computer; it cannot be fitted from data and is not valid for input channels.")
 
         if flat.size == 0:
             raise ValueError(f"Cannot fit {self.norm_method.value} normalization on an empty sample pool; the collection mask left no pixels for this channel group.")
@@ -65,17 +82,20 @@ class ChannelStrategy:
 
 
 class Presets:
-    MIN_MAX          = ChannelStrategy(NormMethod.MIN_MAX_P999, apply_log1p=False)
-    MIN_MAX_LOG1P    = ChannelStrategy(NormMethod.MIN_MAX_P999, apply_log1p=True)
-    ROBUST_IQR       = ChannelStrategy(NormMethod.ROBUST_IQR,   apply_log1p=False)
-    ROBUST_IQR_LOG1P = ChannelStrategy(NormMethod.ROBUST_IQR,   apply_log1p=True)
-    FIXED_DIV_PI     = ChannelStrategy(NormMethod.FIXED_DIV_PI, apply_log1p=False)
-    ZSCORE           = ChannelStrategy(NormMethod.ZSCORE,       apply_log1p=False)
-    ZSCORE_LOG1P     = ChannelStrategy(NormMethod.ZSCORE,       apply_log1p=True)
+    MIN_MAX          = ChannelStrategy(NormMethod.MIN_MAX_P999,   apply_log1p=False)
+    MIN_MAX_LOG1P    = ChannelStrategy(NormMethod.MIN_MAX_P999,   apply_log1p=True)
+    ROBUST_IQR       = ChannelStrategy(NormMethod.ROBUST_IQR,     apply_log1p=False)
+    ROBUST_IQR_LOG1P = ChannelStrategy(NormMethod.ROBUST_IQR,     apply_log1p=True)
+    FIXED_DIV_PI     = ChannelStrategy(NormMethod.FIXED_DIV_PI,   apply_log1p=False)
+    ZSCORE           = ChannelStrategy(NormMethod.ZSCORE,         apply_log1p=False)
+    ZSCORE_LOG1P     = ChannelStrategy(NormMethod.ZSCORE,         apply_log1p=True)
+    FIXED_LOG1P      = ChannelStrategy(NormMethod.FIXED_LOG1P,    apply_log1p=True)
+    FIXED_ANGLE_01   = ChannelStrategy(NormMethod.FIXED_ANGLE_01, apply_log1p=False)
+    FIXED_BOUNDS     = ChannelStrategy(NormMethod.FIXED_BOUNDS,   apply_log1p=False)
 
     @classmethod
     def names(cls) -> list[str]:
-        return ["min_max", "min_max_log1p", "robust_iqr", "robust_iqr_log1p", "fixed_div_pi", "zscore", "zscore_log1p"]
+        return ["min_max", "min_max_log1p", "robust_iqr", "robust_iqr_log1p", "fixed_div_pi", "zscore", "zscore_log1p", "fixed_log1p", "fixed_angle_01", "fixed_bounds"]
 
     @classmethod
     def by_name(cls, name: str) -> ChannelStrategy:
@@ -87,6 +107,9 @@ class Presets:
             "fixed_div_pi"     : cls.FIXED_DIV_PI,
             "zscore"           : cls.ZSCORE,
             "zscore_log1p"     : cls.ZSCORE_LOG1P,
+            "fixed_log1p"      : cls.FIXED_LOG1P,
+            "fixed_angle_01"   : cls.FIXED_ANGLE_01,
+            "fixed_bounds"     : cls.FIXED_BOUNDS,
         }
 
         key = name.strip().lower()
@@ -153,6 +176,9 @@ class NormalizationConfig:
     out_sigma  : str = "default"
     dem        : str = "default"
 
+    fixed_out_bounds_min : tuple = (1e-05, -15.0, 0.01, 1e-05, 1.0, 1.0)
+    fixed_out_bounds_max : tuple = (10.0, 5.0, 5.0, 10.0, 40.0, 20.0)
+
     clamp_output            : bool  = True
     clamp_floor             : float = 0.0
     clamp_ceil              : float = 200.0
@@ -174,12 +200,17 @@ class NormalizationConfig:
     def strategy(self, which: str, slot_key: str) -> ChannelStrategy:
         field_name = self.SLOT_FIELDS.get(slot_key)
         if field_name is not None and getattr(self, field_name) != "default":
-            return Presets.by_name(getattr(self, field_name))
+            return self._with_bounds(Presets.by_name(getattr(self, field_name)))
 
         name = self.input_strategy if which == "input" else self.output_strategy
         if name == "per_slot":
             return ChannelStrategy.from_slot(slot_key)
-        return Presets.by_name(name)
+        return self._with_bounds(Presets.by_name(name))
+
+    def _with_bounds(self, strategy: ChannelStrategy) -> ChannelStrategy:
+        if strategy.norm_method is not NormMethod.FIXED_BOUNDS:
+            return strategy
+        return ChannelStrategy(NormMethod.FIXED_BOUNDS, bounds=(tuple(self.fixed_out_bounds_min), tuple(self.fixed_out_bounds_max)))
 
     def clamp(self) -> OutputClampConfig:
         return OutputClampConfig(enabled=self.clamp_output, floor=self.clamp_floor, ceil=self.clamp_ceil, leaky_slope=self.clamp_leaky_slope, param_leaky_slope=self.param_clamp_leaky_slope, amp_max=self.amp_max)

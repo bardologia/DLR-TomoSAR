@@ -89,13 +89,13 @@ def test_legacy_mode_preset_pins_every_loss_term_flag():
 def test_legacy_mode_preset_pins_the_legacy_normalization():
     preset = LaunchLayout.LEGACY_MODE["preset"]
 
-    assert preset["normalization.pass_mag"]   == "zscore_log1p"
-    assert preset["normalization.pass_phase"] == "min_max"
-    assert preset["normalization.ifg_mag"]    == "zscore_log1p"
-    assert preset["normalization.ifg_phase"]  == "min_max"
-    assert preset["normalization.out_amp"]    == "zscore"
-    assert preset["normalization.out_mu"]     == "zscore"
-    assert preset["normalization.out_sigma"]  == "zscore"
+    assert preset["normalization.pass_mag"]   == "fixed_log1p"
+    assert preset["normalization.pass_phase"] == "fixed_angle_01"
+    assert preset["normalization.ifg_mag"]    == "fixed_log1p"
+    assert preset["normalization.ifg_phase"]  == "fixed_angle_01"
+    assert preset["normalization.out_amp"]    == "fixed_bounds"
+    assert preset["normalization.out_mu"]     == "fixed_bounds"
+    assert preset["normalization.out_sigma"]  == "fixed_bounds"
 
     assert preset["normalization.clamp_output"]            == "True"
     assert preset["normalization.clamp_leaky_slope"]       == "0.0"

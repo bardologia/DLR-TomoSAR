@@ -53,7 +53,7 @@ class StatsComputer:
 
         unique_groups  = list(dict.fromkeys(group_keys))
         group_channels = {g: [i for i, k in enumerate(group_keys) if k == g] for g in unique_groups}
-        needs_data     = {g for g in unique_groups if strategies[g].norm_method is not NormMethod.FIXED_DIV_PI}
+        needs_data     = {g for g in unique_groups if not strategies[g].data_free}
 
         collected: dict[str, list[np.ndarray]] = {g: [] for g in needs_data}
         if not collected:
@@ -106,7 +106,7 @@ class StatsComputer:
         unique_groups    = list(dict.fromkeys(group_keys))
         group_strategies = strategies
 
-        group_mean_std: dict[str, tuple[float, float]] = {g: group_strategies[g].fit(collected[g] if group_strategies[g].norm_method is not NormMethod.FIXED_DIV_PI else np.array([])) for g in unique_groups}
+        group_mean_std: dict[str, tuple[float, float]] = {g: group_strategies[g].fit(np.array([]) if group_strategies[g].data_free else collected[g]) for g in unique_groups}
 
         n          = len(group_keys)
         locs       = [group_mean_std[group_keys[i]][0] for i in range(n)]
@@ -198,8 +198,8 @@ class StatsComputer:
         n_gaussians   : int,
     ) -> ChannelStats:
 
-        role_fit   : dict[str, tuple[float, float]] = {key: output_config.strategy_for(key).fit(pool) for key, pool in role_pools.items()}
         role_strat : dict[str, ChannelStrategy]     = {key: output_config.strategy_for(key) for key in role_pools}
+        role_fit   : dict[str, tuple[float, float]] = {key: strat.fit(role_pools[key]) for key, strat in role_strat.items() if strat.norm_method is not NormMethod.FIXED_BOUNDS}
 
         selected        = output_config.selected_indices(n_gaussians)
         _local_to_role  = {0: "out/amp", 1: "out/mu", 2: "out/sigma"}
@@ -214,7 +214,12 @@ class StatsComputer:
         for out_ch, full_ch in enumerate(selected):
             g        = full_ch // 3
             role_key = _local_to_role[full_ch % 3]
-            m, s     = role_fit[role_key]
+
+            if role_strat[role_key].norm_method is NormMethod.FIXED_BOUNDS:
+                m, s = StatsComputer._fixed_bound(role_strat[role_key], full_ch, n_gaussians)
+            else:
+                m, s = role_fit[role_key]
+
             locs.append(m)
             scales.append(s)
             names.append(f"G{g+1}_{role_key.split('/')[1]}")
@@ -224,12 +229,12 @@ class StatsComputer:
         if logger is not None:
             logger.section("[Output stats from params]")
             rows = []
-            for key, (m, s) in role_fit.items():
-                strat = role_strat[key]
+            for key, strat in role_strat.items():
+                fitted = role_fit.get(key)
                 rows.append({
                     "Channel" : key,
-                    "loc"     : f"{m:.5f}",
-                    "scale"   : f"{s:.5f}",
+                    "loc"     : "per-slot bounds" if fitted is None else f"{fitted[0]:.5f}",
+                    "scale"   : "per-slot bounds" if fitted is None else f"{fitted[1]:.5f}",
                     "Method"  : strat.norm_method.value,
                     "log1p"   : str(strat.apply_log1p),
                     "clamped" : str(_role_clampable[key]),
@@ -247,6 +252,23 @@ class StatsComputer:
             strategies = strategies,
             clampable  = clampable,
         )
+
+    @staticmethod
+    def _fixed_bound(strategy: ChannelStrategy, full_ch: int, n_gaussians: int) -> tuple[float, float]:
+        if strategy.bounds is None:
+            raise ValueError("fixed_bounds strategy carries no bounds; resolve it through NormalizationConfig.strategy so the configured fixed_out_bounds are attached.")
+
+        lo_all, hi_all = strategy.bounds
+        expected       = 3 * n_gaussians
+
+        if len(lo_all) != expected or len(hi_all) != expected:
+            raise ValueError(f"fixed_out_bounds must list exactly {expected} entries (amp, mu, sigma per Gaussian slot) for n_gaussians={n_gaussians}; got {len(lo_all)} min and {len(hi_all)} max entries.")
+
+        lo, hi = float(lo_all[full_ch]), float(hi_all[full_ch])
+        if hi <= lo:
+            raise ValueError(f"fixed_out_bounds entry {full_ch} requires max > min; got min {lo} and max {hi}.")
+
+        return lo, hi - lo
 
     @staticmethod
     def compute_output_stats(
