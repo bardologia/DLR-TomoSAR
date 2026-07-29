@@ -4477,6 +4477,8 @@ class ConfigForm {
     this.pinsEl        = null;
     this.nomatchEl     = null;
     this.countEl       = null;
+    this.legacyMode    = false;
+    this.legacyBtn     = null;
   }
 
   _buildToolbar(cfg) {
@@ -4504,8 +4506,39 @@ class ConfigForm {
 
     bar.appendChild(search);
     bar.appendChild(count);
+
+    if (cfg.layout && cfg.layout.legacy) {
+      const legacy = document.createElement("button");
+      legacy.className = "btn btn--mini btn--legacy";
+      legacy.textContent = "Legacy mode";
+      legacy.title = "Swap every config to the legacy masked-MSE setup (legacy term only, sorted_gt matching, curriculum and augmentation off) and show only its fields; pick a two-Gaussian parameters dataset";
+      legacy.addEventListener("click", () => this._toggleLegacy());
+      this.legacyBtn = legacy;
+      bar.appendChild(legacy);
+    }
+
     bar.appendChild(reset);
     return bar;
+  }
+
+  _toggleLegacy() {
+    const spec = this.config.layout.legacy;
+    this.legacyMode = !this.legacyMode;
+
+    if (this.legacyMode) {
+      Object.entries(spec.preset).forEach(([path, value]) => {
+        const leaf = this.byPath.get(path);
+        if (!leaf) return;
+        if (value !== leaf.value) this.dirty[path] = value;
+        else delete this.dirty[path];
+      });
+    } else {
+      Object.keys(spec.preset).forEach((path) => delete this.dirty[path]);
+    }
+
+    this.legacyBtn.classList.toggle("is-on", this.legacyMode);
+    Object.values(this.controls).forEach((c) => c.reset());
+    this._refresh();
   }
 
   _buildPins(pinned) {
@@ -4756,7 +4789,7 @@ class ConfigForm {
     body.classList.add("pair-override__body");
     body.hidden = true;
 
-    const record = { base: panel.base, override: panel.override, badge, body, toggle, open: false, states: this.states.slice(startAt) };
+    const record = { base: panel.base, override: panel.override, badge, body, toggle, container: override, open: false, states: this.states.slice(startAt) };
 
     const inheritPath = panel.base.split(".").slice(0, -1).concat("inherit").join(".");
     record.states.forEach(({ leaf }) => {
@@ -5018,6 +5051,8 @@ class ConfigForm {
 
   _resetAll() {
     this.dirty = {};
+    this.legacyMode = false;
+    if (this.legacyBtn) this.legacyBtn.classList.remove("is-on");
     Object.values(this.controls).forEach((c) => c.reset());
     this._refresh();
   }
@@ -5091,33 +5126,54 @@ class ConfigForm {
 
   _applyVisibility() {
     const searching = Boolean(this.query);
-    if (this.layoutEl) this.layoutEl.classList.toggle("is-searching", searching);
+    const legacy    = this.legacyMode && this.config && this.config.layout && this.config.layout.legacy ? this.config.layout.legacy : null;
+    const legacySec = legacy ? new Set(legacy.sections) : null;
+    const legacyFld = legacy ? new Set(legacy.expose) : null;
+    const stacked   = searching || Boolean(legacy);
+    if (this.layoutEl) this.layoutEl.classList.toggle("is-searching", stacked);
 
-    this.states.forEach(({ leaf, row }) => {
-      const matches = !searching || leaf.path.toLowerCase().includes(this.query);
-      row.hidden = !matches || row.dataset.gated === "1";
+    this.states.forEach(({ leaf, row, sectionKey, pinned }) => {
+      const matchesQuery  = !searching || leaf.path.toLowerCase().includes(this.query);
+      const matchesLegacy = !legacy || pinned || sectionKey === "essentials" || legacySec.has(sectionKey) || legacyFld.has(leaf.path);
+      row.hidden = !matchesQuery || !matchesLegacy || row.dataset.gated === "1";
     });
 
     this.pairs.forEach((pair) => {
-      const wantOpen = pair.open || (searching && pair.states.some(({ row }) => !row.hidden));
+      if (pair.container) pair.container.hidden = Boolean(legacy);
+      const wantOpen = !legacy && (pair.open || (searching && pair.states.some(({ row }) => !row.hidden)));
       pair.body.hidden = !wantOpen;
       pair.toggle.setAttribute("aria-expanded", String(wantOpen));
       pair.toggle.classList.toggle("is-open", wantOpen);
     });
 
+    this._sweepShells(Boolean(legacy));
+
     let anyVisible = false;
     this.sections.forEach((section) => {
       const whenHidden = this._sectionHidden(section);
-      if (section.navBtn) section.navBtn.hidden = whenHidden;
+      const hasRows    = this.states.some(({ row, sectionKey }) => sectionKey === section.key && !row.hidden);
+      if (section.navBtn) section.navBtn.hidden = whenHidden || (Boolean(legacy) && !hasRows);
 
-      const hasRows = this.states.some(({ leaf, row, sectionKey }) => sectionKey === section.key && !row.hidden);
-      const single  = this.config && this.config.layout && this.config.layout.mode === "single";
-      const show    = !whenHidden && (searching ? hasRows : (single || section.key === this.activeSection));
+      const single = this.config && this.config.layout && this.config.layout.mode === "single";
+      const show   = !whenHidden && (stacked ? hasRows : (single || section.key === this.activeSection));
       section.el.hidden = !show;
-      anyVisible = anyVisible || (show && (!searching || hasRows));
+      anyVisible = anyVisible || (show && (!stacked || hasRows));
     });
 
     if (this.nomatchEl) this.nomatchEl.hidden = !searching || anyVisible;
+  }
+
+  _sweepShells(on) {
+    if (!this.layoutEl) return;
+
+    this.layoutEl.querySelectorAll(".band-block, .field-group, .cfg-panel").forEach((el) => {
+      if (!on) {
+        el.style.display = "";
+        return;
+      }
+      const rows = el.querySelectorAll(".cfg-edit__row");
+      if (rows.length) el.style.display = [...rows].some((row) => !row.hidden) ? "" : "none";
+    });
   }
 
   _refreshPairs() {

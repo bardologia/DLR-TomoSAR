@@ -95,6 +95,47 @@ class LaunchLayout:
         {"value": "capon_cycle",        "label": "Capon cycle"},
     ]}
 
+    LEGACY_MODE = {
+        "sections": ["model"],
+        "expose": [
+            "curriculum.complete.use_param_legacy",
+            "curriculum.complete.weight_param_legacy",
+            "curriculum.complete.legacy_amp_thr",
+            "curriculum.complete.legacy_bounds_min",
+            "curriculum.complete.legacy_bounds_max",
+            "training.epochs",
+            "training.batch_size",
+        ],
+        "preset": {
+            "curriculum.enabled": "False",
+            "curriculum.complete.use_mse_curve": "False",
+            "curriculum.complete.use_l1_curve": "False",
+            "curriculum.complete.use_huber_curve": "False",
+            "curriculum.complete.use_charbonnier_curve": "False",
+            "curriculum.complete.use_cosine_curve": "False",
+            "curriculum.complete.use_param_l1": "False",
+            "curriculum.complete.use_param_huber": "False",
+            "curriculum.complete.use_param_mse": "False",
+            "curriculum.complete.use_param_legacy": "True",
+            "curriculum.complete.use_smoothness_tv": "False",
+            "curriculum.complete.use_total_power": "False",
+            "curriculum.complete.use_moments": "False",
+            "curriculum.complete.use_coherence_resyn": "False",
+            "curriculum.complete.use_covariance_match": "False",
+            "curriculum.complete.use_capon_cycle": "False",
+            "curriculum.complete.weight_param_legacy": "1.0",
+            "curriculum.complete.param_matching": "sorted_gt",
+            "curriculum.complete.use_active_normalization": "False",
+            "curriculum.complete.presence_balance": "False",
+            "curriculum.complete.amp_focal_gamma": "0.0",
+            "augmentation.p_flip_h": "0.0",
+            "augmentation.p_flip_v": "0.0",
+            "augmentation.p_rot90": "0.0",
+            "augmentation.p_noise": "0.0",
+            "trials_enabled": "False",
+        },
+    }
+
     TEMPLATES = {
         "loss": [
             {"title": "Curve losses", "fields": [
@@ -521,6 +562,7 @@ class LaunchLayout:
         },
         "train_backbone": {
             "essentials": TRAIN_ESSENTIALS,
+            "legacy": LEGACY_MODE,
             "sections": [
                 {"key": "model", "title": "Model", "panels": [
                     {"kind": "special", "panel": "model_card", "fields": ["backbone_name", "backbone_head"]},
@@ -1252,6 +1294,8 @@ class LaunchLayout:
         layout = {"essentials": essentials, "sections": sections, "widgets": widgets}
         if "type_tab" in spec:
             layout["type_tab"] = copy.deepcopy(spec["type_tab"])
+        if "legacy" in spec:
+            layout["legacy"] = copy.deepcopy(spec["legacy"])
         return layout
 
     def _entry_claims(self, entry, out):
@@ -1310,6 +1354,20 @@ class LaunchLayout:
             when = section.get("when")
             if when and when["field"] not in known:
                 problems.append(f"section {section['key']} gates on unknown field {when['field']}")
+
+        legacy = layout.get("legacy")
+        if legacy:
+            section_keys = {section["key"] for section in layout["sections"]}
+            unknown_sections = sorted(set(legacy["sections"]) - section_keys)
+            unknown_expose   = sorted(set(legacy["expose"]) - known)
+            unknown_preset   = sorted(set(legacy["preset"]) - known)
+
+            if unknown_sections:
+                problems.append(f"legacy mode for {key} keeps unknown sections: {', '.join(unknown_sections)}")
+            if unknown_expose:
+                problems.append(f"legacy mode for {key} exposes unknown fields: {', '.join(unknown_expose)}")
+            if unknown_preset:
+                problems.append(f"legacy mode for {key} presets unknown fields: {', '.join(unknown_preset)}")
 
         if problems:
             raise LayoutError("\n".join(problems))

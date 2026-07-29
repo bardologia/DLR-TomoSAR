@@ -12,7 +12,7 @@ WEBUI_ROOT = REPO_ROOT / "webui"
 if str(WEBUI_ROOT) not in sys.path:
     sys.path.insert(0, str(WEBUI_ROOT))
 
-from launch_layout            import LaunchLayout
+from launch_layout            import LaunchLayout, LayoutError
 from project_paths            import ProjectPaths
 from script_catalog           import ScriptCatalog
 from tools.runtime.config_cli import ConfigCli
@@ -27,7 +27,7 @@ from configuration.patch_sweep.general      import PatchSweepConfig
 from configuration.training                 import BackboneEntryConfig, DualEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, ImageAeEntryConfig, UnrolledEntryConfig
 from configuration.tuning.general           import TuningEntryConfig
 from models.backbone                        import BACKBONE_MODEL_REGISTRY
-from pipelines.backbone.training.loss_terms import LossComponentCatalog
+from pipelines.backbone.training.loss_terms import LOSS_TERMS, LossComponentCatalog
 
 _DISPATCH_ONLY = {"generate_tomogram", "generate_interferograms"}
 
@@ -72,6 +72,36 @@ def test_sweep_loss_choices_match_the_component_catalog():
     choices = {choice["value"] for choice in LaunchLayout.MULTI_SWEEP_LOSSES["choices"]}
 
     assert choices == set(LossComponentCatalog.names())
+
+
+def test_legacy_mode_preset_pins_every_loss_term_flag():
+    preset = LaunchLayout.LEGACY_MODE["preset"]
+
+    for term in LOSS_TERMS:
+        expected = "True" if term.name == "param_legacy" else "False"
+        assert preset[f"curriculum.complete.{term.use_flag}"] == expected
+
+    assert preset["curriculum.complete.param_matching"] == "sorted_gt"
+    assert preset["curriculum.enabled"] == "False"
+
+
+def test_legacy_mode_ships_with_the_backbone_training_layout():
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(BackboneEntryConfig())]
+    layout = LaunchLayout().build("train_backbone", leaves)
+
+    assert layout["legacy"] == LaunchLayout.LEGACY_MODE
+    assert "curriculum.complete.use_param_legacy" in layout["legacy"]["expose"]
+    assert "model" in layout["legacy"]["sections"]
+
+
+def test_legacy_mode_with_unknown_paths_is_rejected():
+    engine = LaunchLayout()
+    layout = engine._expand("train_backbone")
+    layout["legacy"]["preset"]["curriculum.complete.use_param_l2"] = "False"
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(BackboneEntryConfig())]
+
+    with pytest.raises(LayoutError):
+        engine._validate("train_backbone", layout, leaves)
 
 
 def test_dual_trunk_choices_match_the_backbone_registry():
