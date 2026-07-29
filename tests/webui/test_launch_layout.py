@@ -107,7 +107,22 @@ def test_legacy_mode_preset_pins_the_legacy_optimization():
     assert preset["training.scale_lr_with_batch"] == "False"
 
     overrides = ast.literal_eval(preset["model_overrides"])
-    assert overrides == {"all_groups_lr": 1e-5}
+    assert overrides["all_groups_lr"] == 1e-5
+    assert overrides["all_groups_wd"] == 0.0
+
+
+def test_legacy_mode_preset_pins_the_legacy_architecture():
+    preset = LaunchLayout.LEGACY_MODE["preset"]
+
+    assert preset["backbone_name"] == "unet"
+    assert preset["backbone_head"] == "conv"
+
+    overrides = ast.literal_eval(preset["model_overrides"])
+    assert overrides["features"]          == [64, 128, 256, 512]
+    assert overrides["bottleneck_factor"] == 2
+    assert overrides["dropout"]           == 0.0
+    assert overrides["normalization"]     == "none"
+    assert overrides["conv_bias"]         is True
 
 
 def test_legacy_mode_ships_with_the_backbone_training_layout():

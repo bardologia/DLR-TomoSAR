@@ -7,7 +7,7 @@ from models import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS
 
 class ModelBuilder:
 
-    ALL_GROUPS_LR = "all_groups_lr"
+    GROUP_FANOUTS = {"all_groups_lr": "_lr", "all_groups_wd": "_wd"}
 
     @staticmethod
     def model_key(model_name: str, head: str) -> str:
@@ -39,16 +39,19 @@ class ModelBuilder:
                 raise ValueError("Select the head via the dedicated head field, not model_overrides['head']")
             model_overrides = {"head": head, **model_overrides}
 
-        if ModelBuilder.ALL_GROUPS_LR in model_overrides:
+        for key, suffix in ModelBuilder.GROUP_FANOUTS.items():
+            if key not in model_overrides:
+                continue
+
             model_overrides = dict(model_overrides)
-            uniform_lr      = model_overrides.pop(ModelBuilder.ALL_GROUPS_LR)
-            lr_fields       = [spec.name for spec in fields(config) if spec.name.endswith("_lr")]
+            uniform         = model_overrides.pop(key)
+            group_fields    = [spec.name for spec in fields(config) if spec.name.endswith(suffix)]
 
-            if not lr_fields:
-                raise AttributeError(f"Model override '{ModelBuilder.ALL_GROUPS_LR}' found no *_lr fields on {type(config).__name__}")
+            if not group_fields:
+                raise AttributeError(f"Model override '{key}' found no *{suffix} fields on {type(config).__name__}")
 
-            for name in lr_fields:
-                setattr(config, name, uniform_lr)
+            for name in group_fields:
+                setattr(config, name, uniform)
 
         for attribute, value in model_overrides.items():
             if not hasattr(config, attribute):
