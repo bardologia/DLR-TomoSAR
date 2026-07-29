@@ -97,6 +97,10 @@ def test_legacy_mode_preset_pins_the_legacy_normalization():
     assert preset["normalization.out_mu"]     == "zscore"
     assert preset["normalization.out_sigma"]  == "zscore"
 
+    assert preset["normalization.clamp_output"]            == "True"
+    assert preset["normalization.clamp_leaky_slope"]       == "0.0"
+    assert preset["normalization.param_clamp_leaky_slope"] == "0.0"
+
 
 def test_legacy_mode_preset_pins_the_legacy_optimization():
     preset = LaunchLayout.LEGACY_MODE["preset"]

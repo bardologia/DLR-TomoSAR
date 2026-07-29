@@ -146,6 +146,9 @@ class LaunchLayout:
             "normalization.out_amp": "zscore",
             "normalization.out_mu": "zscore",
             "normalization.out_sigma": "zscore",
+            "normalization.clamp_output": "True",
+            "normalization.clamp_leaky_slope": "0.0",
+            "normalization.param_clamp_leaky_slope": "0.0",
             "trials_enabled": "False",
         },
     }
