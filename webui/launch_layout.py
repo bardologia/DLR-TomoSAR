@@ -96,7 +96,7 @@ class LaunchLayout:
     ]}
 
     LEGACY_MODE = {
-        "sections": ["model"],
+        "sections": [],
         "expose": [
             "curriculum.complete.use_param_legacy",
             "curriculum.complete.weight_param_legacy",

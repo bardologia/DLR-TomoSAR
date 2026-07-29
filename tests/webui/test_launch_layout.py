@@ -131,7 +131,8 @@ def test_legacy_mode_ships_with_the_backbone_training_layout():
 
     assert layout["legacy"] == LaunchLayout.LEGACY_MODE
     assert "curriculum.complete.use_param_legacy" in layout["legacy"]["expose"]
-    assert "model" in layout["legacy"]["sections"]
+    assert layout["legacy"]["sections"] == []
+    assert layout["legacy"]["preset"]["backbone_name"] == "unet"
 
 
 def test_legacy_mode_with_unknown_paths_is_rejected():
