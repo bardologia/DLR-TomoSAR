@@ -85,6 +85,18 @@ def test_legacy_mode_preset_pins_every_loss_term_flag():
     assert preset["curriculum.enabled"] == "False"
 
 
+def test_legacy_mode_preset_pins_the_legacy_normalization():
+    preset = LaunchLayout.LEGACY_MODE["preset"]
+
+    assert preset["normalization.pass_mag"]   == "zscore_log1p"
+    assert preset["normalization.pass_phase"] == "min_max"
+    assert preset["normalization.ifg_mag"]    == "zscore_log1p"
+    assert preset["normalization.ifg_phase"]  == "min_max"
+    assert preset["normalization.out_amp"]    == "zscore"
+    assert preset["normalization.out_mu"]     == "zscore"
+    assert preset["normalization.out_sigma"]  == "zscore"
+
+
 def test_legacy_mode_ships_with_the_backbone_training_layout():
     leaves = [{"path": path} for path, _value in ConfigCli._leaves(BackboneEntryConfig())]
     layout = LaunchLayout().build("train_backbone", leaves)

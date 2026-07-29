@@ -132,6 +132,13 @@ class LaunchLayout:
             "augmentation.p_flip_v": "0.0",
             "augmentation.p_rot90": "0.0",
             "augmentation.p_noise": "0.0",
+            "normalization.pass_mag": "zscore_log1p",
+            "normalization.pass_phase": "min_max",
+            "normalization.ifg_mag": "zscore_log1p",
+            "normalization.ifg_phase": "min_max",
+            "normalization.out_amp": "zscore",
+            "normalization.out_mu": "zscore",
+            "normalization.out_sigma": "zscore",
             "trials_enabled": "False",
         },
     }
