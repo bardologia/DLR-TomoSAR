@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 import tools
-from configuration.normalization           import ChannelStats, ChannelStrategy, NormMethod
+from configuration.normalization           import ChannelStats, ChannelStrategy, NormMethod, OutputClampConfig
 from configuration.sar.gaussian_config     import GaussianConfig
 from configuration.sar.geometry_config     import GeometryConfig
 from configuration.training.backbone       import BackboneTrainerConfig
@@ -65,6 +65,25 @@ def zscore_normalizer(n_gaussians: int) -> Normalizer:
         clampable  = [True, False, True] * n_gaussians,
     )
     return Normalizer(Stats(input_stats=None, output_stats=stats))
+
+
+def spock_normalizer() -> Normalizer:
+    fixed = ChannelStrategy(NormMethod.FIXED_BOUNDS)
+    mins  = [1e-05, -15.0, 0.01, 1e-05, 1.0, 1.0]
+    maxs  = [10.0, 5.0, 5.0, 10.0, 40.0, 20.0]
+
+    stats = ChannelStats(
+        loc        = mins,
+        scale      = [hi - lo for lo, hi in zip(mins, maxs)],
+        names      = [f"G{g + 1}_{role}" for g in range(2) for role in ("amp", "mu", "sigma")],
+        strategies = [fixed] * 6,
+        clampable  = [True, False, True] * 2,
+    )
+
+    normalizer = Normalizer(Stats(input_stats=None, output_stats=stats))
+    normalizer.stats.clamp = OutputClampConfig(enabled=False)
+
+    return normalizer
 
 
 def geometry_config(n_tracks: int = 3) -> GeometryConfig:

@@ -15,7 +15,7 @@ class ParamMatcher:
     @staticmethod
     def _sort_gt(gt: torch.Tensor, gt_phys: torch.Tensor, active_thr: float) -> tuple[torch.Tensor, torch.Tensor]:
         gt_phys_amp = gt_phys[:, :, 0]
-        gt_mu       = gt[:, :, 1]
+        gt_mu       = gt_phys[:, :, 1]
         is_active   = gt_phys_amp > active_thr
         sort_key    = torch.where(is_active, gt_mu, torch.full_like(gt_mu, float("inf")))
         gt_index    = torch.argsort(sort_key, dim=1, stable=True)

@@ -10,7 +10,7 @@ from configuration.training.general.loss    import LossConfig, ParamMatching
 from pipelines.backbone.training.loss       import Loss
 from pipelines.backbone.training.loss_terms import LOSS_TERMS, LossComponentCatalog
 
-from tests.backbone_training._helpers import build_loss, gaussian_config, geometry_config, identity_normalizer, log1p_normalizer, param_tensor, valid_param_tensor, x_axis_tensor, zscore_normalizer
+from tests.backbone_training._helpers import build_loss, gaussian_config, geometry_config, identity_normalizer, log1p_normalizer, param_tensor, spock_normalizer, valid_param_tensor, x_axis_tensor, zscore_normalizer
 
 import tools
 
@@ -683,6 +683,17 @@ def test_legacy_loss_matches_a_verbatim_transcription_of_his_code():
     his  = _his_masked_mse_loss(_his_layout(pred_phys, mins, maxs), _his_layout(gt_phys, mins, maxs))
 
     assert ours.item() == pytest.approx(his.item(), rel=1e-5)
+
+
+def test_legacy_pipeline_keeps_physical_slot_order_under_per_slot_bounds():
+    loss = build_loss(n_gaussians=2, loss_cfg=_legacy_cfg(), norm_stats=spock_normalizer())
+
+    phys = torch.tensor([2.0, 0.0, 2.0, 1.5, 20.0, 5.0]).reshape(1, 6, 1, 1).expand(2, 6, 3, 3).clone()
+    gt   = loss.norm_stats.normalize_output(phys)
+
+    out  = loss(gt.clone(), gt)
+
+    assert out["total_loss"].item() == pytest.approx(0.0, abs=1e-6)
 
 
 def test_legacy_bounds_defaults_match_the_spock_loader():

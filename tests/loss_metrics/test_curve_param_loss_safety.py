@@ -280,11 +280,11 @@ def test_match_sorts_gt_by_mu_among_active():
     gt_phys = gt.clone()
 
     gt_phys[:, :, 0] = torch.tensor([2.0, 0.0, 3.0, 0.0, 1.0]).reshape(1, 5, 1, 1)
-    gt[:, :, 1]      = torch.tensor([5.0, 9.0, 1.0, 8.0, 3.0]).reshape(1, 5, 1, 1)
+    gt_phys[:, :, 1] = torch.tensor([5.0, 9.0, 1.0, 8.0, 3.0]).reshape(1, 5, 1, 1)
 
     _, _, g, gp = PM.match(pred, pred_phys, gt, gt_phys)
 
-    active_mus = g[0, :, 1, 0, 0][gp[0, :, 0, 0, 0] > 1e-3]
+    active_mus = gp[0, :, 1, 0, 0][gp[0, :, 0, 0, 0] > 1e-3]
     assert torch.all(active_mus[1:] >= active_mus[:-1])
 
 
