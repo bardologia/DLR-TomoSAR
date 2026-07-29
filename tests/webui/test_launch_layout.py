@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import re
 import sys
 from pathlib import Path
@@ -95,6 +96,18 @@ def test_legacy_mode_preset_pins_the_legacy_normalization():
     assert preset["normalization.out_amp"]    == "zscore"
     assert preset["normalization.out_mu"]     == "zscore"
     assert preset["normalization.out_sigma"]  == "zscore"
+
+
+def test_legacy_mode_preset_pins_the_legacy_optimization():
+    preset = LaunchLayout.LEGACY_MODE["preset"]
+
+    assert preset["training.warmup_enabled"]      == "False"
+    assert preset["training.clip_mode"]           == "disabled"
+    assert preset["training.scheduler_type"]      == "constant"
+    assert preset["training.scale_lr_with_batch"] == "False"
+
+    overrides = ast.literal_eval(preset["model_overrides"])
+    assert overrides == {"all_groups_lr": 1e-5}
 
 
 def test_legacy_mode_ships_with_the_backbone_training_layout():

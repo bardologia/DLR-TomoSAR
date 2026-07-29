@@ -1,9 +1,14 @@
 from __future__ import annotations
 
+from dataclasses import fields
+
 from models import BACKBONE_CONFIG_REGISTRY, BACKBONE_IMAGE_SIZE_MODELS
 
 
 class ModelBuilder:
+
+    ALL_GROUPS_LR = "all_groups_lr"
+
     @staticmethod
     def model_key(model_name: str, head: str) -> str:
         return model_name if head == "conv" else f"{model_name}-{head}"
@@ -33,6 +38,17 @@ class ModelBuilder:
             if "head" in model_overrides:
                 raise ValueError("Select the head via the dedicated head field, not model_overrides['head']")
             model_overrides = {"head": head, **model_overrides}
+
+        if ModelBuilder.ALL_GROUPS_LR in model_overrides:
+            model_overrides = dict(model_overrides)
+            uniform_lr      = model_overrides.pop(ModelBuilder.ALL_GROUPS_LR)
+            lr_fields       = [spec.name for spec in fields(config) if spec.name.endswith("_lr")]
+
+            if not lr_fields:
+                raise AttributeError(f"Model override '{ModelBuilder.ALL_GROUPS_LR}' found no *_lr fields on {type(config).__name__}")
+
+            for name in lr_fields:
+                setattr(config, name, uniform_lr)
 
         for attribute, value in model_overrides.items():
             if not hasattr(config, attribute):
