@@ -2,32 +2,32 @@
 \begin{frame}{From the legacy pipeline to the current system: model and objective}
   \centering
   \scriptsize
-  \renewcommand{\arraystretch}{1.22}
-  \begin{tabular}{@{}p{2.5cm} p{4.9cm} p{5.9cm}@{}}
+  \renewcommand{\arraystretch}{1.12}
+  \begin{tabular}{@{}l p{4.9cm} p{6.1cm}@{}}
     \toprule
     & \textbf{legacy pipeline} & \textbf{current system} \\
     \midrule
-    backbone
-      & one fixed 5-level UNet (64\,$\to$\,1024, plain double conv, no normalization layers, no dropout)
-      & registry of 20 backbones under one contract; standard trunk UNet-skip \\
-    model form
-      & single network, 6 output channels
-      & dual model: parameter trunk + existence trunk, joint head, \hlval{accent}{90/10} loss split \\
-    output head
-      & single $1{\times}1$ conv
-      & head axis: conv / multihead / per-Gaussian / \hlval{accent}{set prediction} ($K$ gated PixelMLP heads + existence gate) \\
-    scatterer slots
-      & exactly 2, fixed ground-first identity
-      & $K$ slots (studied at $K{=}2$ and $K{=}5$); \hlval{accent}{Hungarian matching} assigns predictions to targets, sorted-GT kept as control \\
-    presence
-      & gated by the \emph{prediction} ($\hat a_2 > 10^{-4}$, $\hat w_2 \ge 0$); missed scatterers never penalised, slot collapse is a loss optimum
-      & gated by the \emph{ground truth}; per-slot presence balancing + \hlval{accent}{active normalization}; collapse eliminated \\
-    parameter loss
-      & masked MSE on min-max targets, equal-weight group means
-      & param L1 standard; Huber / MSE / curve reconstruction alternatives, benchmarked per backbone \\
-    physics terms
-      & \textcolor{soft}{absent}
-      & coherence resynthesis, covariance matching, Capon cycle, moments, total power; warmup $\to$ complete curriculum \\
+    backbone            & UNet5Lv3, one fixed architecture            & registry of 20 backbones, one contract \\
+    standard trunk      & the same UNet                               & UNet-skip \\
+    conv block          & conv--ReLU $\times 2$, biased               & conv--norm--activation, all configurable \\
+    normalization layers& none                                        & batch / instance / group \\
+    dropout             & none                                        & configurable, 0.15 standard \\
+    weight init         & PyTorch default                             & default / Kaiming / Xavier \\
+    \addlinespace[3pt]
+    model form          & single network                              & dual: parameter trunk + existence trunk \\
+    trunk budget        & \textcolor{soft}{---}                       & 90/10 parameter / existence loss split \\
+    output head         & one $1{\times}1$ conv                       & conv / multihead / per-Gaussian / set-pred \\
+    standard head       & \textcolor{soft}{---}                       & set prediction: $K$ PixelMLP heads + gate \\
+    \addlinespace[3pt]
+    slots $K$           & 2, hard-coded                               & configurable, studied at $K{=}2$ and $K{=}5$ \\
+    slot identity       & positional, ground first                    & Hungarian matching, sorted-GT control \\
+    presence signal     & the \emph{prediction} ($\hat a_2, \hat w_2$)& the \emph{ground truth} activity mask \\
+    missed scatterer    & never penalised, collapse optimum           & penalised, per-slot presence balance \\
+    imbalance handling  & none                                        & active normalization, amp focal option \\
+    \addlinespace[3pt]
+    parameter loss      & masked MSE, group means                     & param L1 standard, Huber / MSE options \\
+    curve losses        & none                                        & MSE / L1 / Huber / Charbonnier / cosine \\
+    physics terms       & none                                        & 5 terms, warmup $\to$ complete curriculum \\
     \bottomrule
   \end{tabular}
 \end{frame}
@@ -36,32 +36,29 @@
 \begin{frame}{From the legacy pipeline to the current system: data and normalization}
   \centering
   \scriptsize
-  \renewcommand{\arraystretch}{1.22}
-  \begin{tabular}{@{}p{2.5cm} p{4.9cm} p{5.9cm}@{}}
+  \renewcommand{\arraystretch}{1.12}
+  \begin{tabular}{@{}l p{4.9cm} p{6.1cm}@{}}
     \toprule
     & \textbf{legacy pipeline} & \textbf{current system} \\
     \midrule
-    input channels
-      & 4 secondary amplitudes + 4 interferogram phases
-      & + primary amplitude; per-group representation axis (magnitude / phase / real-imag), optional DEM \\
-    input normalization
-      & raw $\log(1+m)$ magnitudes; phases mapped $[-\pi,\pi] \to [0,1]$ by fixed constants
-      & per-slot-kind strategies \hlval{accent}{fitted from the train region} (robust-IQR log1p for heavy-tailed magnitudes, z-score / fixed-$\pi$ phases), per-channel overrides \\
-    target normalization
-      & fixed hand-set min-max bounds per channel
-      & fitted per-channel statistics over active pixels; heavy-tailed amplitude and width compressed by robust-IQR log1p \\
-    output range
-      & unconstrained regression
-      & physical clamping of $\hat a, \hat\mu, \hat\sigma$ with leaky slopes \\
-    data split
-      & random patch shuffle 80/10/10; neighbouring patches leak across splits
-      & contiguous azimuth bands for train / val / test \\
-    patches
-      & $64 \times 64$, square only
-      & rectangular (azimuth, range) with per-axis stride, standard $64{\times}32$ / $32{\times}16$; optimum derived and confirmed by sweep \\
-    augmentation
-      & \textcolor{soft}{absent}
-      & flips standard; rotation and noise as options, gains benchmarked \\
+    input stack         & 4 secondary $|A|$ + 4 ifg $\varphi$         & + primary $|A|$, optional DEM \\
+    representations     & fixed                                       & magnitude / phase / real-imag axis per group \\
+    targets             & 2-Gaussian fit, one RAT file                & GPU-fitted $K$-Gaussian labels + presence \\
+    \addlinespace[3pt]
+    input $|A|$ scaling & $\log(1{+}m)$, unscaled                     & robust-IQR log1p, fitted \\
+    input $\varphi$ scaling & fixed $[-\pi,\pi] \to [0,1]$            & fixed $\div\,\pi$ / fitted, per channel \\
+    target scaling      & hand-set min-max constants                  & fitted per channel over active pixels \\
+    $\mu$ channels      & min-max                                     & z-score \\
+    $a, \sigma$ channels& min-max                                     & robust-IQR log1p (heavy tails) \\
+    statistics source   & the whole file                              & train region only \\
+    output range        & unconstrained                               & physical clamp on $\hat a, \hat\mu, \hat\sigma$, leaky \\
+    \addlinespace[3pt]
+    split               & random patch shuffle 80/10/10               & contiguous azimuth bands \\
+    split leakage       & neighbours cross splits                     & none by construction \\
+    patch shape         & $64 \times 64$, square only                 & rectangular (az, rg), standard $64{\times}32$ \\
+    stride              & fixed                                       & per-axis, standard $32{\times}16$ \\
+    patch size choice   & unstated                                    & derived floor / ceiling, confirmed by sweep \\
+    augmentation        & none                                        & flips standard; rot90, noise optional \\
     \bottomrule
   \end{tabular}
 \end{frame}
@@ -70,32 +67,31 @@
 \begin{frame}{From the legacy pipeline to the current system: optimization and tooling}
   \centering
   \scriptsize
-  \renewcommand{\arraystretch}{1.22}
-  \begin{tabular}{@{}p{2.5cm} p{4.9cm} p{5.9cm}@{}}
+  \renewcommand{\arraystretch}{1.12}
+  \begin{tabular}{@{}l p{4.9cm} p{6.1cm}@{}}
     \toprule
     & \textbf{legacy pipeline} & \textbf{current system} \\
     \midrule
-    optimizer
-      & Adam, one parameter group, lr $10^{-5}$, no weight decay
-      & AdamW with per-module groups (encoder / bottleneck / decoder / head each own lr and weight decay) \\
-    schedule
-      & constant lr, fixed 300 epochs
-      & cosine annealing + \hlval{accent}{lr warmup}, batch-scaled lr, early stopping with best-checkpoint restore \\
-    stabilization
-      & \textcolor{soft}{absent}
-      & \hlval{accent}{gradient clipping} (fixed and adaptive modes), overfit gate before every run, loss-scale probes, non-finite abort; EMA and AMP options \\
-    checkpointing
-      & one save after the last epoch
-      & per-epoch validation, best + resumable trainer state, run manifests and completion markers \\
-    evaluation
-      & final MSE print on a held-out loader
-      & benchmark suite over every backbone $\times$ objective, occupancy and count diagnostics, physical MAEs, leaderboard \\
-    experiment control
-      & hand-edited driver scripts
-      & config-contract entry points, web console with run health, GPU pools and queueing, multi-seed fan-out \\
-    reproducibility
-      & \textcolor{soft}{absent}
-      & one-click \hlval{good}{legacy mode} rebuilds the entire left column inside this stack for A/B comparison \\
+    optimizer           & Adam                                        & AdamW \\
+    parameter groups    & one                                         & encoder / bottleneck / decoder / head \\
+    learning rate       & $10^{-5}$, flat                             & per group, benchmarked \\
+    weight decay        & 0                                           & per group \\
+    schedule            & constant                                    & cosine annealing \\
+    warmup              & none                                        & lr warmup, 200 steps \\
+    batch scaling       & none                                        & lr scaled with batch size \\
+    clipping            & none                                        & gradient clipping, fixed + adaptive \\
+    \addlinespace[3pt]
+    epochs              & 300, fixed                                  & early stopping, best-checkpoint restore \\
+    checkpointing       & one save at the end                         & per-epoch validation, resumable state \\
+    sanity gates        & none                                        & overfit gate, loss-scale probe \\
+    guards              & none                                        & non-finite abort, VRAM reservation \\
+    precision           & fp32                                        & AMP option, EMA option \\
+    \addlinespace[3pt]
+    evaluation          & one final MSE print                         & benchmark suite, physical MAEs \\
+    diagnostics         & none                                        & occupancy, count accuracy, per-slot stats \\
+    experiment control  & hand-edited scripts                         & config CLI, web console, GPU pools \\
+    multi-run           & manual                                      & multi-seed fan-out, queued experiments \\
+    reproduction        & \textcolor{soft}{---}                       & legacy mode: one click rebuilds this column \\
     \bottomrule
   \end{tabular}
 \end{frame}
