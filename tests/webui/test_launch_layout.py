@@ -109,6 +109,9 @@ def test_legacy_mode_preset_pins_the_legacy_optimization():
     assert preset["training.clip_mode"]           == "disabled"
     assert preset["training.scheduler_type"]      == "constant"
     assert preset["training.scale_lr_with_batch"] == "False"
+    assert preset["training.epochs"]              == "300"
+    assert preset["training.patch_size"]          == "(64, 64)"
+    assert preset["training.patch_stride"]        == "(32, 32)"
 
     overrides = ast.literal_eval(preset["model_overrides"])
     assert overrides["all_groups_lr"] == 1e-5
