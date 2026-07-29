@@ -108,7 +108,7 @@ class LaunchLayout:
                 {"gate": "use_param_l1",     "fields": [{"path": "weight_param_l1", "widget": NUM_WEIGHT}]},
                 {"gate": "use_param_huber",  "fields": [{"path": "weight_param_huber", "widget": NUM_WEIGHT}, "param_huber_delta"]},
                 {"gate": "use_param_mse",    "fields": [{"path": "weight_param_mse", "widget": NUM_WEIGHT}]},
-                {"gate": "use_param_legacy", "fields": [{"path": "weight_param_legacy", "widget": NUM_WEIGHT}]},
+                {"gate": "use_param_legacy", "fields": [{"path": "weight_param_legacy", "widget": NUM_WEIGHT}, "legacy_amp_thr", "legacy_bounds_min", "legacy_bounds_max"]},
                 "param_weights",
                 "param_matching",
             ]},

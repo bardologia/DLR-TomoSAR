@@ -115,8 +115,9 @@ class Loss:
         raise ValueError(f"Unknown param_term kind: {kind!r}. Expected 'l1', 'huber', or 'mse'.")
 
     def _param_legacy(self, matched):
-        pred, pred_phys, gt, _gt_phys = matched
-        return LegacyParamLoss.mse(pred, pred_phys, gt, self.loss_cfg.amp_zero_thr)
+        _pred, pred_phys, _gt, gt_phys = matched
+        cfg = self.loss_cfg
+        return LegacyParamLoss.mse(pred_phys, gt_phys, cfg.legacy_bounds_min, cfg.legacy_bounds_max, cfg.legacy_amp_thr)
 
     @torch.no_grad()
     def _physical_errors(self, matched) -> dict:

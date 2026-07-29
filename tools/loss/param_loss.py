@@ -87,18 +87,35 @@ class ParamMatcher:
 
 class LegacyParamLoss:
     LEGACY_GAUSSIANS = 2
+    BOUND_ENTRIES    = 6
     EMPTY_FLOOR      = 1e-8
+
+    @staticmethod
+    def _scale(phys: torch.Tensor, bounds_min: tuple, bounds_max: tuple) -> torch.Tensor:
+        if len(bounds_min) != LegacyParamLoss.BOUND_ENTRIES or len(bounds_max) != LegacyParamLoss.BOUND_ENTRIES:
+            raise ValueError(f"legacy bounds need exactly {LegacyParamLoss.BOUND_ENTRIES} entries ordered amp1, mu1, sigma1, amp2, mu2, sigma2; got {len(bounds_min)} min and {len(bounds_max)} max entries.")
+
+        lo = torch.tensor(bounds_min, dtype=phys.dtype, device=phys.device).reshape(1, 2, 3, 1, 1)
+        hi = torch.tensor(bounds_max, dtype=phys.dtype, device=phys.device).reshape(1, 2, 3, 1, 1)
+
+        if not torch.all(hi > lo).item():
+            raise ValueError(f"legacy bounds require max > min per entry; got min {tuple(bounds_min)} and max {tuple(bounds_max)}.")
+
+        return (phys - lo) / (hi - lo)
 
     @staticmethod
     def _group_mean(sq_err: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
         return (sq_err * mask).sum(dim=(0, 2, 3)) / (mask.sum() + LegacyParamLoss.EMPTY_FLOOR)
 
     @staticmethod
-    def mse(pred: torch.Tensor, pred_phys: torch.Tensor, gt: torch.Tensor, amp_thr: float) -> torch.Tensor:
-        if pred.shape[1] != LegacyParamLoss.LEGACY_GAUSSIANS:
-            raise ValueError(f"LegacyParamLoss.mse imitates the two-Gaussian legacy masked loss; got {pred.shape[1]} Gaussian slots.")
+    def mse(pred_phys: torch.Tensor, gt_phys: torch.Tensor, bounds_min: tuple, bounds_max: tuple, amp_thr: float) -> torch.Tensor:
+        if pred_phys.shape[1] != LegacyParamLoss.LEGACY_GAUSSIANS:
+            raise ValueError(f"LegacyParamLoss.mse imitates the two-Gaussian legacy masked loss; got {pred_phys.shape[1]} Gaussian slots.")
 
-        present = (pred_phys[:, 1, 0:1] > amp_thr).to(pred.dtype)
+        pred = LegacyParamLoss._scale(pred_phys, bounds_min, bounds_max)
+        gt   = LegacyParamLoss._scale(gt_phys, bounds_min, bounds_max)
+
+        present = (pred[:, 1, 0:1] > amp_thr).to(pred.dtype).detach()
         absent  = 1.0 - present
 
         sq_first  = (pred[:, 0] - gt[:, 0]) ** 2
