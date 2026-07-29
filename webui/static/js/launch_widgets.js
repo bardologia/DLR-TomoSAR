@@ -453,7 +453,7 @@ class ExperimentBuilder {
   static PAIR_COMPONENTS = [
     "mse_curve", "l1_curve", "huber_curve", "charbonnier_curve", "cosine_curve",
     "total_power_relerr", "moments", "coherence_resyn", "covariance_match", "capon_cycle",
-    "param_huber", "param_mse", "smoothness_tv", "param_l1",
+    "param_huber", "param_mse", "param_legacy", "smoothness_tv", "param_l1",
   ];
 
   static STRATEGIES = [
