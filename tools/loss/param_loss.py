@@ -85,6 +85,31 @@ class ParamMatcher:
         raise ValueError(f"Unknown matching method: {method!r}. Expected {ParamMatcher.HUNGARIAN!r} or {ParamMatcher.SORTED_GT!r}.")
 
 
+class LegacyParamLoss:
+    LEGACY_GAUSSIANS = 2
+    EMPTY_FLOOR      = 1e-8
+
+    @staticmethod
+    def _group_mean(sq_err: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        return (sq_err * mask).sum(dim=(0, 2, 3)) / (mask.sum() + LegacyParamLoss.EMPTY_FLOOR)
+
+    @staticmethod
+    def mse(pred: torch.Tensor, pred_phys: torch.Tensor, gt: torch.Tensor, amp_thr: float) -> torch.Tensor:
+        if pred.shape[1] != LegacyParamLoss.LEGACY_GAUSSIANS:
+            raise ValueError(f"LegacyParamLoss.mse imitates the two-Gaussian legacy masked loss; got {pred.shape[1]} Gaussian slots.")
+
+        present = (pred_phys[:, 1, 0:1] > amp_thr).to(pred.dtype)
+        absent  = 1.0 - present
+
+        sq_first  = (pred[:, 0] - gt[:, 0]) ** 2
+        sq_second = (pred[:, 1] - gt[:, 1]) ** 2
+
+        loss_first  = LegacyParamLoss._group_mean(sq_first, absent) + LegacyParamLoss._group_mean(sq_first, present)
+        loss_second = LegacyParamLoss._group_mean(sq_second, present)
+
+        return (loss_first + loss_second).sum()
+
+
 class ParamLoss:
     DENOM_FLOOR = 1e-6
     FRAC_CLAMP  = 1e-3

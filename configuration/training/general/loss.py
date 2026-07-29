@@ -40,6 +40,9 @@ class LossConfig:
     use_param_mse    : bool  = False
     weight_param_mse : float = 0.0
 
+    use_param_legacy    : bool  = False
+    weight_param_legacy : float = 1.0
+
     param_weights : tuple = (1.0, 1.0, 1.0)
 
     param_matching : ParamMatching = ParamMatching.HUNGARIAN

@@ -14,6 +14,8 @@ from tools                                  import NullLogger, NullTracker
 
 class LossScaleProbe:
 
+    DEFAULT_OFF = ("use_param_legacy",)
+
     def __init__(self, probe_cfg, loss_cfg, gaussian_cfg, geometry_cfg, norm_stats=None, logger=None):
         self.probe_cfg    = probe_cfg
         self.gaussian_cfg = gaussian_cfg
@@ -29,7 +31,8 @@ class LossScaleProbe:
 
         for term in LOSS_TERMS:
             override = probe_cfg.enabled_losses.get(term.use_flag)
-            setattr(self.loss_cfg, term.use_flag, override if override is not None else True)
+            default  = term.use_flag not in self.DEFAULT_OFF
+            setattr(self.loss_cfg, term.use_flag, override if override is not None else default)
 
         for term in LOSS_TERMS:
             if getattr(self.loss_cfg, term.use_flag):

@@ -49,6 +49,19 @@ def test_probe_respects_enabled_losses_override():
     assert probe.loss_cfg.use_mse_curve        is True
 
 
+def test_probe_leaves_legacy_term_off_by_default():
+    probe = _probe(LossScaleProbeConfig(enabled=True, n_batches=2, exit_after=False))
+
+    assert probe.loss_cfg.use_param_legacy is False
+
+
+def test_probe_enables_legacy_term_only_on_explicit_override():
+    overrides = {"use_param_legacy": True}
+    probe     = _probe(LossScaleProbeConfig(enabled=True, n_batches=2, exit_after=False, enabled_losses=overrides))
+
+    assert probe.loss_cfg.use_param_legacy is True
+
+
 def test_probe_runs_and_reports_suggested_weights():
     model, _ = tiny_model(in_channels=2, n_gaussians=2)
     loader   = _loader()

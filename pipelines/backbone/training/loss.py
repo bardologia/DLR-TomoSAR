@@ -5,7 +5,7 @@ import torch
 from pipelines.backbone.training.loss_terms import LOSS_TERMS
 from tools.data.gaussians                   import GaussianClamp, GaussianCurve
 from tools.loss.curve_loss                  import CurveLoss
-from tools.loss.param_loss                  import ParamLoss, ParamMatcher
+from tools.loss.param_loss                  import LegacyParamLoss, ParamLoss, ParamMatcher
 from tools.loss.physical_loss               import PhysicalLoss
 from tools.sar.tomo_geometry                import TomoGeometry
 
@@ -27,6 +27,7 @@ class Loss:
         self.loss_generation = 0
 
         cfg = self.loss_cfg
+        self._validate_legacy(cfg)
 
         self.logger.section("[Loss Function]")
         self.logger.kv_table({
@@ -42,7 +43,7 @@ class Loss:
     @property
     def slot_presence_active(self) -> bool:
         cfg = self.loss_cfg
-        return bool(cfg.presence_balance or cfg.use_active_normalization or cfg.amp_focal_gamma > 0.0 or self.log_all_losses)
+        return bool(cfg.presence_balance or cfg.use_active_normalization or cfg.amp_focal_gamma > 0.0 or cfg.use_param_legacy or self.log_all_losses)
 
     def log_active_terms(self, cfg, title: str) -> None:
         active_rows = []
@@ -65,6 +66,8 @@ class Loss:
         }, title=title)
 
     def set_curriculum(self, complete_cfg) -> None:
+        self._validate_legacy(complete_cfg)
+
         self.loss_cfg       = complete_cfg
         self.loss_generation += 1
 
@@ -72,6 +75,10 @@ class Loss:
         self.logger.subsection(f"Param matching (curriculum complete): {complete_cfg.param_matching.value}")
         self.log_active_terms(complete_cfg, title="Active Terms (curriculum complete)")
         self.log_slot_presence_config(complete_cfg, title="Slot-Presence Loss Config (curriculum complete)")
+
+    def _validate_legacy(self, cfg) -> None:
+        if cfg.use_param_legacy and cfg.param_matching.value != ParamMatcher.SORTED_GT:
+            raise ValueError(f"use_param_legacy requires param_matching={ParamMatcher.SORTED_GT!r}; the legacy mask assumes fixed slot identity and {cfg.param_matching.value!r} reassigns prediction slots per pixel.")
 
     def reconstruct_gaussians(self, params: torch.Tensor) -> torch.Tensor:
         return GaussianCurve.reconstruct(params, self.x_axis, self.gaussian_cfg.params_per_gaussian)
@@ -106,6 +113,10 @@ class Loss:
             return ParamLoss.mse(pred, gt, elem_w, cfg.use_active_normalization), {}
 
         raise ValueError(f"Unknown param_term kind: {kind!r}. Expected 'l1', 'huber', or 'mse'.")
+
+    def _param_legacy(self, matched):
+        pred, pred_phys, gt, _gt_phys = matched
+        return LegacyParamLoss.mse(pred, pred_phys, gt, self.loss_cfg.amp_zero_thr)
 
     @torch.no_grad()
     def _physical_errors(self, matched) -> dict:
@@ -281,6 +292,14 @@ class Loss:
                 elif self.log_all_losses:
                     with torch.no_grad():
                         val, per_param_l1 = self._param_term(matched, "l1")
+                else:
+                    continue
+            elif term.name == "param_legacy":
+                if is_used:
+                    val = self._param_legacy(matched)
+                elif self.log_all_losses and matched[0].shape[1] == LegacyParamLoss.LEGACY_GAUSSIANS:
+                    with torch.no_grad():
+                        val = self._param_legacy(matched)
                 else:
                     continue
             else:

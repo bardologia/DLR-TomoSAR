@@ -472,3 +472,105 @@ def test_gradient_flows_with_log_all_losses_and_shared_matching():
     assert pred.grad is not None
     assert torch.isfinite(pred.grad).all().item()
     assert pred.grad.abs().sum().item() > 0.0
+
+
+def _legacy_cfg() -> LossConfig:
+    return LossConfig(use_param_legacy=True, weight_param_legacy=1.0, param_matching=ParamMatching.SORTED_GT)
+
+
+def _legacy_pred(slot2_amp_px0: float, slot2_amp_px1: float) -> torch.Tensor:
+    pred = torch.zeros(1, 6, 1, 2)
+
+    pred[0, :, 0, 0] = torch.tensor([1.0, 10.0, 5.0, slot2_amp_px0, 30.0, 6.0])
+    pred[0, :, 0, 1] = torch.tensor([3.0, 20.0, 7.0, slot2_amp_px1, 40.0, 8.0])
+
+    return pred
+
+
+def _legacy_gt(slot2: tuple = (1.0, 44.0, 6.0)) -> torch.Tensor:
+    gt = torch.zeros(1, 6, 1, 2)
+
+    gt[0, 0:3] = torch.tensor([2.0, 16.0, 4.0]).reshape(3, 1, 1)
+    gt[0, 3:6] = torch.tensor(slot2).reshape(3, 1, 1)
+
+    return gt
+
+
+def test_legacy_term_matches_hand_computed_group_means():
+    loss = build_loss(n_gaussians=2, loss_cfg=_legacy_cfg())
+    pred = _legacy_pred(0.0, 2.0)
+    gt   = _legacy_gt()
+
+    out  = loss(pred, gt)
+
+    assert set(out["components"].keys()) == {"param_legacy"}
+    assert out["total_loss"].item() == pytest.approx(85.0, rel=1e-4)
+
+
+def test_legacy_ignores_gt_slot2_when_prediction_absent():
+    loss = build_loss(n_gaussians=2, loss_cfg=_legacy_cfg())
+
+    out_a = loss(_legacy_pred(0.0, 0.0), _legacy_gt((1.0, 44.0, 6.0)))
+    out_b = loss(_legacy_pred(0.0, 0.0), _legacy_gt((1.5, 60.0, 9.0)))
+
+    assert out_a["total_loss"].item() == pytest.approx(out_b["total_loss"].item(), rel=1e-6)
+
+
+def test_legacy_predicted_absent_slot2_receives_no_gradient():
+    loss = build_loss(n_gaussians=2, loss_cfg=_legacy_cfg())
+    pred = _legacy_pred(0.0, 0.0).requires_grad_(True)
+
+    loss(pred, _legacy_gt())["total_loss"].backward()
+
+    assert torch.all(pred.grad[:, 3:6] == 0.0).item()
+    assert pred.grad[:, 0:3].abs().sum().item() > 0.0
+
+
+def test_legacy_predicted_present_slot2_receives_gradient():
+    loss = build_loss(n_gaussians=2, loss_cfg=_legacy_cfg())
+    pred = _legacy_pred(2.0, 2.0).requires_grad_(True)
+
+    loss(pred, _legacy_gt())["total_loss"].backward()
+
+    assert pred.grad[:, 3:6].abs().sum().item() > 0.0
+    assert torch.isfinite(pred.grad).all().item()
+
+
+def test_legacy_requires_sorted_gt_matching():
+    cfg = LossConfig(use_param_legacy=True, weight_param_legacy=1.0)
+
+    with pytest.raises(ValueError):
+        build_loss(n_gaussians=2, loss_cfg=cfg)
+
+
+def test_legacy_matching_validated_at_curriculum_swap():
+    loss = build_loss(n_gaussians=2)
+
+    with pytest.raises(ValueError):
+        loss.set_curriculum(LossConfig(use_param_legacy=True, weight_param_legacy=1.0))
+
+
+def test_legacy_rejects_non_two_gaussian_runs():
+    loss = build_loss(n_gaussians=3, loss_cfg=_legacy_cfg())
+
+    with pytest.raises(ValueError):
+        loss(param_tensor(2, 3, 4, 4, seed=50), param_tensor(2, 3, 4, 4, seed=51))
+
+
+def test_legacy_monitored_only_on_two_gaussian_runs():
+    two   = build_loss(n_gaussians=2, log_all_losses=True)
+    three = build_loss(n_gaussians=3, log_all_losses=True)
+
+    out_two   = two(param_tensor(2, 2, 5, 5, seed=52), param_tensor(2, 2, 5, 5, seed=53))
+    out_three = three(param_tensor(2, 3, 5, 5, seed=54), param_tensor(2, 3, 5, 5, seed=55))
+
+    assert "param_legacy_norm" in out_two["monitor"]
+    assert "param_legacy_norm" not in out_three["monitor"]
+
+
+def test_legacy_term_logs_occupancy():
+    loss = build_loss(n_gaussians=2, loss_cfg=_legacy_cfg())
+    out  = loss(valid_param_tensor(2, 2, 5, 5, seed=56), valid_param_tensor(2, 2, 5, 5, seed=57))
+
+    assert "pred_active_slot1" in out["occupancy"]
+    assert "count/exact_frac"  in out["occupancy"]

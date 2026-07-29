@@ -21,6 +21,7 @@ LOSS_TERMS = (
     LossTerm("capon_cycle",        "use_capon_cycle",        "weight_capon_cycle",        "denorm"),
     LossTerm("param_huber",        "use_param_huber",        "weight_param_huber",        "norm"),
     LossTerm("param_mse",          "use_param_mse",          "weight_param_mse",          "norm"),
+    LossTerm("param_legacy",       "use_param_legacy",       "weight_param_legacy",       "norm"),
     LossTerm("smoothness_tv",      "use_smoothness_tv",      "weight_smoothness_tv",      "norm"),
     LossTerm("param_l1",           "use_param_l1",           "weight_param_l1",           "norm"),
 )

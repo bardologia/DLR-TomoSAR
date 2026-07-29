@@ -26,6 +26,12 @@ def test_loss_tag_rejects_empty_loss():
         RunNaming.loss_tag(_loss())
 
 
+def test_loss_tag_names_the_legacy_term():
+    loss = _loss(use_param_legacy=True, weight_param_legacy=1.0, param_matching=ParamMatching.SORTED_GT)
+
+    assert RunNaming.loss_tag(loss) == "param_legacy_1"
+
+
 def test_matching_tag_names_the_strategy():
     assert RunNaming.matching_tag(_loss())                                          == "hungarian"
     assert RunNaming.matching_tag(_loss(param_matching=ParamMatching.SORTED_GT))    == "sorted_gt"
