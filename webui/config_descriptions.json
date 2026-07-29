@@ -1672,6 +1672,7 @@
         "save_cubes": "Whether to export the stitched predicted/GT/reduced curve cubes, parameter cubes, pixel-metric maps, and physics error maps as .npy files under cubes_subdir",
         "stitch_window": "Per-patch tapering window used by CubeStitcher when overlap-adding patches into the full scene: hann, uniform, or triangular",
         "cube_dtype": "Numpy dtype string the stitched curve/parameter cubes and exported .npy arrays are cast to, e.g. float32",
+        "render_amp_floor": "Physical amplitude below which a predicted or GT Gaussian component is dropped from curve reconstruction (cubes, figures, curve metrics); parameter cubes keep the raw values; 0 disables the mask, legacy mode sets 1e-3 to reject the legacy fit's prior-stuck phantom components",
         "compute_reduced": "Whether to synthesize the reduced-track Capon baseline tomogram and add the NN-vs-reduced-vs-GT comparison to metrics, figures, and report; skipped automatically when the run uses the full secondary stack",
         "reduced_effort": "CPU parallelism level for the reduced Capon tomogram generation subprocess: low, medium, or high, mapping to 0.25/0.5/0.8 of available cores",
         "reduced_cache_subdir": "Subdirectory under run_directory caching the generated reduced tomogram, DEM, and launch spec by crop/selection key",

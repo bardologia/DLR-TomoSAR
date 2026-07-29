@@ -107,6 +107,9 @@ def test_legacy_mode_preset_pins_the_legacy_normalization():
     assert preset["normalization.clamp_output"] == "False"
     assert "normalization.clamp_leaky_slope" not in preset
 
+    assert preset["curriculum.complete.amp_zero_thr"] == "0.001"
+    assert preset["inference.render_amp_floor"]       == "0.001"
+
 
 def test_legacy_mode_preset_pins_the_legacy_optimization():
     preset = LaunchLayout.LEGACY_MODE["preset"]

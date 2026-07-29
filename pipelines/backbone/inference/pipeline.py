@@ -81,11 +81,12 @@ class InferencePipeline:
         predictor = self.components.predictor_cls(
             run         = run,
             logger      = logger,
-            window_kind = cfg.stitch_window,
-            cube_dtype  = cfg.cube_dtype,
-            save_cubes  = cfg.save_cubes,
-            meta        = meta,
-            cpu_workers = cfg.cpu_workers,
+            window_kind      = cfg.stitch_window,
+            cube_dtype       = cfg.cube_dtype,
+            save_cubes       = cfg.save_cubes,
+            meta             = meta,
+            cpu_workers      = cfg.cpu_workers,
+            render_amp_floor = cfg.render_amp_floor,
         )
         return predictor.run_inference()
 

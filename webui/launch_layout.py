@@ -128,6 +128,8 @@ class LaunchLayout:
             "curriculum.complete.use_active_normalization": "False",
             "curriculum.complete.presence_balance": "False",
             "curriculum.complete.amp_focal_gamma": "0.0",
+            "curriculum.complete.amp_zero_thr": "0.001",
+            "inference.render_amp_floor": "0.001",
             "augmentation.p_flip_h": "0.0",
             "augmentation.p_flip_v": "0.0",
             "augmentation.p_rot90": "0.0",
@@ -352,7 +354,7 @@ class LaunchLayout:
                 {"path": "cpu_workers", "widget": NUM_WORKERS},
                 {"path": "gif_workers", "widget": NUM_WORKERS},
             ]},
-            {"title": "Artifacts", "fields": ["save_plots", "save_animations", "save_cubes", "stitch_window", "cube_dtype"]},
+            {"title": "Artifacts", "fields": ["save_plots", "save_animations", "save_cubes", "stitch_window", "cube_dtype", "render_amp_floor"]},
             {"title": "Reduced baseline", "fields": [
                 {"gate": "compute_reduced", "fields": ["reduced_effort", "reduced_cache_subdir", "reduced_env_name", "reduced_pyrat_dir"]},
             ]},

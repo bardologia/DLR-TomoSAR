@@ -202,6 +202,30 @@ def test_select_stitcher_raises_on_uncovered_pixels():
         stitcher.finalize_cube()
 
 
+def test_cpu_worker_render_floor_drops_weak_components():
+    x_axis = np.linspace(0.0, 40.0, 32).astype(np.float32)
+
+    pred       = np.zeros((1, 6, 4, 4), dtype=np.float32)
+    pred[:, 0] = 1.0
+    pred[:, 1] = 5.0
+    pred[:, 2] = 2.0
+    pred[:, 3] = 5e-4
+    pred[:, 4] = 20.0
+    pred[:, 5] = 3.0
+
+    gt = pred.copy()
+
+    unmasked = Predictor._cpu_worker((pred, gt, x_axis, 2, 0.0))
+    masked   = Predictor._cpu_worker((pred, gt, x_axis, 2, 1e-3))
+
+    idx20 = int(np.argmin(np.abs(x_axis - 20.0)))
+
+    assert unmasked[0][0, idx20, 0, 0] > 1e-4
+    assert masked[0][0, idx20, 0, 0] == pytest.approx(0.0, abs=1e-6)
+    assert masked[1][0, idx20, 0, 0] == pytest.approx(0.0, abs=1e-6)
+    assert masked[2][0, 3, 0, 0] == pytest.approx(5e-4)
+
+
 def test_predictor_run_inference_shapes(tmp_path):
     run       = _build_run(n_az=16, n_rg=16)
     predictor = _make_predictor(tmp_path, run)

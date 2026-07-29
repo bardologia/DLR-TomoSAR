@@ -35,6 +35,7 @@ class InferenceConfig:
     save_cubes      : bool = True
     stitch_window   : str  = "hann"
     cube_dtype      : str  = "float32"
+    render_amp_floor : float = 0.0
 
     compute_reduced      : bool           = True
     reduced_effort       : str            = "high"

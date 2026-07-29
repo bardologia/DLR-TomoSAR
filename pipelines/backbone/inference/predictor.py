@@ -149,20 +149,22 @@ class Predictor:
         run         : Run,
         logger      : Logger,
         *,
-        window_kind : str,
-        cube_dtype  : str,
-        save_cubes  : bool,
-        meta        : InferenceMetadata,
-        cpu_workers : int | None = None,
+        window_kind      : str,
+        cube_dtype       : str,
+        save_cubes       : bool,
+        meta             : InferenceMetadata,
+        cpu_workers      : int | None = None,
+        render_amp_floor : float = 0.0,
     ) -> None:
 
-        self.run         = run
-        self.logger      = logger
-        self.window_kind = window_kind
-        self.cube_dtype  = cube_dtype
-        self.save_cubes  = save_cubes
-        self.cube_dir    = meta.cube_dir
-        self.cpu_workers = cpu_workers if cpu_workers is not None else min(8, os.cpu_count() or 1)
+        self.run              = run
+        self.logger           = logger
+        self.window_kind      = window_kind
+        self.cube_dtype       = cube_dtype
+        self.save_cubes       = save_cubes
+        self.cube_dir         = meta.cube_dir
+        self.cpu_workers      = cpu_workers if cpu_workers is not None else min(8, os.cpu_count() or 1)
+        self.render_amp_floor = float(render_amp_floor)
 
     def _forward_pass(self) -> Tuple[List[List[int]], List[np.ndarray], List[np.ndarray]]:
         run = self.run
@@ -196,7 +198,7 @@ class Predictor:
         run = self.run
         n_K = run.n_gaussians
 
-        tasks = [(pred, gt, run.x_axis, n_K) for pred, gt in zip(all_pred_params, all_gt_params)]
+        tasks = [(pred, gt, run.x_axis, n_K, self.render_amp_floor) for pred, gt in zip(all_pred_params, all_gt_params)]
         results: List[tuple | None] = [None] * len(tasks)
 
         with self.logger.track(transient=True) as prog:
@@ -211,8 +213,19 @@ class Predictor:
         return results
 
     @staticmethod
+    def _render_masked(gauss: np.ndarray, amp_floor: float) -> np.ndarray:
+        if amp_floor <= 0.0:
+            return gauss
+
+        masked           = gauss.copy()
+        amp              = masked[:, :, 0]
+        masked[:, :, 0]  = np.where(amp >= amp_floor, amp, 0.0)
+
+        return masked
+
+    @staticmethod
     def _cpu_worker(args: tuple) -> tuple:
-        pred_params_chunk, gt_params_chunk, x_axis, n_gaussians = args
+        pred_params_chunk, gt_params_chunk, x_axis, n_gaussians, render_amp_floor = args
 
         x          = x_axis.reshape(1, 1, -1, 1, 1).astype(np.float32)
         B, _, H, W = pred_params_chunk.shape
@@ -230,8 +243,8 @@ class Predictor:
         pred_gauss_flat = pred_gauss.reshape(      B, n_K * 3, H, W)
         gt_gauss_flat   = gt_gauss_matched.reshape(B, n_K * 3, H, W)
 
-        pred_curves = GaussianReconstructor.reconstruct_batch(pred_gauss,       x)
-        gt_curves   = GaussianReconstructor.reconstruct_batch(gt_gauss_matched, x)
+        pred_curves = GaussianReconstructor.reconstruct_batch(Predictor._render_masked(pred_gauss,       render_amp_floor), x)
+        gt_curves   = GaussianReconstructor.reconstruct_batch(Predictor._render_masked(gt_gauss_matched, render_amp_floor), x)
 
         return (
             pred_curves,
