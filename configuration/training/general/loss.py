@@ -43,8 +43,8 @@ class LossConfig:
     use_param_legacy    : bool  = False
     weight_param_legacy : float = 1.0
     legacy_amp_thr      : float = 1e-4
-    legacy_bounds_min   : tuple = (-0.2, -5.0, 0.1, -0.2, 2.0, -0.2)
-    legacy_bounds_max   : tuple = (1.0, 5.0, 2.0, 1.0, 20.0, 4.0)
+    legacy_bounds_min   : tuple = (1e-05, -15.0, 0.01, 1e-05, 1.0, 1.0)
+    legacy_bounds_max   : tuple = (10.0, 5.0, 5.0, 10.0, 40.0, 20.0)
 
     param_weights : tuple = (1.0, 1.0, 1.0)
 

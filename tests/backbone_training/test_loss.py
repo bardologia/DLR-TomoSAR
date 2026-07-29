@@ -601,6 +601,14 @@ def test_legacy_monitored_only_on_two_gaussian_runs():
     assert "param_legacy_denorm" not in out_three["monitor"]
 
 
+def test_legacy_bounds_defaults_match_the_spock_loader():
+    cfg = LossConfig()
+
+    assert cfg.legacy_bounds_min == (1e-05, -15.0, 0.01, 1e-05, 1.0, 1.0)
+    assert cfg.legacy_bounds_max == (10.0, 5.0, 5.0, 10.0, 40.0, 20.0)
+    assert cfg.legacy_amp_thr    == 1e-4
+
+
 def test_legacy_term_logs_occupancy():
     loss = build_loss(n_gaussians=2, loss_cfg=_legacy_cfg())
     out  = loss(valid_param_tensor(2, 2, 5, 5, seed=56), valid_param_tensor(2, 2, 5, 5, seed=57))
