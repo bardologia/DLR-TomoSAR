@@ -613,6 +613,64 @@ def test_legacy_monitored_only_on_two_gaussian_runs():
     assert "param_legacy_denorm" not in out_three["monitor"]
 
 
+def _his_masked_mse_loss(y_pred, y):
+    h1_p, w1_p, a1_p = y_pred[:, 0], y_pred[:, 1], y_pred[:, 2]
+    h2_p, w2_p, a2_p = y_pred[:, 3], y_pred[:, 4], y_pred[:, 5]
+
+    h1_t, w1_t, a1_t = y[:, 0], y[:, 1], y[:, 2]
+    h2_t, w2_t, a2_t = y[:, 3], y[:, 4], y[:, 5]
+
+    w_ths         = 0.0
+    a_ths         = 0.0001
+    percent       = 0.01
+    upper_bound_w = w_ths * (1 + percent)
+
+    mask2 = ((a2_p > a_ths) & (~(w2_p < upper_bound_w))).float()
+    mask1 = 1.0 - mask2
+
+    def masked_mse(pred, target, mask):
+        return ((pred - target) ** 2 * mask).sum() / (mask.sum() + 1e-8)
+
+    loss1 = (
+        masked_mse(h1_p, h1_t, mask1) + masked_mse(w1_p, w1_t, mask1) + masked_mse(a1_p, a1_t, mask1)
+        + masked_mse(h1_p, h1_t, mask2) + masked_mse(w1_p, w1_t, mask2) + masked_mse(a1_p, a1_t, mask2)
+    )
+    loss2 = masked_mse(h2_p, h2_t, mask2) + masked_mse(w2_p, w2_t, mask2) + masked_mse(a2_p, a2_t, mask2)
+
+    return loss1 + loss2
+
+
+def _his_layout(phys: torch.Tensor, mins, maxs) -> torch.Tensor:
+    scaled  = torch.empty(phys.shape[0], 6, *phys.shape[3:])
+    ours2his = {0: 2, 1: 0, 2: 1}
+
+    for slot in range(2):
+        for ours, his in ours2his.items():
+            full          = slot * 3 + ours
+            scaled[:, slot * 3 + his] = (phys[:, slot, ours] - mins[full]) / (maxs[full] - mins[full])
+
+    return scaled
+
+
+def test_legacy_loss_matches_a_verbatim_transcription_of_his_code():
+    from tools.loss.param_loss import LegacyParamLoss
+
+    cfg  = LossConfig()
+    gen  = torch.Generator().manual_seed(7)
+    mins = cfg.legacy_bounds_min
+    maxs = cfg.legacy_bounds_max
+
+    span      = torch.tensor([m2 - m1 for m1, m2 in zip(mins, maxs)]).reshape(1, 2, 3, 1, 1)
+    lo        = torch.tensor(mins).reshape(1, 2, 3, 1, 1)
+    pred_phys = lo + span * (torch.rand(4, 2, 3, 5, 5, generator=gen) * 1.6 - 0.3)
+    gt_phys   = lo + span * torch.rand(4, 2, 3, 5, 5, generator=gen)
+
+    ours = LegacyParamLoss.mse(pred_phys, gt_phys, mins, maxs, cfg.legacy_amp_thr)
+    his  = _his_masked_mse_loss(_his_layout(pred_phys, mins, maxs), _his_layout(gt_phys, mins, maxs))
+
+    assert ours.item() == pytest.approx(his.item(), rel=1e-5)
+
+
 def test_legacy_bounds_defaults_match_the_spock_loader():
     cfg = LossConfig()
 
