@@ -52,7 +52,7 @@ class StackPlotter(PlotBase):
 
     def _plot_linear_amplitude(self, amplitude: np.ndarray, title: str, cbar_label: str, out_path: Path) -> Path:
         Az, R      = amplitude.shape
-        vmin, vmax = self._shared_clim(amplitude)
+        vmin, vmax = self._amplitude_clim(amplitude)
 
         fig, ax = plt.subplots(figsize=(8, 6))
         im      = ax.imshow(amplitude, cmap="gray", vmin=vmin, vmax=vmax, extent=[0, R, Az, 0], aspect="auto", interpolation="nearest")

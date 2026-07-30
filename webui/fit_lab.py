@@ -14,6 +14,7 @@ import numpy as np
 from configuration.param_extraction import ExtractionConfig, FitMode
 from project_paths                  import ProjectPaths
 from tools.data.preprocessing       import ProfilePreprocessor
+from tools.reporting.plotting       import PlotBase
 from web_logger                     import WebLogger
 
 
@@ -123,8 +124,12 @@ class FitLab:
                 return None
             image = self.loaded["maps"][src]
 
-        vmin, vmax = np.percentile(image, [1.0, 99.0])
-        cmap       = "gray" if src == "slc" else "viridis"
+        if src == "slc":
+            vmin, vmax = PlotBase._amplitude_clim(image)
+            cmap       = "gray"
+        else:
+            vmin, vmax = np.percentile(image, [1.0, 99.0])
+            cmap       = "viridis"
 
         buf = io.BytesIO()
         plt.imsave(buf, image.T, cmap=cmap, vmin=float(vmin), vmax=float(vmax), format="png")

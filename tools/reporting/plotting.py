@@ -113,6 +113,19 @@ class PlotBase:
         return float(np.percentile(flat, q_low)), float(np.percentile(flat, q_high))
 
     @staticmethod
+    def _amplitude_clim(*arrays: np.ndarray) -> Tuple[float, float]:
+        flat = np.concatenate([np.asarray(a).reshape(-1) for a in arrays])
+        flat = flat[np.isfinite(flat)]
+        if flat.size == 0:
+            raise ValueError("_amplitude_clim received no finite values; cannot derive an amplitude scale from an empty or all-NaN field")
+
+        vmax = 3.0 * float(flat.mean())
+        if vmax <= 0.0:
+            raise ValueError("_amplitude_clim requires a positive mean amplitude; got a non-positive field")
+
+        return 0.0, vmax
+
+    @staticmethod
     def _cmap_with_bad(name: str, bad_color: str = "0.88") -> mcolors.Colormap:
         cmap = plt.get_cmap(name).copy()
         cmap.set_bad(color=bad_color)

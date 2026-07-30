@@ -101,6 +101,37 @@ def test_cmap_with_bad_sets_bad_color():
     assert tuple(bad) == mcolors.to_rgba("red")
 
 
+def test_amplitude_clim_is_three_times_mean():
+    arr = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    lo, hi = PlotBase._amplitude_clim(arr)
+    assert lo == 0.0
+    assert hi == pytest.approx(6.0)
+
+
+def test_amplitude_clim_ignores_nonfinite():
+    arr = np.array([1.0, 3.0, np.nan, np.inf], dtype=np.float32)
+    lo, hi = PlotBase._amplitude_clim(arr)
+    assert lo == 0.0
+    assert hi == pytest.approx(6.0)
+
+
+def test_amplitude_clim_multiple_arrays():
+    a = np.array([1.0, 1.0])
+    b = np.array([3.0, 3.0])
+    lo, hi = PlotBase._amplitude_clim(a, b)
+    assert hi == pytest.approx(6.0)
+
+
+def test_amplitude_clim_empty_raises():
+    with pytest.raises(ValueError):
+        PlotBase._amplitude_clim(np.array([]))
+
+
+def test_amplitude_clim_zero_field_raises():
+    with pytest.raises(ValueError):
+        PlotBase._amplitude_clim(np.zeros(16, dtype=np.float32))
+
+
 def test_normalize_01_range():
     arr  = np.array([2.0, 4.0, 6.0], dtype=np.float32)
     norm = PlotBase._normalize_01(arr)

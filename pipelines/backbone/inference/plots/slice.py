@@ -153,8 +153,8 @@ class SlicePlotter(PlotTools):
         return paths
 
     def _amplitude_panel(self, channel: np.ndarray, title: str, path: Path, extent: list) -> Path:
-        amplitude = np.abs(channel).astype(np.float32)
-        vmax      = float(np.percentile(amplitude, 99.0))
+        amplitude  = np.abs(channel).astype(np.float32)
+        vmin, vmax = self._amplitude_clim(amplitude)
 
         return self._imshow_panel(
             data       = amplitude,
@@ -164,8 +164,8 @@ class SlicePlotter(PlotTools):
             cbar_label = "amplitude",
             extent     = extent,
             cmap       = "gray",
-            vmin       = 0.0,
-            vmax       = max(vmax, 1e-6),
+            vmin       = vmin,
+            vmax       = vmax,
             origin     = "upper",
             path       = path,
             figsize    = (7, 5),
