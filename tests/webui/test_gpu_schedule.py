@@ -55,6 +55,19 @@ class StubProcesses:
         self.pools[job_id] = {"ok": True, "supported": True, "live": True, "gpus": [0]}
 
 
+class StubGuard:
+    def __init__(self) -> None:
+        self.bounced = []
+
+    def bounce(self, gpu: int, user: str) -> None:
+        self.bounced.append({"gpu_index": gpu, "user": user, "status": "survived"})
+
+    def take_bounced(self) -> list[dict]:
+        bounced      = list(self.bounced)
+        self.bounced = []
+        return bounced
+
+
 class StubSystem:
     def __init__(self) -> None:
         self.user    = "bard"
@@ -77,7 +90,7 @@ class StubSystem:
 def schedule(tmp_path):
     processes = StubProcesses()
     system    = StubSystem()
-    schedule  = GpuSchedule(StubPaths(tmp_path), WebLogger(), processes, system)
+    schedule  = GpuSchedule(StubPaths(tmp_path), WebLogger(), processes, system, StubGuard())
     schedule.settings["enabled"] = True
     return schedule, processes, system
 
@@ -331,14 +344,14 @@ def test_greedy_never_unparks_a_job_and_keeps_waiting_for_it(schedule):
     assert processes.writes[-1] == ("job1", [0, 1])
 
 
-def test_charity_opens_the_shared_gpu_when_every_gpu_is_taken(schedule):
-    scheduler, processes, system = schedule
+def test_charity_frees_the_gpu_a_bounced_attempt_hit(schedule):
+    scheduler, processes, _system = schedule
     scheduler.settings["charity"] = True
     processes.add_running_fan_out("job1")
     processes.pools["job1"]["gpus"] = [0, 1, 2, 3]
-    system.occupy(1, "colleague")
 
     scheduler.tick(WEDNESDAY)
+    scheduler.guard.bounce(1, "colleague")
     given = scheduler.charity(WEDNESDAY)
     state = scheduler.state()
 
@@ -354,13 +367,13 @@ def test_charity_opens_the_shared_gpu_when_every_gpu_is_taken(schedule):
 
 
 def test_charity_stays_quiet_while_any_gpu_is_still_free(schedule):
-    scheduler, processes, system = schedule
+    scheduler, processes, _system = schedule
     scheduler.settings["charity"] = True
     processes.add_running_fan_out("job1")
     processes.pools["job1"]["gpus"] = [0, 1]
-    system.occupy(1, "colleague")
 
     scheduler.tick(WEDNESDAY)
+    scheduler.guard.bounce(1, "colleague")
 
     assert scheduler.charity(WEDNESDAY) == []
     assert processes.writes             == []
@@ -371,38 +384,57 @@ def test_charity_never_leaves_a_job_without_a_gpu(schedule):
     scheduler, processes, system = schedule
     scheduler.settings["charity"] = True
     processes.add_running_fan_out("job1")
-    for index in (0, 1, 2, 3):
+    processes.pools["job1"]["gpus"] = [1]
+    for index in (0, 2, 3):
         system.occupy(index, "colleague")
 
     scheduler.tick(WEDNESDAY)
+    scheduler.guard.bounce(1, "colleague")
 
     assert scheduler.charity(WEDNESDAY) == []
     assert processes.writes             == []
     assert scheduler.nap_until          is None
 
 
-def test_charity_off_never_donates(schedule):
-    scheduler, processes, system = schedule
+def test_a_bounce_off_an_unshrinkable_pool_frees_a_gpu_from_the_biggest_one(schedule):
+    scheduler, processes, _system = schedule
+    scheduler.settings["charity"] = True
     processes.add_running_fan_out("job1")
-    processes.pools["job1"]["gpus"] = [0, 1, 2, 3]
-    system.occupy(1, "colleague")
+    processes.add_running_fan_out("job2")
+    processes.pools["job1"]["gpus"] = [0]
+    processes.pools["job2"]["gpus"] = [1, 2, 3]
 
     scheduler.tick(WEDNESDAY)
+    scheduler.guard.bounce(0, "colleague")
+    given = scheduler.charity(WEDNESDAY)
+
+    assert given                                 == ["job2"]
+    assert processes.writes                      == [("job2", [1, 2])]
+    assert scheduler.applied["job2"]["withheld"] == [3]
+
+
+def test_charity_off_drains_bounces_without_donating(schedule):
+    scheduler, processes, _system = schedule
+    processes.add_running_fan_out("job1")
+    processes.pools["job1"]["gpus"] = [0, 1, 2, 3]
+
+    scheduler.tick(WEDNESDAY)
+    scheduler.guard.bounce(1, "colleague")
 
     assert scheduler.charity(WEDNESDAY) == []
     assert processes.writes             == []
+    assert scheduler.guard.bounced      == []
 
 
 def test_the_nap_blocks_greedy_until_it_ends_then_greedy_reclaims(schedule):
-    scheduler, processes, system = schedule
+    scheduler, processes, _system = schedule
     scheduler.settings["charity"] = True
     processes.add_running_fan_out("job1")
     processes.pools["job1"]["gpus"] = [0, 1, 2, 3]
-    system.occupy(1, "colleague")
 
     scheduler.tick(WEDNESDAY)
+    scheduler.guard.bounce(1, "colleague")
     scheduler.charity(WEDNESDAY)
-    system.release(1)
 
     scheduler.sweep(WEDNESDAY)
     assert processes.writes == [("job1", [0, 2, 3])]
@@ -415,19 +447,23 @@ def test_the_nap_blocks_greedy_until_it_ends_then_greedy_reclaims(schedule):
     assert processes.writes[-1] == ("job1", [0, 1, 2, 3])
 
 
-def test_a_second_squeeze_during_the_nap_gets_nothing(schedule):
-    scheduler, processes, system = schedule
+def test_a_second_bounce_during_the_nap_gets_nothing(schedule):
+    scheduler, processes, _system = schedule
     scheduler.settings["charity"] = True
     processes.add_running_fan_out("job1")
     processes.pools["job1"]["gpus"] = [0, 1, 2, 3]
-    system.occupy(1, "colleague")
 
     scheduler.tick(WEDNESDAY)
+    scheduler.guard.bounce(1, "colleague")
     scheduler.charity(WEDNESDAY)
-    system.occupy(2, "rival")
+
+    scheduler.guard.bounce(2, "rival")
 
     assert scheduler.charity(WEDNESDAY) == []
     assert processes.writes             == [("job1", [0, 2, 3])]
+    assert scheduler.guard.bounced      == []
+
+    assert scheduler.charity(WEDNESDAY + GpuSchedule.CHARITY_NAP) == []
 
 
 def test_a_phase_cross_during_the_nap_keeps_the_gift_out(schedule):
@@ -435,15 +471,16 @@ def test_a_phase_cross_during_the_nap_keeps_the_gift_out(schedule):
     scheduler.settings["charity"] = True
     processes.add_running_fan_out("job1")
     processes.pools["job1"]["gpus"] = [2, 3]
-    for index in (0, 1, 2):
-        system.occupy(index, "colleague")
+    system.occupy(0, "colleague")
+    system.occupy(1, "colleague")
 
     scheduler.tick(WEDNESDAY)
+    scheduler.guard.bounce(2, "colleague")
     scheduler.charity(WEDNESDAY)
     assert processes.writes == [("job1", [3])]
 
-    for index in (0, 1, 2):
-        system.release(index)
+    system.release(0)
+    system.release(1)
     scheduler.tick(WEDNESDAY_NIGHT)
 
     assert processes.writes[-1]                  == ("job1", [0, 1, 3])
@@ -451,13 +488,13 @@ def test_a_phase_cross_during_the_nap_keeps_the_gift_out(schedule):
 
 
 def test_turning_charity_off_ends_the_nap(schedule):
-    scheduler, processes, system = schedule
+    scheduler, processes, _system = schedule
     scheduler.settings["charity"] = True
     processes.add_running_fan_out("job1")
     processes.pools["job1"]["gpus"] = [0, 1, 2, 3]
-    system.occupy(1, "colleague")
 
     scheduler.tick(WEDNESDAY)
+    scheduler.guard.bounce(1, "colleague")
     scheduler.charity(WEDNESDAY)
     assert scheduler.nap_until is not None
 
@@ -523,13 +560,13 @@ def test_update_persists_and_reloads(tmp_path):
     processes = StubProcesses()
     payload   = {**GpuSchedule.DEFAULTS, "enabled": True, "charity": True, "weekday_gpus": [1], "night_gpus": [1, 2], "weekend_gpus": [0, 1, 2]}
 
-    scheduler = GpuSchedule(StubPaths(tmp_path), WebLogger(), processes, StubSystem())
+    scheduler = GpuSchedule(StubPaths(tmp_path), WebLogger(), processes, StubSystem(), StubGuard())
     result    = scheduler.update(payload)
 
     assert result["ok"] is True
     assert json.loads(scheduler.path.read_text())["weekday_gpus"] == [1]
 
-    reloaded = GpuSchedule(StubPaths(tmp_path), WebLogger(), processes, StubSystem())
+    reloaded = GpuSchedule(StubPaths(tmp_path), WebLogger(), processes, StubSystem(), StubGuard())
 
     assert reloaded.settings["enabled"]      is True
     assert reloaded.settings["charity"]      is True
@@ -564,7 +601,7 @@ def test_state_reports_the_pool_that_applies_right_now(schedule):
     ({"night_start_hour": 20, "night_end_hour": 20}, "never switch"),
 ])
 def test_update_rejects_an_invalid_schedule(tmp_path, payload, reason):
-    scheduler = GpuSchedule(StubPaths(tmp_path), WebLogger(), StubProcesses(), StubSystem())
+    scheduler = GpuSchedule(StubPaths(tmp_path), WebLogger(), StubProcesses(), StubSystem(), StubGuard())
     before    = dict(scheduler.settings)
 
     result = scheduler.update({**GpuSchedule.DEFAULTS, **payload})
@@ -576,7 +613,7 @@ def test_update_rejects_an_invalid_schedule(tmp_path, payload, reason):
 
 
 def test_update_rejects_a_partial_schedule(tmp_path):
-    scheduler = GpuSchedule(StubPaths(tmp_path), WebLogger(), StubProcesses(), StubSystem())
+    scheduler = GpuSchedule(StubPaths(tmp_path), WebLogger(), StubProcesses(), StubSystem(), StubGuard())
 
     result = scheduler.update({"enabled": True})
 
@@ -589,6 +626,6 @@ def test_an_unreadable_schedule_file_falls_back_to_defaults_loudly(tmp_path):
     paths.logs_dir.mkdir(parents=True)
     (paths.logs_dir / GpuSchedule.FILE_NAME).write_text("{not json")
 
-    scheduler = GpuSchedule(paths, WebLogger(), StubProcesses(), StubSystem())
+    scheduler = GpuSchedule(paths, WebLogger(), StubProcesses(), StubSystem(), StubGuard())
 
     assert scheduler.settings == GpuSchedule.DEFAULTS

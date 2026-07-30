@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 
 from tools.orchestration.gpu_queue import GpuPoolFile
 
+from gpu_watchdog    import GpuWatchdog
 from process_manager import ProcessManager
 from project_paths   import ProjectPaths
 from system_monitor  import SystemMonitor
@@ -114,14 +115,8 @@ class GpuAvailability:
 
         return held
 
-    def census(self) -> dict[int, dict]:
-        census = {}
-
-        for device in self.system.gpu_occupancy():
-            owners = {proc["owner"] for proc in device["procs"] if proc["owner"]}
-            census[device["index"]] = {"idle": not device["procs"], "others": sorted(owners - {self.system.user})}
-
-        return census
+    def idle(self) -> set[int]:
+        return {device["index"] for device in self.system.gpu_occupancy() if not device["procs"]}
 
     def grant(self, target: list[int]) -> list[int]:
         busy = self.busy()
@@ -152,10 +147,11 @@ class GpuSchedule:
         "night_end_hour"   : 8,
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, processes: ProcessManager, system: SystemMonitor) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, processes: ProcessManager, system: SystemMonitor, guard: GpuWatchdog) -> None:
         self.paths        = paths
         self.logger       = logger
         self.processes    = processes
+        self.guard        = guard
         self.availability = GpuAvailability(system)
         self.lock         = threading.Lock()
         self.path         = self.paths.logs_dir / self.FILE_NAME
@@ -292,34 +288,43 @@ class GpuSchedule:
 
         self.logger.ok(f"charity nap over: greedy is awake again and will pick {gifts} back up once they free")
 
-    def _needy(self) -> dict | None:
-        census = self.availability.census()
-        pooled = {gpu for job_id in self._live_jobs() for gpu in self.processes.gpu_pool(job_id).get("gpus", [])}
-
-        if any(entry["idle"] and index not in pooled for index, entry in census.items()):
-            return None
-
-        for index, entry in sorted(census.items()):
-            if entry["others"] and index in pooled:
-                return {"gpu": index, "users": entry["others"]}
-
-        return None
-
-    def _donate(self, needy: dict, moment: datetime) -> list[str]:
-        gpu     = needy["gpu"]
-        holders = []
+    def _pools(self) -> dict[str, list[int]]:
+        pools = {}
 
         for job_id in self._live_jobs():
-            pool = self.processes.gpu_pool(job_id).get("gpus", [])
-            if gpu in pool:
-                holders.append((job_id, pool))
+            gpus = self.processes.gpu_pool(job_id).get("gpus", [])
+            if gpus:
+                pools[job_id] = gpus
 
-        if not holders or any(len(pool) < 2 for _job_id, pool in holders):
-            return []
+        return pools
 
+    def _all_taken(self, pools: dict[str, list[int]]) -> bool:
+        pooled = {gpu for gpus in pools.values() for gpu in gpus}
+        return all(index in pooled for index in self.availability.idle())
+
+    def _releasable(self, pools: dict[str, list[int]]) -> dict[int, list[str]]:
+        holders = {}
+
+        for job_id, gpus in pools.items():
+            for gpu in gpus:
+                holders.setdefault(gpu, []).append(job_id)
+
+        return {gpu: jobs for gpu, jobs in holders.items() if all(len(pools[job_id]) > 1 for job_id in jobs)}
+
+    def _pick(self, releasable: dict[int, list[str]], pools: dict[str, list[int]], wanted: int) -> int | None:
+        if wanted in releasable:
+            return wanted
+
+        if not releasable:
+            return None
+
+        return max(releasable, key=lambda gpu: (min(len(pools[job_id]) for job_id in releasable[gpu]), gpu))
+
+    def _donate(self, gpu: int, jobs: list[str], attempt: dict, moment: datetime) -> list[str]:
         donors = []
 
-        for job_id, pool in holders:
+        for job_id in jobs:
+            pool   = self.processes.gpu_pool(job_id).get("gpus", [])
             result = self.processes.set_gpus(job_id, [g for g in pool if g != gpu])
             if not result.get("ok"):
                 continue
@@ -337,26 +342,33 @@ class GpuSchedule:
         with self.lock:
             self.nap_until    = until
             self.gifted.add(gpu)
-            self.last_charity = {"gpu": gpu, "users": needy["users"], "jobs": donors, "at": moment.isoformat(timespec="seconds"), "until": until.isoformat(timespec="seconds")}
+            self.last_charity = {"gpu": gpu, "users": [attempt["user"]], "jobs": donors, "at": moment.isoformat(timespec="seconds"), "until": until.isoformat(timespec="seconds")}
 
-        self.logger.ok(f"charity opened gpu {gpu} for {', '.join(needy['users'])}: job(s) {donors} leave it once the unit in flight finishes, greedy sleeps until {until.strftime('%A %H:%M')}")
+        self.logger.ok(f"charity opened gpu {gpu} for {attempt['user']}, whose attempt on gpu {attempt['gpu_index']} bounced off a full machine: job(s) {donors} leave it once the unit in flight finishes, greedy sleeps until {until.strftime('%A %H:%M')}")
         return donors
 
     def charity(self, moment: datetime) -> list[str]:
         self._wake(moment)
+        bounced = self.guard.take_bounced()
 
         with self.lock:
             active  = self.settings["enabled"] and self.settings["greedy"] and self.settings["charity"]
             napping = self.nap_until is not None
 
-        if not active or napping:
+        if not active or napping or not bounced:
             return []
 
-        needy = self._needy()
-        if needy is None:
+        pools = self._pools()
+        if not self._all_taken(pools):
             return []
 
-        return self._donate(needy, moment)
+        attempt    = bounced[-1]
+        releasable = self._releasable(pools)
+        gpu        = self._pick(releasable, pools, attempt["gpu_index"])
+        if gpu is None:
+            return []
+
+        return self._donate(gpu, releasable[gpu], attempt, moment)
 
     def _claim(self, job_id: str, current: list[int], freed: list[int]) -> list[str]:
         merged = sorted(set(current) | set(freed))

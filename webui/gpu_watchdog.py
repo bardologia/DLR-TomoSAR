@@ -33,6 +33,7 @@ class GpuWatchdog:
         self.residents = {}
         self.gpus      = []
         self.events    = deque(maxlen=self.EVENT_LIMIT)
+        self.bounced   = deque(maxlen=self.EVENT_LIMIT)
         self.count     = 0
         self.critical  = 0
         self.log_path  = self.paths.gpu_guard_dir / self.LOG_NAME
@@ -56,6 +57,13 @@ class GpuWatchdog:
                 "critical" : self.critical,
                 "log_path" : str(self.log_path),
             }
+
+    def take_bounced(self) -> list[dict]:
+        with self.lock:
+            bounced = list(self.bounced)
+            self.bounced.clear()
+
+        return bounced
 
     def history(self, limit: int = 100) -> dict:
         records = []
@@ -198,6 +206,7 @@ class GpuWatchdog:
                 with self.lock:
                     incident["status"]           = "survived"
                     incident["record"]["status"] = "survived"
+                    self.bounced.append(dict(incident["record"]))
 
     def _fate(self, incident: dict, pid: int) -> str:
         job_id = incident["jobs"].get(pid)

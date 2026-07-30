@@ -171,6 +171,36 @@ def test_untracked_pid_exit_is_not_critical(tmp_path):
     assert watchdog.incidents[("GPU-0", 200)]["status"] == "ended"
 
 
+def test_a_vanished_intruder_is_recorded_as_bounced(tmp_path):
+    watchdog, system, _ = _watchdog(tmp_path)
+
+    _invaded(watchdog, system)
+
+    system.occupancy = [_device([_proc(100, "me")])]
+    system.owners    = {100: "me"}
+    watchdog._evaluate()
+    assert watchdog.take_bounced() == []
+
+    watchdog.incidents[("GPU-0", 200)]["last_seen"] -= GpuWatchdog.GRACE_S + 1
+    watchdog._evaluate()
+
+    bounced = watchdog.take_bounced()
+    assert [record["user"] for record in bounced]           == ["them"]
+    assert bounced[0]["gpu_index"]                          == 0
+    assert watchdog.take_bounced()                          == []
+    assert watchdog.incidents[("GPU-0", 200)]["status"]     == "survived"
+
+
+def test_a_persisting_intruder_is_not_bounced(tmp_path):
+    watchdog, system, _ = _watchdog(tmp_path)
+
+    _invaded(watchdog, system)
+    watchdog._evaluate()
+
+    assert watchdog.take_bounced() == []
+    assert watchdog.incidents[("GPU-0", 200)]["status"] == "active"
+
+
 def test_pending_fate_defers_until_exit_resolves(tmp_path):
     watchdog, system, processes = _watchdog(tmp_path)
     processes.jobs  = {100: "j1"}
