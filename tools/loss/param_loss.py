@@ -88,7 +88,6 @@ class ParamMatcher:
 class LegacyParamLoss:
     LEGACY_GAUSSIANS = 2
     BOUND_ENTRIES    = 6
-    EMPTY_FLOOR      = 1e-8
 
     @staticmethod
     def _scale(phys: torch.Tensor, bounds_min: tuple, bounds_max: tuple) -> torch.Tensor:
@@ -104,27 +103,14 @@ class LegacyParamLoss:
         return (phys - lo) / (hi - lo)
 
     @staticmethod
-    def _group_mean(sq_err: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
-        return (sq_err * mask).sum(dim=(0, 2, 3)) / (mask.sum() + LegacyParamLoss.EMPTY_FLOOR)
-
-    @staticmethod
-    def mse(pred_phys: torch.Tensor, gt_phys: torch.Tensor, bounds_min: tuple, bounds_max: tuple, amp_thr: float) -> torch.Tensor:
+    def mse(pred_phys: torch.Tensor, gt_phys: torch.Tensor, bounds_min: tuple, bounds_max: tuple) -> torch.Tensor:
         if pred_phys.shape[1] != LegacyParamLoss.LEGACY_GAUSSIANS:
-            raise ValueError(f"LegacyParamLoss.mse imitates the two-Gaussian legacy masked loss; got {pred_phys.shape[1]} Gaussian slots.")
+            raise ValueError(f"LegacyParamLoss.mse computes MSE in the two-Gaussian legacy target space; got {pred_phys.shape[1]} Gaussian slots.")
 
         pred = LegacyParamLoss._scale(pred_phys, bounds_min, bounds_max)
         gt   = LegacyParamLoss._scale(gt_phys, bounds_min, bounds_max)
 
-        present = ((pred[:, 1, 0:1] > amp_thr) & (pred[:, 1, 2:3] >= 0.0)).to(pred.dtype).detach()
-        absent  = 1.0 - present
-
-        sq_first  = (pred[:, 0] - gt[:, 0]) ** 2
-        sq_second = (pred[:, 1] - gt[:, 1]) ** 2
-
-        loss_first  = LegacyParamLoss._group_mean(sq_first, absent) + LegacyParamLoss._group_mean(sq_first, present)
-        loss_second = LegacyParamLoss._group_mean(sq_second, present)
-
-        return (loss_first + loss_second).sum()
+        return ((pred - gt) ** 2).mean()
 
 
 class ParamLoss:

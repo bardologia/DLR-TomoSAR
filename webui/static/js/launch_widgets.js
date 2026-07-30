@@ -4511,7 +4511,7 @@ class ConfigForm {
       const legacy = document.createElement("button");
       legacy.className = "btn btn--mini btn--legacy";
       legacy.textContent = "Legacy mode";
-      legacy.title = "Swap every config to the legacy masked-MSE setup (legacy term only, sorted_gt matching, curriculum and augmentation off) and show only its fields; pick a two-Gaussian parameters dataset";
+      legacy.title = "Swap every config to the legacy scaled-MSE setup (legacy term only, sorted_gt matching, curriculum and augmentation off) and show only its fields; pick a two-Gaussian parameters dataset";
       legacy.addEventListener("click", () => this._toggleLegacy());
       this.legacyBtn = legacy;
       bar.appendChild(legacy);

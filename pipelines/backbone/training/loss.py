@@ -78,7 +78,7 @@ class Loss:
 
     def _validate_legacy(self, cfg) -> None:
         if cfg.use_param_legacy and cfg.param_matching.value != ParamMatcher.SORTED_GT:
-            raise ValueError(f"use_param_legacy requires param_matching={ParamMatcher.SORTED_GT!r}; the legacy mask assumes fixed slot identity and {cfg.param_matching.value!r} reassigns prediction slots per pixel.")
+            raise ValueError(f"use_param_legacy requires param_matching={ParamMatcher.SORTED_GT!r}; the legacy per-slot bounds assume fixed slot identity and {cfg.param_matching.value!r} reassigns prediction slots per pixel.")
 
     def reconstruct_gaussians(self, params: torch.Tensor) -> torch.Tensor:
         return GaussianCurve.reconstruct(params, self.x_axis, self.gaussian_cfg.params_per_gaussian)
@@ -117,7 +117,7 @@ class Loss:
     def _param_legacy(self, matched):
         _pred, pred_phys, _gt, gt_phys = matched
         cfg = self.loss_cfg
-        return LegacyParamLoss.mse(pred_phys, gt_phys, cfg.legacy_bounds_min, cfg.legacy_bounds_max, cfg.legacy_amp_thr)
+        return LegacyParamLoss.mse(pred_phys, gt_phys, cfg.legacy_bounds_min, cfg.legacy_bounds_max)
 
     @torch.no_grad()
     def _physical_errors(self, matched) -> dict:

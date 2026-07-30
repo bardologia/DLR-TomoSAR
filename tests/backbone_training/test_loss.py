@@ -518,7 +518,7 @@ def _legacy_gt(slot2: tuple = (1.0, 44.0, 6.0)) -> torch.Tensor:
     return gt
 
 
-def test_legacy_term_matches_hand_computed_group_means():
+def test_legacy_term_matches_hand_computed_scaled_mse():
     loss = build_loss(n_gaussians=2, loss_cfg=_legacy_zero_floor_cfg())
     pred = _legacy_pred(0.0, 2.0)
     gt   = _legacy_gt()
@@ -526,59 +526,27 @@ def test_legacy_term_matches_hand_computed_group_means():
     out  = loss(pred, gt)
 
     assert set(out["components"].keys()) == {"param_legacy"}
-    assert out["total_loss"].item() == pytest.approx(0.416875, rel=1e-4)
+    assert out["total_loss"].item() == pytest.approx(0.0425, rel=1e-4)
 
 
-def test_legacy_ignores_gt_slot2_when_prediction_absent():
+def test_legacy_supervises_gt_slot2_when_prediction_absent():
     loss = build_loss(n_gaussians=2, loss_cfg=_legacy_zero_floor_cfg())
-
-    out_a = loss(_legacy_pred(0.0, 0.0), _legacy_gt((1.0, 44.0, 6.0)))
-    out_b = loss(_legacy_pred(0.0, 0.0), _legacy_gt((1.5, 60.0, 9.0)))
-
-    assert out_a["total_loss"].item() == pytest.approx(out_b["total_loss"].item(), rel=1e-6)
-
-
-def test_legacy_predicted_absent_slot2_receives_no_gradient():
-    loss = build_loss(n_gaussians=2, loss_cfg=_legacy_zero_floor_cfg())
-    pred = _legacy_pred(0.0, 0.0).requires_grad_(True)
-
-    loss(pred, _legacy_gt())["total_loss"].backward()
-
-    assert torch.all(pred.grad[:, 3:6] == 0.0).item()
-    assert pred.grad[:, 0:3].abs().sum().item() > 0.0
-
-
-def test_legacy_predicted_present_slot2_receives_gradient():
-    loss = build_loss(n_gaussians=2, loss_cfg=_legacy_zero_floor_cfg())
-    pred = _legacy_pred(2.0, 2.0).requires_grad_(True)
-
-    loss(pred, _legacy_gt())["total_loss"].backward()
-
-    assert pred.grad[:, 3:6].abs().sum().item() > 0.0
-    assert torch.isfinite(pred.grad).all().item()
-
-
-def test_legacy_negative_scaled_width_masks_slot2_despite_present_amplitude():
-    loss = build_loss(n_gaussians=2, loss_cfg=_legacy_zero_floor_cfg())
-
-    pred = _legacy_pred(2.0, 2.0)
-    pred[0, 5] = 1.0
-
-    out_a = loss(pred, _legacy_gt((1.0, 44.0, 6.0)))
-    out_b = loss(pred.clone(), _legacy_gt((1.5, 60.0, 9.0)))
-
-    assert out_a["total_loss"].item() == pytest.approx(out_b["total_loss"].item(), rel=1e-6)
-
-
-def test_legacy_negative_amp_floor_keeps_the_gate_on_at_zero_amplitude():
-    bounds_min = (-0.2, 0.0, 2.0, -0.2, 0.0, 2.0)
-    bounds_max = (1.0, 80.0, 10.0, 1.0, 80.0, 10.0)
-    loss       = build_loss(n_gaussians=2, loss_cfg=_legacy_cfg(legacy_bounds_min=bounds_min, legacy_bounds_max=bounds_max))
 
     out_a = loss(_legacy_pred(0.0, 0.0), _legacy_gt((1.0, 44.0, 6.0)))
     out_b = loss(_legacy_pred(0.0, 0.0), _legacy_gt((1.5, 60.0, 9.0)))
 
     assert out_a["total_loss"].item() != pytest.approx(out_b["total_loss"].item(), rel=1e-6)
+
+
+def test_legacy_predicted_absent_slot2_receives_gradient():
+    loss = build_loss(n_gaussians=2, loss_cfg=_legacy_zero_floor_cfg())
+    pred = _legacy_pred(0.0, 0.0).requires_grad_(True)
+
+    loss(pred, _legacy_gt())["total_loss"].backward()
+
+    assert pred.grad[:, 3:6].abs().sum().item() > 0.0
+    assert pred.grad[:, 0:3].abs().sum().item() > 0.0
+    assert torch.isfinite(pred.grad).all().item()
 
 
 def test_legacy_bounds_length_mismatch_raises():
@@ -627,46 +595,7 @@ def test_legacy_monitored_only_on_two_gaussian_runs():
     assert "param_legacy_denorm" not in out_three["monitor"]
 
 
-def _his_masked_mse_loss(y_pred, y):
-    h1_p, w1_p, a1_p = y_pred[:, 0], y_pred[:, 1], y_pred[:, 2]
-    h2_p, w2_p, a2_p = y_pred[:, 3], y_pred[:, 4], y_pred[:, 5]
-
-    h1_t, w1_t, a1_t = y[:, 0], y[:, 1], y[:, 2]
-    h2_t, w2_t, a2_t = y[:, 3], y[:, 4], y[:, 5]
-
-    w_ths         = 0.0
-    a_ths         = 0.0001
-    percent       = 0.01
-    upper_bound_w = w_ths * (1 + percent)
-
-    mask2 = ((a2_p > a_ths) & (~(w2_p < upper_bound_w))).float()
-    mask1 = 1.0 - mask2
-
-    def masked_mse(pred, target, mask):
-        return ((pred - target) ** 2 * mask).sum() / (mask.sum() + 1e-8)
-
-    loss1 = (
-        masked_mse(h1_p, h1_t, mask1) + masked_mse(w1_p, w1_t, mask1) + masked_mse(a1_p, a1_t, mask1)
-        + masked_mse(h1_p, h1_t, mask2) + masked_mse(w1_p, w1_t, mask2) + masked_mse(a1_p, a1_t, mask2)
-    )
-    loss2 = masked_mse(h2_p, h2_t, mask2) + masked_mse(w2_p, w2_t, mask2) + masked_mse(a2_p, a2_t, mask2)
-
-    return loss1 + loss2
-
-
-def _his_layout(phys: torch.Tensor, mins, maxs) -> torch.Tensor:
-    scaled  = torch.empty(phys.shape[0], 6, *phys.shape[3:])
-    ours2his = {0: 2, 1: 0, 2: 1}
-
-    for slot in range(2):
-        for ours, his in ours2his.items():
-            full          = slot * 3 + ours
-            scaled[:, slot * 3 + his] = (phys[:, slot, ours] - mins[full]) / (maxs[full] - mins[full])
-
-    return scaled
-
-
-def test_legacy_loss_matches_a_verbatim_transcription_of_his_code():
+def test_legacy_loss_is_plain_mse_in_scaled_space():
     from tools.loss.param_loss import LegacyParamLoss
 
     cfg  = LossConfig()
@@ -679,10 +608,10 @@ def test_legacy_loss_matches_a_verbatim_transcription_of_his_code():
     pred_phys = lo + span * (torch.rand(4, 2, 3, 5, 5, generator=gen) * 1.6 - 0.3)
     gt_phys   = lo + span * torch.rand(4, 2, 3, 5, 5, generator=gen)
 
-    ours = LegacyParamLoss.mse(pred_phys, gt_phys, mins, maxs, cfg.legacy_amp_thr)
-    his  = _his_masked_mse_loss(_his_layout(pred_phys, mins, maxs), _his_layout(gt_phys, mins, maxs))
+    ours     = LegacyParamLoss.mse(pred_phys, gt_phys, mins, maxs)
+    expected = ((((pred_phys - lo) / span) - ((gt_phys - lo) / span)) ** 2).mean()
 
-    assert ours.item() == pytest.approx(his.item(), rel=1e-5)
+    assert ours.item() == pytest.approx(expected.item(), rel=1e-5)
 
 
 def test_legacy_pipeline_keeps_physical_slot_order_under_per_slot_bounds():
@@ -701,7 +630,6 @@ def test_legacy_bounds_defaults_match_the_spock_loader():
 
     assert cfg.legacy_bounds_min == (1e-05, -15.0, 0.01, 1e-05, 1.0, 1.0)
     assert cfg.legacy_bounds_max == (10.0, 5.0, 5.0, 10.0, 40.0, 20.0)
-    assert cfg.legacy_amp_thr    == 1e-4
 
 
 def test_legacy_term_logs_occupancy():
