@@ -491,91 +491,130 @@
   \end{columns}
 \end{frame}
 
-% ---------------------------------------------------------------- 15b Hungarian 2x2
-\begin{frame}{Set prediction, controlled --- the head is the lever, not the matching}
-    \centering
-  \scriptsize
-  \renewcommand{\arraystretch}{1.1}
-  \setlength{\tabcolsep}{5pt}
-  \renewcommand{\seedtag}{setA}
-  \begin{tabular}{@{}l cc !{\hspace{3pt}} cc@{}}
-    \toprule
-     & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c@{}}{set-pred head} \\
-    \cmidrule(lr){2-3}\cmidrule(l){4-5}
-    metric & sort & Hung & sort & Hung \\
-    \midrule
-    \multicolumn{5}{@{}l}{\emph{reconstruction (curve)}} \\
-    curve $R^2$ $\uparrow$  & \seedpm{0.569}{.008} & \seedpm{\textbf{0.603}}{.012} & \seedpm{0.536}{.026} & \seedpm{0.578}{.016} \\
-    curve MAE $\downarrow$  & \seedpm{0.0496}{.0008} & \seedpm{\textbf{0.0471}}{.0005} & \seedpm{0.0503}{.0016} & \seedpm{0.0480}{.0011} \\
-    PSNR [dB] $\uparrow$    & \seedpm{50.3}{.1} & \seedpm{50.7}{.1} & \seedpm{50.0}{.2} & \seedpm{50.4}{.2} \\
-    SSIM elev $\uparrow$    & \seedpm{0.9586}{.0006} & \seedpm{0.9601}{.0003} & \seedpm{0.9586}{.0010} & \seedpm{0.9598}{.0009} \\
-    SSIM range $\uparrow$   & \seedpm{0.9258}{.0021} & \seedpm{0.9277}{.0019} & \seedpm{0.9329}{.0039} & \seedpm{0.9342}{.0028} \\
-    SSIM azim $\uparrow$    & \seedpm{0.9461}{.0012} & \seedpm{0.9479}{.0007} & \seedpm{0.9471}{.0020} & \seedpm{0.9488}{.0014} \\
-    profile cos med $\uparrow$ & \seedpm{0.850}{.024} & \seedpm{0.854}{.022} & \seedpm{\textbf{0.904}}{.034} & \seedpm{0.896}{.033} \\
-    \addlinespace
-    \multicolumn{5}{@{}l}{\emph{detection (matched)}} \\
-    peak err mean $\downarrow$ & \seedpm{4.70}{.47} & \seedpm{4.80}{.52} & \seedpm{1.66}{.09} & \seedpm{\hlval{good}{\textbf{1.63}}}{.08} \\
-    \quad median $\downarrow$  & \seedpm{0.81}{.30} & \seedpm{1.07}{.37} & \seedpm{\textbf{0.67}}{.00} & \seedpm{\textbf{0.67}}{.00} \\
-    \quad p95 $\downarrow$     & \seedpm{15.44}{.47} & \seedpm{15.57}{.56} & \seedpm{6.71}{.47} & \seedpm{\hlval{good}{\textbf{6.04}}}{.47} \\
-    precision $\uparrow$   & \seedpm{0.821}{.008} & \seedpm{0.822}{.002} & \seedpm{0.816}{.005} & \seedpm{0.813}{.004} \\
-    recall $\uparrow$      & \seedpm{0.641}{.029} & \seedpm{0.642}{.045} & \seedpm{0.887}{.008} & \seedpm{\hlval{good}{\textbf{0.893}}}{.004} \\
-    matched F1 $\uparrow$  & \seedpm{0.720}{.020} & \seedpm{0.720}{.027} & \seedpm{0.850}{.006} & \seedpm{\textbf{0.851}}{.004} \\
-    count exact $\uparrow$ & \seedpm{0.595}{.034} & \seedpm{0.590}{.044} & \seedpm{\hlval{good}{\textbf{0.852}}}{.004} & \seedpm{0.841}{.004} \\
-    \quad under $\downarrow$ & \seedpm{0.327}{.036} & \seedpm{0.329}{.057} & \seedpm{0.018}{.005} & \seedpm{\hlval{good}{\textbf{0.017}}}{.004} \\
-    \quad over $\downarrow$  & \seedpm{\textbf{0.078}}{.004} & \seedpm{0.081}{.012} & \seedpm{\hlval{accent}{0.130}}{.005} & \seedpm{\hlval{accent}{0.143}}{.003} \\
-    \bottomrule
-  \end{tabular}
-  \par\vspace{3pt}
-  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (head $\times$ matching $=$ 2$\times$2); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the gate's detection lift; \textcolor{accent}{red} $=$ its over-count price. Peak median/p95: per-pixel peak-error distribution; profile cos med: median per-pixel cosine to the GT profile.\par}
-    
-
-\end{frame}
-
-% ---------------------------------------------------------------- 15c Head 2x2 by scatterer count
-\begin{frame}{The head by scatterer count --- the gate saturates $k{=}1$, layover pays}
+% ---------------------------------------------------------------- 15b Head 2x2, K=2 and K=5
+\begin{frame}{Set prediction, controlled --- the head leads at both $K$; the matching matters only at $K{=}5$}
     \centering
   \scriptsize
   \renewcommand{\arraystretch}{1.05}
-  \setlength{\tabcolsep}{5pt}
-  \renewcommand{\seedtag}{setB}
-  \begin{tabular}{@{}l cc !{\hspace{3pt}} cc@{}}
+  \setlength{\tabcolsep}{2.5pt}
+  \renewcommand{\seedtag}{mgA}
+  \begin{tabular}{@{}l cc !{\hspace{2pt}} cc !{\hspace{8pt}} cc !{\hspace{2pt}} cc@{}}
     \toprule
-     & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c@{}}{set-pred head} \\
-    \cmidrule(lr){2-3}\cmidrule(l){4-5}
-    metric & sort & Hung & sort & Hung \\
+     & \multicolumn{4}{c}{$K{=}2$} & \multicolumn{4}{c@{}}{$K{=}5$} \\
+    \cmidrule(lr){2-5}\cmidrule(l){6-9}
+     & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c}{set-pred head} & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c@{}}{set-pred head} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(l){8-9}
+    metric & sort & Hung & sort & Hung & sort & Hung & sort & Hung \\
     \midrule
-    matched precision $\uparrow$ & \seedpm{0.821}{.008} & \seedpm{0.822}{.002} & \seedpm{0.816}{.005} & \seedpm{0.813}{.004} \\
-    \quad $k{=}1$                & \seedpm{0.853}{.008} & \seedpm{0.848}{.004} & \seedpm{0.849}{.005} & \seedpm{0.836}{.003} \\
-    \quad $k{=}2$                & \seedpm{0.782}{.007} & \seedpm{0.790}{.002} & \seedpm{0.759}{.014} & \seedpm{0.771}{.009} \\
+    \multicolumn{9}{@{}l}{\emph{reconstruction (curve)}} \\
+    curve $R^2$ $\uparrow$ & \seedpm{0.569}{.008} & \seedpm{\textbf{0.603}}{.012} & \seedpm{0.536}{.026} & \seedpm{0.578}{.016} & \seedpm{0.561}{.019} & \seedpm{\textbf{0.587}}{.012} & \seedpm{0.534}{.007} & \seedpm{0.566}{.016} \\
+    curve MAE $\downarrow$ & \seedpm{0.0496}{.0008} & \seedpm{\textbf{0.0471}}{.0005} & \seedpm{0.0503}{.0016} & \seedpm{0.0480}{.0011} & \seedpm{0.0554}{.0006} & \seedpm{\textbf{0.0521}}{.0005} & \seedpm{0.0565}{.0007} & \seedpm{0.0537}{.0008} \\
+    PSNR [dB] $\uparrow$ & \seedpm{50.3}{.1} & \seedpm{50.7}{.1} & \seedpm{50.0}{.2} & \seedpm{50.4}{.2} & \seedpm{49.7}{.2} & \seedpm{49.9}{.1} & \seedpm{49.4}{.1} & \seedpm{49.7}{.2} \\
+    SSIM elev $\uparrow$ & \seedpm{0.9586}{.0006} & \seedpm{0.9601}{.0003} & \seedpm{0.9586}{.0010} & \seedpm{0.9598}{.0009} & \seedpm{0.9530}{.0007} & \seedpm{0.9565}{.0005} & \seedpm{0.9527}{.0014} & \seedpm{0.9553}{.0020} \\
+    SSIM range $\uparrow$ & \seedpm{0.9258}{.0021} & \seedpm{0.9277}{.0019} & \seedpm{0.9329}{.0039} & \seedpm{0.9342}{.0028} & \seedpm{0.9234}{.0028} & \seedpm{0.9319}{.0039} & \seedpm{0.9296}{.0020} & \seedpm{0.9314}{.0026} \\
+    SSIM azim $\uparrow$ & \seedpm{0.9461}{.0012} & \seedpm{0.9479}{.0007} & \seedpm{0.9471}{.0020} & \seedpm{0.9488}{.0014} & \seedpm{0.9435}{.0011} & \seedpm{0.9475}{.0011} & \seedpm{0.9439}{.0013} & \seedpm{0.9466}{.0016} \\
+    profile cos med $\uparrow$ & \seedpm{0.850}{.024} & \seedpm{0.854}{.022} & \seedpm{\textbf{0.904}}{.034} & \seedpm{0.896}{.033} & \seedpm{0.838}{.041} & \seedpm{0.895}{.028} & \seedpm{\textbf{0.905}}{.012} & \seedpm{0.891}{.014} \\
     \addlinespace
-    matched recall $\uparrow$    & \seedpm{0.641}{.029} & \seedpm{0.642}{.045} & \seedpm{0.887}{.008} & \seedpm{\textbf{0.893}}{.004} \\
-    \quad $k{=}1$                & \seedpm{0.620}{.046} & \seedpm{0.617}{.071} & \seedpm{\hlval{good}{\textbf{0.997}}}{.001} & \seedpm{\hlval{good}{\textbf{0.997}}}{.000} \\
-    \quad $k{=}2$                & \seedpm{0.672}{.008} & \seedpm{0.677}{.007} & \seedpm{0.731}{.019} & \seedpm{\textbf{0.744}}{.010} \\
-    \addlinespace
-    count acc $\mid$ pred $k{=}1$ $\uparrow$ & \seedpm{0.948}{.007} & \seedpm{0.951}{.013} & \seedpm{0.975}{.006} & \seedpm{0.977}{.004} \\
-    count acc $\mid$ pred $k{=}2$ $\uparrow$ & \seedpm{\textbf{0.733}}{.010} & \seedpm{0.725}{.026} & \seedpm{0.651}{.007} & \seedpm{\hlval{accent}{0.631}}{.005} \\
-    \addlinespace
-    matched $\mu$ MAE $\downarrow$ & \seedpm{2.30}{.08} & \seedpm{2.29}{.10} & \seedpm{\textbf{2.18}}{.09} & \seedpm{2.19}{.08} \\
-    \quad $k{=}1$                & \seedpm{0.59}{.04} & \seedpm{\textbf{0.56}}{.05} & \seedpm{0.59}{.10} & \seedpm{0.62}{.11} \\
-    \quad $k{=}2$                & \seedpm{\textbf{4.05}}{.08} & \seedpm{4.06}{.02} & \seedpm{\hlval{accent}{4.54}}{.11} & \seedpm{4.51}{.13} \\
-    \addlinespace
-    matched $\sigma$ MAE $\downarrow$ & \seedpm{0.87}{.03} & \seedpm{0.87}{.04} & \seedpm{\textbf{0.82}}{.03} & \seedpm{0.83}{.03} \\
-    \quad $k{=}1$                & \seedpm{0.25}{.01} & \seedpm{0.26}{.02} & \seedpm{\textbf{0.23}}{.01} & \seedpm{0.24}{.01} \\
-    \quad $k{=}2$                & \seedpm{1.51}{.01} & \seedpm{\textbf{1.50}}{.01} & \seedpm{1.70}{.06} & \seedpm{\hlval{accent}{1.71}}{.06} \\
-    \addlinespace
-    matched $a$ MAE $\downarrow$ & \seedpm{0.374}{.026} & \seedpm{0.380}{.033} & \seedpm{\textbf{0.306}}{.002} & \seedpm{0.311}{.004} \\
-    \quad $k{=}1$                & \seedpm{0.161}{.017} & \seedpm{0.180}{.026} & \seedpm{\hlval{good}{\textbf{0.114}}}{.004} & \seedpm{0.133}{.005} \\
-    \quad $k{=}2$                & \seedpm{0.593}{.022} & \seedpm{0.585}{.023} & \seedpm{0.590}{.006} & \seedpm{0.573}{.011} \\
+    \multicolumn{9}{@{}l}{\emph{detection (matched)}} \\
+    peak err mean $\downarrow$ & \seedpm{4.70}{.47} & \seedpm{4.80}{.52} & \seedpm{1.66}{.09} & \seedpm{\hlval{good}{\textbf{1.63}}}{.08} & \seedpm{4.83}{.71} & \seedpm{2.58}{1.51} & \seedpm{1.64}{.04} & \seedpm{\hlval{good}{\textbf{1.56}}}{.10} \\
+    \quad median $\downarrow$ & \seedpm{0.81}{.30} & \seedpm{1.07}{.37} & \seedpm{\textbf{0.67}}{.00} & \seedpm{\textbf{0.67}}{.00} & \seedpm{0.81}{.30} & \seedpm{\textbf{0.67}}{.00} & \seedpm{\textbf{0.67}}{.00} & \seedpm{\textbf{0.67}}{.00} \\
+    \quad p95 $\downarrow$ & \seedpm{15.44}{.47} & \seedpm{15.57}{.56} & \seedpm{6.71}{.47} & \seedpm{\hlval{good}{\textbf{6.04}}}{.47} & \seedpm{15.44}{.47} & \seedpm{9.93}{4.26} & \seedpm{7.38}{.00} & \seedpm{\hlval{good}{\textbf{5.77}}}{.37} \\
+    precision $\uparrow$ & \seedpm{0.821}{.008} & \seedpm{0.822}{.002} & \seedpm{0.816}{.005} & \seedpm{0.813}{.004} & \seedpm{0.620}{.011} & \seedpm{\textbf{0.636}}{.038} & \seedpm{0.627}{.009} & \seedpm{0.573}{.027} \\
+    recall $\uparrow$ & \seedpm{0.641}{.029} & \seedpm{0.642}{.045} & \seedpm{0.887}{.008} & \seedpm{\hlval{good}{\textbf{0.893}}}{.004} & \seedpm{\hlval{accent}{0.648}}{.040} & \seedpm{0.802}{.093} & \seedpm{0.867}{.006} & \seedpm{\hlval{good}{\textbf{0.886}}}{.003} \\
+    matched F1 $\uparrow$ & \seedpm{0.720}{.020} & \seedpm{0.720}{.027} & \seedpm{0.850}{.006} & \seedpm{\textbf{0.851}}{.004} & \seedpm{0.633}{.025} & \seedpm{0.709}{.058} & \seedpm{\textbf{0.728}}{.007} & \seedpm{0.696}{.020} \\
+    count exact $\uparrow$ & \seedpm{0.595}{.034} & \seedpm{0.590}{.044} & \seedpm{\hlval{good}{\textbf{0.852}}}{.004} & \seedpm{0.841}{.004} & \seedpm{0.430}{.050} & \seedpm{0.574}{.131} & \seedpm{\textbf{0.651}}{.004} & \seedpm{0.588}{.062} \\
+    \quad under $\downarrow$ & \seedpm{0.327}{.036} & \seedpm{0.329}{.057} & \seedpm{0.018}{.005} & \seedpm{\hlval{good}{\textbf{0.017}}}{.004} & \seedpm{0.320}{.055} & \seedpm{0.134}{.122} & \seedpm{0.031}{.002} & \seedpm{\hlval{good}{\textbf{0.027}}}{.004} \\
+    \quad over $\downarrow$ & \seedpm{\textbf{0.078}}{.004} & \seedpm{0.081}{.012} & \seedpm{\hlval{accent}{0.130}}{.005} & \seedpm{\hlval{accent}{0.143}}{.003} & \seedpm{\textbf{0.251}}{.008} & \seedpm{0.292}{.021} & \seedpm{0.318}{.006} & \seedpm{\hlval{accent}{0.385}}{.065} \\
     \bottomrule
   \end{tabular}
   \par\vspace{3pt}
-  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (head $\times$ matching = column); held-out test, cells mean $\pm$ seed std over five seeded replicas; $k$ $=$ true scatterer count of the pixel. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the gate's $k{=}1$ saturation and amplitude win, \textcolor{accent}{red} $=$ the layover price. Precision rewards under-prediction --- rank on recall. count acc $\mid$ pred $k$: share of pixels claiming exactly $k$ scatterers whose true count is $k$. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
-    
+  \parbox{0.94\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$; column groups $=$ $K{=}2$ and $K{=}5$, within each head $\times$ matching $=$ 2$\times$2; five seeded replicas per arm, cells mean $\pm$ seed std; held-out test on the matching $K_{\max}$ labels ($K$ groups are different label sets --- compare within a group). \textbf{bold} $=$ best in row within its $K$ group, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the gate's detection lift; \textcolor{accent}{red} $=$ the over-count price and, at $K{=}5$, the sorted-GT break. Peak median/p95: per-pixel peak-error distribution; profile cos med: median per-pixel cosine to the GT profile.\par}
+\end{frame}
 
+% ---------------------------------------------------------------- 15c Head 2x2 by scatterer count, K=2 and K=5
+\begin{frame}{The head by scatterer count --- the gate saturates $k{=}1$; recall fades up the $K{=}5$ ladder}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{1.05}
+  \setlength{\tabcolsep}{2.5pt}
+  \renewcommand{\seedtag}{mgB}
+  \begin{tabular}{@{}l cc !{\hspace{2pt}} cc !{\hspace{8pt}} cc !{\hspace{2pt}} cc@{}}
+    \toprule
+     & \multicolumn{4}{c}{$K{=}2$} & \multicolumn{4}{c@{}}{$K{=}5$} \\
+    \cmidrule(lr){2-5}\cmidrule(l){6-9}
+     & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c}{set-pred head} & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c@{}}{set-pred head} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(l){8-9}
+    metric & sort & Hung & sort & Hung & sort & Hung & sort & Hung \\
+    \midrule
+    matched precision $\uparrow$ & \seedpm{0.821}{.008} & \seedpm{0.822}{.002} & \seedpm{0.816}{.005} & \seedpm{0.813}{.004} & \seedpm{0.620}{.011} & \seedpm{\textbf{0.636}}{.038} & \seedpm{0.627}{.009} & \seedpm{0.573}{.027} \\
+    \quad $k{=}1$ & \seedpm{0.853}{.008} & \seedpm{0.848}{.004} & \seedpm{0.849}{.005} & \seedpm{0.836}{.003} & \seedpm{0.711}{.018} & \seedpm{0.719}{.057} & \seedpm{\textbf{0.726}}{.008} & \seedpm{0.640}{.045} \\
+    \quad $k{=}2$ & \seedpm{0.782}{.007} & \seedpm{0.790}{.002} & \seedpm{0.759}{.014} & \seedpm{0.771}{.009} & \seedpm{\textbf{0.562}}{.011} & \seedpm{0.535}{.020} & \seedpm{0.525}{.009} & \seedpm{0.471}{.015} \\
+    \quad $k{=}3$ & --- & --- & --- & --- & \seedpm{0.549}{.009} & \seedpm{\textbf{0.574}}{.010} & \seedpm{0.519}{.016} & \seedpm{0.538}{.009} \\
+    \quad $k{=}4$ & --- & --- & --- & --- & \seedpm{0.421}{.002} & \seedpm{\textbf{0.525}}{.007} & \seedpm{0.419}{.014} & \seedpm{0.510}{.011} \\
+    \quad $k{=}5$ & --- & --- & --- & --- & \seedpm{0.393}{.014} & \seedpm{\textbf{0.470}}{.013} & \seedpm{0.394}{.010} & \seedpm{0.468}{.011} \\
+    \addlinespace
+    matched recall $\uparrow$ & \seedpm{0.641}{.029} & \seedpm{0.642}{.045} & \seedpm{0.887}{.008} & \seedpm{\textbf{0.893}}{.004} & \seedpm{0.648}{.040} & \seedpm{0.802}{.093} & \seedpm{0.867}{.006} & \seedpm{\textbf{0.886}}{.003} \\
+    \quad $k{=}1$ & \seedpm{0.620}{.046} & \seedpm{0.617}{.071} & \seedpm{\hlval{good}{\textbf{0.997}}}{.001} & \seedpm{\hlval{good}{\textbf{0.997}}}{.000} & \seedpm{0.643}{.070} & \seedpm{0.876}{.162} & \seedpm{\hlval{good}{\textbf{0.996}}}{.002} & \seedpm{0.994}{.002} \\
+    \quad $k{=}2$ & \seedpm{0.672}{.008} & \seedpm{0.677}{.007} & \seedpm{0.731}{.019} & \seedpm{\textbf{0.744}}{.010} & \seedpm{0.830}{.010} & \seedpm{0.862}{.011} & \seedpm{0.893}{.008} & \seedpm{\textbf{0.906}}{.009} \\
+    \quad $k{=}3$ & --- & --- & --- & --- & \seedpm{0.645}{.005} & \seedpm{0.718}{.010} & \seedpm{0.684}{.017} & \seedpm{\hlval{good}{\textbf{0.763}}}{.004} \\
+    \quad $k{=}4$ & --- & --- & --- & --- & \seedpm{0.375}{.008} & \seedpm{0.489}{.010} & \seedpm{0.421}{.015} & \seedpm{\textbf{0.527}}{.010} \\
+    \quad $k{=}5$ & --- & --- & --- & --- & \seedpm{0.233}{.003} & \seedpm{0.290}{.016} & \seedpm{0.281}{.010} & \seedpm{\textbf{0.327}}{.015} \\
+    \addlinespace
+    \multicolumn{9}{@{}l}{\emph{count acc $\mid$ pred $k$ $\uparrow$ --- share of pixels claiming exactly $k$ whose true count is $k$}} \\
+    \quad pred $k{=}1$ & \seedpm{0.948}{.007} & \seedpm{0.951}{.013} & \seedpm{0.975}{.006} & \seedpm{0.977}{.004} & \seedpm{0.948}{.010} & \seedpm{0.965}{.011} & \seedpm{0.973}{.005} & \seedpm{0.978}{.008} \\
+    \quad pred $k{=}2$ & \seedpm{\textbf{0.733}}{.010} & \seedpm{0.725}{.026} & \seedpm{0.651}{.007} & \seedpm{\hlval{accent}{0.631}}{.005} & \seedpm{\textbf{0.315}}{.016} & \seedpm{0.262}{.039} & \seedpm{0.251}{.006} & \seedpm{\hlval{accent}{0.173}}{.061} \\
+    \quad pred $k{=}3$ & --- & --- & --- & --- & \seedpm{\textbf{0.124}}{.008} & \seedpm{0.100}{.018} & \seedpm{0.095}{.008} & \seedpm{0.050}{.011} \\
+    \quad pred $k{=}4$ & --- & --- & --- & --- & \seedpm{\textbf{0.072}}{.006} & \seedpm{0.051}{.011} & \seedpm{0.047}{.005} & \seedpm{0.024}{.006} \\
+    \quad pred $k{=}5$ & --- & --- & --- & --- & \seedpm{\textbf{0.102}}{.012} & \seedpm{0.081}{.004} & \seedpm{0.075}{.005} & \seedpm{0.063}{.009} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.94\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$; column groups $=$ $K{=}2$ and $K{=}5$ (head $\times$ matching within each); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test; $k$ $=$ true scatterer count of the pixel; --- $=$ rank absent from the $K{=}2$ label set. \textbf{bold} $=$ best in row within its $K$ group, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the gate's $k{=}1$ saturation and the higher-rung wins, \textcolor{accent}{red} $=$ the layover price and the unreliable claimed pairs. Precision rewards under-prediction --- rank on recall.\par}
+\end{frame}
+
+% ---------------------------------------------------------------- 15g Head 2x2 components, K=2 and K=5
+\begin{frame}{The head components --- layover pays at $K{=}2$, the crowd pays at $K{=}5$}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{1.05}
+  \setlength{\tabcolsep}{2.5pt}
+  \renewcommand{\seedtag}{mgC}
+  \begin{tabular}{@{}l cc !{\hspace{2pt}} cc !{\hspace{8pt}} cc !{\hspace{2pt}} cc@{}}
+    \toprule
+     & \multicolumn{4}{c}{$K{=}2$} & \multicolumn{4}{c@{}}{$K{=}5$} \\
+    \cmidrule(lr){2-5}\cmidrule(l){6-9}
+     & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c}{set-pred head} & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c@{}}{set-pred head} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(l){8-9}
+    metric & sort & Hung & sort & Hung & sort & Hung & sort & Hung \\
+    \midrule
+    matched $\mu$ MAE $\downarrow$ & \seedpm{2.30}{.08} & \seedpm{2.29}{.10} & \seedpm{\textbf{2.18}}{.09} & \seedpm{2.19}{.08} & \seedpm{2.30}{.14} & \seedpm{\textbf{1.90}}{.12} & \seedpm{2.05}{.06} & \seedpm{1.94}{.06} \\
+    \quad $k{=}1$ & \seedpm{0.59}{.04} & \seedpm{\textbf{0.56}}{.05} & \seedpm{0.59}{.10} & \seedpm{0.62}{.11} & \seedpm{0.69}{.09} & \seedpm{\textbf{0.63}}{.04} & \seedpm{0.65}{.05} & \seedpm{0.75}{.08} \\
+    \quad $k{=}2$ & \seedpm{\textbf{4.05}}{.08} & \seedpm{4.06}{.02} & \seedpm{\hlval{accent}{4.54}}{.11} & \seedpm{4.51}{.13} & \seedpm{\textbf{1.81}}{.04} & \seedpm{1.83}{.09} & \seedpm{1.99}{.05} & \seedpm{1.83}{.09} \\
+    \quad $k{=}3$ & --- & --- & --- & --- & \seedpm{4.24}{.10} & \seedpm{3.63}{.16} & \seedpm{4.32}{.11} & \seedpm{\textbf{3.60}}{.14} \\
+    \quad $k{=}4$ & --- & --- & --- & --- & \seedpm{7.88}{.20} & \seedpm{\hlval{good}{\textbf{6.48}}}{.13} & \seedpm{7.50}{.23} & \seedpm{6.55}{.25} \\
+    \quad $k{=}5$ & --- & --- & --- & --- & \seedpm{9.56}{.28} & \seedpm{9.16}{.23} & \seedpm{9.43}{.18} & \seedpm{9.48}{.26} \\
+    \addlinespace
+    matched $\sigma$ MAE $\downarrow$ & \seedpm{0.87}{.03} & \seedpm{0.87}{.04} & \seedpm{\textbf{0.82}}{.03} & \seedpm{0.83}{.03} & \seedpm{0.79}{.04} & \seedpm{0.79}{.05} & \seedpm{\hlval{good}{\textbf{0.70}}}{.01} & \seedpm{0.77}{.03} \\
+    \quad $k{=}1$ & \seedpm{0.25}{.01} & \seedpm{0.26}{.02} & \seedpm{\textbf{0.23}}{.01} & \seedpm{0.24}{.01} & \seedpm{0.35}{.03} & \seedpm{0.36}{.04} & \seedpm{\textbf{0.29}}{.01} & \seedpm{0.35}{.03} \\
+    \quad $k{=}2$ & \seedpm{1.51}{.01} & \seedpm{\textbf{1.50}}{.01} & \seedpm{1.70}{.06} & \seedpm{\hlval{accent}{1.71}}{.06} & \seedpm{\textbf{0.97}}{.01} & \seedpm{1.11}{.04} & \seedpm{1.00}{.00} & \seedpm{1.12}{.04} \\
+    \quad $k{=}3$ & --- & --- & --- & --- & \seedpm{\textbf{1.36}}{.01} & \seedpm{1.45}{.05} & \seedpm{1.41}{.01} & \seedpm{1.46}{.03} \\
+    \quad $k{=}4$ & --- & --- & --- & --- & \seedpm{\textbf{1.60}}{.01} & \seedpm{1.70}{.08} & \seedpm{1.70}{.00} & \seedpm{1.70}{.04} \\
+    \quad $k{=}5$ & --- & --- & --- & --- & \seedpm{\textbf{1.66}}{.01} & \seedpm{1.84}{.13} & \seedpm{1.83}{.01} & \seedpm{1.81}{.07} \\
+    \addlinespace
+    matched $a$ MAE $\downarrow$ & \seedpm{0.374}{.026} & \seedpm{0.380}{.033} & \seedpm{\textbf{0.306}}{.002} & \seedpm{0.311}{.004} & \seedpm{0.526}{.026} & \seedpm{0.564}{.050} & \seedpm{\hlval{good}{\textbf{0.442}}}{.008} & \seedpm{0.552}{.044} \\
+    \quad $k{=}1$ & \seedpm{0.161}{.017} & \seedpm{0.180}{.026} & \seedpm{\hlval{good}{\textbf{0.114}}}{.004} & \seedpm{0.133}{.005} & \seedpm{0.172}{.015} & \seedpm{0.230}{.040} & \seedpm{\textbf{0.130}}{.007} & \seedpm{0.235}{.058} \\
+    \quad $k{=}2$ & \seedpm{0.593}{.022} & \seedpm{0.585}{.023} & \seedpm{0.590}{.006} & \seedpm{0.573}{.011} & \seedpm{\textbf{0.725}}{.023} & \seedpm{0.906}{.053} & \seedpm{0.744}{.014} & \seedpm{\hlval{accent}{0.920}}{.048} \\
+    \quad $k{=}3$ & --- & --- & --- & --- & \seedpm{\textbf{1.018}}{.020} & \seedpm{1.091}{.016} & \seedpm{1.024}{.013} & \seedpm{1.096}{.030} \\
+    \quad $k{=}4$ & --- & --- & --- & --- & \seedpm{1.067}{.015} & \seedpm{1.078}{.026} & \seedpm{1.038}{.011} & \seedpm{1.049}{.026} \\
+    \quad $k{=}5$ & --- & --- & --- & --- & \seedpm{0.988}{.015} & \seedpm{1.001}{.041} & \seedpm{\textbf{0.895}}{.007} & \seedpm{0.915}{.041} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.94\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$; column groups $=$ $K{=}2$ and $K{=}5$ (head $\times$ matching within each); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test; $k$ $=$ true scatterer count of the pixel; component errors over matched pairs only; --- $=$ rank absent from the $K{=}2$ label set. \textbf{bold} $=$ best in row within its $K$ group, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the gate's amplitude win at $K{=}2$ and the Hungarian $\mu$ buy at $K{=}5$; \textcolor{accent}{red} $=$ the layover price at $K{=}2$ and the amplitude Hungarian pays at $K{=}5$. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
 \end{frame}
 
 % ---------------------------------------------------------------- 15d Head 2x2: predicted stats vs GT
-\begin{frame}{The head, predicted statistics vs the GT --- the gate calibrates activity, pays in amplitude}
+\begin{frame}{The $K{=}2$ head, predicted statistics vs the GT --- the gate calibrates activity, pays in amplitude}
     \centering
   \scriptsize
   \renewcommand{\arraystretch}{0.95}
@@ -616,129 +655,6 @@
   \end{tabular}
   \par\vspace{3pt}
   \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (head $\times$ matching = column); five seeded replicas per arm, cells mean $\pm$ seed std; means conditioned on the slot's GT activity mask. \textbf{bold} $=$ closest to the \textcolor{good}{GT} column, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the gate's activity and leakage wins, \textcolor{accent}{red} $=$ the slot-1 over-fire and the amplitude payment. Inactive GT slots define no $\mu$/$\sigma$ reference (---). Width rows: std of the prediction over GT-active pixels vs the GT's own std. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
-    
-
-\end{frame}
-
-% ---------------------------------------------------------------- 15e Head 2x2 at K=5
-\begin{frame}{Set prediction at $K{=}5$ --- the head still leads, and the matching now matters}
-    \centering
-  \scriptsize
-  \renewcommand{\arraystretch}{1.1}
-  \setlength{\tabcolsep}{5pt}
-  \renewcommand{\seedtag}{khA}
-  \begin{tabular}{@{}l cc !{\hspace{3pt}} cc@{}}
-    \toprule
-     & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c@{}}{set-pred head} \\
-    \cmidrule(lr){2-3}\cmidrule(l){4-5}
-    metric & sort & Hung & sort & Hung \\
-    \midrule
-    \multicolumn{5}{@{}l}{\emph{reconstruction (curve)}} \\
-    curve $R^2$ $\uparrow$ & \seedpm{0.561}{.019} & \seedpm{\textbf{0.587}}{.012} & \seedpm{0.534}{.007} & \seedpm{0.566}{.016} \\
-    curve MAE $\downarrow$ & \seedpm{0.0554}{.0006} & \seedpm{\textbf{0.0521}}{.0005} & \seedpm{0.0565}{.0007} & \seedpm{0.0537}{.0008} \\
-    PSNR [dB] $\uparrow$ & \seedpm{49.7}{.2} & \seedpm{49.9}{.1} & \seedpm{49.4}{.1} & \seedpm{49.7}{.2} \\
-    SSIM elev $\uparrow$ & \seedpm{0.9530}{.0007} & \seedpm{0.9565}{.0005} & \seedpm{0.9527}{.0014} & \seedpm{0.9553}{.0020} \\
-    SSIM range $\uparrow$ & \seedpm{0.9234}{.0028} & \seedpm{0.9319}{.0039} & \seedpm{0.9296}{.0020} & \seedpm{0.9314}{.0026} \\
-    SSIM azim $\uparrow$ & \seedpm{0.9435}{.0011} & \seedpm{0.9475}{.0011} & \seedpm{0.9439}{.0013} & \seedpm{0.9466}{.0016} \\
-    profile cos med $\uparrow$ & \seedpm{0.838}{.041} & \seedpm{0.895}{.028} & \seedpm{\textbf{0.905}}{.012} & \seedpm{0.891}{.014} \\
-    \addlinespace
-    \multicolumn{5}{@{}l}{\emph{detection (matched)}} \\
-    peak err mean $\downarrow$ & \seedpm{4.83}{.71} & \seedpm{2.58}{1.51} & \seedpm{1.64}{.04} & \seedpm{\hlval{good}{\textbf{1.56}}}{.10} \\
-    \quad median $\downarrow$ & \seedpm{0.81}{.30} & \seedpm{\textbf{0.67}}{.00} & \seedpm{\textbf{0.67}}{.00} & \seedpm{\textbf{0.67}}{.00} \\
-    \quad p95 $\downarrow$ & \seedpm{15.44}{.47} & \seedpm{9.93}{4.26} & \seedpm{7.38}{.00} & \seedpm{\hlval{good}{\textbf{5.77}}}{.37} \\
-    precision $\uparrow$ & \seedpm{0.620}{.011} & \seedpm{\textbf{0.636}}{.038} & \seedpm{0.627}{.009} & \seedpm{0.573}{.027} \\
-    recall $\uparrow$ & \seedpm{\hlval{accent}{0.648}}{.040} & \seedpm{0.802}{.093} & \seedpm{0.867}{.006} & \seedpm{\hlval{good}{\textbf{0.886}}}{.003} \\
-    matched F1 $\uparrow$ & \seedpm{0.633}{.025} & \seedpm{0.709}{.058} & \seedpm{\textbf{0.728}}{.007} & \seedpm{0.696}{.020} \\
-    count exact $\uparrow$ & \seedpm{0.430}{.050} & \seedpm{0.574}{.131} & \seedpm{\textbf{0.651}}{.004} & \seedpm{0.588}{.062} \\
-    \quad under $\downarrow$ & \seedpm{0.320}{.055} & \seedpm{0.134}{.122} & \seedpm{0.031}{.002} & \seedpm{\hlval{good}{\textbf{0.027}}}{.004} \\
-    \quad over $\downarrow$ & \seedpm{\textbf{0.251}}{.008} & \seedpm{0.292}{.021} & \seedpm{0.318}{.006} & \seedpm{\hlval{accent}{0.385}}{.065} \\
-    \bottomrule
-  \end{tabular}
-  \par\vspace{3pt}
-  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ $K{=}5$ $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (head $\times$ matching $=$ 2$\times$2); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the gate's detection lift; \textcolor{accent}{red} $=$ the over-count price and the sorted-GT break. Peak median/p95: per-pixel peak-error distribution; profile cos med: median per-pixel cosine to the GT profile.\par}
-    
-
-\end{frame}
-
-% ---------------------------------------------------------------- 15f Head 2x2 at K=5 by scatterer count
-\begin{frame}{The $K{=}5$ head by scatterer count --- the gate saturates $k{=}1$, recall fades up the ladder}
-    \centering
-  \scriptsize
-  \renewcommand{\arraystretch}{1.0}
-  \setlength{\tabcolsep}{5pt}
-  \renewcommand{\seedtag}{khB}
-  \begin{tabular}{@{}l cc !{\hspace{3pt}} cc@{}}
-    \toprule
-     & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c@{}}{set-pred head} \\
-    \cmidrule(lr){2-3}\cmidrule(l){4-5}
-    metric & sort & Hung & sort & Hung \\
-    \midrule
-    matched precision $\uparrow$ & \seedpm{0.620}{.011} & \seedpm{\textbf{0.636}}{.038} & \seedpm{0.627}{.009} & \seedpm{0.573}{.027} \\
-    \quad $k{=}1$ & \seedpm{0.711}{.018} & \seedpm{0.719}{.057} & \seedpm{\textbf{0.726}}{.008} & \seedpm{0.640}{.045} \\
-    \quad $k{=}2$ & \seedpm{\textbf{0.562}}{.011} & \seedpm{0.535}{.020} & \seedpm{0.525}{.009} & \seedpm{0.471}{.015} \\
-    \quad $k{=}3$ & \seedpm{0.549}{.009} & \seedpm{\textbf{0.574}}{.010} & \seedpm{0.519}{.016} & \seedpm{0.538}{.009} \\
-    \quad $k{=}4$ & \seedpm{0.421}{.002} & \seedpm{\textbf{0.525}}{.007} & \seedpm{0.419}{.014} & \seedpm{0.510}{.011} \\
-    \quad $k{=}5$ & \seedpm{0.393}{.014} & \seedpm{\textbf{0.470}}{.013} & \seedpm{0.394}{.010} & \seedpm{0.468}{.011} \\
-    \addlinespace
-    matched recall $\uparrow$ & \seedpm{0.648}{.040} & \seedpm{0.802}{.093} & \seedpm{0.867}{.006} & \seedpm{\textbf{0.886}}{.003} \\
-    \quad $k{=}1$ & \seedpm{0.643}{.070} & \seedpm{0.876}{.162} & \seedpm{\hlval{good}{\textbf{0.996}}}{.002} & \seedpm{0.994}{.002} \\
-    \quad $k{=}2$ & \seedpm{0.830}{.010} & \seedpm{0.862}{.011} & \seedpm{0.893}{.008} & \seedpm{\textbf{0.906}}{.009} \\
-    \quad $k{=}3$ & \seedpm{0.645}{.005} & \seedpm{0.718}{.010} & \seedpm{0.684}{.017} & \seedpm{\hlval{good}{\textbf{0.763}}}{.004} \\
-    \quad $k{=}4$ & \seedpm{0.375}{.008} & \seedpm{0.489}{.010} & \seedpm{0.421}{.015} & \seedpm{\textbf{0.527}}{.010} \\
-    \quad $k{=}5$ & \seedpm{0.233}{.003} & \seedpm{0.290}{.016} & \seedpm{0.281}{.010} & \seedpm{\textbf{0.327}}{.015} \\
-    \addlinespace
-    \multicolumn{5}{@{}l}{\emph{count acc $\mid$ pred $k$ $\uparrow$ --- share of pixels claiming exactly $k$ whose true count is $k$}} \\
-    \quad pred $k{=}1$ & \seedpm{0.948}{.010} & \seedpm{0.965}{.011} & \seedpm{0.973}{.005} & \seedpm{0.978}{.008} \\
-    \addlinespace[2pt]
-    \quad pred $k{=}2$ & \seedpm{\textbf{0.315}}{.016} & \seedpm{0.262}{.039} & \seedpm{0.251}{.006} & \seedpm{\hlval{accent}{0.173}}{.061} \\
-    \quad pred $k{=}3$ & \seedpm{\textbf{0.124}}{.008} & \seedpm{0.100}{.018} & \seedpm{0.095}{.008} & \seedpm{0.050}{.011} \\
-    \quad pred $k{=}4$ & \seedpm{\textbf{0.072}}{.006} & \seedpm{0.051}{.011} & \seedpm{0.047}{.005} & \seedpm{0.024}{.006} \\
-    \quad pred $k{=}5$ & \seedpm{\textbf{0.102}}{.012} & \seedpm{0.081}{.004} & \seedpm{0.075}{.005} & \seedpm{0.063}{.009} \\
-    \bottomrule
-  \end{tabular}
-  \par\vspace{3pt}
-  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ $K{=}5$ $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (head $\times$ matching $=$ 2$\times$2); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; $k$ $=$ true scatterer count of the pixel. \textcolor{good}{green} $=$ the $k{=}1$ saturation and the higher-rung wins; \textcolor{accent}{red} $=$ the unreliable claimed pairs. Precision rewards under-prediction --- read it alongside recall. count acc $\mid$ pred $k$: share of pixels claiming exactly $k$ scatterers whose true count is $k$.\par}
-    
-
-\end{frame}
-
-% ---------------------------------------------------------------- 15g Head 2x2 at K=5: component errors
-\begin{frame}{The $K{=}5$ components --- position pays for the crowd, the sorted arms keep the widths}
-    \centering
-  \scriptsize
-  \renewcommand{\arraystretch}{1.0}
-  \setlength{\tabcolsep}{5pt}
-  \renewcommand{\seedtag}{khC}
-  \begin{tabular}{@{}l cc !{\hspace{3pt}} cc@{}}
-    \toprule
-     & \multicolumn{2}{c}{conv head} & \multicolumn{2}{c@{}}{set-pred head} \\
-    \cmidrule(lr){2-3}\cmidrule(l){4-5}
-    metric & sort & Hung & sort & Hung \\
-    \midrule
-    matched $\mu$ MAE $\downarrow$ & \seedpm{2.30}{.14} & \seedpm{\textbf{1.90}}{.12} & \seedpm{2.05}{.06} & \seedpm{1.94}{.06} \\
-    \quad $k{=}1$ & \seedpm{0.69}{.09} & \seedpm{\textbf{0.63}}{.04} & \seedpm{0.65}{.05} & \seedpm{0.75}{.08} \\
-    \quad $k{=}2$ & \seedpm{\textbf{1.81}}{.04} & \seedpm{1.83}{.09} & \seedpm{1.99}{.05} & \seedpm{1.83}{.09} \\
-    \quad $k{=}3$ & \seedpm{4.24}{.10} & \seedpm{3.63}{.16} & \seedpm{4.32}{.11} & \seedpm{\textbf{3.60}}{.14} \\
-    \quad $k{=}4$ & \seedpm{7.88}{.20} & \seedpm{\hlval{good}{\textbf{6.48}}}{.13} & \seedpm{7.50}{.23} & \seedpm{6.55}{.25} \\
-    \quad $k{=}5$ & \seedpm{9.56}{.28} & \seedpm{9.16}{.23} & \seedpm{9.43}{.18} & \seedpm{9.48}{.26} \\
-    \addlinespace
-    matched $\sigma$ MAE $\downarrow$ & \seedpm{0.79}{.04} & \seedpm{0.79}{.05} & \seedpm{\hlval{good}{\textbf{0.70}}}{.01} & \seedpm{0.77}{.03} \\
-    \quad $k{=}1$ & \seedpm{0.35}{.03} & \seedpm{0.36}{.04} & \seedpm{\textbf{0.29}}{.01} & \seedpm{0.35}{.03} \\
-    \quad $k{=}2$ & \seedpm{\textbf{0.97}}{.01} & \seedpm{1.11}{.04} & \seedpm{1.00}{.00} & \seedpm{1.12}{.04} \\
-    \quad $k{=}3$ & \seedpm{\textbf{1.36}}{.01} & \seedpm{1.45}{.05} & \seedpm{1.41}{.01} & \seedpm{1.46}{.03} \\
-    \quad $k{=}4$ & \seedpm{\textbf{1.60}}{.01} & \seedpm{1.70}{.08} & \seedpm{1.70}{.00} & \seedpm{1.70}{.04} \\
-    \quad $k{=}5$ & \seedpm{\textbf{1.66}}{.01} & \seedpm{1.84}{.13} & \seedpm{1.83}{.01} & \seedpm{1.81}{.07} \\
-    \addlinespace
-    matched $a$ MAE $\downarrow$ & \seedpm{0.526}{.026} & \seedpm{0.564}{.050} & \seedpm{\hlval{good}{\textbf{0.442}}}{.008} & \seedpm{0.552}{.044} \\
-    \quad $k{=}1$ & \seedpm{0.172}{.015} & \seedpm{0.230}{.040} & \seedpm{\textbf{0.130}}{.007} & \seedpm{0.235}{.058} \\
-    \quad $k{=}2$ & \seedpm{\textbf{0.725}}{.023} & \seedpm{0.906}{.053} & \seedpm{0.744}{.014} & \seedpm{\hlval{accent}{0.920}}{.048} \\
-    \quad $k{=}3$ & \seedpm{\textbf{1.018}}{.020} & \seedpm{1.091}{.016} & \seedpm{1.024}{.013} & \seedpm{1.096}{.030} \\
-    \quad $k{=}4$ & \seedpm{1.067}{.015} & \seedpm{1.078}{.026} & \seedpm{1.038}{.011} & \seedpm{1.049}{.026} \\
-    \quad $k{=}5$ & \seedpm{0.988}{.015} & \seedpm{1.001}{.041} & \seedpm{\textbf{0.895}}{.007} & \seedpm{0.915}{.041} \\
-    \bottomrule
-  \end{tabular}
-  \par\vspace{3pt}
-  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ $K{=}5$ $\cdot$ param-MSE $\cdot$ presence none $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (head $\times$ matching $=$ 2$\times$2); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; $k$ $=$ true scatterer count of the pixel; component errors over matched pairs only. \textcolor{good}{green} $=$ the Hungarian $\mu$ buy and the sorted-arm component wins; \textcolor{accent}{red} $=$ the amplitude Hungarian pays. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
     
 
 \end{frame}
@@ -1081,94 +997,132 @@
   \end{columns}
 \end{frame}
 
-% ---------------------------------------------------------------- 18 Two levers re-measured
-\begin{frame}{The two levers, re-measured under Hungarian matching --- A stays free, B now costs recall}
+% ---------------------------------------------------------------- 18 Two levers, K=2 and K=5
+\begin{frame}{The two levers --- A stays free; B costs recall, then the curve}
     \centering
   \scriptsize
-  \renewcommand{\arraystretch}{0.86}
-  \setlength{\tabcolsep}{6pt}
-  \renewcommand{\seedtag}{setD}
-  \begin{tabular}{@{}l c c c c@{}}
+  \renewcommand{\arraystretch}{0.74}
+  \setlength{\tabcolsep}{2.5pt}
+  \renewcommand{\seedtag}{mgD}
+  \begin{tabular}{@{}l cc !{\hspace{2pt}} cc !{\hspace{8pt}} cc !{\hspace{2pt}} cc@{}}
     \toprule
-    metric & none & $+$A & $+$B & $+$AB \\
+     & \multicolumn{4}{c}{$K{=}2$} & \multicolumn{4}{c@{}}{$K{=}5$} \\
+    \cmidrule(lr){2-5}\cmidrule(l){6-9}
+    metric & none & $+$A & $+$B & $+$AB & none & $+$A & $+$B & $+$AB \\
     \midrule
-    \multicolumn{5}{@{}l}{\emph{reconstruction (curve)}} \\
-    curve $R^2$ $\uparrow$  & \seedpm{0.578}{.016} & \seedpm{0.579}{.017} & \seedpm{0.553}{.011} & \seedpm{0.558}{.014} \\
-    curve MAE $\downarrow$  & \seedpm{0.0480}{.0011} & \seedpm{0.0479}{.0008} & \seedpm{0.0493}{.0008} & \seedpm{0.0489}{.0007} \\
-    PSNR [dB] $\uparrow$    & \seedpm{50.41}{.17} & \seedpm{50.43}{.17} & \seedpm{50.16}{.11} & \seedpm{50.21}{.14} \\
-    SSIM elev $\uparrow$    & \seedpm{0.9598}{.0009} & \seedpm{0.9600}{.0007} & \seedpm{0.9589}{.0007} & \seedpm{0.9592}{.0006} \\
-    SSIM range $\uparrow$   & \seedpm{0.9342}{.0028} & \seedpm{0.9346}{.0025} & \seedpm{0.9308}{.0027} & \seedpm{0.9319}{.0018} \\
-    SSIM azim $\uparrow$    & \seedpm{0.9488}{.0014} & \seedpm{0.9491}{.0011} & \seedpm{0.9466}{.0011} & \seedpm{0.9471}{.0008} \\
-    profile cos med $\uparrow$ & \seedpm{0.896}{.033} & \seedpm{0.892}{.042} & \seedpm{0.883}{.038} & \seedpm{0.891}{.035} \\
-    peak err mean $\downarrow$ & \seedpm{\textbf{1.63}}{.08} & \seedpm{\textbf{1.63}}{.11} & \seedpm{1.72}{.16} & \seedpm{1.67}{.10} \\
-    \quad median $\downarrow$  & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} \\
-    \quad p95 $\downarrow$     & \seedpm{\textbf{6.04}}{.47} & \seedpm{6.31}{.37} & \seedpm{6.44}{.60} & \seedpm{6.31}{.37} \\
+    \multicolumn{9}{@{}l}{\emph{reconstruction (curve)}} \\
+    curve $R^2$ $\uparrow$ & \seedpm{0.578}{.016} & \seedpm{0.579}{.017} & \seedpm{0.553}{.011} & \seedpm{0.558}{.014} & \seedpm{0.566}{.016} & \seedpm{\textbf{0.572}}{.010} & \seedpm{\hlval{accent}{0.473}}{.040} & \seedpm{0.481}{.029} \\
+    curve MAE $\downarrow$ & \seedpm{0.0480}{.0011} & \seedpm{0.0479}{.0008} & \seedpm{0.0493}{.0008} & \seedpm{0.0489}{.0007} & \seedpm{0.0537}{.0008} & \seedpm{\textbf{0.0533}}{.0007} & \seedpm{0.0646}{.0028} & \seedpm{0.0637}{.0025} \\
+    PSNR [dB] $\uparrow$ & \seedpm{50.41}{.17} & \seedpm{50.43}{.17} & \seedpm{50.16}{.11} & \seedpm{50.21}{.14} & \seedpm{49.71}{.16} & \seedpm{49.77}{.11} & \seedpm{48.88}{.33} & \seedpm{48.94}{.25} \\
+    SSIM elev $\uparrow$ & \seedpm{0.9598}{.0009} & \seedpm{0.9600}{.0007} & \seedpm{0.9589}{.0007} & \seedpm{0.9592}{.0006} & \seedpm{0.9553}{.0020} & \seedpm{0.9559}{.0014} & \seedpm{0.9388}{.0032} & \seedpm{0.9398}{.0025} \\
+    SSIM range $\uparrow$ & \seedpm{0.9342}{.0028} & \seedpm{0.9346}{.0025} & \seedpm{0.9308}{.0027} & \seedpm{0.9319}{.0018} & \seedpm{0.9314}{.0026} & \seedpm{0.9326}{.0021} & \seedpm{0.9084}{.0050} & \seedpm{0.9103}{.0035} \\
+    SSIM azim $\uparrow$ & \seedpm{0.9488}{.0014} & \seedpm{0.9491}{.0011} & \seedpm{0.9466}{.0011} & \seedpm{0.9471}{.0008} & \seedpm{0.9466}{.0016} & \seedpm{0.9473}{.0012} & \seedpm{0.9288}{.0036} & \seedpm{0.9300}{.0033} \\
+    profile cos med $\uparrow$ & \seedpm{0.896}{.033} & \seedpm{0.892}{.042} & \seedpm{0.883}{.038} & \seedpm{0.891}{.035} & \seedpm{0.891}{.014} & \seedpm{0.899}{.030} & \seedpm{0.859}{.027} & \seedpm{0.865}{.035} \\
+    peak err mean $\downarrow$ & \seedpm{\textbf{1.63}}{.08} & \seedpm{\textbf{1.63}}{.11} & \seedpm{1.72}{.16} & \seedpm{1.67}{.10} & \seedpm{1.56}{.10} & \seedpm{\textbf{1.50}}{.10} & \seedpm{1.89}{.12} & \seedpm{1.85}{.16} \\
+    \quad median $\downarrow$ & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} \\
+    \quad p95 $\downarrow$ & \seedpm{\textbf{6.04}}{.47} & \seedpm{6.31}{.37} & \seedpm{6.44}{.60} & \seedpm{6.31}{.37} & \seedpm{\textbf{5.77}}{.37} & \seedpm{\textbf{5.77}}{.37} & \seedpm{\hlval{accent}{7.92}}{.88} & \seedpm{7.79}{.60} \\
     \addlinespace
-    \multicolumn{5}{@{}l}{\emph{detection (matched)}} \\
-    precision $\uparrow$   & \seedpm{0.813}{.004} & \seedpm{0.816}{.003} & \seedpm{0.813}{.011} & \seedpm{0.814}{.009} \\
-    recall $\uparrow$      & \seedpm{0.893}{.004} & \seedpm{0.893}{.003} & \seedpm{\hlval{accent}{0.879}}{.007} & \seedpm{\hlval{accent}{0.882}}{.004} \\
-    matched F1 $\uparrow$  & \seedpm{0.851}{.004} & \seedpm{0.853}{.002} & \seedpm{0.845}{.008} & \seedpm{0.846}{.005} \\
-    count exact $\uparrow$ & \seedpm{0.841}{.004} & \seedpm{0.841}{.009} & \seedpm{0.843}{.022} & \seedpm{0.844}{.017} \\
-    \quad under $\downarrow$ & \seedpm{\textbf{0.017}}{.004} & \seedpm{0.019}{.004} & \seedpm{0.026}{.008} & \seedpm{0.023}{.002} \\
-    \quad over $\downarrow$  & \seedpm{0.142}{.003} & \seedpm{0.140}{.006} & \seedpm{\textbf{0.131}}{.017} & \seedpm{0.133}{.015} \\
+    \multicolumn{9}{@{}l}{\emph{detection (matched)}} \\
+    precision $\uparrow$ & \seedpm{0.813}{.004} & \seedpm{0.816}{.003} & \seedpm{0.813}{.011} & \seedpm{0.814}{.009} & \seedpm{0.573}{.027} & \seedpm{\textbf{0.575}}{.019} & \seedpm{\hlval{accent}{0.483}}{.036} & \seedpm{0.502}{.027} \\
+    recall $\uparrow$ & \seedpm{0.893}{.004} & \seedpm{0.893}{.003} & \seedpm{\hlval{accent}{0.879}}{.007} & \seedpm{\hlval{accent}{0.882}}{.004} & \seedpm{0.886}{.003} & \seedpm{0.889}{.004} & \seedpm{0.878}{.011} & \seedpm{0.880}{.003} \\
+    matched F1 $\uparrow$ & \seedpm{0.851}{.004} & \seedpm{0.853}{.002} & \seedpm{0.845}{.008} & \seedpm{0.846}{.005} & \seedpm{0.696}{.020} & \seedpm{\textbf{0.698}}{.013} & \seedpm{\hlval{accent}{0.622}}{.029} & \seedpm{0.639}{.022} \\
+    count exact $\uparrow$ & \seedpm{0.841}{.004} & \seedpm{0.841}{.009} & \seedpm{0.843}{.022} & \seedpm{0.844}{.017} & \seedpm{0.588}{.062} & \seedpm{\textbf{0.589}}{.063} & \seedpm{0.445}{.202} & \seedpm{0.529}{.122} \\
+    \quad under $\downarrow$ & \seedpm{\textbf{0.017}}{.004} & \seedpm{0.019}{.004} & \seedpm{0.026}{.008} & \seedpm{0.023}{.002} & \seedpm{0.027}{.004} & \seedpm{0.025}{.005} & \seedpm{0.025}{.010} & \seedpm{\textbf{0.023}}{.004} \\
+    \quad over $\downarrow$ & \seedpm{0.142}{.003} & \seedpm{0.140}{.006} & \seedpm{\textbf{0.131}}{.017} & \seedpm{0.133}{.015} & \seedpm{\textbf{0.385}}{.065} & \seedpm{0.386}{.067} & \seedpm{0.529}{.209} & \seedpm{0.448}{.126} \\
     \addlinespace
-    \multicolumn{5}{@{}l}{\emph{seed-to-seed spread (std over 5 seeds)} $\downarrow$} \\
-    curve $R^2$  & .016 & .017 & \textbf{.011} & .014 \\
-    SSIM range   & .0028 & .0025 & .0027 & \textbf{.0018} \\
-    curve MAE    & .0011 & .0008 & .0008 & \textbf{.0007} \\
-    profile cos med & \textbf{.033} & .042 & .038 & .035 \\
-    \bottomrule
-  \end{tabular}
-  \par\vspace{0pt}
-  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (presence lever = column); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. $+$A active normalization, $+$B presence balance, $+$AB both. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; spread rows compare the seed stds themselves; \textcolor{accent}{red} $=$ B's recall price --- A moves nothing past noise. Peak median/p95: per-pixel peak-error distribution; profile cos med: median per-pixel cosine to the GT profile.\par}
-    
-
-\end{frame}
-
-% ---------------------------------------------------------------- 18b Levers by scatterer count
-\begin{frame}{The levers by scatterer count --- B's cost lives in the second scatterer}
-    \centering
-  \scriptsize
-  \renewcommand{\arraystretch}{1.11}
-  \setlength{\tabcolsep}{6pt}
-  \renewcommand{\seedtag}{setE}
-  \begin{tabular}{@{}l c c c c@{}}
-    \toprule
-    metric & none & $+$A & $+$B & $+$AB \\
-    \midrule
-    matched precision $\uparrow$ & \seedpm{0.813}{.004} & \seedpm{0.816}{.003} & \seedpm{0.813}{.011} & \seedpm{0.814}{.009} \\
-    \quad $k{=}1$                & \seedpm{0.836}{.003} & \seedpm{0.839}{.005} & \seedpm{0.847}{.017} & \seedpm{0.846}{.015} \\
-    \quad $k{=}2$                & \seedpm{0.771}{.009} & \seedpm{0.776}{.009} & \seedpm{\hlval{accent}{0.754}}{.007} & \seedpm{\hlval{accent}{0.757}}{.008} \\
-    \addlinespace
-    matched recall $\uparrow$    & \seedpm{0.893}{.004} & \seedpm{0.893}{.003} & \seedpm{\hlval{accent}{0.879}}{.007} & \seedpm{\hlval{accent}{0.882}}{.004} \\
-    \quad $k{=}1$                & \seedpm{0.997}{.000} & \seedpm{0.997}{.001} & \seedpm{0.992}{.009} & \seedpm{0.996}{.001} \\
-    \addlinespace[2pt]
-    \quad $k{=}2$                & \seedpm{0.744}{.010} & \seedpm{0.744}{.007} & \seedpm{\hlval{accent}{0.719}}{.007} & \seedpm{\hlval{accent}{0.721}}{.010} \\
-    \addlinespace
-    count acc $\mid$ pred $k{=}1$ $\uparrow$ & \seedpm{0.977}{.004} & \seedpm{0.975}{.006} & \seedpm{0.970}{.005} & \seedpm{0.970}{.005} \\
-    count acc $\mid$ pred $k{=}2$ $\uparrow$ & \seedpm{0.631}{.005} & \seedpm{0.634}{.012} & \seedpm{0.646}{.030} & \seedpm{0.643}{.027} \\
-    \addlinespace
-    matched $\mu$ MAE $\downarrow$ & \seedpm{2.19}{.08} & \seedpm{\textbf{2.15}}{.09} & \seedpm{2.27}{.12} & \seedpm{2.23}{.07} \\
-    \quad $k{=}1$                & \seedpm{\textbf{0.62}}{.11} & \seedpm{0.63}{.15} & \seedpm{0.66}{.15} & \seedpm{0.63}{.15} \\
-    \quad $k{=}2$                & \seedpm{4.51}{.13} & \seedpm{\textbf{4.41}}{.19} & \seedpm{4.64}{.16} & \seedpm{4.60}{.11} \\
-    \addlinespace
-    matched $\sigma$ MAE $\downarrow$ & \seedpm{0.83}{.03} & \seedpm{0.82}{.04} & \seedpm{0.83}{.02} & \seedpm{0.81}{.02} \\
-    \quad $k{=}1$                & \seedpm{0.24}{.01} & \seedpm{0.24}{.01} & \seedpm{0.24}{.01} & \seedpm{0.23}{.01} \\
-    \quad $k{=}2$                & \seedpm{1.71}{.06} & \seedpm{1.69}{.09} & \seedpm{1.70}{.06} & \seedpm{1.67}{.04} \\
-    \addlinespace
-    matched $a$ MAE $\downarrow$ & \seedpm{0.311}{.004} & \seedpm{0.315}{.009} & \seedpm{0.317}{.012} & \seedpm{0.316}{.012} \\
-    \quad $k{=}1$                & \seedpm{0.133}{.005} & \seedpm{0.134}{.010} & \seedpm{0.136}{.012} & \seedpm{0.133}{.009} \\
-    \quad $k{=}2$                & \seedpm{0.573}{.011} & \seedpm{0.582}{.008} & \seedpm{0.585}{.012} & \seedpm{0.589}{.019} \\
+    \multicolumn{9}{@{}l}{\emph{seed-to-seed spread (std over 5 seeds)} $\downarrow$} \\
+    curve $R^2$ & .016 & .017 & \textbf{.011} & .014 & .016 & \textbf{.010} & \hlval{accent}{.040} & .029 \\
+    curve MAE & .0011 & .0008 & .0008 & \textbf{.0007} & --- & --- & --- & --- \\
+    SSIM range & .0028 & .0025 & .0027 & \textbf{.0018} & --- & --- & --- & --- \\
+    profile cos med & \textbf{.033} & .042 & .038 & .035 & --- & --- & --- & --- \\
+    count exact & --- & --- & --- & --- & \textbf{.062} & .063 & \hlval{accent}{.202} & .122 \\
+    count over & --- & --- & --- & --- & \textbf{.065} & .067 & \hlval{accent}{.209} & .126 \\
     \bottomrule
   \end{tabular}
   \par\vspace{3pt}
-  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (presence lever = column); held-out test, cells mean $\pm$ seed std over five seeded replicas; $k$ $=$ true scatterer count of the pixel. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; \textcolor{accent}{red} $=$ B's $k{=}2$ cost. Precision rewards under-prediction --- rank on recall. count acc $\mid$ pred $k$: share of pixels claiming exactly $k$ scatterers whose true count is $k$. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
-    
+  \parbox{0.94\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$; column groups $=$ $K{=}2$ and $K{=}5$ (presence lever within each); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test on the matching $K_{\max}$ labels. $+$A active normalization, $+$B presence balance, $+$AB both; each none arm $=$ its $K$'s set-pred$\cdot$Hungarian heads arm. \textbf{bold} $=$ best in row within its $K$ group, marked only where best and worst differ by more than $5\%$; spread rows compare the seed stds themselves (--- $=$ spread not reported for that $K$); \textcolor{accent}{red} $=$ B's recall price at $K{=}2$, its curve and precision price and seed destabilization at $K{=}5$ --- A stays free at both. Peak median/p95: per-pixel peak-error distribution; profile cos med: median per-pixel cosine to the GT profile.\par}
+\end{frame}
 
+% ---------------------------------------------------------------- 18b Levers by scatterer count, K=2 and K=5
+\begin{frame}{The levers by scatterer count --- B's cost starts at the second scatterer and spreads at $K{=}5$}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{1.05}
+  \setlength{\tabcolsep}{2.5pt}
+  \renewcommand{\seedtag}{mgE}
+  \begin{tabular}{@{}l cc !{\hspace{2pt}} cc !{\hspace{8pt}} cc !{\hspace{2pt}} cc@{}}
+    \toprule
+     & \multicolumn{4}{c}{$K{=}2$} & \multicolumn{4}{c@{}}{$K{=}5$} \\
+    \cmidrule(lr){2-5}\cmidrule(l){6-9}
+    metric & none & $+$A & $+$B & $+$AB & none & $+$A & $+$B & $+$AB \\
+    \midrule
+    matched precision $\uparrow$ & \seedpm{0.813}{.004} & \seedpm{0.816}{.003} & \seedpm{0.813}{.011} & \seedpm{0.814}{.009} & \seedpm{0.573}{.027} & \seedpm{\textbf{0.575}}{.019} & \seedpm{\hlval{accent}{0.483}}{.036} & \seedpm{0.502}{.027} \\
+    \quad $k{=}1$ & \seedpm{0.836}{.003} & \seedpm{0.839}{.005} & \seedpm{0.847}{.017} & \seedpm{0.846}{.015} & \seedpm{0.640}{.045} & \seedpm{\textbf{0.643}}{.036} & \seedpm{\hlval{accent}{0.521}}{.067} & \seedpm{0.554}{.049} \\
+    \quad $k{=}2$ & \seedpm{0.771}{.009} & \seedpm{0.776}{.009} & \seedpm{\hlval{accent}{0.754}}{.007} & \seedpm{\hlval{accent}{0.757}}{.008} & \seedpm{0.471}{.015} & \seedpm{\textbf{0.473}}{.008} & \seedpm{0.415}{.007} & \seedpm{0.416}{.012} \\
+    \quad $k{=}3$ & --- & --- & --- & --- & \seedpm{0.538}{.009} & \seedpm{\textbf{0.540}}{.007} & \seedpm{0.478}{.005} & \seedpm{0.478}{.012} \\
+    \quad $k{=}4$ & --- & --- & --- & --- & \seedpm{\textbf{0.510}}{.011} & \seedpm{\textbf{0.510}}{.007} & \seedpm{0.466}{.013} & \seedpm{0.469}{.010} \\
+    \quad $k{=}5$ & --- & --- & --- & --- & \seedpm{\textbf{0.468}}{.011} & \seedpm{0.467}{.005} & \seedpm{0.439}{.017} & \seedpm{0.441}{.006} \\
+    \addlinespace
+    matched recall $\uparrow$ & \seedpm{0.893}{.004} & \seedpm{0.893}{.003} & \seedpm{\hlval{accent}{0.879}}{.007} & \seedpm{\hlval{accent}{0.882}}{.004} & \seedpm{0.886}{.003} & \seedpm{0.889}{.004} & \seedpm{0.878}{.011} & \seedpm{0.880}{.003} \\
+    \quad $k{=}1$ & \seedpm{0.997}{.000} & \seedpm{0.997}{.001} & \seedpm{0.992}{.009} & \seedpm{0.996}{.001} & \seedpm{0.994}{.002} & \seedpm{0.996}{.002} & \seedpm{0.987}{.008} & \seedpm{0.991}{.003} \\
+    \quad $k{=}2$ & \seedpm{0.744}{.010} & \seedpm{0.744}{.007} & \seedpm{\hlval{accent}{0.719}}{.007} & \seedpm{\hlval{accent}{0.721}}{.010} & \seedpm{0.906}{.009} & \seedpm{0.908}{.011} & \seedpm{0.902}{.016} & \seedpm{0.897}{.007} \\
+    \quad $k{=}3$ & --- & --- & --- & --- & \seedpm{0.763}{.004} & \seedpm{0.767}{.005} & \seedpm{\hlval{accent}{0.734}}{.016} & \seedpm{\hlval{accent}{0.733}}{.012} \\
+    \quad $k{=}4$ & --- & --- & --- & --- & \seedpm{0.527}{.010} & \seedpm{0.535}{.011} & \seedpm{0.514}{.027} & \seedpm{0.519}{.014} \\
+    \quad $k{=}5$ & --- & --- & --- & --- & \seedpm{0.327}{.015} & \seedpm{0.339}{.013} & \seedpm{0.336}{.033} & \seedpm{\textbf{0.344}}{.016} \\
+    \addlinespace
+    \multicolumn{9}{@{}l}{\emph{count acc $\mid$ pred $k$ $\uparrow$ --- share of pixels claiming exactly $k$ whose true count is $k$}} \\
+    \quad pred $k{=}1$ & \seedpm{0.977}{.004} & \seedpm{0.975}{.006} & \seedpm{0.970}{.005} & \seedpm{0.970}{.005} & \seedpm{0.978}{.008} & \seedpm{0.977}{.006} & \seedpm{0.972}{.012} & \seedpm{0.976}{.005} \\
+    \quad pred $k{=}2$ & \seedpm{0.631}{.005} & \seedpm{0.634}{.012} & \seedpm{0.646}{.030} & \seedpm{0.643}{.027} & \seedpm{\textbf{0.173}}{.061} & \seedpm{0.161}{.050} & \seedpm{0.108}{.070} & \seedpm{0.116}{.051} \\
+    \quad pred $k{=}3$ & --- & --- & --- & --- & \seedpm{0.050}{.011} & \seedpm{\textbf{0.057}}{.009} & \seedpm{0.032}{.008} & \seedpm{0.033}{.005} \\
+    \quad pred $k{=}4$ & --- & --- & --- & --- & \seedpm{\textbf{0.024}}{.006} & \seedpm{0.023}{.004} & \seedpm{0.009}{.003} & \seedpm{0.010}{.002} \\
+    \quad pred $k{=}5$ & --- & --- & --- & --- & \seedpm{0.063}{.009} & \seedpm{\textbf{0.065}}{.006} & \seedpm{0.039}{.003} & \seedpm{0.041}{.005} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.94\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$; column groups $=$ $K{=}2$ and $K{=}5$ (presence lever within each); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test; $k$ $=$ true scatterer count of the pixel; --- $=$ rank absent from the $K{=}2$ label set. $+$A active normalization, $+$B presence balance, $+$AB both. \textbf{bold} $=$ best in row within its $K$ group, marked only where best and worst differ by more than $5\%$; \textcolor{accent}{red} $=$ B's $k{=}2$ cost at $K{=}2$, its precision price and the wrong-way $k{=}3$ at $K{=}5$. Precision rewards under-prediction --- rank on recall.\par}
+\end{frame}
+
+% ---------------------------------------------------------------- 18f Lever components, K=2 and K=5
+\begin{frame}{The lever components --- B is noise at $K{=}2$; at $K{=}5$ it buys amplitude, pays position and width}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{1.05}
+  \setlength{\tabcolsep}{2.5pt}
+  \renewcommand{\seedtag}{mgF}
+  \begin{tabular}{@{}l cc !{\hspace{2pt}} cc !{\hspace{8pt}} cc !{\hspace{2pt}} cc@{}}
+    \toprule
+     & \multicolumn{4}{c}{$K{=}2$} & \multicolumn{4}{c@{}}{$K{=}5$} \\
+    \cmidrule(lr){2-5}\cmidrule(l){6-9}
+    metric & none & $+$A & $+$B & $+$AB & none & $+$A & $+$B & $+$AB \\
+    \midrule
+    matched $\mu$ MAE $\downarrow$ & \seedpm{2.19}{.08} & \seedpm{\textbf{2.15}}{.09} & \seedpm{2.27}{.12} & \seedpm{2.23}{.07} & \seedpm{\textbf{1.94}}{.06} & \seedpm{1.97}{.07} & \seedpm{\hlval{accent}{2.14}}{.07} & \seedpm{2.11}{.12} \\
+    \quad $k{=}1$ & \seedpm{\textbf{0.62}}{.11} & \seedpm{0.63}{.15} & \seedpm{0.66}{.15} & \seedpm{0.63}{.15} & \seedpm{0.75}{.08} & \seedpm{\textbf{0.71}}{.14} & \seedpm{0.88}{.10} & \seedpm{0.82}{.12} \\
+    \quad $k{=}2$ & \seedpm{4.51}{.13} & \seedpm{\textbf{4.41}}{.19} & \seedpm{4.64}{.16} & \seedpm{4.60}{.11} & \seedpm{\textbf{1.83}}{.09} & \seedpm{1.90}{.05} & \seedpm{1.99}{.08} & \seedpm{1.99}{.11} \\
+    \quad $k{=}3$ & --- & --- & --- & --- & \seedpm{\textbf{3.60}}{.14} & \seedpm{3.72}{.07} & \seedpm{3.86}{.14} & \seedpm{3.87}{.15} \\
+    \quad $k{=}4$ & --- & --- & --- & --- & \seedpm{6.55}{.25} & \seedpm{6.59}{.25} & \seedpm{6.67}{.17} & \seedpm{6.63}{.18} \\
+    \quad $k{=}5$ & --- & --- & --- & --- & \seedpm{9.48}{.26} & \seedpm{9.40}{.23} & \seedpm{9.71}{.17} & \seedpm{9.64}{.10} \\
+    \addlinespace
+    matched $\sigma$ MAE $\downarrow$ & \seedpm{0.83}{.03} & \seedpm{0.82}{.04} & \seedpm{0.83}{.02} & \seedpm{0.81}{.02} & \seedpm{\textbf{0.77}}{.03} & \seedpm{0.78}{.02} & \seedpm{0.83}{.02} & \seedpm{\hlval{accent}{0.85}}{.04} \\
+    \quad $k{=}1$ & \seedpm{0.24}{.01} & \seedpm{0.24}{.01} & \seedpm{0.24}{.01} & \seedpm{0.23}{.01} & \seedpm{\textbf{0.35}}{.03} & \seedpm{\textbf{0.35}}{.03} & \seedpm{0.39}{.02} & \seedpm{0.41}{.04} \\
+    \quad $k{=}2$ & \seedpm{1.71}{.06} & \seedpm{1.69}{.09} & \seedpm{1.70}{.06} & \seedpm{1.67}{.04} & \seedpm{\textbf{1.12}}{.04} & \seedpm{1.13}{.03} & \seedpm{1.18}{.03} & \seedpm{1.20}{.05} \\
+    \quad $k{=}3$ & --- & --- & --- & --- & \seedpm{\textbf{1.46}}{.03} & \seedpm{1.47}{.03} & \seedpm{1.54}{.02} & \seedpm{1.56}{.04} \\
+    \quad $k{=}4$ & --- & --- & --- & --- & \seedpm{\textbf{1.70}}{.04} & \seedpm{1.73}{.03} & \seedpm{1.76}{.06} & \seedpm{1.79}{.03} \\
+    \quad $k{=}5$ & --- & --- & --- & --- & \seedpm{1.81}{.07} & \seedpm{1.87}{.05} & \seedpm{1.83}{.08} & \seedpm{1.87}{.04} \\
+    \addlinespace
+    matched $a$ MAE $\downarrow$ & \seedpm{0.311}{.004} & \seedpm{0.315}{.009} & \seedpm{0.317}{.012} & \seedpm{0.316}{.012} & \seedpm{0.552}{.044} & \seedpm{0.540}{.038} & \seedpm{0.485}{.019} & \seedpm{\hlval{good}{\textbf{0.469}}}{.014} \\
+    \quad $k{=}1$ & \seedpm{0.133}{.005} & \seedpm{0.134}{.010} & \seedpm{0.136}{.012} & \seedpm{0.133}{.009} & \seedpm{0.235}{.058} & \seedpm{0.228}{.053} & \seedpm{0.231}{.020} & \seedpm{\textbf{0.219}}{.008} \\
+    \quad $k{=}2$ & \seedpm{0.573}{.011} & \seedpm{0.582}{.008} & \seedpm{0.585}{.012} & \seedpm{0.589}{.019} & \seedpm{0.920}{.048} & \seedpm{0.901}{.038} & \seedpm{0.822}{.048} & \seedpm{\textbf{0.790}}{.030} \\
+    \quad $k{=}3$ & --- & --- & --- & --- & \seedpm{1.096}{.030} & \seedpm{1.075}{.020} & \seedpm{0.901}{.028} & \seedpm{\textbf{0.892}}{.039} \\
+    \quad $k{=}4$ & --- & --- & --- & --- & \seedpm{1.049}{.026} & \seedpm{1.029}{.020} & \seedpm{0.800}{.041} & \seedpm{\textbf{0.798}}{.049} \\
+    \quad $k{=}5$ & --- & --- & --- & --- & \seedpm{0.915}{.041} & \seedpm{0.883}{.033} & \seedpm{0.638}{.050} & \seedpm{\hlval{good}{\textbf{0.627}}}{.050} \\
+    \bottomrule
+  \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.94\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$; column groups $=$ $K{=}2$ and $K{=}5$ (presence lever within each); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test; $k$ $=$ true scatterer count of the pixel; component errors over matched pairs only; --- $=$ rank absent from the $K{=}2$ label set. $+$A active normalization, $+$B presence balance, $+$AB both. \textbf{bold} $=$ best in row within its $K$ group, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the amplitude B buys at $K{=}5$; \textcolor{accent}{red} $=$ the position and width it pays. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
 \end{frame}
 
 % ---------------------------------------------------------------- 18c Levers: predicted stats vs GT
-\begin{frame}{The levers, predicted statistics vs the GT --- the head sets the distribution, B trims the empties}
+\begin{frame}{The $K{=}2$ levers, predicted statistics vs the GT --- the head sets the distribution, B trims the empties}
     \centering
   \scriptsize
   \renewcommand{\arraystretch}{0.95}
@@ -1204,128 +1158,6 @@
   \end{tabular}
   \par\vspace{3pt}
   \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (presence lever = column); five seeded replicas per arm, cells mean $\pm$ seed std; means conditioned on the slot's GT activity mask. \textbf{bold} $=$ closest to the \textcolor{good}{GT} column, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the empty-slot trim B buys. Inactive GT slots define no $\mu$/$\sigma$ reference (---). Width rows: std of the prediction over GT-active pixels vs the GT's own std. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
-    
-
-\end{frame}
-
-% ---------------------------------------------------------------- 18d Levers at K=5
-\begin{frame}{The levers at $K{=}5$ --- A stays free, B now pays in the curve}
-    \centering
-  \scriptsize
-  \renewcommand{\arraystretch}{0.86}
-  \setlength{\tabcolsep}{6pt}
-  \renewcommand{\seedtag}{kpA}
-  \begin{tabular}{@{}l c c c c@{}}
-    \toprule
-    metric & none & $+$A & $+$B & $+$AB \\
-    \midrule
-    \multicolumn{5}{@{}l}{\emph{reconstruction (curve)}} \\
-    curve $R^2$ $\uparrow$ & \seedpm{0.566}{.016} & \seedpm{\textbf{0.572}}{.010} & \seedpm{\hlval{accent}{0.473}}{.040} & \seedpm{0.481}{.029} \\
-    curve MAE $\downarrow$ & \seedpm{0.0537}{.0008} & \seedpm{\textbf{0.0533}}{.0007} & \seedpm{0.0646}{.0028} & \seedpm{0.0637}{.0025} \\
-    PSNR [dB] $\uparrow$ & \seedpm{49.71}{.16} & \seedpm{49.77}{.11} & \seedpm{48.88}{.33} & \seedpm{48.94}{.25} \\
-    SSIM elev $\uparrow$ & \seedpm{0.9553}{.0020} & \seedpm{0.9559}{.0014} & \seedpm{0.9388}{.0032} & \seedpm{0.9398}{.0025} \\
-    SSIM range $\uparrow$ & \seedpm{0.9314}{.0026} & \seedpm{0.9326}{.0021} & \seedpm{0.9084}{.0050} & \seedpm{0.9103}{.0035} \\
-    SSIM azim $\uparrow$ & \seedpm{0.9466}{.0016} & \seedpm{0.9473}{.0012} & \seedpm{0.9288}{.0036} & \seedpm{0.9300}{.0033} \\
-    profile cos med $\uparrow$ & \seedpm{0.891}{.014} & \seedpm{0.899}{.030} & \seedpm{0.859}{.027} & \seedpm{0.865}{.035} \\
-    peak err mean $\downarrow$ & \seedpm{1.56}{.10} & \seedpm{\textbf{1.50}}{.10} & \seedpm{1.89}{.12} & \seedpm{1.85}{.16} \\
-    \quad median $\downarrow$ & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} & \seedpm{0.67}{.00} \\
-    \quad p95 $\downarrow$ & \seedpm{\textbf{5.77}}{.37} & \seedpm{\textbf{5.77}}{.37} & \seedpm{\hlval{accent}{7.92}}{.88} & \seedpm{7.79}{.60} \\
-    \addlinespace
-    \multicolumn{5}{@{}l}{\emph{detection (matched)}} \\
-    precision $\uparrow$ & \seedpm{0.573}{.027} & \seedpm{\textbf{0.575}}{.019} & \seedpm{\hlval{accent}{0.483}}{.036} & \seedpm{0.502}{.027} \\
-    recall $\uparrow$ & \seedpm{0.886}{.003} & \seedpm{0.889}{.004} & \seedpm{0.878}{.011} & \seedpm{0.880}{.003} \\
-    matched F1 $\uparrow$ & \seedpm{0.696}{.020} & \seedpm{\textbf{0.698}}{.013} & \seedpm{\hlval{accent}{0.622}}{.029} & \seedpm{0.639}{.022} \\
-    count exact $\uparrow$ & \seedpm{0.588}{.062} & \seedpm{\textbf{0.589}}{.063} & \seedpm{0.445}{.202} & \seedpm{0.529}{.122} \\
-    \quad under $\downarrow$ & \seedpm{0.027}{.004} & \seedpm{0.025}{.005} & \seedpm{0.025}{.010} & \seedpm{\textbf{0.023}}{.004} \\
-    \quad over $\downarrow$ & \seedpm{\textbf{0.385}}{.065} & \seedpm{0.386}{.067} & \seedpm{0.529}{.209} & \seedpm{0.448}{.126} \\
-    \addlinespace
-    \multicolumn{5}{@{}l}{\emph{seed-to-seed spread (std over 5 seeds)} $\downarrow$} \\
-    curve $R^2$  & .016 & \textbf{.010} & \hlval{accent}{.040} & .029 \\
-    count exact  & \textbf{.062} & .063 & \hlval{accent}{.202} & .122 \\
-    count over   & \textbf{.065} & .067 & \hlval{accent}{.209} & .126 \\
-    \bottomrule
-  \end{tabular}
-  \par\vspace{2pt}
-  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}5$ $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (presence lever $=$ column); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. $+$A active normalization, $+$B presence balance, $+$AB both; the none arm $=$ the $K{=}5$ set-pred$\cdot$Hungarian heads arm. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; spread rows compare the seed stds themselves; \textcolor{accent}{red} $=$ B's curve and precision price and its seed destabilization --- A stays free. Peak median/p95: per-pixel peak-error distribution; profile cos med: median per-pixel cosine to the GT profile.\par}
-    
-
-\end{frame}
-
-% ---------------------------------------------------------------- 18e Levers at K=5 by scatterer count
-\begin{frame}{The $K{=}5$ levers by scatterer count --- precision pays everywhere, the tail payoff never lands}
-    \centering
-  \scriptsize
-  \renewcommand{\arraystretch}{1.0}
-  \setlength{\tabcolsep}{6pt}
-  \renewcommand{\seedtag}{kpB}
-  \begin{tabular}{@{}l c c c c@{}}
-    \toprule
-    metric & none & $+$A & $+$B & $+$AB \\
-    \midrule
-    matched precision $\uparrow$ & \seedpm{0.573}{.027} & \seedpm{\textbf{0.575}}{.019} & \seedpm{\hlval{accent}{0.483}}{.036} & \seedpm{0.502}{.027} \\
-    \quad $k{=}1$ & \seedpm{0.640}{.045} & \seedpm{\textbf{0.643}}{.036} & \seedpm{\hlval{accent}{0.521}}{.067} & \seedpm{0.554}{.049} \\
-    \quad $k{=}2$ & \seedpm{0.471}{.015} & \seedpm{\textbf{0.473}}{.008} & \seedpm{0.415}{.007} & \seedpm{0.416}{.012} \\
-    \quad $k{=}3$ & \seedpm{0.538}{.009} & \seedpm{\textbf{0.540}}{.007} & \seedpm{0.478}{.005} & \seedpm{0.478}{.012} \\
-    \quad $k{=}4$ & \seedpm{\textbf{0.510}}{.011} & \seedpm{\textbf{0.510}}{.007} & \seedpm{0.466}{.013} & \seedpm{0.469}{.010} \\
-    \quad $k{=}5$ & \seedpm{\textbf{0.468}}{.011} & \seedpm{0.467}{.005} & \seedpm{0.439}{.017} & \seedpm{0.441}{.006} \\
-    \addlinespace
-    matched recall $\uparrow$ & \seedpm{0.886}{.003} & \seedpm{0.889}{.004} & \seedpm{0.878}{.011} & \seedpm{0.880}{.003} \\
-    \quad $k{=}1$ & \seedpm{0.994}{.002} & \seedpm{0.996}{.002} & \seedpm{0.987}{.008} & \seedpm{0.991}{.003} \\
-    \quad $k{=}2$ & \seedpm{0.906}{.009} & \seedpm{0.908}{.011} & \seedpm{0.902}{.016} & \seedpm{0.897}{.007} \\
-    \quad $k{=}3$ & \seedpm{0.763}{.004} & \seedpm{0.767}{.005} & \seedpm{\hlval{accent}{0.734}}{.016} & \seedpm{\hlval{accent}{0.733}}{.012} \\
-    \quad $k{=}4$ & \seedpm{0.527}{.010} & \seedpm{0.535}{.011} & \seedpm{0.514}{.027} & \seedpm{0.519}{.014} \\
-    \addlinespace[2pt]
-    \quad $k{=}5$ & \seedpm{0.327}{.015} & \seedpm{0.339}{.013} & \seedpm{0.336}{.033} & \seedpm{\textbf{0.344}}{.016} \\
-    \addlinespace
-    \multicolumn{5}{@{}l}{\emph{count acc $\mid$ pred $k$ $\uparrow$ --- share of pixels claiming exactly $k$ whose true count is $k$}} \\
-    \quad pred $k{=}1$ & \seedpm{0.978}{.008} & \seedpm{0.977}{.006} & \seedpm{0.972}{.012} & \seedpm{0.976}{.005} \\
-    \quad pred $k{=}2$ & \seedpm{\textbf{0.173}}{.061} & \seedpm{0.161}{.050} & \seedpm{0.108}{.070} & \seedpm{0.116}{.051} \\
-    \quad pred $k{=}3$ & \seedpm{0.050}{.011} & \seedpm{\textbf{0.057}}{.009} & \seedpm{0.032}{.008} & \seedpm{0.033}{.005} \\
-    \quad pred $k{=}4$ & \seedpm{\textbf{0.024}}{.006} & \seedpm{0.023}{.004} & \seedpm{0.009}{.003} & \seedpm{0.010}{.002} \\
-    \quad pred $k{=}5$ & \seedpm{0.063}{.009} & \seedpm{\textbf{0.065}}{.006} & \seedpm{0.039}{.003} & \seedpm{0.041}{.005} \\
-    \bottomrule
-  \end{tabular}
-  \par\vspace{2pt}
-  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}5$ $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (presence lever $=$ column); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. $+$A active normalization, $+$B presence balance, $+$AB both; the none arm $=$ the $K{=}5$ set-pred$\cdot$Hungarian heads arm. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; $k$ $=$ true scatterer count of the pixel. \textcolor{accent}{red} $=$ B's precision price and the wrong-way $k{=}3$. Precision rewards under-prediction --- read it alongside recall. count acc $\mid$ pred $k$: share of pixels claiming exactly $k$ scatterers whose true count is $k$.\par}
-    
-
-\end{frame}
-
-% ---------------------------------------------------------------- 18f Levers at K=5: component errors
-\begin{frame}{The $K{=}5$ lever components --- B buys amplitude, pays in position and width}
-    \centering
-  \scriptsize
-  \renewcommand{\arraystretch}{1.0}
-  \setlength{\tabcolsep}{6pt}
-  \renewcommand{\seedtag}{kpC}
-  \begin{tabular}{@{}l c c c c@{}}
-    \toprule
-    metric & none & $+$A & $+$B & $+$AB \\
-    \midrule
-    matched $\mu$ MAE $\downarrow$ & \seedpm{\textbf{1.94}}{.06} & \seedpm{1.97}{.07} & \seedpm{\hlval{accent}{2.14}}{.07} & \seedpm{2.11}{.12} \\
-    \quad $k{=}1$ & \seedpm{0.75}{.08} & \seedpm{\textbf{0.71}}{.14} & \seedpm{0.88}{.10} & \seedpm{0.82}{.12} \\
-    \quad $k{=}2$ & \seedpm{\textbf{1.83}}{.09} & \seedpm{1.90}{.05} & \seedpm{1.99}{.08} & \seedpm{1.99}{.11} \\
-    \quad $k{=}3$ & \seedpm{\textbf{3.60}}{.14} & \seedpm{3.72}{.07} & \seedpm{3.86}{.14} & \seedpm{3.87}{.15} \\
-    \quad $k{=}4$ & \seedpm{6.55}{.25} & \seedpm{6.59}{.25} & \seedpm{6.67}{.17} & \seedpm{6.63}{.18} \\
-    \quad $k{=}5$ & \seedpm{9.48}{.26} & \seedpm{9.40}{.23} & \seedpm{9.71}{.17} & \seedpm{9.64}{.10} \\
-    \addlinespace
-    matched $\sigma$ MAE $\downarrow$ & \seedpm{\textbf{0.77}}{.03} & \seedpm{0.78}{.02} & \seedpm{0.83}{.02} & \seedpm{\hlval{accent}{0.85}}{.04} \\
-    \quad $k{=}1$ & \seedpm{\textbf{0.35}}{.03} & \seedpm{\textbf{0.35}}{.03} & \seedpm{0.39}{.02} & \seedpm{0.41}{.04} \\
-    \quad $k{=}2$ & \seedpm{\textbf{1.12}}{.04} & \seedpm{1.13}{.03} & \seedpm{1.18}{.03} & \seedpm{1.20}{.05} \\
-    \quad $k{=}3$ & \seedpm{\textbf{1.46}}{.03} & \seedpm{1.47}{.03} & \seedpm{1.54}{.02} & \seedpm{1.56}{.04} \\
-    \quad $k{=}4$ & \seedpm{\textbf{1.70}}{.04} & \seedpm{1.73}{.03} & \seedpm{1.76}{.06} & \seedpm{1.79}{.03} \\
-    \quad $k{=}5$ & \seedpm{1.81}{.07} & \seedpm{1.87}{.05} & \seedpm{1.83}{.08} & \seedpm{1.87}{.04} \\
-    \addlinespace
-    matched $a$ MAE $\downarrow$ & \seedpm{0.552}{.044} & \seedpm{0.540}{.038} & \seedpm{0.485}{.019} & \seedpm{\hlval{good}{\textbf{0.469}}}{.014} \\
-    \quad $k{=}1$ & \seedpm{0.235}{.058} & \seedpm{0.228}{.053} & \seedpm{0.231}{.020} & \seedpm{\textbf{0.219}}{.008} \\
-    \quad $k{=}2$ & \seedpm{0.920}{.048} & \seedpm{0.901}{.038} & \seedpm{0.822}{.048} & \seedpm{\textbf{0.790}}{.030} \\
-    \quad $k{=}3$ & \seedpm{1.096}{.030} & \seedpm{1.075}{.020} & \seedpm{0.901}{.028} & \seedpm{\textbf{0.892}}{.039} \\
-    \quad $k{=}4$ & \seedpm{1.049}{.026} & \seedpm{1.029}{.020} & \seedpm{0.800}{.041} & \seedpm{\textbf{0.798}}{.049} \\
-    \quad $k{=}5$ & \seedpm{0.915}{.041} & \seedpm{0.883}{.033} & \seedpm{0.638}{.050} & \seedpm{\hlval{good}{\textbf{0.627}}}{.050} \\
-    \bottomrule
-  \end{tabular}
-  \par\vspace{2pt}
-  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: UNet $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}5$ $\cdot$ param-MSE $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ (presence lever $=$ column); five seeded replicas per arm, cells mean $\pm$ seed std; held-out test. $+$A active normalization, $+$B presence balance, $+$AB both; the none arm $=$ the $K{=}5$ set-pred$\cdot$Hungarian heads arm. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; $k$ $=$ true scatterer count of the pixel; component errors over matched pairs only. \textcolor{good}{green} $=$ the amplitude B buys; \textcolor{accent}{red} $=$ the position and width it pays. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
     
 
 \end{frame}

@@ -4,7 +4,7 @@ Compile the full deck with tectonic:
 
     tectonic full_project_story.tex
 
-Produces `full_project_story.pdf` (109 content frames + 8 act dividers + 1 sub-divider + 3 backup, 16:9; 124 rendered pages incl. title and overlays — re-measured 2026-07-16 after the head-2x2 + presence-lever five-seed refreshes (each got the standing three-table treatment; the 12-run lever grid became the three presence frames, see the design log). 120 predated that (the input-ablation refresh recut the two amplitude-only frames into four). 118 predated that (the augmentation five-seed refresh added its by-scatterer-count + GT-statistics pair 20b2/20b3). 116 predated that (the normalization five-seed refresh added the same pair as 12c/12d). 114 predated that (the price-of-reach + operator-split pair went into the context section). 112 predated that (the exact ladder argument + its rung table frame), 109 predated that (the context-section theory chain had just been deleted — six frames + their three backup frames; it rested on a degenerate homogeneity premise). 109 also predated that chain going in; 107 predated that (manipulation-per-line expansion, eight frames became thirteen), 102 predated that (raw-derivation expansion, eight frames), 100 predated that (argument-line recut, six frames), 97 predated that (three-frame L1-vs-MSE section), 94 predated that (step-8 mechanism frame), 93 predated that (summed-up frame), 92 predated that (reduced-stack detection frame), 91 predated that, 90 predated the step-8/9 split, 89 predated the K-scatterer frame, 88 predated the convergence/gradient continuation frame, 87 predated the joint-error-landscape frame).
+Produces `full_project_story.pdf` (146 rendered pages as of 2026-07-30 — the K=2/K=5 table grouping replaced twelve per-K frames with six merged ones, see design log; earlier chain: 109 content frames + 8 act dividers + 1 sub-divider + 3 backup, 16:9; 124 rendered pages incl. title and overlays — re-measured 2026-07-16 after the head-2x2 + presence-lever five-seed refreshes (each got the standing three-table treatment; the 12-run lever grid became the three presence frames, see the design log). 120 predated that (the input-ablation refresh recut the two amplitude-only frames into four). 118 predated that (the augmentation five-seed refresh added its by-scatterer-count + GT-statistics pair 20b2/20b3). 116 predated that (the normalization five-seed refresh added the same pair as 12c/12d). 114 predated that (the price-of-reach + operator-split pair went into the context section). 112 predated that (the exact ladder argument + its rung table frame), 109 predated that (the context-section theory chain had just been deleted — six frames + their three backup frames; it rested on a degenerate homogeneity premise). 109 also predated that chain going in; 107 predated that (manipulation-per-line expansion, eight frames became thirteen), 102 predated that (raw-derivation expansion, eight frames), 100 predated that (argument-line recut, six frames), 97 predated that (three-frame L1-vs-MSE section), 94 predated that (step-8 mechanism frame), 93 predated that (summed-up frame), 92 predated that (reduced-stack detection frame), 91 predated that, 90 predated the step-8/9 split, 89 predated the K-scatterer frame, 88 predated the convergence/gradient continuation frame, 87 predated the joint-error-landscape frame).
 Pure Beamer + TikZ, no external fonts, so it builds offline once the CTAN cache is warm.
 
 # Structure (since 2026-07-12)
@@ -16,16 +16,44 @@ The slides live in shared section files; the full deck and the sub-presentations
 - `full_project_story.tex` — documentclass + `\input{preamble}` + title block, then the `\act`/`\subact` divider lines inline and the 19 section inputs in the original narrative order. Nothing else.
 - `sub_NN_theme.tex` — ten standalone thematic sub-presentations, each = own title page + `\input` of its section file(s). Themes regroup content across act boundaries: 01_problem (overview + signal model), 02_dataset_labels, 03_representation, 04_stability (stability + augmentation), 05_set_prediction (small-K through the 12-run imbalance grid), 06_context_information, 07_loss_theory (error theory + loss design + L1 vs MSE), 08_benchmark (board + winner + dual-trunk block), 09_physics (loss terms + unrolled solver), 10_jepa. Build the same way, e.g. `tectonic sub_07_loss_theory.tex`.
 
-All builds run inside this directory (images resolve via `../figures/...`).
-
-This is the tracked copy of the deck. The working copy lives in the gitignored
-`presentations/full_project_story/` and pulls its images straight out of
-`results/`; here those 26 images are vendored into `docs/presentations/figures/`
-so the deck compiles in a fresh clone with no run outputs present. The two
-copies are kept in sync by hand, so edit the working copy and re-sync, or edit
-here and copy back.
+All builds run inside this directory (images resolve via `../../results/...`).
 
 # Design log
+
+- K=2/K=5 TABLES GROUPED SIDE BY SIDE 2026-07-30 (user: "usually the results
+  are in tables, it shows for K=2 and then everything again for K=5, but I
+  think the best way is to group them. I think there is enough horizontal
+  space for that"). The two four-arm result blocks in 06_set_prediction now
+  carry ONE table per topic with $K{=}2$ and $K{=}5$ as top-level column
+  groups: label + 8 mean+-std columns, tabcolsep 2.5pt, 2pt intra-group / 8pt
+  inter-group gaps, caption parbox widened to 0.94\textwidth -- fits the
+  140 mm text width with zero overfull hboxes at the deck-standard scriptsize.
+  Head 2x2 block: 15b+15e -> "Set prediction, controlled --- the head leads at
+  both K; the matching matters only at K=5" (seedtag mgA, stretch 1.05);
+  15c(count rows)+15f -> "The head by scatterer count" (mgB); 15c(component
+  rows)+15g -> "The head components --- layover pays at K=2, the crowd pays at
+  K=5" (mgC). Presence-lever block: 18+18d -> "The two levers --- A stays
+  free; B costs recall, then the curve" (mgD, stretch 0.74; title cut to one
+  line, the Hungarian qualifier lives in the runs caption); 18b(count)+18e
+  (mgE); 18b(components)+18f (mgF). Cells were copied verbatim by a
+  parse-and-zip script (scratchpad merge_k_tables.py), and 700 non-dash cells
+  were machine-verified against the pre-change snapshot in docs/presentations:
+  every merged 4-cell quad equals one complete source row, so no cell moved
+  columns. Bold / \hlval marks are PRESERVED per K group and the captions
+  restate the rule as "best in row within its K group", plus a flag that the
+  two groups are different label sets (K_2 vs K_max=5 test data) so
+  cross-group reading is on the reader. Ranks k>=3 / pred k>=3 have no K=2
+  reference (two-slot labels) -> "---" cells; the merged lever headline unions
+  the seed-spread rows (K=2 exported curve MAE / SSIM range / profile cos med,
+  K=5 exported count exact / count over; the absent side shows "---"). The
+  four stats-vs-GT frames stay UNMERGED: their row structures differ (slots
+  0-1 incl. conditional mu/sigma at K=2 vs slots 0-4 activity/leakage at K=5)
+  and each K needs its own GT reference column; the K=2 pair is retitled "The
+  K=2 head / levers, predicted statistics ..." so the pairing reads. The dual
+  ROUTING (7 arms per K) and dual RATIO (6/5 arms) blocks cannot group
+  horizontally -- 14/11 mean+-std columns exceed the text width at scriptsize
+  -- and keep their split frames. Deck 152 -> 146 pages, sub_05 24 -> 20;
+  warning set unchanged (only pre-existing overfulls remain).
 
 - FIVE-PERCENT BOLD GATE + FILLED COLOUR CELLS 2026-07-27 (user: "in all tables
   of values, highlight only the lines in which the best and worst values vary
