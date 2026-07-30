@@ -27,11 +27,13 @@ class GpuWeekPanel {
     const save = document.getElementById("sb-sch-save");
     const toggle = document.getElementById("sb-sch-toggle");
     const greedy = document.getElementById("sb-sch-greedy");
-    if (!save || !toggle || !greedy) return;
+    const charity = document.getElementById("sb-sch-charity");
+    if (!save || !toggle || !greedy || !charity) return;
 
-    save.addEventListener("click", () => this._submit((this.state || {}).enabled, (this.state || {}).greedy));
-    toggle.addEventListener("click", () => this._submit(!(this.state || {}).enabled, (this.state || {}).greedy));
-    greedy.addEventListener("click", () => this._submit((this.state || {}).enabled, !(this.state || {}).greedy));
+    save.addEventListener("click", () => this._submit((this.state || {}).enabled, (this.state || {}).greedy, (this.state || {}).charity));
+    toggle.addEventListener("click", () => this._submit(!(this.state || {}).enabled, (this.state || {}).greedy, (this.state || {}).charity));
+    greedy.addEventListener("click", () => this._submit((this.state || {}).enabled, !(this.state || {}).greedy, (this.state || {}).charity));
+    charity.addEventListener("click", () => this._submit((this.state || {}).enabled, (this.state || {}).greedy, !(this.state || {}).charity));
   }
 
   _value(id) {
@@ -44,10 +46,11 @@ class GpuWeekPanel {
     return el ? el.value : "";
   }
 
-  async _submit(enabled, greedy) {
+  async _submit(enabled, greedy, charity) {
     const payload = {
       enabled: !!enabled,
       greedy: !!greedy,
+      charity: !!charity,
       weekday_gpus: GpuWeekPanel.parseGpus(this._raw("sb-sch-weekday")),
       night_gpus: GpuWeekPanel.parseGpus(this._raw("sb-sch-night")),
       weekend_gpus: GpuWeekPanel.parseGpus(this._raw("sb-sch-weekend")),
@@ -78,6 +81,7 @@ class GpuWeekPanel {
     const mode = document.getElementById("sb-sch-mode");
     const toggle = document.getElementById("sb-sch-toggle");
     const greedy = document.getElementById("sb-sch-greedy");
+    const charity = document.getElementById("sb-sch-charity");
     const hint = document.getElementById("sb-sch-hint");
     const on = !!state.enabled;
     const waiting = state.waiting || [];
@@ -96,14 +100,24 @@ class GpuWeekPanel {
       greedy.classList.toggle("is-safe", !!state.greedy && on);
       greedy.disabled = !on;
     }
+    if (charity) {
+      charity.textContent = state.charity ? "charity: ON" : "charity: off";
+      charity.classList.toggle("is-safe", !!state.charity && !!state.greedy && on);
+      charity.disabled = !on || !state.greedy;
+    }
     if (hint) {
       const chase = waiting.length
         ? state.greedy
-          ? ` · ${waiting.join(",")} busy elsewhere, retrying every 10 min`
+          ? state.napping
+            ? ` · ${waiting.join(",")} stay out while charity naps`
+            : ` · ${waiting.join(",")} busy elsewhere, retrying every 10 min`
           : ` · ${waiting.join(",")} were busy at the switch, greedy off so they stay out`
         : "";
+      const gave = state.napping && state.last_charity
+        ? ` · charity opened gpu ${state.last_charity.gpu} for ${(state.last_charity.users || []).join(",")}, greedy naps until ${String(state.nap_until).slice(11, 16)}`
+        : "";
       hint.textContent = on
-        ? `${state.phase} now — running fan-outs use ${state.gpus_now.join(",")}${chase} · night ${state.night_window} · weekend ${state.window}`
+        ? `${state.phase} now — running fan-outs use ${state.gpus_now.join(",")}${chase}${gave} · night ${state.night_window} · weekend ${state.window}`
         : `off — night would be ${state.night_window}, weekend ${state.window}`;
     }
 
@@ -274,6 +288,7 @@ class StatusBoard {
       `<span class="ntf__hint" id="sb-sch-hint" title="Running fan-outs are moved onto the pool of the phase they cross into: the weekend window wins, otherwise the night pool applies between the night hours and the weekday pool covers the rest. A GPU another user is computing on is never taken. Only the switch is automatic: a manual resize from a console tile stands until the next switch.">--</span>` +
       `<div class="strip__actions">` +
       `<button type="button" class="impact__arm" id="sb-sch-greedy" title="Greedy mode: a GPU held by someone else at the switch is re-checked every 10 minutes and picked up once it frees, until the phase pool is whole. Off, the switch takes whatever is free at that moment and nothing changes it afterwards but you.">greedy: --</button>` +
+      `<button type="button" class="impact__arm" id="sb-sch-charity" title="Charity mode: when another user lands on a GPU your fan-outs hold while every GPU on the machine is taken, that GPU is dropped from your pools (it opens once the unit in flight finishes) and greedy sleeps for 4 hours so it is not taken back. One GPU per nap, and no job is ever left without a GPU.">charity: --</button>` +
       `<button type="button" class="impact__arm" id="sb-sch-save" title="Save the weekday, night and weekend GPU pools">save</button>` +
       `<button type="button" class="impact__arm" id="sb-sch-toggle" title="Toggle the automatic weekday/night/weekend GPU switch">schedule: --</button>` +
       `</div>` +

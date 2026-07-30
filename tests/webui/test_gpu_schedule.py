@@ -331,6 +331,143 @@ def test_greedy_never_unparks_a_job_and_keeps_waiting_for_it(schedule):
     assert processes.writes[-1] == ("job1", [0, 1])
 
 
+def test_charity_opens_the_shared_gpu_when_every_gpu_is_taken(schedule):
+    scheduler, processes, system = schedule
+    scheduler.settings["charity"] = True
+    processes.add_running_fan_out("job1")
+    processes.pools["job1"]["gpus"] = [0, 1, 2, 3]
+    system.occupy(1, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+    given = scheduler.charity(WEDNESDAY)
+    state = scheduler.state()
+
+    assert given                                 == ["job1"]
+    assert processes.writes                      == [("job1", [0, 2, 3])]
+    assert scheduler.applied["job1"]["withheld"] == [1]
+    assert scheduler.nap_until                   == WEDNESDAY + GpuSchedule.CHARITY_NAP
+    assert state["napping"]                is True
+    assert state["gifted"]                 == [1]
+    assert state["last_charity"]["gpu"]    == 1
+    assert state["last_charity"]["users"]  == ["colleague"]
+    assert state["last_charity"]["jobs"]   == ["job1"]
+
+
+def test_charity_stays_quiet_while_any_gpu_is_still_free(schedule):
+    scheduler, processes, system = schedule
+    scheduler.settings["charity"] = True
+    processes.add_running_fan_out("job1")
+    processes.pools["job1"]["gpus"] = [0, 1]
+    system.occupy(1, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+
+    assert scheduler.charity(WEDNESDAY) == []
+    assert processes.writes             == []
+    assert scheduler.nap_until          is None
+
+
+def test_charity_never_leaves_a_job_without_a_gpu(schedule):
+    scheduler, processes, system = schedule
+    scheduler.settings["charity"] = True
+    processes.add_running_fan_out("job1")
+    for index in (0, 1, 2, 3):
+        system.occupy(index, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+
+    assert scheduler.charity(WEDNESDAY) == []
+    assert processes.writes             == []
+    assert scheduler.nap_until          is None
+
+
+def test_charity_off_never_donates(schedule):
+    scheduler, processes, system = schedule
+    processes.add_running_fan_out("job1")
+    processes.pools["job1"]["gpus"] = [0, 1, 2, 3]
+    system.occupy(1, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+
+    assert scheduler.charity(WEDNESDAY) == []
+    assert processes.writes             == []
+
+
+def test_the_nap_blocks_greedy_until_it_ends_then_greedy_reclaims(schedule):
+    scheduler, processes, system = schedule
+    scheduler.settings["charity"] = True
+    processes.add_running_fan_out("job1")
+    processes.pools["job1"]["gpus"] = [0, 1, 2, 3]
+    system.occupy(1, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+    scheduler.charity(WEDNESDAY)
+    system.release(1)
+
+    scheduler.sweep(WEDNESDAY)
+    assert processes.writes == [("job1", [0, 2, 3])]
+
+    later = WEDNESDAY + GpuSchedule.CHARITY_NAP
+    scheduler.charity(later)
+    scheduler.sweep(later)
+
+    assert scheduler.nap_until  is None
+    assert processes.writes[-1] == ("job1", [0, 1, 2, 3])
+
+
+def test_a_second_squeeze_during_the_nap_gets_nothing(schedule):
+    scheduler, processes, system = schedule
+    scheduler.settings["charity"] = True
+    processes.add_running_fan_out("job1")
+    processes.pools["job1"]["gpus"] = [0, 1, 2, 3]
+    system.occupy(1, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+    scheduler.charity(WEDNESDAY)
+    system.occupy(2, "rival")
+
+    assert scheduler.charity(WEDNESDAY) == []
+    assert processes.writes             == [("job1", [0, 2, 3])]
+
+
+def test_a_phase_cross_during_the_nap_keeps_the_gift_out(schedule):
+    scheduler, processes, system = schedule
+    scheduler.settings["charity"] = True
+    processes.add_running_fan_out("job1")
+    processes.pools["job1"]["gpus"] = [2, 3]
+    for index in (0, 1, 2):
+        system.occupy(index, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+    scheduler.charity(WEDNESDAY)
+    assert processes.writes == [("job1", [3])]
+
+    for index in (0, 1, 2):
+        system.release(index)
+    scheduler.tick(WEDNESDAY_NIGHT)
+
+    assert processes.writes[-1]                  == ("job1", [0, 1, 3])
+    assert scheduler.applied["job1"]["withheld"] == [2]
+
+
+def test_turning_charity_off_ends_the_nap(schedule):
+    scheduler, processes, system = schedule
+    scheduler.settings["charity"] = True
+    processes.add_running_fan_out("job1")
+    processes.pools["job1"]["gpus"] = [0, 1, 2, 3]
+    system.occupy(1, "colleague")
+
+    scheduler.tick(WEDNESDAY)
+    scheduler.charity(WEDNESDAY)
+    assert scheduler.nap_until is not None
+
+    result = scheduler.update({**GpuSchedule.DEFAULTS, "enabled": True, "charity": False})
+
+    assert result["ok"]         is True
+    assert scheduler.nap_until  is None
+    assert scheduler.gifted     == set()
+
+
 def test_a_disabled_schedule_sweeps_nothing(schedule):
     scheduler, processes, system = schedule
     processes.add_running_fan_out("job1")
@@ -384,7 +521,7 @@ def test_finished_jobs_are_forgotten(schedule):
 
 def test_update_persists_and_reloads(tmp_path):
     processes = StubProcesses()
-    payload   = {**GpuSchedule.DEFAULTS, "enabled": True, "weekday_gpus": [1], "night_gpus": [1, 2], "weekend_gpus": [0, 1, 2]}
+    payload   = {**GpuSchedule.DEFAULTS, "enabled": True, "charity": True, "weekday_gpus": [1], "night_gpus": [1, 2], "weekend_gpus": [0, 1, 2]}
 
     scheduler = GpuSchedule(StubPaths(tmp_path), WebLogger(), processes, StubSystem())
     result    = scheduler.update(payload)
@@ -395,6 +532,7 @@ def test_update_persists_and_reloads(tmp_path):
     reloaded = GpuSchedule(StubPaths(tmp_path), WebLogger(), processes, StubSystem())
 
     assert reloaded.settings["enabled"]      is True
+    assert reloaded.settings["charity"]      is True
     assert reloaded.settings["weekday_gpus"] == [1]
     assert reloaded.settings["night_gpus"]   == [1, 2]
     assert reloaded.settings["weekend_gpus"] == [0, 1, 2]
@@ -414,6 +552,7 @@ def test_state_reports_the_pool_that_applies_right_now(schedule):
 @pytest.mark.parametrize("payload, reason", [
     ({"enabled": "yes"},                    "true or false"),
     ({"greedy": "sure"},                    "true or false"),
+    ({"charity": "why not"},                "true or false"),
     ({"weekday_gpus": []},                  "at least one GPU"),
     ({"weekend_gpus": [0, 0]},              "repeat"),
     ({"weekday_gpus": [-1]},                "non-negative"),

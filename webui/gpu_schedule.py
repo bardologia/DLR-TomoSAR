@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from tools.orchestration.gpu_queue import GpuPoolFile
 
@@ -114,6 +114,15 @@ class GpuAvailability:
 
         return held
 
+    def census(self) -> dict[int, dict]:
+        census = {}
+
+        for device in self.system.gpu_occupancy():
+            owners = {proc["owner"] for proc in device["procs"] if proc["owner"]}
+            census[device["index"]] = {"idle": not device["procs"], "others": sorted(owners - {self.system.user})}
+
+        return census
+
     def grant(self, target: list[int]) -> list[int]:
         busy = self.busy()
         return [gpu for gpu in target if gpu not in busy]
@@ -123,12 +132,15 @@ class GpuSchedule:
 
     INTERVAL       = 30.0
     SWEEP_INTERVAL = 600.0
+    CHARITY_NAP    = timedelta(hours=4)
     FILE_NAME      = "gpu_schedule.json"
     GPU_KEYS       = ("weekday_gpus", "night_gpus", "weekend_gpus")
+    FLAG_KEYS      = ("enabled", "greedy", "charity")
 
     DEFAULTS = {
         "enabled"          : False,
         "greedy"           : True,
+        "charity"          : False,
         "weekday_gpus"     : [2, 3],
         "night_gpus"       : [0, 1, 2, 3],
         "weekend_gpus"     : [0, 1, 2, 3],
@@ -152,6 +164,9 @@ class GpuSchedule:
         self.last_tick    = None
         self.last_sweep   = None
         self.swept_at     = None
+        self.nap_until    = None
+        self.gifted       = set()
+        self.last_charity = None
 
         self._load()
 
@@ -173,11 +188,11 @@ class GpuSchedule:
         if missing:
             raise ValueError(f"the schedule must define {missing}")
 
-        for key in ("enabled", "greedy"):
+        for key in cls.FLAG_KEYS:
             if not isinstance(payload[key], bool):
                 raise ValueError(f"'{key}' must be true or false, got {payload[key]!r}")
 
-        settings = {"enabled": payload["enabled"], "greedy": payload["greedy"], **WeekWindow.validate(payload).as_dict(), **NightWindow.validate(payload).as_dict()}
+        settings = {**{key: payload[key] for key in cls.FLAG_KEYS}, **WeekWindow.validate(payload).as_dict(), **NightWindow.validate(payload).as_dict()}
 
         for key in cls.GPU_KEYS:
             gpus = GpuPoolFile.validate({"gpus": payload[key]})
@@ -218,9 +233,14 @@ class GpuSchedule:
 
         return live
 
+    def _gifts(self) -> set[int]:
+        with self.lock:
+            return set(self.gifted)
+
     def _cross(self, job_id: str, phase: str) -> list[str]:
         target   = self.gpus_for(phase)
-        granted  = self.availability.grant(target)
+        gifts    = self._gifts()
+        granted  = [gpu for gpu in self.availability.grant(target) if gpu not in gifts]
         withheld = [gpu for gpu in target if gpu not in granted]
 
         self.applied[job_id]["withheld"] = withheld
@@ -262,6 +282,82 @@ class GpuSchedule:
 
         return applied
 
+    def _wake(self, moment: datetime) -> None:
+        with self.lock:
+            if self.nap_until is None or moment < self.nap_until:
+                return
+            gifts          = sorted(self.gifted)
+            self.nap_until = None
+            self.gifted.clear()
+
+        self.logger.ok(f"charity nap over: greedy is awake again and will pick {gifts} back up once they free")
+
+    def _needy(self) -> dict | None:
+        census = self.availability.census()
+        pooled = {gpu for job_id in self._live_jobs() for gpu in self.processes.gpu_pool(job_id).get("gpus", [])}
+
+        if any(entry["idle"] and index not in pooled for index, entry in census.items()):
+            return None
+
+        for index, entry in sorted(census.items()):
+            if entry["others"] and index in pooled:
+                return {"gpu": index, "users": entry["others"]}
+
+        return None
+
+    def _donate(self, needy: dict, moment: datetime) -> list[str]:
+        gpu     = needy["gpu"]
+        holders = []
+
+        for job_id in self._live_jobs():
+            pool = self.processes.gpu_pool(job_id).get("gpus", [])
+            if gpu in pool:
+                holders.append((job_id, pool))
+
+        if not holders or any(len(pool) < 2 for _job_id, pool in holders):
+            return []
+
+        donors = []
+
+        for job_id, pool in holders:
+            result = self.processes.set_gpus(job_id, [g for g in pool if g != gpu])
+            if not result.get("ok"):
+                continue
+
+            donors.append(job_id)
+            record = self.applied.get(job_id)
+            if record is not None and gpu not in record["withheld"]:
+                record["withheld"].append(gpu)
+
+        if not donors:
+            return []
+
+        until = moment + self.CHARITY_NAP
+
+        with self.lock:
+            self.nap_until    = until
+            self.gifted.add(gpu)
+            self.last_charity = {"gpu": gpu, "users": needy["users"], "jobs": donors, "at": moment.isoformat(timespec="seconds"), "until": until.isoformat(timespec="seconds")}
+
+        self.logger.ok(f"charity opened gpu {gpu} for {', '.join(needy['users'])}: job(s) {donors} leave it once the unit in flight finishes, greedy sleeps until {until.strftime('%A %H:%M')}")
+        return donors
+
+    def charity(self, moment: datetime) -> list[str]:
+        self._wake(moment)
+
+        with self.lock:
+            active  = self.settings["enabled"] and self.settings["greedy"] and self.settings["charity"]
+            napping = self.nap_until is not None
+
+        if not active or napping:
+            return []
+
+        needy = self._needy()
+        if needy is None:
+            return []
+
+        return self._donate(needy, moment)
+
     def _claim(self, job_id: str, current: list[int], freed: list[int]) -> list[str]:
         merged = sorted(set(current) | set(freed))
         if merged == sorted(current):
@@ -277,9 +373,10 @@ class GpuSchedule:
     def sweep(self, moment: datetime) -> list[str]:
         with self.lock:
             greedy          = self.settings["enabled"] and self.settings["greedy"]
+            napping         = self.nap_until is not None and moment < self.nap_until
             self.last_sweep = moment.isoformat(timespec="seconds")
 
-        if not greedy:
+        if not greedy or napping:
             return []
 
         claimed = []
@@ -314,6 +411,7 @@ class GpuSchedule:
             try:
                 moment = datetime.now()
                 self.tick(moment)
+                self.charity(moment)
 
                 if self._due(time.monotonic()):
                     self.sweep(moment)
@@ -325,13 +423,16 @@ class GpuSchedule:
     def start(self) -> None:
         worker = threading.Thread(target=self._watch, daemon=True)
         worker.start()
-        self.logger.muted(f"gpu schedule armed from {self.path} (enabled={self.settings['enabled']}, greedy={self.settings['greedy']}, every {self.INTERVAL:.0f}s)")
+        self.logger.muted(f"gpu schedule armed from {self.path} (enabled={self.settings['enabled']}, greedy={self.settings['greedy']}, charity={self.settings['charity']}, every {self.INTERVAL:.0f}s)")
 
     def state(self) -> dict:
         with self.lock:
             settings = dict(self.settings)
             last     = self.last_tick
             swept    = self.last_sweep
+            nap      = self.nap_until.isoformat(timespec="seconds") if self.nap_until else None
+            gifts    = sorted(self.gifted)
+            given    = dict(self.last_charity) if self.last_charity else None
 
         phase   = self.phase(datetime.now())
         waiting = sorted({gpu for record in self.applied.values() for gpu in record["withheld"]})
@@ -341,6 +442,10 @@ class GpuSchedule:
             "phase"        : phase,
             "gpus_now"     : list(settings[f"{phase}_gpus"]),
             "waiting"      : waiting,
+            "napping"      : nap is not None,
+            "nap_until"    : nap,
+            "gifted"       : gifts,
+            "last_charity" : given,
             "window"       : self.week_window().label(),
             "night_window" : self.night_window().label(),
             "last_tick"    : last,
@@ -356,10 +461,13 @@ class GpuSchedule:
 
         with self.lock:
             self.settings = settings
+            if not (settings["enabled"] and settings["greedy"] and settings["charity"]):
+                self.nap_until = None
+                self.gifted.clear()
 
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(json.dumps(settings, indent=2) + "\n", encoding="utf-8")
 
-        self.logger.ok(f"gpu schedule saved: {'on' if settings['enabled'] else 'off'}, greedy {'on' if settings['greedy'] else 'off'}, weekday {settings['weekday_gpus']}, night {settings['night_gpus']}, weekend {settings['weekend_gpus']}")
+        self.logger.ok(f"gpu schedule saved: {'on' if settings['enabled'] else 'off'}, greedy {'on' if settings['greedy'] else 'off'}, charity {'on' if settings['charity'] else 'off'}, weekday {settings['weekday_gpus']}, night {settings['night_gpus']}, weekend {settings['weekend_gpus']}")
 
         return {"ok": True, **self.state()}
