@@ -175,6 +175,10 @@ def test_stackplotter_smoke(tmp_path, primary, secondaries, interferograms, dem_
     assert "dem_full" in saved
     assert all(p.is_file() for p in saved.values())
 
+    for index in range(3):
+        assert f"coherence_{index:02d}_magnitude" in saved
+        assert f"coherence_{index:02d}_phase"     in saved
+
 
 def test_value_distribution_log_conserves_counts():
     rng    = np.random.default_rng(0)
