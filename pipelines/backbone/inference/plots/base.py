@@ -6,6 +6,7 @@ from typing  import List, Tuple
 import matplotlib
 
 matplotlib.use("Agg")
+import matplotlib.colors    as mcolors
 import numpy                as np
 
 from tools.reporting.plotting import PlotBase
@@ -65,7 +66,7 @@ class PlotTools(PlotBase):
         y_label    : str,
         cbar_label : str,
         extent     : list,
-        cmap       : str,
+        cmap       : str | mcolors.Colormap,
         vmin       : float,
         vmax       : float,
         origin     : str,

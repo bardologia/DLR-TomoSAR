@@ -143,7 +143,7 @@ class SlicePlotter(PlotTools):
                 y_label    = "azimuth index",
                 cbar_label = "phase [rad]",
                 extent     = extent,
-                cmap       = "twilight",
+                cmap       = self._phase_cmap(),
                 vmin       = -np.pi,
                 vmax       = np.pi,
                 origin     = "upper",

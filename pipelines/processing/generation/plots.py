@@ -68,7 +68,7 @@ class StackPlotter(PlotBase):
         Az, R = phase.shape
 
         fig, ax = plt.subplots(figsize=(8, 6))
-        im      = ax.imshow(phase, cmap="twilight", vmin=-np.pi, vmax=np.pi, extent=[0, R, Az, 0], aspect="auto", interpolation="nearest")
+        im      = ax.imshow(phase, cmap=self._phase_cmap(), vmin=-np.pi, vmax=np.pi, extent=[0, R, Az, 0], aspect="auto", interpolation="nearest")
         ax.set_xlabel("range [px]")
         ax.set_ylabel("azimuth [px]")
         ax.set_title(title)

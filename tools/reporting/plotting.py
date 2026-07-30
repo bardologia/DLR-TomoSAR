@@ -10,6 +10,8 @@ import numpy             as np
 
 matplotlib.use("Agg")
 
+from tools.reporting.colormaps import PhaseColormap
+
 
 class PlotBase:
     PHASE_TICKS  = [-np.pi, -np.pi / 2, 0.0, np.pi / 2, np.pi]
@@ -115,6 +117,10 @@ class PlotBase:
         cmap = plt.get_cmap(name).copy()
         cmap.set_bad(color=bad_color)
         return cmap
+
+    @staticmethod
+    def _phase_cmap() -> mcolors.Colormap:
+        return PhaseColormap.colormap()
 
     @staticmethod
     def _normalize_01(arr: np.ndarray) -> np.ndarray:

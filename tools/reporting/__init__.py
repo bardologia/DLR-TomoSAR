@@ -2,6 +2,7 @@ from .markdown  import MarkdownDoc, MarkdownTable, ScalarFormatter
 from .ranges    import RangeFormatter
 from .reporting import MetricSectionGrouper, ReportAssets
 from .plotting  import PlotBase
+from .colormaps import PhaseColormap
 
 __all__ = [
     "MarkdownDoc",
@@ -11,4 +12,5 @@ __all__ = [
     "MetricSectionGrouper",
     "ReportAssets",
     "PlotBase",
+    "PhaseColormap",
 ]
