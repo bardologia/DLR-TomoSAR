@@ -15,6 +15,8 @@ if str(REPO_ROOT) not in sys.path:
 from configuration.dataset                import AugmentationConfig
 from configuration.training               import LossConfig, ParamMatching
 from models                               import BACKBONE_MODEL_REGISTRY
+from models.dual                          import DUAL_CONFIG_REGISTRY
+from pipelines.dual.training.pipeline     import TrunkChannelMap
 from pipelines.shared.training.run_naming import RunNaming
 from tools.monitoring.logger              import Logger
 
@@ -70,6 +72,7 @@ class RunRenamer:
     RESULT_FILES   = ("training_results.json", "inference_results.json")
     RUNS_SUBDIRS   = ("training", "folds")
     SCHEDULER_FILE = Path("batch_train_logs") / "train_scheduler_results.json"
+    SEED_DIR       = re.compile(r"seed\d+")
 
     def __init__(self, roots: list[Path], apply: bool) -> None:
         self.roots  = [Path(root) for root in roots]
@@ -91,6 +94,10 @@ class RunRenamer:
 
     def _discover(self, directory: Path, groups: dict[Path, list[Path]]) -> None:
         if (directory / "meta" / "run_summary.json").is_file():
+            groups.setdefault(directory.parent, []).append(directory)
+            return
+
+        if self._seed_children(directory):
             groups.setdefault(directory.parent, []).append(directory)
             return
 
@@ -136,19 +143,23 @@ class RunRenamer:
         return mapping
 
     def _plan_run(self, run_dir: Path) -> str | None:
-        summary = self._read_json(run_dir / "meta" / "run_summary.json")
+        metadata_dir = self._metadata_dir(run_dir)
+        summary      = self._read_json(metadata_dir / "meta" / "run_summary.json")
         if summary is None:
             self.logger.info(f"skip {run_dir.name}: no meta/run_summary.json (not a training run)")
             return None
 
         model = summary["model_name"]
+        if model in DUAL_CONFIG_REGISTRY:
+            return self._plan_dual_run(run_dir, metadata_dir, summary)
+
         if model not in BACKBONE_MODEL_REGISTRY:
-            self.logger.info(f"skip {run_dir.name}: model '{model}' is not a backbone (autoencoder or foreign run)")
+            self.logger.info(f"skip {run_dir.name}: model '{model}' is neither a backbone nor a dual model (autoencoder or foreign run)")
             return None
 
-        model_config = self._read_json(run_dir / "meta" / "model_config.json")
-        trainer      = self._read_json(run_dir / "docs" / "trainer_config.json")
-        dataset      = self._read_json(run_dir / "meta" / "dataset_creation_config.json")
+        model_config = self._read_json(metadata_dir / "meta" / "model_config.json")
+        trainer      = self._read_json(metadata_dir / "docs" / "trainer_config.json")
+        dataset      = self._read_json(metadata_dir / "meta" / "dataset_creation_config.json")
         if model_config is None or trainer is None or dataset is None:
             self.logger.warning(f"skip {run_dir.name}: missing model_config/trainer_config/dataset_creation_config metadata")
             return None
@@ -196,6 +207,63 @@ class RunRenamer:
         self.logger.warning(f"skip {name}: matches no known naming generation {old_tags}")
         return None
 
+    def _plan_dual_run(self, run_dir: Path, metadata_dir: Path, summary: dict) -> str | None:
+        model_config = self._read_json(metadata_dir / "meta" / "dual_model_config.json")
+        trainer      = self._read_json(metadata_dir / "docs" / "trainer_config.json")
+        dataset      = self._read_json(metadata_dir / "meta" / "dataset_creation_config.json")
+        if model_config is None or trainer is None or dataset is None:
+            self.logger.warning(f"skip {run_dir.name}: missing dual_model_config/trainer_config/dataset_creation_config metadata")
+            return None
+
+        payload = self._loss_payload(trainer)
+        if payload is None:
+            self.logger.warning(f"skip {run_dir.name}: trainer config has neither a loss curriculum nor a param_loss")
+            return None
+
+        matching = self._matching(payload, summary)
+        if matching is None:
+            self.logger.warning(f"skip {run_dir.name}: no recognizable matching strategy in trainer config or run summary")
+            return None
+
+        config  = model_config["config"]
+        head    = config["head"]
+        unknown = sorted((set(config["params_input"]) | set(config["existence_input"])) - set(TrunkChannelMap.GROUPS))
+        if unknown:
+            self.logger.warning(f"skip {run_dir.name}: trunk inputs use retired channel groups {unknown}; only {list(TrunkChannelMap.GROUPS)} name a routing tag")
+            return None
+
+        trunk_tag    = RunNaming.dual_model_tag(config["params_backbone"], config["existence_backbone"])
+        input_tag    = f"{TrunkChannelMap.group_label(tuple(config['params_input']))}.{TrunkChannelMap.group_label(tuple(config['existence_input']))}"
+        loss         = self._loss_config(payload, matching)
+        augmentation = self._augmentation(dataset["augmentation"])
+        n_gaussians  = trainer["gaussian"]["n_default_gaussians"]
+
+        new_tag = RunNaming.tag(trunk_tag, head, loss, n_gaussians, augmentation, extras=(input_tag,))
+
+        name = run_dir.name
+        if name == new_tag or name.startswith(f"{new_tag}_"):
+            self.logger.info(f"skip {name}: already in the new naming")
+            return None
+
+        model    = summary["model_name"]
+        old_tags = (RunNaming.tag(model, head, loss, n_gaussians, augmentation, extras=(input_tag,)), RunNaming.tag(model, head, loss, n_gaussians, augmentation))
+        for old_tag in old_tags:
+            if name == old_tag:
+                return new_tag
+
+            if name.startswith(f"{old_tag}_"):
+                return f"{new_tag}{name[len(old_tag):]}"
+
+        self.logger.warning(f"skip {name}: matches no known dual naming generation {old_tags}")
+        return None
+
+    def _metadata_dir(self, run_dir: Path) -> Path:
+        if (run_dir / "meta" / "run_summary.json").is_file():
+            return run_dir
+
+        seed_runs = self._seed_children(run_dir)
+        return seed_runs[0] if seed_runs else run_dir
+
     def _read_json(self, path: Path) -> dict | None:
         if not path.is_file():
             return None
@@ -238,8 +306,15 @@ class RunRenamer:
                 continue
 
             source.rename(target)
-            for relative in self.PATCH_FILES:
-                self._patch_file(target / relative, {old: new})
+            for holder in (target, *self._seed_children(target)):
+                for relative in self.PATCH_FILES:
+                    self._patch_file(holder / relative, {old: new})
+
+    def _seed_children(self, directory: Path) -> list[Path]:
+        if not directory.is_dir():
+            return []
+
+        return sorted(child for child in directory.iterdir() if child.is_dir() and self.SEED_DIR.fullmatch(child.name) and (child / "meta" / "run_summary.json").is_file())
 
     def _patch_file(self, path: Path, mapping: dict[str, str]) -> None:
         if not path.exists():
@@ -267,7 +342,7 @@ class RunRenamer:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Rename existing runs to the model-head-matching-K_N-aug-presence-loss_weight naming, rebuilding each name from the run's persisted metadata (run_summary, model_config, trainer_config, dataset_creation_config)")
+    parser = argparse.ArgumentParser(description="Rename existing runs to the model-head-matching-K_N-aug-presence-loss_weight naming (dual runs gain the dual_<trunks> tag and the params.existence routing tag), rebuilding each name from the run's persisted metadata (run_summary, model_config or dual_model_config, trainer_config, dataset_creation_config)")
     parser.add_argument("roots", nargs="+", type=Path, help="any mix of run directories and roots holding them at any depth: training/trial roots, benchmark or cross-validation run tags (training/ or folds/), tuning trial trees, or whole runs roots")
     parser.add_argument("--apply", action="store_true", help="perform the renames; without it the script only prints the plan")
     args = parser.parse_args()
