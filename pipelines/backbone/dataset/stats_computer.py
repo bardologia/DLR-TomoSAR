@@ -158,11 +158,17 @@ class StatsComputer:
         if len(group_keys) != in_channels:
             raise ValueError(f"Group key count ({len(group_keys)}) does not match the dataset input channels ({in_channels}).")
 
+        slot_overrides = {slot: getattr(normalization, field_name) for slot, field_name in NormalizationConfig.SLOT_FIELDS.items() if getattr(normalization, field_name) != "default"}
+        strategy_label = f"{normalization.input_strategy} (per slot-kind, grouped across passes/ifgs)"
+        if slot_overrides:
+            strategy_label += "  |  per-slot overrides win: " + ", ".join(f"{slot}={preset}" for slot, preset in slot_overrides.items())
+
         logger.section("[Input Normalization Statistics]")
         logger.kv_table({
-            "Strategy"       : f"{normalization.input_strategy} (per slot-kind, grouped across passes/ifgs)",
-            "Source"         : f"{len(parts)} region array(s), up to {max_vals_per_group:,} values per group",
-            "Input channels" : in_channels,
+            "Strategy"        : strategy_label,
+            "Output strategy" : normalization.output_strategy,
+            "Source"          : f"{len(parts)} region array(s), train split only, up to {max_vals_per_group:,} values per group",
+            "Input channels"  : in_channels,
         })
 
         strategies = {g: normalization.strategy("input", g) for g in dict.fromkeys(group_keys)}

@@ -6,18 +6,21 @@ from configuration.dataset import AugmentationConfig
 
 
 class SpatialAugmenter:
-    def __init__(self, config: AugmentationConfig, logger, seed: int = 0):
+    def __init__(self, config: AugmentationConfig, logger, seed: int = 0, rot90_inactive: bool = False):
         self.config = config
         self.logger = logger
         self.seed   = int(seed)
         self._rng   = np.random.default_rng(self.seed)
 
+        rot90 = f"{self.config.p_rot90} (inactive: skipped while a per-pixel geometry field is active)" if rot90_inactive else self.config.p_rot90
+
         self.logger.section("[Data Augmentation]")
         self.logger.kv_table(
             {
+                "Applies to"      : "train split only",
                 "Flip Horizontal" : self.config.p_flip_h,
                 "Flip Vertical"   : self.config.p_flip_v,
-                "Rotate 90°"      : self.config.p_rot90,
+                "Rotate 90°"      : rot90,
                 "Noise"           : f"std={self.config.noise_std} (normalized units) p={self.config.p_noise}",
             },
             title="Augmentation Config",

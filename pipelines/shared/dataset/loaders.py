@@ -26,12 +26,15 @@ class Loader:
 
         logger.section(section_label)
         logger.kv_table({
-            "Batch size"      : batch_size,
-            "Num workers"     : num_workers,
-            "Pin memory"      : pin_memory,
-            "Prefetch factor" : prefetch_factor,
-            "Shuffle train"   : shuffle_train,
-            "Seed"            : seed,
+            "Batch size"         : batch_size,
+            "Num workers"        : num_workers,
+            "Pin memory"         : pin_memory,
+            "Prefetch factor"    : prefetch_factor if num_workers > 0 else f"{prefetch_factor} (inactive: num_workers=0)",
+            "Persistent workers" : num_workers > 0,
+            "Worker seeding"     : f"base seed {seed} + worker id (augmenter RNG reseeded per worker)" if num_workers > 0 else "main process",
+            "Shuffle train"      : shuffle_train,
+            "Drop last"          : "train only",
+            "Seed"               : seed,
         })
 
         worker_init = Reproducibility.worker_init(seed) if num_workers > 0 else None
@@ -50,7 +53,10 @@ class Loader:
         test_loader  = DataLoader(test_dataset,  shuffle = False,         drop_last = False, **_base)
 
         logger.kv_table({
-            "Train batches" : len(train_loader),
+            "Train samples" : len(train_dataset),
+            "Val samples"   : len(val_dataset),
+            "Test samples"  : len(test_dataset),
+            "Train batches" : f"{len(train_loader)} (drop_last floors a partial final batch)",
             "Val batches"   : len(val_loader),
             "Test batches"  : len(test_loader),
         })

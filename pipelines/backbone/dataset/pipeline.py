@@ -37,8 +37,8 @@ class DatasetPipeline:
         self.layout          = Layout(config.preprocessing_run_directory,  logger=self.logger, parameters_path=config.parameters_path)
         self.cropper         = Cropper(self.layout, config.split_regions,  logger=self.logger, secondary_labels=config.secondary_labels)
         self.metadata_writer = MetadataWriter(self.training_run_directory, logger=self.logger)
-        self.augmenter       = SpatialAugmenter(config.augmentation,       logger=self.logger, seed=self.seed)
         self.geometry_field  = self._load_geometry_field() if build_geometry_field else None
+        self.augmenter       = SpatialAugmenter(config.augmentation,       logger=self.logger, seed=self.seed, rot90_inactive=self.geometry_field is not None)
 
         if self.geometry_field is not None and config.augmentation.p_rot90 > 0.0:
             self.logger.warning("augmentation.p_rot90 > 0 has no effect: 90-degree rotations are skipped while a per-pixel geometry field is active.")
@@ -61,6 +61,7 @@ class DatasetPipeline:
                 "Output Parameters"  : ",".join(oc.role_names),
                 "Patch Size"         : config.patch.size,
                 "Patch Stride"       : config.patch.stride,
+                "Symmetric Padding"  : config.patch.use_symmetric_padding,
             },
             title="Dataset Creation",
         )
@@ -128,10 +129,10 @@ class DatasetPipeline:
             parts.append(part)
             patchers.append(patcher)
 
+        self.logger.subsection(f"Split '{split_name}': {len(parts)} disjoint region(s), {sum(len(p) for p in parts)} patches total")
+
         if len(parts) == 1:
             return parts[0], patchers[0]
-
-        self.logger.subsection(f"Split '{split_name}': {len(parts)} disjoint regions, {sum(len(p) for p in parts)} patches total")
 
         return MultiRegionDataset(parts), patchers
 
@@ -156,6 +157,7 @@ class DatasetPipeline:
         )
 
         norm_stats.save(self.training_run_directory / "meta")
+        self.logger.info(f"Normalization stats saved: {self.training_run_directory / 'meta'}")
 
         normalizer          = Normalizer(norm_stats)
         train_ds.normalizer = normalizer
