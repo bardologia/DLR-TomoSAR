@@ -7,11 +7,12 @@ import torch
 
 
 class NullLogger:
-    def section(self, *a, **k):      pass
-    def subsection(self, *a, **k):   pass
-    def info(self, *a, **k):         pass
-    def warning(self, *a, **k):      pass
-    def kv_table(self, *a, **k):     pass
+    def section(self, *a, **k):       pass
+    def subsection(self, *a, **k):    pass
+    def info(self, *a, **k):          pass
+    def warning(self, *a, **k):       pass
+    def kv_table(self, *a, **k):      pass
+    def metrics_table(self, *a, **k): pass
 
 
 class RecordingTracker:

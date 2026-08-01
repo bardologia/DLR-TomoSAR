@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import gc
+import os
 import time
 from pathlib import Path
 
@@ -54,7 +55,6 @@ class BaseTrainer:
         if lr_scale != 1.0:
             for pg in param_groups:
                 pg["lr"] = float(pg["lr"]) * lr_scale
-            self.logger.subsection(f"Linear LR scaling x{lr_scale:.4f} applied to {len(param_groups)} param groups (batch-size rule).")
 
         self.base_lrs  = [float(pg["lr"]) for pg in param_groups]
         self.optimizer = self._build_optimizer(param_groups)
@@ -82,9 +82,49 @@ class BaseTrainer:
         self._gt_occupancy_logged = set()
 
         self._update_optimizer(self.lr_scheduler.effective_lrs())
+        self._log_loop_configuration()
 
     def _log_init_banner(self) -> None:
         pass
+
+    def _log_loop_configuration(self) -> None:
+        training = self.config.training
+        memory   = self.config.memory
+
+        if self.device.type == "cuda":
+            visible = os.environ.get("CUDA_VISIBLE_DEVICES", "all")
+            device  = f"cuda ({torch.cuda.get_device_name(self.device)}, CUDA_VISIBLE_DEVICES={visible})"
+        else:
+            device  = str(self.device)
+
+        self.logger.section("[Training Loop Configuration]")
+        self.logger.kv_table({
+            "Device"                   : device,
+            "Epochs"                   : self.epochs,
+            "Validation frequency"     : f"every {self.validation_frequency} epochs",
+            "Gradient accumulation"    : f"{self.accumulation_steps} batches per optimizer step",
+            "AMP (bfloat16 autocast)"  : self.use_amp,
+            "EMA"                      : f"enabled (decay {self.ema.decay})" if self.ema.enabled else "disabled",
+            "Restore best at end"      : self.restore_best,
+            "Resume"                   : self.resume,
+            "Abort on non-finite loss" : self.abort_on_nonfinite_loss,
+            "Debug logging"            : training.log_debug,
+            "LR scale (batch-size rule)": f"x{self.config.optimizer.lr_scale:.4f} (from the micro-batch, ignores accumulation)",
+            "Optimizer"                : f"AdamW (default betas={tuple(self.config.optimizer.betas)}, eps={self.config.optimizer.eps:g}, weight_decay={self.config.optimizer.weight_decay:g}; per-group values below take precedence)",
+            "Cache clearing"           : f"every_n_steps={memory.clear_cache_every_n_steps}, after_eval={memory.clear_cache_after_eval}, after_epoch={memory.clear_cache_after_epoch}",
+            "VRAM reservation"         : f"{memory.reserve_vram} (keep free {memory.vram_keep_free_gb:g} GB)",
+            "cudnn"                    : f"deterministic={torch.backends.cudnn.deterministic}, benchmark={torch.backends.cudnn.benchmark}",
+        })
+
+        rows = []
+        for i, pg in enumerate(self.optimizer.param_groups):
+            rows.append({
+                "Group"        : pg.get("name", str(i)),
+                "LR"           : f"{pg['lr']:g}",
+                "Weight decay" : f"{pg['weight_decay']:g}",
+            })
+
+        self.logger.metrics_table(rows, columns=["Group", "LR", "Weight decay"], title="Optimizer Param Groups (after lr_scale)")
 
     def _build_param_groups(self) -> list[dict]:
         raise NotImplementedError
@@ -105,7 +145,22 @@ class BaseTrainer:
         pass
 
     def _log_train_banner(self, train_loader: DataLoader, val_loader: DataLoader, test_loader: DataLoader) -> None:
-        pass
+        micro_batch = train_loader.batch_size if isinstance(train_loader, DataLoader) else None
+
+        info = {
+            "Train batches"      : len(train_loader),
+            "Validation batches" : len(val_loader),
+            "Test batches"       : len(test_loader),
+        }
+
+        if micro_batch is not None:
+            info["Micro-batch size"]     = micro_batch
+            info["Effective batch size"] = f"{micro_batch * self.accumulation_steps} (micro-batch x {self.accumulation_steps} accumulation steps)"
+        else:
+            info["Micro-batch size"]     = "in-memory batch list (gate/probe run)"
+
+        info["Device"] = self.device
+        self.logger.kv_table(info)
 
     def _before_training(self, train_loader: DataLoader) -> None:
         pass
@@ -323,13 +378,16 @@ class BaseTrainer:
 
     def _evaluate_test(self, test_loader: DataLoader, epoch: int) -> dict:
         if self.restore_best and self.checkpoint.best_epoch >= 0:
-            test = self.evaluate(test_loader, epoch, stage="test")
+            kind    = "EMA snapshot" if self.ema.enabled else "raw weights"
+            weights = f"restored best checkpoint (epoch {self.checkpoint.best_epoch + 1}, {kind})"
+            test    = self.evaluate(test_loader, epoch, stage="test")
         else:
+            weights = "EMA of final weights" if self.ema.enabled else "final-epoch weights"
             with self.ema.applied(self.model):
                 test = self.evaluate(test_loader, epoch, stage="test")
 
         self.tracker.log_scalar("loss/test", test["avg_loss"], epoch)
-        self.logger.subsection(f"Test : loss={test['avg_loss']:.4f}  (batches={test['num_batches']})")
+        self.logger.subsection(f"Test : loss={test['avg_loss']:.4f}  (batches={test['num_batches']}, weights: {weights})")
 
         return test
 
