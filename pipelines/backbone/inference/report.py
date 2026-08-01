@@ -601,6 +601,7 @@ class Report:
         ("3.12 JEPA embedding diagnostics",                      lambda k: k.startswith("jepa_")),
         ("3.13 Label quality (GT fit vs raw tomogram)",          lambda k: k.startswith("label_")),
         ("3.14 Normalization & clamp health",                    lambda k: k.startswith(("norm_in_", "clamp_"))),
+        ("3.15 Flip-equivariance consistency",                   lambda k: k.startswith("flip_")),
         ("3.10 Matched Gaussian errors (permutation-invariant)", lambda k: k.startswith("matched_")),
         ("3.9b Per-slot parameter statistics by activity",       lambda k: k.startswith("slot_") and ("_amp_" in k or "_mu_" in k or "_sig_" in k)),
         ("3.9 Slot occupancy & active count",                    lambda k: k.startswith(("active_frac", "active_count", "count_")) or (k.startswith("slot_") and "_active_" in k)),
@@ -699,14 +700,17 @@ class Report:
             ("pixel_mse_map",       "5.1 MSE map (log scale, pred vs GT)"),
             ("pixel_r2_map",        "5.2 R\u00b2 map (pred vs GT)"),
             ("pixel_peak_map",      "5.3 Peak-location error map (|\u0394 peak index|)"),
-            ("label_r2_map",        "5.4 Label fit R\u00b2 map (GT curves vs raw tomogram)"),
-            ("metric_histograms",   "5.5 Metric distributions"),
+            ("label_r2_map",          "5.4 Label fit R\u00b2 map (GT curves vs raw tomogram)"),
+            ("flip_consistency_map",  "5.5 Flip-equivariance disagreement map"),
+            ("metric_histograms",     "5.6 Metric distributions"),
         )
         if any(fp.get(key) for key, _title in pixel_groups):
             out.append("\n## 5. Per-pixel metric maps\n")
             out.append(
                 "5.4 scores the labels themselves: the R\u00b2 of the fitted GT Gaussians against the raw Capon tomogram profile, "
-                "so low-R\u00b2 areas in the model error maps above can be read against low label quality rather than model failure.\n"
+                "so low-R\u00b2 areas in the model error maps above can be read against low label quality rather than model failure. "
+                "5.5, when computed, is the disagreement between the prediction and the unflipped prediction on flipped inputs, "
+                "a label-free confidence signal.\n"
             )
             self._section(out, pixel_groups)
 

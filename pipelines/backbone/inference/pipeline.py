@@ -9,6 +9,7 @@ import numpy as np
 from configuration.inference                         import InferenceConfig
 from pipelines.backbone.inference.data_consistency   import DataConsistencyEvaluator
 from pipelines.backbone.inference.figures            import FigureComposer
+from pipelines.backbone.inference.flip_consistency   import FlipConsistencyEvaluator
 from pipelines.backbone.inference.normalization_audit import NormalizationAudit
 from pipelines.backbone.inference.loader             import RunLoader
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
@@ -209,6 +210,42 @@ class InferencePipeline:
 
         logger.subsection(f"Label quality : mean fit R² = {stats['label_r2_mean']:.4f}, {stats['label_r2_frac_below_05'] * 100.0:.1f}% of labels below R² 0.5")
 
+    def _evaluate_flip_consistency(self, cfg: InferenceConfig, meta: InferenceMetadata, run, result, global_metrics: dict, logger: Logger) -> None:
+        if not cfg.compute_flip_consistency:
+            logger.section("[Inference: Flip Consistency skipped]")
+            logger.subsection("compute_flip_consistency is disabled; the flip-equivariance disagreement map is absent from metrics, figures, and report.")
+            global_metrics["flip_consistency_status"] = "skipped: compute_flip_consistency disabled"
+            Metrics.write_json(global_metrics, meta.metrics_path)
+            return
+
+        logger.section("[Inference: Flip Consistency]")
+
+        evaluator = FlipConsistencyEvaluator(run, logger, window_kind=cfg.stitch_window, render_amp_floor=cfg.render_amp_floor)
+        flip_map  = evaluator.run()
+
+        result.flip_consistency = flip_map
+
+        finite = flip_map[np.isfinite(flip_map)]
+        if not finite.size:
+            raise ValueError("Flip-consistency map holds no finite value; the stitched disagreement is degenerate")
+
+        err_flat  = result.pixel_mse.reshape(-1).astype(np.float64)
+        flip_flat = flip_map.reshape(-1).astype(np.float64)
+        both      = np.isfinite(err_flat) & np.isfinite(flip_flat)
+        corr      = float(np.corrcoef(flip_flat[both], err_flat[both])[0, 1]) if both.sum() > 2 else float("nan")
+
+        global_metrics["flip_consistency_status"] = "computed"
+        global_metrics["flip_mse_mean"]           = float(finite.mean())
+        global_metrics["flip_mse_median"]         = float(np.median(finite))
+        global_metrics["flip_mse_p95"]            = float(np.percentile(finite, 95.0))
+        global_metrics["flip_error_corr"]         = corr
+        Metrics.write_json(global_metrics, meta.metrics_path)
+
+        if cfg.save_cubes:
+            np.save(meta.cube_dir / "flip_consistency.npy", flip_map)
+
+        logger.subsection(f"Flip consistency : mean disagreement {global_metrics['flip_mse_mean']:.4g}, correlation with pixel MSE {corr:.3f}")
+
     def _audit_normalization(self, meta: InferenceMetadata, run, result, global_metrics: dict, logger: Logger) -> None:
         logger.section("[Inference: Normalization Audit]")
 
@@ -275,6 +312,7 @@ class InferencePipeline:
         self._synthesize_reduced(cfg, meta, run, result, x_axis_np, global_metrics, indices, logger)
         self._evaluate_data_consistency(cfg, meta, run, result, x_axis_np, global_metrics, logger)
         self._evaluate_label_quality(cfg, meta, run, result, x_axis_np, global_metrics, logger)
+        self._evaluate_flip_consistency(cfg, meta, run, result, global_metrics, logger)
         self._audit_normalization(meta, run, result, global_metrics, logger)
 
         figure_paths = {}

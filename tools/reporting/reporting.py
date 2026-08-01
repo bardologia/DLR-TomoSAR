@@ -65,6 +65,7 @@ class MetricSectionGrouper:
         ("Matched Gaussian (Permutation-Invariant)", re.compile(r"^matched_")),
         ("Label Quality",                re.compile(r"^label_")),
         ("Normalization Health",         re.compile(r"^(norm_in_|clamp_)")),
+        ("Flip Consistency",             re.compile(r"^flip_")),
     ]
 
     LEFTOVER_TITLE = "Other Metrics"

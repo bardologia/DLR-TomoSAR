@@ -47,6 +47,8 @@ class InferenceConfig:
     physics_floor            : float = 1e-3
     phase_multilook          : int   = 9
 
+    compute_flip_consistency : bool  = False
+
     n_best_profiles   : int = 12
     n_worst_profiles  : int = 12
     n_random_profiles : int = 12

@@ -48,6 +48,7 @@ class Result:
     reduced          : Optional[ReducedComparison] = None
     data_consistency : Optional[object]            = None
     label_r2         : Optional[np.ndarray]        = None
+    flip_consistency : Optional[np.ndarray]        = None
 
 
 class Metrics:
