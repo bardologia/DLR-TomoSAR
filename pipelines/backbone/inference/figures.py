@@ -131,6 +131,14 @@ class FigureComposer:
         if result.flip_consistency is not None:
             pixel_map_specs.append(("flip_consistency_map", "flip_consistency", result.flip_consistency, "Flip-equivariance disagreement (curve MSE)", "MSE", {"cmap": cfg.cmap_error, "log": True}))
 
+        if result.stratified is not None:
+            figure_paths["stratified_errors"] = [self.plotter.stratified.plot_error_curve(
+                rows      = payload["rows"],
+                covariate = name,
+                out_path  = meta.figures_dir / "stratified" / f"{name}.png",
+                discrete  = payload["discrete"],
+            ) for name, payload in sorted(result.stratified.items())]
+
         for key, fname, data, title, label, extra in pixel_map_specs:
             figure_paths[key] = [slice_plotter.plot_pixel_metric_map(
                 metric_map = data,

@@ -1698,7 +1698,8 @@
         "save_dpi": "Saved figure file resolution in dots per inch",
         "figure_style": "Figure style preset: report for on-screen PNG reports, paper for print-ready NeurIPS figures (9pt fonts, Okabe-Ito colors, 300 DPI, vector PDF for non-image plots)",
         "paths": "InferencePaths sub-config naming the output subdirectories and result filenames under the run's inference output directory",
-        "compute_flip_consistency": "Also run the model on azimuth- and range-flipped inputs, unflip the predictions, and stitch the per-pixel curve disagreement into a flip-equivariance map: a label-free confidence signal saved as a cube, figure, and flip_* metrics (roughly triples the forward-pass cost)"
+        "compute_flip_consistency": "Also run the model on azimuth- and range-flipped inputs, unflip the predictions, and stitch the per-pixel curve disagreement into a flip-equivariance map: a label-free confidence signal saved as a cube, figure, and flip_* metrics (roughly triples the forward-pass cost)",
+        "compute_stratified": "Also stratify the per-pixel curve MSE by scene covariates (GT active count, primary amplitude, mean coherence, DEM slope, label fit R²): binned median curves with IQR bands as figures plus strat_* rank-correlation metrics"
       }
     },
     "inference/image_autoencoder::ImageAeInferencePaths": {

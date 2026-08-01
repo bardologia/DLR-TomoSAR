@@ -66,6 +66,7 @@ class MetricSectionGrouper:
         ("Label Quality",                re.compile(r"^label_")),
         ("Normalization Health",         re.compile(r"^(norm_in_|clamp_)")),
         ("Flip Consistency",             re.compile(r"^flip_")),
+        ("Stratified Errors",            re.compile(r"^strat")),
     ]
 
     LEFTOVER_TITLE = "Other Metrics"

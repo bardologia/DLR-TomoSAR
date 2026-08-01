@@ -18,6 +18,7 @@ from pipelines.backbone.inference.plots              import Plotter
 from pipelines.backbone.inference.predictor          import Predictor
 from pipelines.backbone.inference.reduced            import ReducedTomogramSynthesizer
 from pipelines.backbone.inference.report             import Report, ReportPayloadBuilder
+from pipelines.backbone.inference.stratified         import StratifiedErrors
 from tools.monitoring.logger                         import Logger
 from tools.reporting.plotting                        import PlotBase
 from tools.runtime.completion                        import CompletionMarker
@@ -246,6 +247,26 @@ class InferencePipeline:
 
         logger.subsection(f"Flip consistency : mean disagreement {global_metrics['flip_mse_mean']:.4g}, correlation with pixel MSE {corr:.3f}")
 
+    def _stratify_errors(self, cfg: InferenceConfig, meta: InferenceMetadata, run, result, global_metrics: dict, logger: Logger) -> None:
+        if not cfg.compute_stratified:
+            logger.section("[Inference: Stratified Errors skipped]")
+            logger.subsection("compute_stratified is disabled; the covariate-stratified error curves are absent from metrics, figures, and report.")
+            global_metrics["stratified_status"] = "skipped: compute_stratified disabled"
+            Metrics.write_json(global_metrics, meta.metrics_path)
+            return
+
+        logger.section("[Inference: Stratified Errors]")
+
+        tables, scalars   = StratifiedErrors(run, result).run()
+        result.stratified = tables
+
+        global_metrics["stratified_status"] = "computed"
+        global_metrics.update(scalars)
+        Metrics.write_json(global_metrics, meta.metrics_path)
+
+        strongest = max(tables, key=lambda name: abs(scalars[f"strat_{name}_spearman"]))
+        logger.subsection(f"Stratified over {sorted(tables)}; strongest rank correlation with error: {strongest} ({scalars[f'strat_{strongest}_spearman']:.3f})")
+
     def _audit_normalization(self, meta: InferenceMetadata, run, result, global_metrics: dict, logger: Logger) -> None:
         logger.section("[Inference: Normalization Audit]")
 
@@ -313,6 +334,7 @@ class InferencePipeline:
         self._evaluate_data_consistency(cfg, meta, run, result, x_axis_np, global_metrics, logger)
         self._evaluate_label_quality(cfg, meta, run, result, x_axis_np, global_metrics, logger)
         self._evaluate_flip_consistency(cfg, meta, run, result, global_metrics, logger)
+        self._stratify_errors(cfg, meta, run, result, global_metrics, logger)
         self._audit_normalization(meta, run, result, global_metrics, logger)
 
         figure_paths = {}

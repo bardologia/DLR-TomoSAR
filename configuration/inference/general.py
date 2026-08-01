@@ -48,6 +48,7 @@ class InferenceConfig:
     phase_multilook          : int   = 9
 
     compute_flip_consistency : bool  = False
+    compute_stratified       : bool  = True
 
     n_best_profiles   : int = 12
     n_worst_profiles  : int = 12
