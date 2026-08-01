@@ -38,9 +38,13 @@ class _StubDataset:
 class _RecordingLogger:
     def __init__(self):
         self.warnings = []
+        self.infos    = []
 
     def warning(self, message):
         self.warnings.append(message)
+
+    def info(self, message):
+        self.infos.append(message)
 
 
 def _dataset(n: int = 4) -> _StubDataset:

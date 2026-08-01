@@ -52,10 +52,12 @@ class UnrolledOverfitGate:
         gate.training.reserve_vram        = False
         gate.measurement_noise_std        = 0.0
 
+        self.check.record("training.epochs",              self.check.planned_epochs)
         self.check.record("training.scheduler_epochs",    1_000_000)
         self.check.record("training.early_stop_patience", self.check.planned_epochs)
         self.check.record("training.warmup_enabled",      False)
         self.check.record("training.use_ema",             False)
+        self.check.record("training.reserve_vram",        False)
         self.check.record("measurement_noise_std",        0.0)
 
         return gate
@@ -63,6 +65,8 @@ class UnrolledOverfitGate:
     def run(self, model_cfg, x_axis, ppg: int, norm_stats, train_dataset) -> None:
         if not self.check.enabled:
             return
+
+        self.check.announce()
 
         gate_entry     = self._sanitized_entry_config()
         gate_model_cfg = self.check.sanitized_model_config(model_cfg)
@@ -97,6 +101,9 @@ class UnrolledTrainingPipeline:
         if self.config.augmentation.p_noise > 0.0:
             logger.warning("augmentation.p_noise > 0 has no effect for unrolled training: the input stack is discarded and measurements are synthesised from the ground truth; use measurement_noise_std for measurement-space noise.")
 
+        if self.config.augmentation.p_flip_h > 0.0 or self.config.augmentation.p_flip_v > 0.0:
+            logger.info("augmentation flips are inert for unrolled training: pixels are processed independently and the loss is a permutation-invariant per-pixel mean.")
+
     def _build_dataset_pipeline(self, run_directory: Path, logger, gaussian_cfg) -> tuple:
         dataset_config             = self.factory.training_dataset_config()
         dataset_config.n_gaussians = gaussian_cfg.n_default_gaussians
@@ -120,9 +127,15 @@ class UnrolledTrainingPipeline:
         model, model_cfg = get_unrolled(self.config.model_name, **self.config.model_overrides)
 
         logger.section("[Model Built]")
-        logger.subsection(f"Architecture : {self.config.model_name}")
-        logger.subsection(f"Iterations   : {model_cfg.n_iterations}")
-        logger.subsection(f"Parameters   : {sum(p.numel() for p in model.parameters()):,}")
+        logger.kv_table({
+            "Architecture"    : self.config.model_name,
+            "Iterations"      : model_cfg.n_iterations,
+            "Prox block"      : f"hidden={model_cfg.prox_hidden}, kernel={model_cfg.prox_kernel_size}, activation={model_cfg.activation}",
+            "Init"            : f"step_init={model_cfg.step_init:g}, threshold_init={model_cfg.threshold_init:g}",
+            "Param-group LRs" : f"steps lr={model_cfg.steps_lr:g} wd={model_cfg.steps_wd:g}  |  prox lr={model_cfg.prox_lr:g} wd={model_cfg.prox_wd:g}",
+            "Model overrides" : self.config.model_overrides or "none",
+            "Parameters"      : f"{sum(p.numel() for p in model.parameters()):,}",
+        })
 
         return model, model_cfg
 
@@ -160,6 +173,7 @@ class UnrolledTrainingPipeline:
         self._pretrain_preflight(run_directory)
 
         ConfigCli.save_resolved(self.config, run_directory / "docs" / "resolved_entry_config.json")
+        logger.info(f"Resolved entry config saved: {run_directory / 'docs' / 'resolved_entry_config.json'}")
 
         self._warn_inert_augmentation(logger)
 

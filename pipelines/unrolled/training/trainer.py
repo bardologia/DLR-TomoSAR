@@ -68,16 +68,20 @@ class UnrolledTrainer:
 
         self.logger.section("[Unrolled Trainer]")
         self.logger.kv_table({
-            "Device"          : str(self.device),
-            "Epochs"          : self.training.epochs,
-            "Curve loss"      : entry_config.curve_loss,
-            "Noise std"       : entry_config.measurement_noise_std,
-            "Power floor"     : entry_config.power_floor,
-            "Warmup"          : f"{self.training.warmup_enabled} ({self.training.warmup_steps} steps)",
-            "EMA"             : f"{self.training.use_ema} (decay {self.training.ema_decay})",
-            "VRAM reservation": f"{self.training.reserve_vram} (keep free {self.training.vram_keep_free_gb} GB)",
-            "Sample points"   : int(self.x_axis.shape[0]),
-            "Parameters"      : sum(p.numel() for p in self.model.parameters()),
+            "Device"           : str(self.device),
+            "Epochs"           : self.training.epochs,
+            "Curve loss"       : entry_config.curve_loss,
+            "Noise std"        : f"{entry_config.measurement_noise_std} (fresh noise every epoch, also for val/test targets)",
+            "Power floor"      : entry_config.power_floor,
+            "Elevation axis"   : f"[{float(self.x_axis[0]):g}, {float(self.x_axis[-1]):g}] m, {int(self.x_axis.shape[0])} samples",
+            "AMP"              : self.use_amp,
+            "Grad clip norm"   : self.training.max_grad_norm,
+            "Early stopping"   : f"patience {self.training.early_stop_patience} epochs, min_delta {self.training.early_stop_min_delta}",
+            "LR scale"         : f"x{lr_scale:.4f} (batch-size rule)",
+            "Warmup"           : f"{self.training.warmup_enabled} ({self.training.warmup_steps} optimizer steps)",
+            "EMA"              : f"{self.training.use_ema} (decay {self.training.ema_decay})",
+            "VRAM reservation" : f"{self.training.reserve_vram} (keep free {self.training.vram_keep_free_gb} GB)",
+            "Parameters"       : sum(p.numel() for p in self.model.parameters()),
         })
 
     @torch.no_grad()
@@ -184,7 +188,7 @@ class UnrolledTrainer:
                 epochs_without_improvement += 1
 
             if epochs_without_improvement > self.training.early_stop_patience:
-                self.logger.subsection(f"Early stopping at epoch {epoch}: no val improvement for {epochs_without_improvement} epochs")
+                self.logger.subsection(f"Early stopping at epoch {epoch}: {epochs_without_improvement} epochs without val improvement over min_delta={self.training.early_stop_min_delta} (patience {self.training.early_stop_patience}, strict > so patience+1 epochs are tolerated)")
                 break
 
         with self.ema.applied(self.model):
@@ -193,11 +197,15 @@ class UnrolledTrainer:
         best_path = self.checkpoint_dir / "best.pt"
         if best_path.is_file():
             self.model.load_state_dict(torch.load(best_path, map_location=self.device, weights_only=True))
+            weights = "best checkpoint (EMA weights)" if self.training.use_ema else "best checkpoint"
+        else:
+            weights = "final-epoch weights (no improving checkpoint was saved)"
 
         with torch.no_grad():
             self.test_metrics = self._run_epoch(test_loader, train=False)
 
         self.logger.section("[Test Metrics]")
+        self.logger.subsection(f"Evaluated on {weights}; targets re-synthesised with fresh measurement noise.")
         self.logger.kv_table(self.test_metrics)
 
         FileIO.save_json({"history": history, "test": self.test_metrics, "best_val_loss": self.best_val_loss}, self.run_dir / "training_summary.json")
