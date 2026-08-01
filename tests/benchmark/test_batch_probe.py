@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import inspect
+import re
 
 import pytest
 import torch
@@ -62,7 +63,7 @@ def test_build_context_imports_real_dataset_and_trainer_pipeline():
     source = inspect.getsource(module)
 
     assert "DatasetPipeline" in source
-    assert "from pipelines.backbone.training.trainer import Trainer" in source
+    assert re.search(r"from pipelines\.backbone\.training\.trainer\s+import Trainer", source)
 
 
 def test_run_catches_exceptions_and_reports_failure_dict(monkeypatch, tmp_path):
