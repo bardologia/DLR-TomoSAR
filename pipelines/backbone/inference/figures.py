@@ -7,6 +7,7 @@ import numpy as np
 
 from configuration.inference                         import InferenceConfig
 from pipelines.backbone.inference.animation          import Animator
+from pipelines.backbone.inference.failure_modes      import FailureModes
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 from pipelines.backbone.inference.metrics            import Metrics, Result
 from pipelines.backbone.inference.plots              import Plotter
@@ -138,6 +139,21 @@ class FigureComposer:
                 out_path  = meta.figures_dir / "stratified" / f"{name}.png",
                 discrete  = payload["discrete"],
             ) for name, payload in sorted(result.stratified.items())]
+
+        if result.failure_mode_map is not None:
+            figure_paths["failure_mode_map"] = [self.plotter.stratified.plot_failure_mode_map(
+                result.failure_mode_map,
+                mode_names = FailureModes.MODES,
+                out_path   = meta.figures_dir / "pixel_maps" / "failure_mode.png",
+                az_offset  = result.azimuth_offset,
+                rg_offset  = result.range_offset,
+            )]
+
+        if result.miss_by_sep:
+            figure_paths["miss_by_separation"] = [self.plotter.stratified.plot_miss_by_separation(
+                result.miss_by_sep,
+                out_path = meta.figures_dir / "pixel_maps" / "miss_by_separation.png",
+            )]
 
         for key, fname, data, title, label, extra in pixel_map_specs:
             figure_paths[key] = [slice_plotter.plot_pixel_metric_map(

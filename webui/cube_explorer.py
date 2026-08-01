@@ -112,6 +112,7 @@ class CubeExplorer:
         "seed_std_sigma"           : "seed std sigma",
         "label_r2"                 : "label R2",
         "flip_consistency"         : "flip disagreement",
+        "failure_mode"             : "failure mode",
     }
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:

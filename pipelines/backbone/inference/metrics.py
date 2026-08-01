@@ -50,6 +50,8 @@ class Result:
     label_r2         : Optional[np.ndarray]        = None
     flip_consistency : Optional[np.ndarray]        = None
     stratified       : Optional[dict]              = None
+    failure_mode_map : Optional[np.ndarray]        = None
+    miss_by_sep      : Optional[list]              = None
 
 
 class Metrics:

@@ -603,6 +603,7 @@ class Report:
         ("3.14 Normalization & clamp health",                    lambda k: k.startswith(("norm_in_", "clamp_"))),
         ("3.15 Flip-equivariance consistency",                   lambda k: k.startswith("flip_")),
         ("3.16 Stratified errors (by scene covariate)",          lambda k: k.startswith("strat")),
+        ("3.17 Failure-mode classification",                     lambda k: k.startswith("failure_")),
         ("3.10 Matched Gaussian errors (permutation-invariant)", lambda k: k.startswith("matched_")),
         ("3.9b Per-slot parameter statistics by activity",       lambda k: k.startswith("slot_") and ("_amp_" in k or "_mu_" in k or "_sig_" in k)),
         ("3.9 Slot occupancy & active count",                    lambda k: k.startswith(("active_frac", "active_count", "count_")) or (k.startswith("slot_") and "_active_" in k)),
@@ -704,7 +705,9 @@ class Report:
             ("label_r2_map",          "5.4 Label fit R\u00b2 map (GT curves vs raw tomogram)"),
             ("flip_consistency_map",  "5.5 Flip-equivariance disagreement map"),
             ("stratified_errors",     "5.6 Error stratified by scene covariates"),
-            ("metric_histograms",     "5.7 Metric distributions"),
+            ("failure_mode_map",      "5.7 Dominant failure mode per pixel"),
+            ("miss_by_separation",    "5.8 Miss rate by GT scatterer separation"),
+            ("metric_histograms",     "5.9 Metric distributions"),
         )
         if any(fp.get(key) for key, _title in pixel_groups):
             out.append("\n## 5. Per-pixel metric maps\n")

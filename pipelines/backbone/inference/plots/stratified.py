@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 from pipelines.backbone.inference.plots.base import PlotTools
 
@@ -35,6 +36,42 @@ class StratifiedErrorPlotter(PlotTools):
         ax.set_title(f"Error stratified by {self.COVARIATE_LABELS.get(covariate, covariate).lower()}")
         if discrete:
             ax.set_xticks(centers)
+        ax.grid(True, alpha=0.3)
+        fig.tight_layout()
+
+        return self._save(fig, out_path)
+
+    def plot_failure_mode_map(self, mode_map, mode_names: tuple, out_path: Path, az_offset: int, rg_offset: int) -> Path:
+        H, W   = mode_map.shape
+        extent = [rg_offset, rg_offset + W, az_offset + H, az_offset]
+        legend = ", ".join(f"{index}={name}" for index, name in enumerate(mode_names))
+
+        return self._imshow_figure(
+            mode_map.astype(np.int64),
+            x_label        = "Range [px]",
+            y_label        = "Azimuth [px]",
+            title          = "Dominant failure mode per pixel",
+            cmap           = None,
+            extent         = extent,
+            discrete       = True,
+            levels         = list(range(len(mode_names))),
+            colorbar_label = "Mode",
+            text_overlay   = legend,
+            path           = out_path,
+        )
+
+    def plot_miss_by_separation(self, rows: list[dict], out_path: Path) -> Path:
+        self._apply_style()
+
+        centers = [row["center"] for row in rows]
+        rates   = [row["miss_rate"] * 100.0 for row in rows]
+
+        fig, ax = plt.subplots(figsize=self.figsize(self.FULL_WIDTH))
+        ax.plot(centers, rates, marker="o", color="#D55E00", linewidth=1.4)
+        ax.set_xlabel("Minimum GT scatterer separation [m]")
+        ax.set_ylabel("Pixels with a missed scatterer [%]")
+        ax.set_title("Miss rate by ground-truth scatterer separation")
+        ax.set_ylim(bottom=0.0)
         ax.grid(True, alpha=0.3)
         fig.tight_layout()
 
