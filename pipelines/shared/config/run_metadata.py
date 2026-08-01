@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import asdict
 from pathlib     import Path
 
@@ -12,6 +13,7 @@ from configuration.training                     import BackboneTrainerConfig
 from pipelines.shared.config.config_persistence import BackboneModelConfigIO
 from tools.data.io                              import FileIO
 from tools.monitoring.logger                    import Logger
+from tools.runtime.git_state                    import GitState
 from tools.runtime.run_tag                      import RunTag
 
 
@@ -39,16 +41,21 @@ class TrainingRunMetadata:
         trainer_config.io.logdir = str(self.run_directory)
         trainer_config.io.writer = self.writer
 
+        self.git_commit = GitState.commit()
+
         self._owns_logger = logger is None
-        self.logger       = logger or Logger(log_dir = str(self.logs_directory), name = f"{model_name}_metadata", level = "INFO",)
+        file_mode         = "a" if trainer_config.training.resume else "w"
+        self.logger       = logger or Logger(log_dir = str(self.logs_directory), name = f"{model_name}_metadata", level = "INFO", file_mode = file_mode)
 
         self.logger.section("[Training RunMetadata Initialized]")
         devices = torch.cuda.device_count() if torch.cuda.is_available() else 0
+        visible = os.environ.get("CUDA_VISIBLE_DEVICES", "unset (all GPUs visible)")
         self.logger.kv_table({
-            "Run Directory" : self.run_directory,
-            "Model"         : self.model_name,
-            "Backend"       : "PyTorch",
-            "Devices"       : f"{devices} -> {[torch.cuda.get_device_name(i) for i in range(devices)]}",
+            "Run Directory"   : self.run_directory,
+            "Model"           : self.model_name,
+            "Backend"         : "PyTorch",
+            "Git commit"      : self.git_commit,
+            "Visible devices" : f"{devices} -> {[torch.cuda.get_device_name(i) for i in range(devices)]} (after CUDA_VISIBLE_DEVICES={visible} masking; indices are relative to the mask)",
         })
 
     @staticmethod
@@ -90,6 +97,7 @@ class TrainingRunMetadata:
             "n_devices"     : torch.cuda.device_count() if torch.cuda.is_available() else 0,
             "n_gaussians"   : n_gaussians,
             "seed"          : seed,
+            "git_commit"    : self.git_commit,
         }
 
         FileIO.save_json(payload, out_path)
