@@ -2415,6 +2415,27 @@
         "mass_windows": "Side lengths of the centred sub-windows the cumulative gradient-mass ladder is reported for; each must not exceed window",
         "figure_style": "PlotBase figure style the ERF heatmap and mass curve are rendered with (report or paper)"
       }
+    },
+    "diagnostics::ActivationXrayConfig": {
+      "summary": "Entry config that x-rays the activations of one or more trained backbone runs on real data: forward hooks on every leaf module over a few batches, issue detection for dead, exploding or constant activations, and a report per run",
+      "fields": {
+        "runs_dir": "Root directory scanned recursively for run directories holding the configured checkpoint file; each selected run is x-rayed in sequence",
+        "run_filter": "Run directory names (or names of parent directories whose nested runs are expanded) to x-ray; empty selects interactively on a TTY and every discovered run otherwise",
+        "split": "Dataset split the capture batches are drawn from",
+        "device": "Torch device the model and batches run on during capture",
+        "checkpoint_name": "Checkpoint filename loaded from each run directory and used as the run-discovery marker",
+        "output_subdir": "Name of the output directory created inside each run directory for the JSON dump, plots and markdown report",
+        "batch_size": "Batch size of the capture forward passes",
+        "max_batches": "Number of batches accumulated into the per-layer statistics; more batches sharpen dead-channel detection at linear cost",
+        "dead_zero_frac_warn": "Exact-zero activation fraction at or above which a layer is flagged as mostly dead (warning)",
+        "dead_zero_frac_critical": "Exact-zero activation fraction at or above which a layer is flagged as dead (critical)",
+        "dead_channel_frac_warn": "Fraction of channels that never activate above the dead threshold at or above which a layer is flagged (warning)",
+        "explode_abs_threshold": "Peak absolute activation at or above which a layer is flagged as exploding (warning)",
+        "constant_std_threshold": "Activation standard deviation at or below which a non-dead layer is flagged as constant (warning)",
+        "make_plots": "Render the depth-profile figures and per-layer histograms for flagged layers",
+        "max_layer_histograms": "Maximum number of flagged layers that get an individual activation histogram figure",
+        "figure_style": "PlotBase figure style the plots are rendered with (report or paper)"
+      }
     }
   }
 }

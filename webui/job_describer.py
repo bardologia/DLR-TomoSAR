@@ -180,6 +180,11 @@ class JobDescriber:
             ("root",   "runs_dir",   "opt_tail"),
             ("window", "window",     "text"),
         ],
+        "xray_activations": [
+            ("runs",    "run_filter",  "list", "all runs"),
+            ("root",    "runs_dir",    "opt_tail"),
+            ("batches", "max_batches", "text"),
+        ],
         "export_tensorboard_plots": [
             ("runs", "run_filter", "list", "all runs"),
             ("root", "runs_dir",   "opt_tail"),

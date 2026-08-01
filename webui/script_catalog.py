@@ -142,6 +142,11 @@ class ScriptCatalog:
             "category"  : "Analysis",
             "purpose"   : "Scan a runs directory, select one or more checkpoints, and diagnose each: dead weights, near-uniform layers, rank collapse, dead neurons, exploded or non-finite values, normalisation-scale collapse, and initialisation anomalies. Writes a console report, a markdown report with per-tensor plots, and a JSON of all metrics inside each run directory.",
         },
+        "xray_activations": {
+            "title"     : "X-Ray Activations",
+            "category"  : "Analysis",
+            "purpose"   : "X-ray the activations of trained backbone runs on real data. Hook every leaf module, run a few batches, and diagnose dead layers, dead channels, exploding and constant activations. Writes depth profiles, per-layer histograms for flagged layers, a JSON of all statistics, and a markdown report inside each run directory. The static-weight sibling of this check is X-Ray Weights.",
+        },
         "measure_receptive_field": {
             "title"     : "Receptive Field",
             "category"  : "Analysis",

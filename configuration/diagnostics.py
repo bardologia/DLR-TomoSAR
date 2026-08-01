@@ -210,3 +210,27 @@ class ReceptiveFieldConfig:
     mass_windows     : List[int] = field(default_factory=lambda: [8, 16, 24, 32, 40, 48, 56, 64, 96, 128])
 
     figure_style : str = "report"
+
+
+@dataclass
+class ActivationXrayConfig:
+    runs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
+    run_filter : List[str] = field(default_factory=list)
+
+    split           : str = "test"
+    device          : str = "cpu"
+    checkpoint_name : str = "best_model.pt"
+    output_subdir   : str = "activation_xray"
+
+    batch_size  : int = 8
+    max_batches : int = 8
+
+    dead_zero_frac_warn     : float = 0.90
+    dead_zero_frac_critical : float = 0.99
+    dead_channel_frac_warn  : float = 0.25
+    explode_abs_threshold   : float = 1e4
+    constant_std_threshold  : float = 1e-7
+
+    make_plots           : bool = True
+    max_layer_histograms : int  = 12
+    figure_style         : str  = "report"

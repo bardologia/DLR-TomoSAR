@@ -111,6 +111,7 @@ class ProjectPaths:
         "compare_runs"                    : "analysis",
         "compare_seeds"                   : "analysis",
         "xray_weights"                    : "analysis",
+        "xray_activations"                : "analysis",
         "measure_receptive_field"         : "analysis",
         "export_tensorboard_plots"        : "analysis",
         "collect_reports"                 : "analysis",

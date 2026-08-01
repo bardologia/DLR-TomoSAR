@@ -1232,6 +1232,28 @@ class LaunchLayout:
                 ]},
             ],
         },
+        "xray_activations": {
+            "sections": [
+                {"key": "config", "title": "Configuration", "panels": [
+                    {"kind": "fields", "groups": [
+                        {"title": "Runs", "fields": [
+                            "runs_dir",
+                            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir", "checkpointOnly": True}},
+                            "checkpoint_name",
+                            "output_subdir",
+                        ]},
+                        {"title": "Capture", "fields": [
+                            "split",
+                            "device",
+                            {"path": "batch_size",  "widget": {"kind": "number", "min": 1, "max": 128, "step": 1}},
+                            {"path": "max_batches", "widget": {"kind": "number", "min": 1, "max": 128, "step": 1}},
+                        ]},
+                        {"title": "Detection thresholds", "fields": ["dead_zero_frac_warn", "dead_zero_frac_critical", "dead_channel_frac_warn", "explode_abs_threshold", "constant_std_threshold"]},
+                        {"title": "Report", "fields": ["make_plots", "max_layer_histograms", "figure_style"]},
+                    ]},
+                ]},
+            ],
+        },
         "measure_receptive_field": {
             "sections": [
                 {"key": "config", "title": "Configuration", "panels": [
