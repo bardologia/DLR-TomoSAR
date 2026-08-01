@@ -3989,3 +3989,53 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 @media (max-width: 980px) {
   .fl-cards { grid-template-columns: 1fr; }
 }
+
+/* ---------- slice collector ---------- */
+
+.sc-stage { margin-top: 18px; display: flex; flex-direction: column; gap: 18px; }
+
+.sc-bar {
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--surface); border: 1px solid var(--line); border-top: 2px solid var(--accent);
+  border-radius: var(--r-card); box-shadow: 0 1px 3px rgba(22, 25, 27, 0.06);
+  padding: 14px 16px;
+}
+.sc-bar__controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; }
+.sc-bar__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 12px; }
+
+.sc-name {
+  width: 280px; font-family: var(--mono); font-size: 12px; padding: 6px 8px;
+  border: 1px solid var(--line); border-radius: var(--r-card);
+  background: var(--surface); color: var(--ink);
+}
+.sc-name:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+
+.sc-msg { font-family: var(--mono); font-size: 11px; color: var(--ink-dim); overflow-wrap: anywhere; }
+
+.sc-points { display: flex; flex-wrap: wrap; gap: 6px; }
+.sc-points:empty { display: none; }
+
+.sc-rows { display: flex; flex-direction: column; gap: 18px; }
+
+.sc-row {
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-card); box-shadow: 0 1px 3px rgba(22, 25, 27, 0.06);
+  padding: 14px 16px;
+}
+.sc-row__title { margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--ink); }
+.sc-row__sub { margin-left: 8px; font-family: var(--mono); font-size: 11px; font-weight: 400; color: var(--ink-faint); }
+.sc-row__track { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 6px; }
+
+.sc-cell { margin: 0; flex: 0 0 auto; width: 320px; display: flex; flex-direction: column; gap: 6px; }
+.sc-cell img {
+  width: 100%; height: 190px; object-fit: fill;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-card);
+}
+.sc-cell__cap { display: flex; flex-direction: column; gap: 2px; font-family: var(--mono); font-size: 11px; color: var(--ink-dim); overflow: hidden; }
+.sc-cell__run { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-cell__stamp { color: var(--ink-faint); }
+
+@media (max-width: 980px) {
+  .sc-cell { width: 240px; }
+  .sc-cell img { height: 150px; }
+}

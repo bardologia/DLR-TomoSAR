@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260727a" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260802a" />
 </head>
 <body>
 
@@ -36,6 +36,7 @@
     <a href="#/console" data-route="console">Console</a>
     <a href="#/results" data-route="results">Results</a>
     <a href="#/cube" data-route="cube">Cube</a>
+    <a href="#/slices" data-route="slices">Slices</a>
     <a href="#/fitlab" data-route="fitlab">Fit Lab</a>
     <a href="#/leaderboard" data-route="leaderboard">Leaderboard</a>
     <a href="#/feedtuner" data-route="feedtuner">Feed Tuner</a>
@@ -634,6 +635,77 @@
     </div>
   </section>
 
+  <!-- SLICE COLLECTOR -->
+  <section class="page page--pad" data-page="slices">
+    <div class="page__head">
+      <h2 class="page__title">Slice collector</h2>
+      <p class="page__lead">
+        Pick any number of saved inference cubes, set one cut position, and read the same
+        slice from every run side by side. Collect renders the paper-style figures for all
+        selected runs and queued points into a single comparison folder, so nobody has to
+        load each run and print its slices one at a time.
+      </p>
+    </div>
+
+    <div class="cube-pick">
+      <div class="cube-grouplist" id="sc-strip" aria-label="Saved cubes"></div>
+      <p class="cube-hint" id="sc-hint">Loading directories&hellip;</p>
+    </div>
+
+    <div class="sc-stage" id="sc-stage" hidden>
+      <div class="sc-bar">
+        <div class="sc-bar__controls">
+          <div class="cube-jump" role="group" aria-label="Cut position">
+            <span class="cube-jump__cell">
+              <label for="sc-az">az</label>
+              <input type="number" id="sc-az" class="cube-jump__input" min="0" step="1" inputmode="numeric" />
+              <span class="cube-jump__range" id="sc-az-range"></span>
+            </span>
+            <span class="cube-jump__cell">
+              <label for="sc-rg">rg</label>
+              <input type="number" id="sc-rg" class="cube-jump__input" min="0" step="1" inputmode="numeric" />
+              <span class="cube-jump__range" id="sc-rg-range"></span>
+            </span>
+            <button type="button" class="btn btn--mini" id="sc-add" title="Queue this point so Collect saves it for every selected run">Add point</button>
+            <button type="button" class="btn btn--mini" id="sc-clear" hidden>Clear points</button>
+          </div>
+          <div class="cube-spaces" id="sc-axes" role="group" aria-label="Cut axes">
+            <button type="button" class="cube-space is-active" data-axis="range">Range cut</button>
+            <button type="button" class="cube-space" data-axis="azimuth">Azimuth cut</button>
+          </div>
+          <div class="cube-sources" id="sc-sources" role="group" aria-label="Sources">
+            <button type="button" class="cube-source is-active" data-source="pred"><i class="cube-dot" data-source="pred"></i>pred</button>
+            <button type="button" class="cube-source" data-source="gt"><i class="cube-dot" data-source="gt"></i>gt</button>
+            <button type="button" class="cube-source" data-source="reduced"><i class="cube-dot" data-source="reduced"></i>capon reduced</button>
+            <button type="button" class="cube-source" data-source="full"><i class="cube-dot" data-source="full"></i>capon full</button>
+          </div>
+          <div class="cube-spaces" id="sc-space" role="group" aria-label="Value space">
+            <button type="button" class="cube-space is-active" data-space="physical">Physical</button>
+            <button type="button" class="cube-space" data-space="normalized">Normalized</button>
+          </div>
+          <div class="cube-spaces" id="sc-shared" role="group" aria-label="Colour scale">
+            <button type="button" class="cube-space is-active" data-scale="shared" title="One colour scale across all selected runs">Shared scale</button>
+            <button type="button" class="cube-space" data-scale="perrun" title="Each run keeps its own colour scale">Per-run scale</button>
+          </div>
+          <select id="sc-cmap" class="cube-mselect" aria-label="Tomogram colormap">
+            <option value="jet" selected>jet</option>
+            <option value="viridis">viridis</option>
+            <option value="inferno">inferno</option>
+            <option value="turbo">turbo</option>
+            <option value="gray">gray</option>
+          </select>
+        </div>
+        <div class="sc-points" id="sc-points"></div>
+        <div class="sc-bar__actions">
+          <input id="sc-name" class="sc-name" type="text" spellcheck="false" autocomplete="off" placeholder="collection name (optional)" />
+          <button type="button" class="btn btn--primary" id="sc-collect" title="Render paper-style figures for every selected run at every queued point">Collect figures</button>
+          <span class="sc-msg" id="sc-msg"></span>
+        </div>
+      </div>
+      <div class="sc-rows" id="sc-rows"></div>
+    </div>
+  </section>
+
   <!-- FIT LAB -->
   <section class="page page--pad" data-page="fitlab">
     <div class="page__head">
@@ -1018,9 +1090,10 @@
 <script src="/static/js/results.js?v=20260714a"></script>
 <script src="/static/js/leaderboard.js?v=20260716"></script>
 <script src="/static/js/tomogram.js?v=20260714f"></script>
+<script src="/static/js/slice_collector.js?v=20260802a"></script>
 <script src="/static/js/fit_lab.js?v=20260721a"></script>
 <script src="/static/js/tensorboard.js?v=20260702r"></script>
 <script src="/static/js/feed_tuner.js?v=20260624a"></script>
-<script src="/static/js/app.js?v=20260720a"></script>
+<script src="/static/js/app.js?v=20260802a"></script>
 </body>
 </html>

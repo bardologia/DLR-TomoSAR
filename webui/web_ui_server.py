@@ -4,7 +4,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from config_registry                   import ConfigRegistry
-from cube_explorer                     import CubeExplorer
+from cube_explorer                     import CubeExplorer, SliceCollector
 from dataset_browser                   import DatasetBrowser
 from equation_library                  import EquationLibrary
 from fit_lab                           import FitLab
@@ -93,6 +93,7 @@ class WebUIServer:
         self.tensorboard       = TensorboardManager(self.paths, self.logger)
         self.results           = ResultsBrowser(self.logger)
         self.cubes             = CubeExplorer(self.paths, self.logger)
+        self.slices            = SliceCollector(self.cubes, self.logger)
         self.datasets          = DatasetBrowser(self.logger)
         self.leaderboard       = RunLeaderboard(self.logger)
         self.curves            = TrainingCurves(self.logger)
@@ -127,6 +128,7 @@ class WebUIServer:
             tensorboard       = self.tensorboard,
             results           = self.results,
             cubes             = self.cubes,
+            slices            = self.slices,
             datasets          = self.datasets,
             leaderboard       = self.leaderboard,
             curves            = self.curves,

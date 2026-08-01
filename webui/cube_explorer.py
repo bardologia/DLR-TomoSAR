@@ -2,8 +2,11 @@ from __future__ import annotations
 
 import io
 import json
+import re
 import threading
-from pathlib import Path
+from collections import OrderedDict
+from datetime    import datetime
+from pathlib     import Path
 
 import matplotlib
 
@@ -30,12 +33,13 @@ class SliceFigureArchiver(PlotBase):
         "full"    : "Capon full (raw)",
     }
 
-    def render(self, data: np.ndarray, heights: np.ndarray, vmin: float, vmax: float, source: str, axis: str, az: int, rg: int, space: str, path: Path, cmap: str = "jet") -> Path:
+    def render(self, data: np.ndarray, heights: np.ndarray, vmin: float, vmax: float, source: str, axis: str, az: int, rg: int, space: str, path: Path, cmap: str = "jet", label: str | None = None) -> Path:
         x_label   = "azimuth index" if axis == "range" else "range index"
         title_pos = f"range = {rg}" if axis == "range" else f"azimuth = {az}"
         y_label   = "elevation bin" if source == "full" else "elevation [m]"
         cbar      = "intensity (per-column normalised)" if space == "normalized" else "intensity"
         extent    = [0, int(data.shape[1]), float(heights[0]), float(heights[-1])]
+        title     = f"{self.LABELS[source]} — {title_pos}" if label is None else f"{label} — {self.LABELS[source]} — {title_pos}"
 
         previous = PlotBase.style
         PlotBase.use_style("paper")
@@ -44,7 +48,7 @@ class SliceFigureArchiver(PlotBase):
                 data,
                 x_label        = x_label,
                 y_label        = y_label,
-                title          = f"{self.LABELS[source]} — {title_pos}",
+                title          = title,
                 cmap           = cmap,
                 vmin           = vmin,
                 vmax           = vmax,
@@ -1098,4 +1102,288 @@ class CubeExplorer:
 
         amplitude = np.abs(np.asarray(raw[az_lo:az_hi, rg_lo:rg_hi])).astype(np.float32)
         return 20.0 * np.log10(np.maximum(amplitude, 1e-12))
+
+
+class SliceCollector:
+
+    SOURCES    = ("pred", "gt", "reduced", "full")
+    AXES       = ("range", "azimuth")
+    MAX_RUNS   = 24
+    MAX_POINTS = 24
+    CACHE_CAP  = 16
+
+    def __init__(self, cubes: CubeExplorer, logger: WebLogger) -> None:
+        self.cubes       = cubes
+        self.logger      = logger
+        self.lock        = threading.Lock()
+        self.render_lock = threading.Lock()
+        self.contexts    = OrderedDict()
+
+    def info(self, cube_id: str) -> dict:
+        try:
+            context = self._context(cube_id)
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+        if context is None:
+            return {"ok": False, "error": f"unknown cube id: {cube_id}"}
+
+        entries = context["entries"]
+        return {
+            "ok"        : True,
+            "id"        : str(context["stamp_dir"]),
+            "run"       : context["run"],
+            "group"     : context["group"],
+            "stamp"     : context["stamp"],
+            "n_az"      : context["n_az"],
+            "n_rg"      : context["n_rg"],
+            "sources"   : [s for s in self.SOURCES if s in entries],
+            "intensity" : {s: [entries[s]["vmin"], entries[s]["vmax"]] for s in entries},
+        }
+
+    def slice_png(self, cube_id: str, source: str, axis: str, az: int, rg: int, space: str = "physical", cmap: str = "jet", vmin: float | None = None, vmax: float | None = None) -> bytes | None:
+        if source not in self.SOURCES or axis not in self.AXES or space not in ("physical", "normalized"):
+            return None
+
+        try:
+            context = self._context(cube_id)
+        except Exception:
+            return None
+
+        entry = None if context is None else context["entries"].get(source)
+        if entry is None:
+            return None
+
+        data, heights, lo, hi = self._cut(entry, axis, az, rg, space)
+        if space == "physical" and vmin is not None and vmax is not None and vmax > vmin:
+            lo, hi = float(vmin), float(vmax)
+
+        buf = io.BytesIO()
+        plt.imsave(buf, np.flipud(data), cmap=CubeExplorer._entry_cmap(entry, cmap), vmin=lo, vmax=hi, format="png")
+        return buf.getvalue()
+
+    def collect(self, ids: list, points: list, sources: list, axes: list, space: str = "physical", cmap: str = "jet", shared: bool = True, name: str = "") -> dict:
+        ids     = list(dict.fromkeys(str(i) for i in ids if i))
+        sources = list(dict.fromkeys(sources))
+        axes    = list(dict.fromkeys(axes))
+
+        if not ids:
+            return {"ok": False, "error": "select at least one run"}
+        if len(ids) > self.MAX_RUNS:
+            return {"ok": False, "error": f"at most {self.MAX_RUNS} runs per collection, got {len(ids)}"}
+        if space not in ("physical", "normalized"):
+            return {"ok": False, "error": f"unknown space: {space}"}
+        if not sources or any(s not in self.SOURCES for s in sources):
+            return {"ok": False, "error": f"sources must be a non-empty subset of {self.SOURCES}"}
+        if not axes or any(a not in self.AXES for a in axes):
+            return {"ok": False, "error": f"axes must be a non-empty subset of {self.AXES}"}
+
+        try:
+            points   = self._points(points)
+            contexts = []
+            for cube_id in ids:
+                context = self._context(cube_id)
+                if context is None:
+                    return {"ok": False, "error": f"unknown cube id: {cube_id}"}
+                contexts.append(context)
+        except Exception as exc:
+            return {"ok": False, "error": str(exc)}
+
+        labels  = self._labels(contexts)
+        title   = re.sub(r"[^A-Za-z0-9._-]+", "_", name or "").strip("._")
+        title   = title or datetime.now().strftime("collection_%Y%m%d_%H%M%S")
+        out_dir = contexts[0]["root"] / "slice_collections" / title
+        clims   = {source: self._shared_clim(contexts, source, space) if shared else None for source in sources}
+        missing = [{"label": label, "source": source} for source in sources for context, label in zip(contexts, labels) if source not in context["entries"]]
+
+        files = []
+        with self.render_lock:
+            for az, rg in points:
+                point_dir = out_dir / f"az{az:04d}_rg{rg:04d}"
+                for source in sources:
+                    clim = clims[source]
+                    for axis in axes:
+                        cut_dir = point_dir / f"{axis}_{source}_{space}"
+                        for context, label in zip(contexts, labels):
+                            entry = context["entries"].get(source)
+                            if entry is None:
+                                continue
+
+                            az_i = int(np.clip(az, 0, context["n_az"] - 1))
+                            rg_i = int(np.clip(rg, 0, context["n_rg"] - 1))
+                            data, heights, vmin, vmax = self._cut(entry, axis, az_i, rg_i, space)
+                            if clim is not None:
+                                vmin, vmax = clim
+
+                            saved = self.cubes.archiver.render(data, heights, vmin, vmax, source, axis, az_i, rg_i, space, cut_dir / f"{label}.png", cmap=CubeExplorer._entry_cmap(entry, cmap), label=label)
+                            files.append(str(saved.relative_to(out_dir)))
+
+        if not files:
+            return {"ok": False, "error": "no figures rendered; none of the selected runs carry the requested sources"}
+
+        manifest = {
+            "name"    : title,
+            "created" : datetime.now().isoformat(timespec="seconds"),
+            "space"   : space,
+            "cmap"    : cmap,
+            "shared"  : bool(shared),
+            "axes"    : axes,
+            "sources" : sources,
+            "points"  : [{"az": az, "rg": rg} for az, rg in points],
+            "clims"   : {source: (list(clim) if clim else None) for source, clim in clims.items()},
+            "runs"    : [{"id": str(c["stamp_dir"]), "run": c["run"], "group": c["group"], "stamp": c["stamp"], "label": label} for c, label in zip(contexts, labels)],
+            "missing" : missing,
+            "files"   : files,
+        }
+        (out_dir / "collection.json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+
+        self.logger.ok(f"collected {len(files)} slice figures from {len(contexts)} runs into {out_dir}")
+        return {"ok": True, "dir": str(out_dir), "name": title, "files": files, "missing": missing, "runs": len(contexts)}
+
+    def _points(self, raw) -> list:
+        if not isinstance(raw, list) or not raw:
+            raise ValueError("points must be a non-empty list of {az, rg}")
+        if len(raw) > self.MAX_POINTS:
+            raise ValueError(f"at most {self.MAX_POINTS} points per collection, got {len(raw)}")
+
+        points = []
+        seen   = set()
+        for entry in raw:
+            az, rg = int(entry["az"]), int(entry["rg"])
+            if az < 0 or rg < 0:
+                raise ValueError(f"point az={az}, rg={rg} is negative")
+            if (az, rg) in seen:
+                continue
+            seen.add((az, rg))
+            points.append((az, rg))
+
+        return points
+
+    @staticmethod
+    def _labels(contexts: list) -> list:
+        counts = {}
+        for context in contexts:
+            counts[context["run"]] = counts.get(context["run"], 0) + 1
+
+        grouped = []
+        for context in contexts:
+            label = context["run"]
+            if counts[label] > 1 and context["group"] not in (".", ""):
+                label = f"{context['group'].replace('/', '_')}__{label}"
+            grouped.append(label)
+
+        labels = []
+        for context, label in zip(contexts, grouped):
+            if grouped.count(label) > 1:
+                label = f"{label}__{context['stamp']}"
+            labels.append(label)
+
+        return labels
+
+    @staticmethod
+    def _shared_clim(contexts: list, source: str, space: str) -> tuple[float, float] | None:
+        if space != "physical":
+            return None
+
+        entries = [context["entries"][source] for context in contexts if source in context["entries"]]
+        if not entries:
+            return None
+
+        vmin = min(entry["vmin"] for entry in entries)
+        vmax = max(entry["vmax"] for entry in entries)
+        return (vmin, vmax) if vmax > vmin else None
+
+    @staticmethod
+    def _cut(entry: dict, axis: str, az: int, rg: int, space: str) -> tuple[np.ndarray, np.ndarray, float, float]:
+        cube               = entry["cube"]
+        n_elev, n_az, n_rg = cube.shape
+
+        az   = int(np.clip(az, 0, n_az - 1))
+        rg   = int(np.clip(rg, 0, n_rg - 1))
+        data = np.asarray(cube[:, :, rg] if axis == "range" else cube[:, az, :])
+        data = np.abs(data).astype(np.float32) if np.iscomplexobj(data) else data.astype(np.float32)
+
+        data, vmin, vmax = CubeExplorer._normalize_cut(entry, data, space)
+
+        order   = np.argsort(entry["x_axis"])
+        heights = np.asarray(entry["x_axis"], dtype=np.float64)[order]
+        return data[order], heights, float(vmin), float(vmax)
+
+    def _context(self, cube_id: str) -> dict | None:
+        stamp_dir = self.cubes._stamp_dir(cube_id)
+        if stamp_dir is None:
+            return None
+
+        key = str(stamp_dir)
+        with self.lock:
+            if key in self.contexts:
+                self.contexts.move_to_end(key)
+                return self.contexts[key]
+
+        context = self._build_context(stamp_dir)
+
+        with self.lock:
+            self.contexts[key] = context
+            while len(self.contexts) > self.CACHE_CAP:
+                self.contexts.popitem(last=False)
+
+        return context
+
+    def _build_context(self, stamp_dir: Path) -> dict:
+        root = self._root_for(stamp_dir)
+        if root is None:
+            raise ValueError(f"{stamp_dir} is outside every catalogued runs root")
+
+        cubes_dir = stamp_dir / "cubes"
+        pred_raw  = np.load(cubes_dir / "pred_curves.npy", mmap_mode="r")
+        if pred_raw.ndim != 3:
+            raise ValueError(f"pred_curves.npy is not a 3D cube: shape={pred_raw.shape}")
+
+        n_elev, n_az, n_rg = pred_raw.shape
+        curve_axis         = self.cubes._curve_axis(stamp_dir, n_elev)
+
+        entries = {"pred": self._entry(pred_raw, curve_axis)}
+        for source in ("gt", "reduced"):
+            path = cubes_dir / f"{source}_curves.npy"
+            if path.is_file():
+                raw = np.load(path, mmap_mode="r")
+                if raw.shape[1:] != (n_az, n_rg):
+                    raise ValueError(f"source '{source}' spatial shape {raw.shape[1:]} does not match pred {(n_az, n_rg)}")
+                entries[source] = self._entry(raw, curve_axis)
+
+        full_raw = self.cubes._full_raw(stamp_dir, n_az, n_rg)
+        if full_raw is not None:
+            entries["full"] = self._entry(full_raw, np.arange(full_raw.shape[0], dtype=np.float64))
+
+        run_dir = stamp_dir.parent.parent
+        return {
+            "stamp_dir" : stamp_dir,
+            "root"      : root,
+            "run"       : run_dir.name,
+            "group"     : str(run_dir.relative_to(root).parent),
+            "stamp"     : stamp_dir.name,
+            "n_az"      : n_az,
+            "n_rg"      : n_rg,
+            "entries"   : entries,
+        }
+
+    @staticmethod
+    def _entry(raw: np.ndarray, x_axis: np.ndarray) -> dict:
+        sample = np.asarray(raw[:, :: max(1, raw.shape[1] // 256), :: max(1, raw.shape[2] // 256)])
+        sample = np.abs(sample) if np.iscomplexobj(sample) else sample
+        sample = sample[np.isfinite(sample)]
+        vmin, vmax = (np.percentile(sample, [1.0, 99.0]) if sample.size else (0.0, 1.0))
+
+        return {
+            "cube"   : raw,
+            "x_axis" : x_axis,
+            "vmin"   : float(vmin),
+            "vmax"   : float(vmax),
+        }
+
+    def _root_for(self, stamp_dir: Path) -> Path | None:
+        matches = [root for root in self.cubes.roots if stamp_dir.is_relative_to(root)]
+        if not matches:
+            return None
+        return Path(max(matches, key=len))
 

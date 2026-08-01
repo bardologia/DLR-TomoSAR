@@ -391,6 +391,28 @@ class App {
         canvas : root.querySelector("canvas"),
       })),
     });
+
+    this.sliceCollectorView = new window.SliceCollectorView({
+      strip       : document.getElementById("sc-strip"),
+      hint        : document.getElementById("sc-hint"),
+      stage       : document.getElementById("sc-stage"),
+      azInput     : document.getElementById("sc-az"),
+      rgInput     : document.getElementById("sc-rg"),
+      azRange     : document.getElementById("sc-az-range"),
+      rgRange     : document.getElementById("sc-rg-range"),
+      addBtn      : document.getElementById("sc-add"),
+      clearBtn    : document.getElementById("sc-clear"),
+      points      : document.getElementById("sc-points"),
+      axesWrap    : document.getElementById("sc-axes"),
+      sourcesWrap : document.getElementById("sc-sources"),
+      spaceWrap   : document.getElementById("sc-space"),
+      sharedWrap  : document.getElementById("sc-shared"),
+      cmapSel     : document.getElementById("sc-cmap"),
+      nameInput   : document.getElementById("sc-name"),
+      collectBtn  : document.getElementById("sc-collect"),
+      msg         : document.getElementById("sc-msg"),
+      rows        : document.getElementById("sc-rows"),
+    });
   }
 
   _initModelZoo() {
@@ -447,6 +469,7 @@ class App {
     if (route === "feedtuner") this.feedTuner.enter();
     if (route === "cube") this.tomogramView.enter();
     else this.tomogramView.leave();
+    if (route === "slices") this.sliceCollectorView.enter();
     if (route === "fitlab") this.fitLabView.enter();
     if (route === "console") this.runConsole.onShow();
     setTimeout(() => this.reveal.scan(), 60);

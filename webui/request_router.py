@@ -10,7 +10,7 @@ from pathlib      import Path
 from urllib.parse import parse_qs, unquote, urlparse
 
 from config_registry                   import ConfigRegistry
-from cube_explorer                     import CubeExplorer
+from cube_explorer                     import CubeExplorer, SliceCollector
 from dataset_browser                   import DatasetBrowser
 from equation_library                  import EquationLibrary
 from fit_lab                           import FitLab
@@ -50,7 +50,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, saved_runs: SavedRunStore, notifier: JobNotifier, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves, fitlab: FitLab) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, saved_runs: SavedRunStore, notifier: JobNotifier, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, slices: SliceCollector, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves, fitlab: FitLab) -> None:
         self.paths             = paths
         self.logger            = logger
         self.catalog           = catalog
@@ -79,6 +79,7 @@ class RequestRouter:
         self.tensorboard       = tensorboard
         self.results           = results
         self.cubes             = cubes
+        self.slices            = slices
         self.datasets          = datasets
         self.leaderboard       = leaderboard
         self.curves            = curves
@@ -320,6 +321,28 @@ class RequestRouter:
                 rg      = int((query.get("rg") or ["0"])[0]),
                 space   = (query.get("space") or ["physical"])[0],
                 cmap    = (query.get("cmap") or ["jet"])[0],
+            )
+            self._send_png(handler, png)
+            return
+        if path == "/api/slices/info":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.slices.info((query.get("id") or [""])[0])
+            self._send_json(handler, result, 200 if result.get("ok") else 404)
+            return
+        if path == "/api/slices/slice":
+            query = parse_qs(urlparse(handler.path).query)
+            vmin  = (query.get("vmin") or [""])[0]
+            vmax  = (query.get("vmax") or [""])[0]
+            png   = self.slices.slice_png(
+                cube_id = (query.get("id") or [""])[0],
+                source  = (query.get("source") or ["pred"])[0],
+                axis    = (query.get("axis") or ["range"])[0],
+                az      = int((query.get("az") or ["0"])[0]),
+                rg      = int((query.get("rg") or ["0"])[0]),
+                space   = (query.get("space") or ["physical"])[0],
+                cmap    = (query.get("cmap") or ["jet"])[0],
+                vmin    = float(vmin) if vmin else None,
+                vmax    = float(vmax) if vmax else None,
             )
             self._send_png(handler, png)
             return
@@ -598,6 +621,20 @@ class RequestRouter:
                 rg      = int(body.get("rg", 0)),
                 space   = body.get("space", "physical"),
                 cmap    = body.get("cmap", "jet"),
+            )
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/slices/collect":
+            result = self.slices.collect(
+                ids     = body.get("ids") or [],
+                points  = body.get("points") or [],
+                sources = body.get("sources") or [],
+                axes    = body.get("axes") or [],
+                space   = body.get("space", "physical"),
+                cmap    = body.get("cmap", "jet"),
+                shared  = bool(body.get("shared", True)),
+                name    = body.get("name", ""),
             )
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
