@@ -110,10 +110,13 @@ class TrainingPipeline:
         if not check.enabled:
             return
 
+        check.announce()
+
         gate_trainer_config = check.sanitized_trainer_config(self.trainer_config)
 
-        gate_trainer_config.param_loss.use_active_normalization = False
-        check.record("param_loss.use_active_normalization", False)
+        if self.autoencoder_cfg is None:
+            gate_trainer_config.param_loss.use_active_normalization = False
+            check.record("param_loss.use_active_normalization", False)
 
         base_backbone_config = ModelBuilder.config_from_registry(self.backbone_name, self.entry.model_overrides, head=self.entry.backbone_head)
         gate_backbone_config = check.sanitized_model_config(base_backbone_config)
@@ -163,9 +166,15 @@ class TrainingPipeline:
             "Backbone Out"         : backbone_out,
             "Backbone Parameters"  : f"{backbone_params:,}",
             "Trainable Parameters" : f"{trainable_params:,}",
-            "Target Provider"      : self.trainer_config.target_provider,
-            "Embedding Loss"       : self.trainer_config.embedding_loss,
         }
+
+        if self.autoencoder_cfg is not None:
+            info["Target Provider"] = self.trainer_config.target_provider
+            info["Embedding Loss"]  = self._embedding_loss_label(self.trainer_config.embedding_loss)
+            info["Param Loss"]      = "inactive (profile AE coupled; the run-name loss tokens still describe param_loss)"
+        else:
+            info["Target Provider"] = "inactive (no profile AE)"
+            info["Embedding Loss"]  = "inactive (no profile AE; the backbone trains on param_loss, banner below)"
 
         if self.image_ae_cfg is not None:
             info["Image AE"]            = f"{self.image_ae_model_name}  (embedding_dim={self.image_ae_cfg.embedding_dim}, mode={self.trainer_config.image_autoencoder_mode})"
@@ -181,6 +190,20 @@ class TrainingPipeline:
 
         logger.section("[JEPA Module Built]")
         logger.kv_table(info)
+
+    @staticmethod
+    def _embedding_loss_label(emb) -> str:
+        terms = []
+        if emb.use_embedding_mse:
+            terms.append(f"mse w={emb.weight_embedding_mse:g}")
+        if emb.use_embedding_cosine:
+            terms.append(f"cosine w={emb.weight_embedding_cosine:g}")
+        if emb.use_embedding_smoothl1:
+            terms.append(f"smoothl1 w={emb.weight_embedding_smoothl1:g} beta={emb.smoothl1_beta:g}")
+        if emb.use_curve_recon:
+            terms.append(f"curve_recon({emb.curve_kind}) w={emb.weight_curve_recon:g}")
+
+        return "  |  ".join(terms) if terms else "no terms enabled"
 
     def _build_backbone(self, in_channels: int, out_channels: int, patch_size, config=None):
         overrides = {"in_channels": in_channels, "out_channels": out_channels}
@@ -222,7 +245,8 @@ class TrainingPipeline:
 
     def _save_metadata(self, run_meta, backbone_cfg, datasets, x_len: int) -> None:
         gaussian_cfg = self.trainer_config.gaussian
-        in_channels  = datasets["train"].input_channels
+        backbone_in  = self.image_ae_cfg.embedding_dim if self.image_ae_cfg is not None else datasets["train"].input_channels
+        backbone_out = self.autoencoder_cfg.embedding_dim if self.autoencoder_cfg is not None else self._gaussian_out_channels()
 
         run_meta.save_trainer_config()
         run_meta.save_model_config(backbone_cfg, self.backbone_name)
@@ -232,7 +256,7 @@ class TrainingPipeline:
         if self.image_ae_cfg is not None:
             ImageAutoencoderConfigIO.save(self.image_ae_cfg, self.image_ae_model_name, run_meta.metadata_directory)
 
-        run_meta.save_run_summary(self.backbone_name, in_channels=in_channels, out_channels=gaussian_cfg.params_per_gaussian * gaussian_cfg.n_default_gaussians, x_axis_length=x_len, seed=self.entry.seed)
+        run_meta.save_run_summary(self.backbone_name, in_channels=backbone_in, out_channels=backbone_out, x_axis_length=x_len, n_gaussians=gaussian_cfg.n_default_gaussians, seed=self.entry.seed)
 
     def _profile_normalizer(self, metadata_directory, logger):
         if self.autoencoder_cfg is None:

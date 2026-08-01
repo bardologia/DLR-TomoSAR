@@ -71,15 +71,17 @@ def test_overfit_gate_backbone_config_carries_entry_head(tmp_path, monkeypatch):
     monkeypatch.setattr(OverfitCheck, "sanitized_trainer_config", fake_sanitized_trainer_config)
     monkeypatch.setattr(TrainingPipeline, "_build_module", fake_build_module)
 
-    pipe                = TrainingPipeline.__new__(TrainingPipeline)
-    pipe.entry          = JepaEntryConfig(backbone_head="set_pred", overfit_check=OverfitCheckConfig(enabled=True))
-    pipe.backbone_name  = pipe.entry.backbone_name
-    pipe.trainer_config = SimpleNamespace()
+    pipe                 = TrainingPipeline.__new__(TrainingPipeline)
+    pipe.entry           = JepaEntryConfig(backbone_head="set_pred", overfit_check=OverfitCheckConfig(enabled=True))
+    pipe.backbone_name   = pipe.entry.backbone_name
+    pipe.trainer_config  = SimpleNamespace()
+    pipe.autoencoder_cfg = None
 
     run_meta = SimpleNamespace(run_directory=tmp_path)
+    logger   = SimpleNamespace(section=lambda *a, **k: None, subsection=lambda *a, **k: None)
 
     with pytest.raises(_GateStop):
-        pipe._run_overfit_check(run_meta, None, {"train": None}, 128, None)
+        pipe._run_overfit_check(run_meta, logger, {"train": None}, 128, None)
 
     assert captured["config"].head == "set_pred"
 
