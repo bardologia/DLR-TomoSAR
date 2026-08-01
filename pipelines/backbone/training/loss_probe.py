@@ -150,7 +150,8 @@ class LossScaleProbe:
         criterion = self._build_criterion(x_axis)
 
         self.logger.section("[Loss Scale Probe]")
-        self.logger.subsection(f"Averaging over {self.probe_cfg.n_batches} batches — all weights forced to 1.0")
+        self.logger.subsection(f"Averaging over {self.probe_cfg.n_batches} batches; all enabled term weights forced to 1.0 (use_param_legacy forced off unless explicitly enabled).")
+        self.logger.subsection("Raw values are shaped by the initial-stage loss config (matching, active normalization, presence balance, amp_zero_thr).")
 
         accum = self._collect(criterion, train_loader, model, device)
 

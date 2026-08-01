@@ -35,7 +35,7 @@ class Loss:
             "Log all losses" : self.log_all_losses,
             "Param matching" : cfg.param_matching.value,
         })
-        self.logger.kv_table(self.geometry.describe(), title="Tomographic Geometry")
+        self.logger.kv_table(self.geometry.describe(), title="Tomographic Geometry (scene-constant fallback; a per-pixel kz map supplied by the dataset supersedes it)")
 
         self.log_active_terms(cfg, title="Active Terms")
         self.log_slot_presence_config(cfg, title="Slot-Presence Loss Config")
@@ -46,14 +46,18 @@ class Loss:
         return bool(cfg.presence_balance or cfg.use_active_normalization or cfg.amp_focal_gamma > 0.0 or cfg.use_param_legacy or self.log_all_losses)
 
     def log_active_terms(self, cfg, title: str) -> None:
+        active     = [(term.name, float(getattr(cfg, term.weight_key))) for term in LOSS_TERMS if getattr(cfg, term.use_flag)]
+        weight_sum = sum(weight for _name, weight in active)
+
         active_rows = []
+        for name, weight in active:
+            effective = weight / weight_sum if weight_sum > 0.0 else weight
+            active_rows.append({"Term": name, "Weight": f"{weight:g}", "Effective": f"{effective:g}"})
 
-        for term in LOSS_TERMS:
-            if getattr(cfg, term.use_flag):
-                weight = getattr(cfg, term.weight_key)
-                active_rows.append({"Term": term.name, "Weight": f"{weight:g}"})
+        self.logger.metrics_table(active_rows, ["Term", "Weight", "Effective"], title=title)
 
-        self.logger.metrics_table(active_rows, ["Term", "Weight"], title=title)
+        if weight_sum > 0.0:
+            self.logger.subsection(f"The total loss is divided by the active weight sum ({weight_sum:g}); the Effective column is the coefficient actually applied.")
 
     def log_slot_presence_config(self, cfg, title: str) -> None:
         self.logger.kv_table({
@@ -65,16 +69,18 @@ class Loss:
             "use_active_normalization" : cfg.use_active_normalization,
         }, title=title)
 
-    def set_curriculum(self, complete_cfg) -> None:
+    def set_curriculum(self, complete_cfg, context: str = "curriculum swap") -> None:
         self._validate_legacy(complete_cfg)
 
         self.loss_cfg       = complete_cfg
         self.loss_generation += 1
 
-        self.logger.subsection("Active loss composition changes at the curriculum swap; train/val loss curves are not comparable across the swap epoch.")
-        self.logger.subsection(f"Param matching (curriculum complete): {complete_cfg.param_matching.value}")
-        self.log_active_terms(complete_cfg, title="Active Terms (curriculum complete)")
-        self.log_slot_presence_config(complete_cfg, title="Slot-Presence Loss Config (curriculum complete)")
+        if context == "curriculum swap":
+            self.logger.subsection("Active loss composition changes at the curriculum swap; train/val loss curves are not comparable across the swap epoch.")
+
+        self.logger.subsection(f"Param matching ({context}): {complete_cfg.param_matching.value}")
+        self.log_active_terms(complete_cfg, title=f"Active Terms ({context})")
+        self.log_slot_presence_config(complete_cfg, title=f"Slot-Presence Loss Config ({context})")
 
     def _validate_legacy(self, cfg) -> None:
         if cfg.use_param_legacy and cfg.param_matching.value != ParamMatcher.SORTED_GT:

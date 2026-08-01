@@ -92,7 +92,7 @@ class MaxBatchProbe:
             emit_docs  = False,
         )
 
-        trainer.criterion.set_curriculum(trainer_config.curriculum.complete)
+        trainer.criterion.set_curriculum(trainer_config.curriculum.complete, context="VRAM probe on the complete stage")
         trainer.model.train()
 
         return trainer
