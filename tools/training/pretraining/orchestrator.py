@@ -64,7 +64,7 @@ class PretrainOrchestrator:
             raise SystemExit(f"max batch-size finder failed: {result['error']}")
 
         self.training.batch_size = int(result["batch_size"])
-        self.logger.subsection(f"Resolved batch size: {self.training.batch_size} (peak {result['peak_gb']:.2f} GB, scale_lr_with_batch={self.training.scale_lr_with_batch})")
+        self.logger.subsection(f"Resolved batch size: {self.training.batch_size} overrides training.batch_size for this run (peak {result['peak_gb']:.2f} GB, scale_lr_with_batch={self.training.scale_lr_with_batch})")
 
     def _tune_loader(self, context: PretrainContext) -> None:
         tuner = LoaderTuner(
@@ -90,7 +90,7 @@ class PretrainOrchestrator:
 
         self.training.num_workers     = int(choice["num_workers"])
         self.training.prefetch_factor = int(choice["prefetch_factor"])
-        self.logger.subsection(f"Resolved loader: workers={self.training.num_workers} prefetch={self.training.prefetch_factor} (pin_memory recommendation {choice['pin_memory']})")
+        self.logger.subsection(f"Resolved loader: workers={self.training.num_workers} prefetch={self.training.prefetch_factor} override training.num_workers/prefetch_factor for this run (pin_memory recommendation {choice['pin_memory']} is not applied; the training loader always pins memory)")
 
     def run(self) -> None:
         if not self._enabled():
@@ -99,11 +99,24 @@ class PretrainOrchestrator:
         if self.pretrain.find_batch_size:
             self.logger.section("[Pretrain] Max batch-size finder")
             self.logger.subsection("Probe run: the dataset and model below belong to the batch-size probe, not the training run.")
+            self.logger.kv_table({
+                "VRAM budget"   : f"{self.pretrain.vram_budget_gb:g} GB",
+                "Batch ceiling" : f"{self.pretrain.max_batch} (trials are powers of two up to the ceiling)",
+                "Measure steps" : self.pretrain.measure_steps,
+            })
             self._find_batch_size(self.build())
             self._release_cache()
 
         if self.pretrain.tune_loader:
             self.logger.section("[Pretrain] DataLoader tuner")
             self.logger.subsection("Probe run: the dataset and model below belong to the loader-timing probe, not the training run.")
+            self.logger.kv_table({
+                "Worker counts"    : list(self.pretrain.worker_counts),
+                "Prefetch factors" : list(self.pretrain.prefetch_factors),
+                "Warmup batches"   : self.pretrain.warmup_batches,
+                "Timed batches"    : self.pretrain.timed_batches,
+                "Data-wait target" : self.pretrain.data_wait_target,
+                "Probe seed"       : self.pretrain.seed,
+            })
             self._tune_loader(self.build())
             self._release_cache()

@@ -15,6 +15,9 @@ class _Logger:
     def subsection(self, *args, **kwargs):
         pass
 
+    def kv_table(self, *args, **kwargs):
+        pass
+
 
 def _pretrain(**overrides):
     base = dict(
