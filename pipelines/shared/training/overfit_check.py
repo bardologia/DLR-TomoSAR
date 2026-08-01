@@ -39,6 +39,10 @@ class OverfitCheck:
     def planned_epochs(self) -> int:
         return math.ceil(self.config.max_steps / self.epoch_steps)
 
+    def announce(self) -> None:
+        self.logger.section("[Overfit Gate]")
+        self.logger.subsection("Gate run: the trainer banners below belong to the overfit sanity gate (sanitized throwaway config), not the training run.")
+
     def record(self, key: str, value) -> None:
         self.overrides[key] = value
 
@@ -63,11 +67,16 @@ class OverfitCheck:
         cfg.early_stopping.restore_best = False
         cfg.resources.enabled           = False
 
-        self.record("optimizer.weight_decay",      0.0)
-        self.record("training.use_ema",            False)
-        self.record("warmup.warmup_enabled",       False)
-        self.record("scheduler.type",              "constant")
-        self.record("early_stopping.restore_best", False)
+        self.record("io.logdir",                    str(self.work_directory))
+        self.record("training.epochs",              self.planned_epochs)
+        self.record("training.validation_frequency", self.planned_epochs)
+        self.record("training.use_ema",             False)
+        self.record("training.resume",              False)
+        self.record("optimizer.weight_decay",       0.0)
+        self.record("warmup.warmup_enabled",        False)
+        self.record("scheduler.type",               "constant")
+        self.record("early_stopping.restore_best",  False)
+        self.record("resources.enabled",            False)
 
         return cfg
 
