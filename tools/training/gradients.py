@@ -5,6 +5,8 @@ import torch
 
 
 class GradientClipper:
+    EXPLODING_NORM_SENTINEL = 100.0
+
     def __init__(self, config, logger, tracker, param_groups=None):
         self.logger       = logger
         self.tracker      = tracker
@@ -20,6 +22,8 @@ class GradientClipper:
 
         self.history: list[float] = []
 
+        self._adaptive_active_logged = False
+
         fields = {"Mode": self.mode}
 
         if self.mode == "fixed":
@@ -28,12 +32,15 @@ class GradientClipper:
         elif self.mode == "adaptive_percentile":
             fields["Window"]     = self.window
             fields["Percentile"] = self.percentile
+            fields["Warm-up"]    = f"no clipping until {self.window} optimizer steps are recorded"
 
         elif self.mode == "adaptive_mean_std":
             fields["Window"]       = self.window
             fields["Mean+k*Std k"] = self.mean_std_k
+            fields["Warm-up"]      = f"no clipping until {self.window} optimizer steps are recorded"
 
-        fields["Histogram every"] = self.hist_freq
+        fields["Histogram every"] = f"{self.hist_freq} optimizer steps"
+        fields["NaN grad scan"]   = "on (log_debug)" if self.tracker.debug else "off (enable with training.log_debug)"
 
         self.logger.section("[Gradient Clipper]")
         self.logger.kv_table(fields)
@@ -102,8 +109,8 @@ class GradientClipper:
 
         norm = GradientClipper.global_norm(model)
 
-        if norm > 100.0:
-            self.logger.warning(f"Exploding gradient norm detected: {norm:.2f} at step {global_step}!")
+        if norm > self.EXPLODING_NORM_SENTINEL:
+            self.logger.warning(f"Gradient norm {norm:.2f} exceeded the fixed alert sentinel {self.EXPLODING_NORM_SENTINEL} at step {global_step} (alert only, independent of the clip threshold).")
 
         self.tracker.log_scalar("optim/grad_norm", norm, global_step)
         self._log_group_norms(global_step)
@@ -115,6 +122,9 @@ class GradientClipper:
             threshold = self.threshold
         else:
             threshold = self._compute_adaptive_threshold()
+            if threshold is not None and not self._adaptive_active_logged:
+                self._adaptive_active_logged = True
+                self.logger.info(f"Adaptive gradient clipping active from step {global_step}: window of {self.window} optimizer steps filled, initial threshold {threshold:.4f}.")
 
         if threshold is None:
             return norm
@@ -132,7 +142,7 @@ class GradientClipper:
     def record(self, grad_norm_value: float, global_step: int):
         self.history.append(float(grad_norm_value))
 
-        if global_step % self.hist_freq == 0 and len(self.history) >= self.hist_freq:
+        if len(self.history) % self.hist_freq == 0:
             self.tracker.log_histogram("optim/grad_norm_hist", np.asarray(self.history[-self.hist_freq:], dtype=np.float32), global_step)
 
     def state_dict(self) -> dict:
