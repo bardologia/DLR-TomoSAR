@@ -1181,6 +1181,7 @@ class LaunchLayout:
                             {"path": "group_tags", "widget": {"kind": "dataset", "mode": "run_groups", "multi": True, "baseFrom": "runs_dir"}},
                         ]},
                         {"title": "Report", "fields": ["inference_subdir", "output_subdir", "metrics_filename", "report_filename"]},
+                        {"title": "Disagreement maps", "fields": ["compute_disagreement", "cubes_subdir"]},
                     ]},
                 ]},
             ],

@@ -106,6 +106,10 @@ class CubeExplorer:
         "physics_coherence_error"  : "coherence err",
         "physics_covariance_error" : "covariance err",
         "physics_valid_mask"       : "valid mask",
+        "seed_std_profile"         : "seed std profile",
+        "seed_std_amp"             : "seed std amp",
+        "seed_std_mu"              : "seed std mu",
+        "seed_std_sigma"           : "seed std sigma",
     }
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:

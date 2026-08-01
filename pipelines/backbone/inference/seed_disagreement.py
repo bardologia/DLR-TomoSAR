@@ -1,0 +1,188 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import numpy as np
+
+from tools.data.io            import FileIO
+from tools.loss.param_loss    import ParamMatcher
+from tools.reporting.plotting import PlotBase
+
+
+class SeedDisagreementPlots(PlotBase):
+
+    CMAP = "inferno"
+
+    def map_figure(self, data: np.ndarray, title: str, colorbar_label: str, az_offset: int, rg_offset: int, path: Path) -> Path:
+        H, W   = data.shape
+        extent = [rg_offset, rg_offset + W, az_offset + H, az_offset]
+
+        return self._imshow_figure(
+            np.asarray(data, dtype=np.float64),
+            x_label        = "Range [px]",
+            y_label        = "Azimuth [px]",
+            title          = title,
+            cmap           = self._cmap_with_bad(self.CMAP),
+            extent         = extent,
+            colorbar_label = colorbar_label,
+            path           = path,
+        )
+
+
+class SeedDisagreementMaps:
+
+    PROFILE_CUBE = "pred_curves.npy"
+    PARAMS_CUBE  = "params_pred.npy"
+    MIN_ACTIVE   = 2
+
+    MAP_TITLES = {
+        "seed_std_profile" : "Across-seed std of the reconstructed profile (mean over elevation)",
+        "seed_std_amp"     : "Across-seed std of predicted amplitude (mean over slots)",
+        "seed_std_mu"      : "Across-seed std of predicted mu (active slots, metres)",
+        "seed_std_sigma"   : "Across-seed std of predicted sigma (active slots, metres)",
+    }
+
+    def __init__(self, group_dir: Path, run_dirs: list[Path], inference_dirs: list[Path], cubes_subdir: str, metrics_filename: str, output_dir: Path, logger) -> None:
+        self.group_dir        = Path(group_dir)
+        self.run_dirs         = [Path(d) for d in run_dirs]
+        self.inference_dirs   = [Path(d) for d in inference_dirs]
+        self.cube_dirs        = [d / cubes_subdir for d in self.inference_dirs]
+        self.metrics_filename = metrics_filename
+        self.output_dir       = Path(output_dir)
+        self.figures_dir      = self.output_dir / "figures" / "seed_disagreement"
+        self.logger           = logger
+
+        self.seeds = [str(d.relative_to(self.group_dir)) for d in self.run_dirs]
+
+    def _validate_cubes(self) -> None:
+        for cube_dir in self.cube_dirs:
+            for name in (self.PROFILE_CUBE, self.PARAMS_CUBE):
+                if not (cube_dir / name).is_file():
+                    raise FileNotFoundError(f"{cube_dir / name} is missing; re-run inference with save_cubes enabled for every seed, or disable compute_disagreement")
+
+    def _open_cubes(self, name: str) -> list[np.ndarray]:
+        cubes  = [np.load(cube_dir / name, mmap_mode="r") for cube_dir in self.cube_dirs]
+        shapes = {cube.shape for cube in cubes}
+        if len(shapes) != 1:
+            raise ValueError(f"Seed cubes {name} disagree on shape across {self.seeds}: {sorted(shapes)}; the seeds were inferred on different regions and cannot be compared pixelwise")
+
+        return cubes
+
+    def _offsets(self) -> tuple[int, int]:
+        metrics = FileIO.load_json(self.inference_dirs[0] / self.metrics_filename)
+        if "split_region" not in metrics:
+            raise KeyError(f"{self.inference_dirs[0] / self.metrics_filename} has no split_region; re-run inference to regenerate it")
+
+        az_start, _az_end, rg_start, _rg_end = (int(v) for v in metrics["split_region"])
+        return az_start, rg_start
+
+    def _profile_map(self) -> np.ndarray:
+        curves             = self._open_cubes(self.PROFILE_CUBE)
+        n_elev, n_az, n_rg = curves[0].shape
+
+        acc = np.zeros((n_az, n_rg), dtype=np.float64)
+        for e in range(n_elev):
+            stack = np.stack([np.asarray(cube[e], dtype=np.float64) for cube in curves])
+            acc  += stack.std(axis=0, ddof=1)
+
+        return (acc / n_elev).astype(np.float32)
+
+    def _masked_std(self, values: np.ndarray, active: np.ndarray) -> np.ndarray:
+        n    = active.sum(axis=0)
+        fill = np.where(active, values, 0.0)
+        mean = np.divide(fill.sum(axis=0), n, out=np.zeros(n.shape, dtype=np.float64), where=n > 0)
+        sq   = np.where(active, (values - mean) ** 2, 0.0)
+        var  = np.divide(sq.sum(axis=0), n - 1, out=np.full(n.shape, np.nan), where=n >= self.MIN_ACTIVE)
+
+        return np.sqrt(var)
+
+    def _param_maps(self) -> dict[str, np.ndarray]:
+        params       = self._open_cubes(self.PARAMS_CUBE)
+        n_ch, n_az, n_rg = params[0].shape
+        n_k          = n_ch // 3
+
+        amp_acc = np.zeros((n_az, n_rg), dtype=np.float64)
+        sums    = {"mu": np.zeros((n_az, n_rg), dtype=np.float64), "sigma": np.zeros((n_az, n_rg), dtype=np.float64)}
+        counts  = {"mu": np.zeros((n_az, n_rg), dtype=np.int32),   "sigma": np.zeros((n_az, n_rg), dtype=np.int32)}
+
+        for k in range(n_k):
+            amps   = np.stack([np.asarray(p[3 * k],     dtype=np.float64) for p in params])
+            mus    = np.stack([np.asarray(p[3 * k + 1], dtype=np.float64) for p in params])
+            sigmas = np.stack([np.asarray(p[3 * k + 2], dtype=np.float64) for p in params])
+
+            amp_acc += amps.std(axis=0, ddof=1)
+            active   = amps > ParamMatcher.ACTIVE_AMP_THR
+
+            for field, values in (("mu", mus), ("sigma", sigmas)):
+                std = self._masked_std(values, active)
+                ok  = np.isfinite(std)
+
+                sums[field][ok]  += std[ok]
+                counts[field]    += ok
+
+        maps = {"seed_std_amp": (amp_acc / n_k).astype(np.float32)}
+        for field in ("mu", "sigma"):
+            with np.errstate(invalid="ignore"):
+                slot_mean = np.divide(sums[field], counts[field], out=np.full(sums[field].shape, np.nan), where=counts[field] > 0)
+            maps[f"seed_std_{field}"] = slot_mean.astype(np.float32)
+
+        return maps
+
+    def _write_maps(self, maps: dict[str, np.ndarray]) -> dict[str, list[str]]:
+        written = {}
+        for name, data in maps.items():
+            paths = []
+            for cube_dir in self.cube_dirs:
+                path = cube_dir / f"{name}.npy"
+                np.save(path, data)
+                paths.append(str(path))
+            written[name] = paths
+
+        return written
+
+    def _summarize(self, maps: dict[str, np.ndarray]) -> dict:
+        summary = {"n_seeds": len(self.seeds)}
+        for name, data in maps.items():
+            finite = data[np.isfinite(data)]
+            if finite.size:
+                summary[f"{name}_mean"]   = float(finite.mean())
+                summary[f"{name}_median"] = float(np.median(finite))
+                summary[f"{name}_p95"]    = float(np.percentile(finite, 95.0))
+            else:
+                summary[f"{name}_mean"]   = None
+                summary[f"{name}_median"] = None
+                summary[f"{name}_p95"]    = None
+
+        return summary
+
+    def _render_figures(self, maps: dict[str, np.ndarray]) -> dict[str, Path]:
+        az_offset, rg_offset = self._offsets()
+        plots                = SeedDisagreementPlots()
+
+        figures = {}
+        for name, data in maps.items():
+            figures[name] = plots.map_figure(
+                data,
+                title          = self.MAP_TITLES[name],
+                colorbar_label = "Across-seed std",
+                az_offset      = az_offset,
+                rg_offset      = rg_offset,
+                path           = self.figures_dir / f"{name}.png",
+            )
+
+        return figures
+
+    def run(self) -> dict:
+        self._validate_cubes()
+        FileIO.ensure_dirs(self.figures_dir)
+
+        maps = {"seed_std_profile": self._profile_map()}
+        maps.update(self._param_maps())
+
+        written = self._write_maps(maps)
+        summary = self._summarize(maps)
+        figures = self._render_figures(maps)
+
+        self.logger.info(f"Seed-disagreement maps written into {len(self.cube_dirs)} seed cube dirs: {sorted(maps)}")
+
+        return {"summary": summary, "figures": figures, "maps_written": written}

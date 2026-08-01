@@ -13,7 +13,7 @@ def main() -> None:
     from pipelines.backbone.inference.seed_comparison import SeedComparison
     from tools.runtime.config_cli import ConfigCli
 
-    config = ConfigCli(SeedComparisonConfig(), description="Aggregate the existing inference results of the seed runs nested inside each selected group directory into a per-group seed-comparison report with the across-seed mean ± std of every scalar metric; pure report generation, no inference is re-run").apply()
+    config = ConfigCli(SeedComparisonConfig(), description="Aggregate the existing inference results of the seed runs nested inside each selected group directory into a per-group seed-comparison report with the across-seed mean ± std of every scalar metric, plus per-pixel seed-disagreement maps written into each seed's cube directory; no inference is re-run").apply()
 
     SeedComparison(config).run()
 

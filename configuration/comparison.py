@@ -44,6 +44,9 @@ class SeedComparisonConfig:
     metrics_filename : str = "metrics.json"
     report_filename  : str = "report.md"
 
+    compute_disagreement : bool = True
+    cubes_subdir         : str  = "cubes"
+
 
 @dataclass
 class ComparisonPathsConfig:

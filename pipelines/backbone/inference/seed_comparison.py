@@ -3,8 +3,9 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from pipelines.backbone.inference.report       import Report
-from pipelines.shared.inference.run_classifier import RunDirectoryWalk
+from pipelines.backbone.inference.report            import Report
+from pipelines.backbone.inference.seed_disagreement import SeedDisagreementMaps
+from pipelines.shared.inference.run_classifier      import RunDirectoryWalk
 from tools.data.io                             import FileIO
 from tools.metrics.scoring                     import SeedAggregation
 from tools.monitoring.logger                   import Logger
@@ -41,7 +42,7 @@ class SeedInferenceResolver:
 
 
 class SeedComparisonReport:
-    def __init__(self, group_dir: Path, run_dirs: list[Path], inference_dirs: list[Path], output_subdir: str, metrics_filename: str, report_filename: str, logger: Logger) -> None:
+    def __init__(self, group_dir: Path, run_dirs: list[Path], inference_dirs: list[Path], output_subdir: str, metrics_filename: str, report_filename: str, logger: Logger, disagreement: dict | None = None) -> None:
         if len(run_dirs) < 2:
             raise ValueError(f"A seed comparison needs at least two seed runs inside {group_dir}, got {len(run_dirs)}: {[str(d) for d in run_dirs]}")
 
@@ -51,6 +52,7 @@ class SeedComparisonReport:
         self.metrics_filename = metrics_filename
         self.report_filename  = report_filename
         self.logger           = logger
+        self.disagreement     = disagreement
 
         self.output_dir = self.group_dir / "inference" / output_subdir
         self.seeds      = [str(d.relative_to(self.group_dir)) for d in self.run_dirs]
@@ -70,6 +72,9 @@ class SeedComparisonReport:
             "mean"           : means,
             "std"            : stds,
         }
+
+        if self.disagreement is not None:
+            payload["disagreement"] = self.disagreement["summary"]
 
         path = self.output_dir / self.metrics_filename
         FileIO.save_json(payload, path)
@@ -132,6 +137,29 @@ class SeedComparisonReport:
 
         return out
 
+    def _build_disagreement_section(self) -> list[str]:
+        out = ["\n## 3. Seed disagreement maps\n"]
+        out.append(
+            "Per-pixel across-seed standard deviation of the model outputs, written as cubes into every seed's inference cube directory "
+            "(they appear as metric-map layers in the cube explorer). Mu and sigma disagreement is measured over slots active in at "
+            f"least {SeedDisagreementMaps.MIN_ACTIVE} seeds.\n"
+        )
+
+        summary = self.disagreement["summary"]
+        table   = MarkdownTable(("Map", "Mean", "Median", "p95"))
+        for name in SeedDisagreementMaps.MAP_TITLES:
+            cells = [summary.get(f"{name}_{stat}") for stat in ("mean", "median", "p95")]
+            table.add_row(f"`{name}`", *[self._fmt(cell) if cell is not None else "—" for cell in cells])
+
+        out.append("\n".join(table.render()))
+        out.append("")
+
+        for name, figure_path in self.disagreement["figures"].items():
+            out.append(f"![{name}]({os.path.relpath(figure_path, self.output_dir)})")
+            out.append("")
+
+        return out
+
     def _write_report(self, per_seed: list[dict], means: dict, stds: dict) -> Path:
         lines = ["# TomoSAR Seed-Comparison Report", ""]
         lines.append(f"_Generated on {RunTag.timestamp()}_")
@@ -140,6 +168,9 @@ class SeedComparisonReport:
 
         lines += self._build_seed_runs_section()
         lines += self._build_metrics_section(per_seed, means, stds)
+
+        if self.disagreement is not None:
+            lines += self._build_disagreement_section()
 
         path = self.output_dir / self.report_filename
         path.write_text("\n".join(lines), encoding="utf-8")
@@ -181,6 +212,18 @@ class SeedComparison:
         run_dirs       = sorted(RunDirectoryWalk.walk(group_dir))
         inference_dirs = [resolver.resolve(run_dir) for run_dir in run_dirs]
 
+        disagreement = None
+        if self.config.compute_disagreement:
+            disagreement = SeedDisagreementMaps(
+                group_dir        = group_dir,
+                run_dirs         = run_dirs,
+                inference_dirs   = inference_dirs,
+                cubes_subdir     = self.config.cubes_subdir,
+                metrics_filename = self.config.metrics_filename,
+                output_dir       = group_dir / "inference" / output_subdir,
+                logger           = logger,
+            ).run()
+
         return SeedComparisonReport(
             group_dir        = group_dir,
             run_dirs         = run_dirs,
@@ -189,6 +232,7 @@ class SeedComparison:
             metrics_filename = self.config.metrics_filename,
             report_filename  = self.config.report_filename,
             logger           = logger,
+            disagreement     = disagreement,
         ).run()
 
     def run(self) -> list[Path]:
@@ -200,10 +244,11 @@ class SeedComparison:
             resolver      = SeedInferenceResolver(self.config.inference_subdir, self.config.metrics_filename)
 
             logger.kv_table({
-                "Runs dir"  : str(self.runs_dir),
-                "Groups"    : len(group_dirs),
-                "Inference" : self.config.inference_subdir or "latest per run",
-                "Output"    : output_subdir,
+                "Runs dir"     : str(self.runs_dir),
+                "Groups"       : len(group_dirs),
+                "Inference"    : self.config.inference_subdir or "latest per run",
+                "Output"       : output_subdir,
+                "Disagreement" : "maps + figures" if self.config.compute_disagreement else "disabled",
             }, title="Configuration")
 
             reports = []

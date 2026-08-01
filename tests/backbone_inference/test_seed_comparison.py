@@ -142,12 +142,14 @@ def test_report_excludes_per_slice_metrics_from_the_tables(tmp_path):
 
 def _config(runs_dir: Path, group_tags: list[str], inference_subdir: str = "", output_subdir: str = "") -> SimpleNamespace:
     return SimpleNamespace(
-        runs_dir         = str(runs_dir),
-        group_tags       = group_tags,
-        inference_subdir = inference_subdir,
-        output_subdir    = output_subdir,
-        metrics_filename = "metrics.json",
-        report_filename  = "report.md",
+        runs_dir             = str(runs_dir),
+        group_tags           = group_tags,
+        inference_subdir     = inference_subdir,
+        output_subdir        = output_subdir,
+        metrics_filename     = "metrics.json",
+        report_filename      = "report.md",
+        compute_disagreement = False,
+        cubes_subdir         = "cubes",
     )
 
 
