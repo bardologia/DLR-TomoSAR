@@ -18,13 +18,24 @@ class Warmup:
         self.warmup_finished    = False
         self._logged_completion = False
 
-        self.logger.section("[Warmup Scheduler]")
-        self.logger.kv_table({
+        active = self.enabled and self.warmup_steps > 0
+
+        info = {
             "Enabled"      : self.enabled,
-            "Steps"        : self.warmup_steps,
+            "Effective"    : "active" if active else "inactive (no warmup applied)",
+            "Steps"        : f"{self.warmup_steps} optimizer steps",
             "Mode"         : self.mode,
             "Start Factor" : self.warmup_start_factor,
-        })
+        }
+
+        if self.mode == "polynomial":
+            info["Poly Power"] = self.poly_power
+
+        if self.mode == "exponential" and self.warmup_start_factor <= 0:
+            info["Mode"] = "exponential (start factor <= 0, falls back to a linear ramp)"
+
+        self.logger.section("[Warmup Scheduler]")
+        self.logger.kv_table(info)
 
     def factor(self) -> float:
         if not self.enabled or self.warmup_steps <= 0:
@@ -65,7 +76,7 @@ class Warmup:
         if self.current_step >= self.warmup_steps and not self.warmup_finished:
             self.warmup_finished = True
             if not self._logged_completion:
-                self.logger.info(f"Warmup completed at step {self.current_step}.")
+                self.logger.info(f"Warmup completed after {self.current_step} optimizer steps.")
                 self._logged_completion = True
 
         return factor
@@ -165,6 +176,8 @@ class Scheduler:
         self._epoch_offset = epoch_offset
         self.current_lrs   = list(self.base_lrs)
 
+        self.logger.subsection(f"LR schedule restarted from its base LRs: epoch offset {epoch_offset}, horizon {self.config.scheduler.epochs} epochs from the offset.")
+
     def step(self, epoch: int) -> list[float]:
         factor           = self._factor_for(epoch - self._epoch_offset)
         self.current_lrs = [lr * factor for lr in self.base_lrs]
@@ -191,20 +204,22 @@ class Scheduler:
     def _log_scheduler_info(self):
         self.logger.section("[Learning Rate Scheduler]")
         info = {
-            "Scheduler Type" : self.scheduler_type,
-            "Base LRs"       : self.base_lrs,
+            "Scheduler Type"           : self.scheduler_type,
+            "Base LRs (after lr_scale)": self.base_lrs,
         }
 
         if self.scheduler_type in ("cosine_annealing", "linear", "polynomial", "exponential"):
-            info["T_max"]   = self.config.scheduler.epochs
-            info["Eta Min"] = self.config.scheduler.eta_min
+            info["T_max (scheduler.epochs)"] = self.config.scheduler.epochs
+            info["Eta Min (param group 0)"]  = f"{self.config.scheduler.eta_min} (other groups floor at eta_min * lr_i / lr_0)"
 
         if self.scheduler_type == "polynomial":
             info["Power"] = self.config.scheduler.power
 
         if self.scheduler_type == "step":
-            info["Step Size"] = self.config.scheduler.step_size
-            info["Gamma"]     = self.config.scheduler.gamma
+            info["Step Size"]               = self.config.scheduler.step_size
+            info["Gamma"]                   = self.config.scheduler.gamma
+            info["Eta Min (param group 0)"] = f"{self.config.scheduler.eta_min} (decay floor)"
 
-        info["Warmup Enabled"] = self.warmup.enabled if self.warmup else False
+        warmup_active          = bool(self.warmup) and self.warmup.enabled and self.warmup.warmup_steps > 0
+        info["Warmup Active"]  = warmup_active
         self.logger.kv_table(info)

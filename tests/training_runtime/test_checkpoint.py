@@ -12,6 +12,7 @@ class StubTrainer:
     def __init__(self, model, loss_generation=0):
         self.model     = model
         self.criterion = SimpleNamespace(loss_generation=loss_generation)
+        self.ema       = SimpleNamespace(enabled=False)
 
     def capture_state(self, epoch: int) -> dict:
         return {

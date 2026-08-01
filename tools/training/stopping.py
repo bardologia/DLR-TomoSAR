@@ -12,8 +12,9 @@ class EarlyStopping:
 
         self.logger.section("[Early Stopping]")
         self.logger.kv_table({
-            "Patience"  : self.patience,
-            "Min Delta" : self.min_delta,
+            "Patience"     : f"{self.patience} validation rounds (not epochs; validation may run every N epochs)",
+            "Min Delta"    : self.min_delta,
+            "Restore best" : self.config.early_stopping.restore_best,
         })
 
         self.best_loss  = None
@@ -36,7 +37,7 @@ class EarlyStopping:
 
         if stop:
             self.triggered = True
-            self.logger.warning(f"Early stopping triggered at epoch {epoch + 1}. Best epoch was {self.best_epoch + 1}.")
+            self.logger.warning(f"Early stopping triggered at epoch {epoch + 1}: {self.counter} validation rounds without improvement over min_delta={self.min_delta}. Best epoch (by the min_delta rule) was {self.best_epoch + 1}.")
 
         return stop
 

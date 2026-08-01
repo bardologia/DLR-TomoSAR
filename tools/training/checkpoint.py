@@ -44,7 +44,8 @@ class Checkpoint:
         checkpoint["best_val_loss"] = self.best_val_loss
         checkpoint["best_epoch"]    = self.best_epoch
 
-        self.logger.info(f"Saving checkpoint at epoch {epoch + 1} to {path}")
+        weights = "EMA weights" if trainer.ema.enabled else "raw weights"
+        self.logger.info(f"Saving checkpoint ({weights}) at epoch {epoch + 1} to {path}")
         os.makedirs(os.path.dirname(path), exist_ok=True)
         torch.save(checkpoint, path)
 

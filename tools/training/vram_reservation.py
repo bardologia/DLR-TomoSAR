@@ -17,6 +17,9 @@ class VramReservation:
         self.logger          = logger
         self.filled          = False
 
+        if bool(enabled) and not self.enabled:
+            self.logger.subsection("VRAM reservation requested (memory.reserve_vram=True) but the device is not CUDA; no memory is parked.")
+
     def _free_bytes(self) -> int:
         free, _total = torch.cuda.mem_get_info(self.device)
         return free

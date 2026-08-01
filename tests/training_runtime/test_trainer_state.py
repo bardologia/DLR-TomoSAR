@@ -22,7 +22,7 @@ def _scheduler_config(epochs: int = 10) -> SimpleNamespace:
 
 
 def _stopping_config(patience: int = 3) -> SimpleNamespace:
-    return SimpleNamespace(early_stopping=SimpleNamespace(patience=patience, min_delta=0.0))
+    return SimpleNamespace(early_stopping=SimpleNamespace(patience=patience, min_delta=0.0, restore_best=True))
 
 
 def _clipper_config(window: int = 4) -> SimpleNamespace:

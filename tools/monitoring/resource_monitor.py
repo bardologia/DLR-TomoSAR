@@ -229,7 +229,7 @@ class ResourceMonitor:
             self._maybe_warn(
                 "vram",
                 f"VRAM usage {vram_pct:.1f}% "
-                f"({gpu_used:.2f}/{gpu_total:.2f} GB) "
+                f"({gpu_used:.2f}/{gpu_total:.2f} GB, aggregated over all {len(self._gpu_handles)} visible GPUs) "
                 f">= threshold {self.warn_vram_pct:.1f}%",
             )
         
@@ -268,6 +268,7 @@ class ResourceMonitor:
 
         self._update_peak_metrics(metrics)
         self._check_warnings(metrics, gpu_used, gpu_total)
+        self._sample_idx += 1
 
         return metrics
 
@@ -288,7 +289,6 @@ class ResourceMonitor:
             try:
                 metrics = self.sample()
                 self._publish(metrics)
-                self._sample_idx += 1
             except Exception as exc:
                 if self.logger is not None:
                     self.logger.warning(f"[ResourceMonitor] sample failed: {exc}")
@@ -298,13 +298,16 @@ class ResourceMonitor:
         if self.logger is None:
             return
         
+        tb_effective = self.log_to_tb and self.tracker is not None and getattr(self.tracker, "writer", None) is not None
+
         self.logger.section("[Resource Monitor]")
         self.logger.kv_table({
-            "Enabled"         : True,
+            "Enabled"         : self.enabled,
             "Poll interval"   : f"{self.interval:.1f} s",
-            "NVML available"  : f"{self._nvml_ok} ({len(self._gpu_handles)} GPUs)",
-            "TB logging"      : self.log_to_tb,
-            "Warn thresholds" : f"RAM>={self.warn_ram_pct:.0f}%  VRAM>={self.warn_vram_pct:.0f}%  SWAP>={self.warn_swap_pct:.0f}%  SHM>={self.warn_shm_pct:.0f}%",
+            "NVML available"  : f"{self._nvml_ok} ({len(self._gpu_handles)} GPUs; VRAM figures aggregate all visible GPUs)",
+            "TB logging"      : f"{self.log_to_tb} (effective: {tb_effective})",
+            "Warn thresholds" : f"RAM>={self.warn_ram_pct:g}%  VRAM>={self.warn_vram_pct:g}%  SWAP>={self.warn_swap_pct:g}%  SHM>={self.warn_shm_pct:g}%",
+            "Warn cooldown"   : f"{self.warn_cooldown_s:g} s per warning kind",
         })
 
     def start(self):
@@ -325,7 +328,10 @@ class ResourceMonitor:
     def _log_peak_metrics(self):
         if self.logger is None:
             return
-        
+
+        if self._sample_idx == 0:
+            return
+
         peaks = {}
         for key, value in self.peak.items():
             unit                 = "%" if key.endswith("_pct") else "GB"
@@ -333,6 +339,7 @@ class ResourceMonitor:
         peaks["Total samples"] = self._sample_idx
 
         self.logger.section("[Resource Monitor - Peaks]")
+        self.logger.subsection(f"VRAM peaks aggregate all {len(self._gpu_handles)} visible GPUs, not only the training device.")
         self.logger.kv_table(peaks)
 
     def _stop_thread(self):
