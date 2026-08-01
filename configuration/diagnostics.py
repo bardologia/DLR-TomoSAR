@@ -192,3 +192,21 @@ class ReportCollectionEntryConfig:
             latest_only       = self.latest_only,
             embed_images      = self.embed_images,
         )
+
+
+@dataclass
+class ReceptiveFieldConfig:
+    runs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
+    run_filter : List[str] = field(default_factory=list)
+
+    split           : str = "test"
+    device          : str = "cpu"
+    checkpoint_name : str = "best_model.pt"
+    output_subdir   : str = "receptive_field"
+
+    window           : int       = 160
+    n_azimuth_probes : int       = 4
+    n_range_probes   : int       = 3
+    mass_windows     : List[int] = field(default_factory=lambda: [8, 16, 24, 32, 40, 48, 56, 64, 96, 128])
+
+    figure_style : str = "report"

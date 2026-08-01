@@ -1231,6 +1231,29 @@ class LaunchLayout:
                 ]},
             ],
         },
+        "measure_receptive_field": {
+            "sections": [
+                {"key": "config", "title": "Configuration", "panels": [
+                    {"kind": "fields", "groups": [
+                        {"title": "Runs", "fields": [
+                            "runs_dir",
+                            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir", "checkpointOnly": True}},
+                            "checkpoint_name",
+                            "output_subdir",
+                        ]},
+                        {"title": "Probing", "fields": [
+                            "split",
+                            "device",
+                            {"path": "window",           "widget": {"kind": "number", "min": 32, "max": 512, "step": 16}},
+                            {"path": "n_azimuth_probes", "widget": {"kind": "number", "min": 1, "max": 16, "step": 1}},
+                            {"path": "n_range_probes",   "widget": {"kind": "number", "min": 1, "max": 16, "step": 1}},
+                            {"path": "mass_windows",     "widget": {"kind": "multi", "numeric": True}},
+                        ]},
+                        {"title": "Figures", "fields": ["figure_style"]},
+                    ]},
+                ]},
+            ],
+        },
         "export_tensorboard_plots": {
             "sections": [
                 {"key": "config", "title": "Configuration", "panels": [

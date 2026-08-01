@@ -2398,6 +2398,22 @@
         "seeds": "List of seeds swept per (dataset, patch size) unit, one training run per seed nested as seed<N> inside the unit directory; defaults to the standard five-seed set 0-4, empty falls back to the single seed field, and the report ranks on the seed-mean test loss",
         "poll_interval_s": "Seconds between GPU-queue polls while training runs are in flight"
       }
+    },
+    "diagnostics::ReceptiveFieldConfig": {
+      "summary": "Entry config that measures the effective receptive field of one or more trained backbone runs on real data: probe pixels across the split region, gradient of the centre output magnitude w.r.t. the input window, ERF sigma per axis and a gradient-mass ladder, written into each run directory",
+      "fields": {
+        "runs_dir": "Root directory scanned recursively for run directories holding the configured checkpoint file; each selected run is measured in sequence",
+        "run_filter": "Run directory names (or names of parent directories whose nested runs are expanded) to measure; empty selects interactively on a TTY and every discovered run otherwise",
+        "split": "Dataset split whose region provides the real input stack the probes are cut from",
+        "device": "Torch device the model and probe windows run on; cpu is enough since only a handful of windows are evaluated",
+        "checkpoint_name": "Checkpoint filename loaded from each run directory and used as the run-discovery marker",
+        "output_subdir": "Name of the output directory created inside each run directory for the gradient cube, summary JSON, figures and markdown report",
+        "window": "Side length in pixels of the square probe window cut around each probe pixel; must fit inside the split region and bound all mass_windows",
+        "n_azimuth_probes": "Number of probe pixels along azimuth, spread evenly across the split region with a window/2 margin",
+        "n_range_probes": "Number of probe pixels along range, spread evenly across the split region with a window/2 margin",
+        "mass_windows": "Side lengths of the centred sub-windows the cumulative gradient-mass ladder is reported for; each must not exceed window",
+        "figure_style": "PlotBase figure style the ERF heatmap and mass curve are rendered with (report or paper)"
+      }
     }
   }
 }

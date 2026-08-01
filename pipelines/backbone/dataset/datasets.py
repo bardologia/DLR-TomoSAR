@@ -117,6 +117,10 @@ class PatchDataset(Dataset):
 
         return self.normalizer.normalize_output(gt_params)
 
+    def assemble_window(self, complex_window: np.ndarray, dem_window: Optional[np.ndarray] = None) -> np.ndarray:
+        input_tensor = self._build_input_tensor(complex_window, dem_window)
+        return self._normalize_input_tensor(input_tensor)
+
     def __len__(self) -> int:
         return self.grid.grid.number_of_patches
 

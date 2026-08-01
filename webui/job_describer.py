@@ -175,6 +175,11 @@ class JobDescriber:
             ("root",       "runs_dir",            "opt_tail"),
             ("checkpoint", "checkpoint_filename", "text"),
         ],
+        "measure_receptive_field": [
+            ("runs",   "run_filter", "list", "all runs"),
+            ("root",   "runs_dir",   "opt_tail"),
+            ("window", "window",     "text"),
+        ],
         "export_tensorboard_plots": [
             ("runs", "run_filter", "list", "all runs"),
             ("root", "runs_dir",   "opt_tail"),
