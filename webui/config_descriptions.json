@@ -2455,6 +2455,20 @@
         "render_amp_floor": "Amplitude floor below which predicted Gaussians are dropped before rendering the occlusion comparison curves, matching the inference render floor",
         "figure_style": "PlotBase figure style the bar charts are rendered with (report or paper)"
       }
+    },
+    "diagnostics::AttentionCaptureConfig": {
+      "summary": "Entry config that captures attention-gate maps and attention weights of one or more trained attention-based backbone runs on one real batch, with per-layer entropy and peak statistics written into each run directory",
+      "fields": {
+        "runs_dir": "Root directory scanned recursively for run directories holding the configured checkpoint file; each selected run is captured in sequence",
+        "run_filter": "Run directory names (or names of parent directories whose nested runs are expanded) to capture; empty selects interactively on a TTY and every discovered run otherwise",
+        "split": "Dataset split the capture batch is drawn from",
+        "device": "Torch device the model and batch run on during capture",
+        "checkpoint_name": "Checkpoint filename loaded from each run directory and used as the run-discovery marker",
+        "output_subdir": "Name of the output directory created inside each run directory for the JSON, gate figures and markdown report",
+        "batch_size": "Number of real patches in the single capture batch",
+        "max_gate_figures": "Maximum number of attention-gate maps rendered as individual figures",
+        "figure_style": "PlotBase figure style the figures are rendered with (report or paper)"
+      }
     }
   }
 }

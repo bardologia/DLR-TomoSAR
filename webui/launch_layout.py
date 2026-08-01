@@ -1277,6 +1277,26 @@ class LaunchLayout:
                 ]},
             ],
         },
+        "capture_attention": {
+            "sections": [
+                {"key": "config", "title": "Configuration", "panels": [
+                    {"kind": "fields", "groups": [
+                        {"title": "Runs", "fields": [
+                            "runs_dir",
+                            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir", "checkpointOnly": True}},
+                            "checkpoint_name",
+                            "output_subdir",
+                        ]},
+                        {"title": "Capture", "fields": [
+                            "split",
+                            "device",
+                            {"path": "batch_size", "widget": {"kind": "number", "min": 1, "max": 64, "step": 1}},
+                        ]},
+                        {"title": "Figures", "fields": ["max_gate_figures", "figure_style"]},
+                    ]},
+                ]},
+            ],
+        },
         "attribute_inputs": {
             "sections": [
                 {"key": "config", "title": "Configuration", "panels": [

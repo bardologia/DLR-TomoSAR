@@ -189,6 +189,10 @@ class JobDescriber:
             ("runs", "run_filter", "list", "all runs"),
             ("root", "runs_dir",   "opt_tail"),
         ],
+        "capture_attention": [
+            ("runs", "run_filter", "list", "all runs"),
+            ("root", "runs_dir",   "opt_tail"),
+        ],
         "export_tensorboard_plots": [
             ("runs", "run_filter", "list", "all runs"),
             ("root", "runs_dir",   "opt_tail"),

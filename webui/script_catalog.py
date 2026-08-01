@@ -157,6 +157,11 @@ class ScriptCatalog:
             "category"  : "Analysis",
             "purpose"   : "Attribute the predictions of trained backbone runs to their input channels. Gradient attribution shares |∂ output/∂ input| across channels per output family (amp, mu, sigma) on probe windows, and an occlusion pass zeroes one normalized channel at a time to measure the prediction shift. Answers which tracks and which channel kinds (amplitude vs interferometric phase vs DEM) the model actually uses.",
         },
+        "capture_attention": {
+            "title"     : "Capture Attention",
+            "category"  : "Analysis",
+            "purpose"   : "Capture the attention of trained attention-based backbone runs on one real batch. Records attention-gate maps (attention UNet), shared-block attention weights (Swin, TransUNet, UNETR and friends) and torch multi-head attention (SegFormer), then reports per-layer entropy and peak concentration plus gate-map figures. Refuses runs whose model holds no attention module.",
+        },
         "export_tensorboard_plots": {
             "title"     : "Export TensorBoard Plots",
             "category"  : "Analysis",

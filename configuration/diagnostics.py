@@ -256,3 +256,19 @@ class InputAttributionConfig:
     render_amp_floor : float = 0.0
 
     figure_style : str = "report"
+
+
+@dataclass
+class AttentionCaptureConfig:
+    runs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
+    run_filter : List[str] = field(default_factory=list)
+
+    split           : str = "test"
+    device          : str = "cpu"
+    checkpoint_name : str = "best_model.pt"
+    output_subdir   : str = "attention_capture"
+
+    batch_size       : int = 4
+    max_gate_figures : int = 8
+
+    figure_style : str = "report"

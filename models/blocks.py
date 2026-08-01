@@ -492,6 +492,23 @@ class Decoder(nn.Module):
         return x
 
 
+class AttentionTap:
+    _sink = None
+
+    @classmethod
+    def enable(cls, sink: list) -> None:
+        cls._sink = sink
+
+    @classmethod
+    def disable(cls) -> None:
+        cls._sink = None
+
+    @classmethod
+    def record(cls, weights) -> None:
+        if cls._sink is not None:
+            cls._sink.append(weights.detach().cpu())
+
+
 def scaled_dot_product(query, key, value, scale, attention_dropout, attention_bias=None):
     attention_weights = (query @ key.transpose(-2, -1)) * scale
 
@@ -499,6 +516,7 @@ def scaled_dot_product(query, key, value, scale, attention_dropout, attention_bi
         attention_weights = attention_weights + attention_bias
 
     attention_weights = attention_weights.softmax(dim=-1)
+    AttentionTap.record(attention_weights)
     attention_weights = attention_dropout(attention_weights)
 
     return attention_weights @ value
