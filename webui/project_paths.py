@@ -113,6 +113,7 @@ class ProjectPaths:
         "xray_weights"                    : "analysis",
         "xray_activations"                : "analysis",
         "measure_receptive_field"         : "analysis",
+        "attribute_inputs"                : "analysis",
         "export_tensorboard_plots"        : "analysis",
         "collect_reports"                 : "analysis",
     }

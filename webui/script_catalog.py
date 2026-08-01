@@ -152,6 +152,11 @@ class ScriptCatalog:
             "category"  : "Analysis",
             "purpose"   : "Measure the effective receptive field of trained backbone runs on real data. Probe pixels spread across the split region, backpropagate the centre-pixel output magnitude to the input window, and report ERF sigma per axis, the cumulative gradient-mass ladder, a log-scale ERF heatmap, and a markdown report inside each run directory.",
         },
+        "attribute_inputs": {
+            "title"     : "Attribute Inputs",
+            "category"  : "Analysis",
+            "purpose"   : "Attribute the predictions of trained backbone runs to their input channels. Gradient attribution shares |∂ output/∂ input| across channels per output family (amp, mu, sigma) on probe windows, and an occlusion pass zeroes one normalized channel at a time to measure the prediction shift. Answers which tracks and which channel kinds (amplitude vs interferometric phase vs DEM) the model actually uses.",
+        },
         "export_tensorboard_plots": {
             "title"     : "Export TensorBoard Plots",
             "category"  : "Analysis",

@@ -185,6 +185,10 @@ class JobDescriber:
             ("root",    "runs_dir",    "opt_tail"),
             ("batches", "max_batches", "text"),
         ],
+        "attribute_inputs": [
+            ("runs", "run_filter", "list", "all runs"),
+            ("root", "runs_dir",   "opt_tail"),
+        ],
         "export_tensorboard_plots": [
             ("runs", "run_filter", "list", "all runs"),
             ("root", "runs_dir",   "opt_tail"),

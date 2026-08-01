@@ -1,22 +1,16 @@
 from __future__ import annotations
 
-from pathlib import Path
-from types   import SimpleNamespace
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
 import torch
 
-from configuration.diagnostics                    import ReceptiveFieldConfig
-from pipelines.backbone.inference.receptive_field import ErfComputation, RunReceptiveField
+from pipelines.backbone.inference.probes          import ProbeWindows
+from pipelines.backbone.inference.receptive_field import ErfComputation
 
 
 WINDOW = 16
-
-
-class _SilentLogger:
-    def __getattr__(self, name):
-        return lambda *args, **kwargs: None
 
 
 class _ConvModel(torch.nn.Module):
@@ -73,11 +67,12 @@ def test_mass_windows_exceeding_the_probe_window_raise():
         ErfComputation(_ConvModel(3), WINDOW, [8, 32])
 
 
-def test_probe_centers_keep_the_window_margin(tmp_path):
-    config   = ReceptiveFieldConfig(window=8, n_azimuth_probes=3, n_range_probes=2)
-    analysis = RunReceptiveField(tmp_path, config, _SilentLogger())
+def _region_run(n_az: int, n_rg: int) -> SimpleNamespace:
+    return SimpleNamespace(split_region=SimpleNamespace(azimuth_size=n_az, range_size=n_rg))
 
-    centers = analysis._probe_centers(32, 20)
+
+def test_probe_centers_keep_the_window_margin():
+    centers = ProbeWindows(_region_run(32, 20), window=8).centers(3, 2)
 
     azs = sorted({az for az, _rg in centers})
     rgs = sorted({rg for _az, rg in centers})
@@ -87,9 +82,6 @@ def test_probe_centers_keep_the_window_margin(tmp_path):
     assert rgs[0] >= 4 and rgs[-1] <= 15
 
 
-def test_probe_centers_raise_when_the_region_is_too_small(tmp_path):
-    config   = ReceptiveFieldConfig(window=64)
-    analysis = RunReceptiveField(tmp_path, config, _SilentLogger())
-
+def test_probe_centers_raise_when_the_region_is_too_small():
     with pytest.raises(ValueError):
-        analysis._probe_centers(32, 200)
+        ProbeWindows(_region_run(32, 200), window=64).centers(2, 2)

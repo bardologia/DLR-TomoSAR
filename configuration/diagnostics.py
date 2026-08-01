@@ -234,3 +234,25 @@ class ActivationXrayConfig:
     make_plots           : bool = True
     max_layer_histograms : int  = 12
     figure_style         : str  = "report"
+
+
+@dataclass
+class InputAttributionConfig:
+    runs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
+    run_filter : List[str] = field(default_factory=list)
+
+    split           : str = "test"
+    device          : str = "cpu"
+    checkpoint_name : str = "best_model.pt"
+    output_subdir   : str = "input_attribution"
+
+    window           : int = 64
+    n_azimuth_probes : int = 4
+    n_range_probes   : int = 3
+
+    occlude          : bool  = True
+    batch_size       : int   = 8
+    max_batches      : int   = 2
+    render_amp_floor : float = 0.0
+
+    figure_style : str = "report"

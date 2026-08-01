@@ -10,6 +10,7 @@ import torch
 
 from configuration.diagnostics             import ReceptiveFieldConfig
 from pipelines.backbone.inference.loader   import RunLoader
+from pipelines.backbone.inference.probes   import ProbeWindows
 from tools.data.io                         import FileIO
 from tools.reporting.markdown              import MarkdownDoc, MarkdownTable
 from tools.reporting.plotting              import PlotBase
@@ -122,28 +123,6 @@ class RunReceptiveField:
             checkpoint_name = self.config.checkpoint_name,
         )
 
-    def _probe_centers(self, n_az: int, n_rg: int) -> list[tuple[int, int]]:
-        half = self.config.window // 2
-        if n_az < self.config.window or n_rg < self.config.window:
-            raise ValueError(f"Split region {n_az}x{n_rg} is smaller than the {self.config.window}px probe window; choose a smaller window or a larger split")
-
-        az_centers = np.linspace(half, n_az - half - 1, self.config.n_azimuth_probes).round().astype(int)
-        rg_centers = np.linspace(half, n_rg - half - 1, self.config.n_range_probes).round().astype(int)
-
-        return [(int(az), int(rg)) for az in az_centers for rg in rg_centers]
-
-    def _assemble_windows(self, run, centers: list[tuple[int, int]]) -> torch.Tensor:
-        half    = self.config.window // 2
-        dem     = run.dataset.dem
-        windows = []
-
-        for az, rg in centers:
-            complex_window = run.complex_inputs[:, az - half:az + half, rg - half:rg + half]
-            dem_window     = dem[az - half:az + half, rg - half:rg + half] if dem is not None else None
-            windows.append(run.dataset.assemble_window(complex_window, dem_window))
-
-        return torch.from_numpy(np.stack(windows)).float()
-
     def _write_summary(self, run, centers, sigma_az: float, sigma_rg: float, masses: dict[int, float]) -> Path:
         payload = {
             "backbone"        : run.backbone_name,
@@ -184,10 +163,9 @@ class RunReceptiveField:
         PlotBase.use_style(self.config.figure_style)
 
         run     = self._load_run()
-        n_az    = run.split_region.azimuth_size
-        n_rg    = run.split_region.range_size
-        centers = self._probe_centers(n_az, n_rg)
-        windows = self._assemble_windows(run, centers)
+        probes  = ProbeWindows(run, self.config.window)
+        centers = probes.centers(self.config.n_azimuth_probes, self.config.n_range_probes)
+        windows = probes.assemble(centers)
 
         erf  = ErfComputation(run.model.module, self.config.window, self.config.mass_windows)
         grad = erf.gradient_map(windows)

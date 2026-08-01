@@ -3,8 +3,8 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-from pipelines.backbone.inference.predictor import CubeStitcher, Predictor
-from tools.data.gaussians                   import GaussianReconstructor
+from pipelines.backbone.inference.predictor import CubeStitcher
+from pipelines.backbone.inference.probes    import PredictionCurves
 
 
 class FlipConsistencyEvaluator:
@@ -12,20 +12,13 @@ class FlipConsistencyEvaluator:
     FLIP_AXES = {"azimuth": 2, "range": 3}
 
     def __init__(self, run, logger, *, window_kind: str, render_amp_floor: float = 0.0) -> None:
-        self.loaded           = run
-        self.logger           = logger
-        self.window_kind      = window_kind
-        self.render_amp_floor = float(render_amp_floor)
+        self.loaded      = run
+        self.logger      = logger
+        self.window_kind = window_kind
+        self.renderer    = PredictionCurves(run.n_gaussians, run.x_axis, render_amp_floor)
 
     def _curves(self, params: np.ndarray) -> np.ndarray:
-        n_K        = self.loaded.n_gaussians
-        B, _, H, W = params.shape
-
-        x     = np.asarray(self.loaded.x_axis, dtype=np.float32).reshape(1, 1, -1, 1, 1)
-        gauss = params[:, :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
-        gauss = Predictor._render_masked(gauss, self.render_amp_floor)
-
-        return GaussianReconstructor.reconstruct_batch(gauss, x)
+        return self.renderer.render(params)
 
     def _flipped_params(self, images: torch.Tensor, axis: int) -> np.ndarray:
         flipped = torch.flip(images, dims=[axis])
