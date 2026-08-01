@@ -9,6 +9,7 @@ import numpy as np
 from configuration.inference                         import InferenceConfig
 from pipelines.backbone.inference.data_consistency   import DataConsistencyEvaluator
 from pipelines.backbone.inference.figures            import FigureComposer
+from pipelines.backbone.inference.normalization_audit import NormalizationAudit
 from pipelines.backbone.inference.loader             import RunLoader
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 from pipelines.backbone.inference.metrics            import Metrics
@@ -208,6 +209,21 @@ class InferencePipeline:
 
         logger.subsection(f"Label quality : mean fit R² = {stats['label_r2_mean']:.4f}, {stats['label_r2_frac_below_05'] * 100.0:.1f}% of labels below R² 0.5")
 
+    def _audit_normalization(self, meta: InferenceMetadata, run, result, global_metrics: dict, logger: Logger) -> None:
+        logger.section("[Inference: Normalization Audit]")
+
+        stats = NormalizationAudit(run, result).run()
+        global_metrics.update(stats)
+        Metrics.write_json(global_metrics, meta.metrics_path)
+
+        logger.subsection(
+            f"Input drift : worst |mean| {stats['norm_in_worst_abs_mean']:.3f}, worst |std-1| {stats['norm_in_worst_std_dev']:.3f}, "
+            f"overflow {stats['norm_in_overflow_frac'] * 100.0:.3f}%"
+        )
+
+        if "clamp_amp_ceil_frac" in stats:
+            logger.subsection(f"Clamp hits  : amp ceil {stats['clamp_amp_ceil_frac'] * 100.0:.2f}%, sigma floor {stats['clamp_sigma_floor_frac'] * 100.0:.2f}%, mu out of axis {stats['clamp_mu_out_of_axis_frac'] * 100.0:.2f}%")
+
     def _compose_figures(self, composer: FigureComposer, result, run, global_metrics: dict, x_axis_np: np.ndarray, indices: dict) -> Dict[str, List[Path]]:
         return composer.compose(
             result         = result,
@@ -259,6 +275,7 @@ class InferencePipeline:
         self._synthesize_reduced(cfg, meta, run, result, x_axis_np, global_metrics, indices, logger)
         self._evaluate_data_consistency(cfg, meta, run, result, x_axis_np, global_metrics, logger)
         self._evaluate_label_quality(cfg, meta, run, result, x_axis_np, global_metrics, logger)
+        self._audit_normalization(meta, run, result, global_metrics, logger)
 
         figure_paths = {}
         gif_paths    = {}

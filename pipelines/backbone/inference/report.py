@@ -600,6 +600,7 @@ class Report:
         ("3.11 Interferometric data consistency",                lambda k: k.startswith(("physics_", "phase_agreement_"))),
         ("3.12 JEPA embedding diagnostics",                      lambda k: k.startswith("jepa_")),
         ("3.13 Label quality (GT fit vs raw tomogram)",          lambda k: k.startswith("label_")),
+        ("3.14 Normalization & clamp health",                    lambda k: k.startswith(("norm_in_", "clamp_"))),
         ("3.10 Matched Gaussian errors (permutation-invariant)", lambda k: k.startswith("matched_")),
         ("3.9b Per-slot parameter statistics by activity",       lambda k: k.startswith("slot_") and ("_amp_" in k or "_mu_" in k or "_sig_" in k)),
         ("3.9 Slot occupancy & active count",                    lambda k: k.startswith(("active_frac", "active_count", "count_")) or (k.startswith("slot_") and "_active_" in k)),

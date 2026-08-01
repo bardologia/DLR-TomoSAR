@@ -221,7 +221,7 @@ def test_report_metric_sections_render_in_display_order():
 
     assert titles[0]  == "3.1 Dataset statistics"
     assert titles[4]  == "3.4b SSIM summaries (normalised)"
-    assert titles[-1] == "3.13 Label quality (GT fit vs raw tomogram)"
+    assert titles[-1] == "3.14 Normalization & clamp health"
 
 
 def test_report_is_per_slice_ssim_classifier():
