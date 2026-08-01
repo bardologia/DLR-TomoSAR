@@ -188,6 +188,26 @@ class InferencePipeline:
             np.save(meta.cube_dir / "physics_covariance_error.npy", consistency.covariance_error_map)
             np.save(meta.cube_dir / "physics_valid_mask.npy",       consistency.valid_mask)
 
+    def _evaluate_label_quality(self, cfg: InferenceConfig, meta: InferenceMetadata, run, result, x_axis_np: np.ndarray, global_metrics: dict, logger: Logger) -> None:
+        if run.full_curves is None:
+            logger.section("[Inference: Label Quality skipped]")
+            logger.subsection("No raw tomogram was loaded for this run; the label-quality R² map is absent from metrics, figures, and report.")
+            global_metrics["label_quality_status"] = "skipped: no raw tomogram loaded"
+            Metrics.write_json(global_metrics, meta.metrics_path)
+            return
+
+        r2_map, stats = Metrics(result, x_axis_np, run.n_gaussians).label_quality(run.full_curves)
+
+        result.label_r2 = r2_map
+        global_metrics["label_quality_status"] = "computed"
+        global_metrics.update(stats)
+        Metrics.write_json(global_metrics, meta.metrics_path)
+
+        if cfg.save_cubes:
+            np.save(meta.cube_dir / "label_r2.npy", r2_map)
+
+        logger.subsection(f"Label quality : mean fit R² = {stats['label_r2_mean']:.4f}, {stats['label_r2_frac_below_05'] * 100.0:.1f}% of labels below R² 0.5")
+
     def _compose_figures(self, composer: FigureComposer, result, run, global_metrics: dict, x_axis_np: np.ndarray, indices: dict) -> Dict[str, List[Path]]:
         return composer.compose(
             result         = result,
@@ -238,6 +258,7 @@ class InferencePipeline:
         self._evaluate_embeddings(meta, run, global_metrics, logger)
         self._synthesize_reduced(cfg, meta, run, result, x_axis_np, global_metrics, indices, logger)
         self._evaluate_data_consistency(cfg, meta, run, result, x_axis_np, global_metrics, logger)
+        self._evaluate_label_quality(cfg, meta, run, result, x_axis_np, global_metrics, logger)
 
         figure_paths = {}
         gif_paths    = {}

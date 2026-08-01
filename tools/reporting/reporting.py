@@ -63,6 +63,7 @@ class MetricSectionGrouper:
         ("Per-Elevation-Bin Aggregates", re.compile(r"^elev_")),
         ("Slot Occupancy",               re.compile(r"^slot_")),
         ("Matched Gaussian (Permutation-Invariant)", re.compile(r"^matched_")),
+        ("Label Quality",                re.compile(r"^label_")),
     ]
 
     LEFTOVER_TITLE = "Other Metrics"

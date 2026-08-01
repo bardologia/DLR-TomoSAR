@@ -125,6 +125,9 @@ class FigureComposer:
             ("pixel_peak_map", "peak_error", result.pixel_peak_err_idx.astype(np.float32), "Peak-location absolute error (denorm)", "|Δ peak idx|", {"cmap": cfg.cmap_error}),
         ]
 
+        if result.label_r2 is not None:
+            pixel_map_specs.append(("label_r2_map", "label_r2", result.label_r2, "Label fit R² (GT curves vs raw tomogram)", "R²", {"cmap": "RdYlGn", "q_low": 2.0, "q_high": 98.0}))
+
         for key, fname, data, title, label, extra in pixel_map_specs:
             figure_paths[key] = [slice_plotter.plot_pixel_metric_map(
                 metric_map = data,

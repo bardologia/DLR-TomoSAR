@@ -110,6 +110,7 @@ class CubeExplorer:
         "seed_std_amp"             : "seed std amp",
         "seed_std_mu"              : "seed std mu",
         "seed_std_sigma"           : "seed std sigma",
+        "label_r2"                 : "label R2",
     }
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:

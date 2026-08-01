@@ -47,6 +47,7 @@ class Result:
     params_gt        : Optional[np.ndarray]        = None
     reduced          : Optional[ReducedComparison] = None
     data_consistency : Optional[object]            = None
+    label_r2         : Optional[np.ndarray]        = None
 
 
 class Metrics:
@@ -552,3 +553,25 @@ class Metrics:
             improvement    = improvement,
             metrics        = out,
         )
+
+    def label_quality(self, full_curves: np.ndarray) -> Tuple[np.ndarray, Dict[str, float]]:
+        gt   = np.asarray(self.result.gt_curves, dtype=np.float64)
+        full = np.asarray(full_curves,           dtype=np.float64)
+
+        if gt.shape != full.shape:
+            raise ValueError(f"GT curves {gt.shape} and raw tomogram {full.shape} disagree in shape; the label-quality map needs both on the same region and elevation axis")
+
+        r2_map = R2.pixel_map(gt, full, axis=0)
+        finite = r2_map[np.isfinite(r2_map)]
+
+        if not finite.size:
+            raise ValueError("Label-quality R² map holds no finite value; the GT curves or the raw tomogram are degenerate on this region")
+
+        stats = {
+            "label_r2_mean"          : float(finite.mean()),
+            "label_r2_median"        : float(np.median(finite)),
+            "label_r2_p05"           : float(np.percentile(finite, 5.0)),
+            "label_r2_frac_below_05" : float((finite < 0.5).mean()),
+        }
+
+        return r2_map.astype(np.float32), stats

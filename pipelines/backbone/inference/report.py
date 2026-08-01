@@ -599,6 +599,7 @@ class Report:
         ("3.1 Dataset statistics",                               lambda k: k in Report._DATASET_KEYS or k.endswith("_status")),
         ("3.11 Interferometric data consistency",                lambda k: k.startswith(("physics_", "phase_agreement_"))),
         ("3.12 JEPA embedding diagnostics",                      lambda k: k.startswith("jepa_")),
+        ("3.13 Label quality (GT fit vs raw tomogram)",          lambda k: k.startswith("label_")),
         ("3.10 Matched Gaussian errors (permutation-invariant)", lambda k: k.startswith("matched_")),
         ("3.9b Per-slot parameter statistics by activity",       lambda k: k.startswith("slot_") and ("_amp_" in k or "_mu_" in k or "_sig_" in k)),
         ("3.9 Slot occupancy & active count",                    lambda k: k.startswith(("active_frac", "active_count", "count_")) or (k.startswith("slot_") and "_active_" in k)),
@@ -697,10 +698,15 @@ class Report:
             ("pixel_mse_map",       "5.1 MSE map (log scale, pred vs GT)"),
             ("pixel_r2_map",        "5.2 R\u00b2 map (pred vs GT)"),
             ("pixel_peak_map",      "5.3 Peak-location error map (|\u0394 peak index|)"),
-            ("metric_histograms",   "5.4 Metric distributions"),
+            ("label_r2_map",        "5.4 Label fit R\u00b2 map (GT curves vs raw tomogram)"),
+            ("metric_histograms",   "5.5 Metric distributions"),
         )
         if any(fp.get(key) for key, _title in pixel_groups):
             out.append("\n## 5. Per-pixel metric maps\n")
+            out.append(
+                "5.4 scores the labels themselves: the R\u00b2 of the fitted GT Gaussians against the raw Capon tomogram profile, "
+                "so low-R\u00b2 areas in the model error maps above can be read against low label quality rather than model failure.\n"
+            )
             self._section(out, pixel_groups)
 
         param_groups = (

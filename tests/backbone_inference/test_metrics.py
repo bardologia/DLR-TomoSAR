@@ -455,3 +455,36 @@ def test_reduced_comparison_identical_reduced_zero_improvement(parameters):
 
     assert comp.metrics["improvement_pixel_mse_mean"] == pytest.approx(0.0, abs=1e-6)
     assert comp.reduced_norm.shape == gt.shape
+
+
+def test_label_quality_perfect_fit_gives_r2_one():
+    rng    = np.random.default_rng(0)
+    curves = rng.uniform(0.5, 2.0, size=(N_ELEV, 4, 3)).astype(np.float32)
+    result = _make_result(curves, curves)
+
+    r2_map, stats = Metrics(result, _x_axis(), N_GAUSSIANS).label_quality(curves.copy())
+
+    assert r2_map.shape == (4, 3)
+    assert np.allclose(r2_map, 1.0, atol=1e-5)
+    assert stats["label_r2_mean"]          == pytest.approx(1.0, abs=1e-5)
+    assert stats["label_r2_frac_below_05"] == pytest.approx(0.0)
+
+
+def test_label_quality_noisier_labels_score_lower():
+    rng   = np.random.default_rng(1)
+    raw   = rng.uniform(0.5, 2.0, size=(N_ELEV, 4, 3)).astype(np.float32)
+    clean = raw + rng.normal(0.0, 0.01, size=raw.shape).astype(np.float32)
+    noisy = raw + rng.normal(0.0, 0.60, size=raw.shape).astype(np.float32)
+
+    _map_clean, stats_clean = Metrics(_make_result(clean, clean), _x_axis(), N_GAUSSIANS).label_quality(raw)
+    _map_noisy, stats_noisy = Metrics(_make_result(noisy, noisy), _x_axis(), N_GAUSSIANS).label_quality(raw)
+
+    assert stats_clean["label_r2_mean"] > stats_noisy["label_r2_mean"]
+
+
+def test_label_quality_shape_mismatch_raises():
+    curves = np.ones((N_ELEV, 4, 3), dtype=np.float32)
+    result = _make_result(curves, curves)
+
+    with pytest.raises(ValueError):
+        Metrics(result, _x_axis(), N_GAUSSIANS).label_quality(np.ones((N_ELEV, 5, 3), dtype=np.float32))
