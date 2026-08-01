@@ -122,7 +122,7 @@ class Logger:
     LOG_LEVELS      = {name: getattr(logging, name) for name in ("DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL")}
     FILE_RULE_WIDTH = 100
 
-    def __init__(self, log_dir: str = "logs", name: str = "experiment", level: str = "INFO", config: Any = None) -> None:
+    def __init__(self, log_dir: str = "logs", name: str = "experiment", level: str = "INFO", config: Any = None, file_mode: str = "w") -> None:
         self.log_dir    = log_dir
         self.name       = name
         self.start_time = datetime.now()
@@ -161,7 +161,7 @@ class Logger:
         self._file_handler: Optional[logging.FileHandler] = None
         if log_dir:
             file_formatter = logging.Formatter('[%(asctime)s] [%(levelname)s] %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-            file_handler   = logging.FileHandler(os.path.join(self.log_dir, f'{name}.log'), mode='w', encoding='utf-8')
+            file_handler   = logging.FileHandler(os.path.join(self.log_dir, f'{name}.log'), mode=file_mode, encoding='utf-8')
             file_handler.setFormatter(file_formatter)
             file_handler.setLevel(log_level)
             self.logger.addHandler(file_handler)
@@ -256,6 +256,16 @@ class Logger:
 
     def render(self, renderable: Any) -> None:
         self.console.print(renderable)
+
+        if self._file_handler is None:
+            return
+
+        capture = Console(width=self.FILE_RULE_WIDTH, no_color=True, force_terminal=False, theme=_THEME)
+        with capture.capture() as captured:
+            capture.print(renderable)
+
+        for line in captured.get().rstrip("\n").split("\n"):
+            self._to_file(f"      {line.rstrip()}")
 
     def panel(self, body: Any, title: Optional[str] = None, style: str = "cyan") -> None:
         self.console.print(Panel(body, title=title, border_style=style))
