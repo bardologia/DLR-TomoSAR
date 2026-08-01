@@ -63,6 +63,95 @@ class ParamSampler:
         self._counts = {name: 0  for name in self.PARAM_NAMES}
 
 
+class SlotVitals:
+
+    def __init__(self, params_per_gaussian: int, amp_zero_thr: float):
+        self.ppg    = params_per_gaussian
+        self.thr    = amp_zero_thr
+        self.active = False
+
+        self._reset_val()
+        self._reset_grad()
+
+    def begin(self) -> None:
+        self.active = True
+        self._reset_val()
+
+    @torch.no_grad()
+    def observe(self, pred_params_phys: torch.Tensor) -> None:
+        if not self.active:
+            return
+
+        B, C, H, W = pred_params_phys.shape
+        p          = pred_params_phys.reshape(B, C // self.ppg, self.ppg, H, W)
+        amp        = p[:, :, 0]
+        active     = amp > self.thr
+
+        counts = active.sum(dim=(0, 2, 3)).detach().float().cpu()
+        amps   = (amp * active).sum(dim=(0, 2, 3)).detach().float().cpu()
+
+        if self._active_count is None:
+            self._active_count = counts
+            self._amp_sum      = amps
+        else:
+            self._active_count += counts
+            self._amp_sum      += amps
+
+        self._n_pixels += B * H * W
+
+    def observe_gradient(self, grad: torch.Tensor) -> None:
+        B, C, H, W = grad.shape
+        g          = grad.detach().reshape(B, C // self.ppg, self.ppg, H, W)
+        norms      = g.pow(2).sum(dim=(0, 2, 3, 4)).sqrt().float().cpu()
+
+        if self._grad_sum is None:
+            self._grad_sum = norms
+        else:
+            self._grad_sum += norms
+
+        self._grad_batches += 1
+
+    def scalars(self) -> dict:
+        if self._active_count is None or self._n_pixels == 0:
+            return {}
+
+        fractions = self._active_count / self._n_pixels
+        out       = {f"slot_vitals/active_frac/slot_{k}": float(fractions[k]) for k in range(fractions.numel())}
+
+        for k in range(fractions.numel()):
+            n_active = float(self._active_count[k])
+            out[f"slot_vitals/amp_mean/slot_{k}"] = float(self._amp_sum[k]) / n_active if n_active > 0 else 0.0
+
+        usage = self._active_count / self._active_count.sum().clamp_min(1.0)
+        ent   = -(usage.clamp_min(1e-12) * usage.clamp_min(1e-12).log()).sum()
+        out["slot_vitals/usage_entropy"] = float(ent / torch.log(torch.tensor(float(max(usage.numel(), 2)))))
+
+        return out
+
+    def gradient_scalars(self) -> dict:
+        if self._grad_sum is None or self._grad_batches == 0:
+            return {}
+
+        means = self._grad_sum / self._grad_batches
+        out   = {f"slot_vitals/grad_norm/slot_{k}": float(means[k]) for k in range(means.numel())}
+
+        self._reset_grad()
+        return out
+
+    def end(self) -> None:
+        self.active = False
+        self._reset_val()
+
+    def _reset_val(self) -> None:
+        self._active_count = None
+        self._amp_sum      = None
+        self._n_pixels     = 0
+
+    def _reset_grad(self) -> None:
+        self._grad_sum     = None
+        self._grad_batches = 0
+
+
 class ExampleSelector:
     CANDIDATES_PER_BATCH = 256
     QUANTILES            = (0.1, 0.5, 0.9)

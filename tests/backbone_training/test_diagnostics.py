@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from pipelines.backbone.training.diagnostics import ExampleSelector, ParamSampler, ReconstructionFigures
+from pipelines.backbone.training.diagnostics import ExampleSelector, ParamSampler, ReconstructionFigures, SlotVitals
 from tests.backbone_training._helpers        import build_loss, valid_param_tensor
 
 
@@ -263,3 +263,77 @@ def test_figures_disable_when_no_category_matches():
 
     assert figs._disabled is True
     assert tracker.figures == []
+
+
+def _vitals(n_k: int = 2) -> "SlotVitals":
+    return SlotVitals(params_per_gaussian=3, amp_zero_thr=1e-3)
+
+
+def _phys(amps: list[float], H: int = 2, W: int = 2) -> torch.Tensor:
+    n_k  = len(amps)
+    phys = torch.zeros(1, n_k * 3, H, W)
+
+    for k, amp in enumerate(amps):
+        phys[:, 3 * k]     = amp
+        phys[:, 3 * k + 1] = 10.0
+        phys[:, 3 * k + 2] = 3.0
+
+    return phys
+
+
+def test_slot_vitals_inactive_until_begin():
+    vitals = _vitals()
+    vitals.observe(_phys([1.0, 1.0]))
+
+    assert vitals.scalars() == {}
+
+
+def test_slot_vitals_active_fractions_and_amp_means():
+    vitals = _vitals()
+    vitals.begin()
+    vitals.observe(_phys([2.0, 0.0]))
+
+    scalars = vitals.scalars()
+
+    assert scalars["slot_vitals/active_frac/slot_0"] == pytest.approx(1.0)
+    assert scalars["slot_vitals/active_frac/slot_1"] == pytest.approx(0.0)
+    assert scalars["slot_vitals/amp_mean/slot_0"]    == pytest.approx(2.0)
+    assert scalars["slot_vitals/amp_mean/slot_1"]    == pytest.approx(0.0)
+
+
+def test_slot_vitals_entropy_is_low_when_one_slot_dominates():
+    balanced = _vitals()
+    balanced.begin()
+    balanced.observe(_phys([1.0, 1.0]))
+
+    collapsed = _vitals()
+    collapsed.begin()
+    collapsed.observe(_phys([1.0, 0.0]))
+
+    assert balanced.scalars()["slot_vitals/usage_entropy"]  == pytest.approx(1.0)
+    assert collapsed.scalars()["slot_vitals/usage_entropy"] == pytest.approx(0.0, abs=1e-6)
+
+
+def test_slot_vitals_accumulates_gradient_norms_per_slot():
+    vitals = _vitals()
+
+    grad          = torch.zeros(1, 6, 2, 2)
+    grad[:, 0:3]  = 3.0
+
+    vitals.observe_gradient(grad)
+    vitals.observe_gradient(grad)
+
+    scalars = vitals.gradient_scalars()
+
+    assert scalars["slot_vitals/grad_norm/slot_0"] == pytest.approx((9.0 * 12) ** 0.5)
+    assert scalars["slot_vitals/grad_norm/slot_1"] == pytest.approx(0.0)
+    assert vitals.gradient_scalars() == {}
+
+
+def test_slot_vitals_end_resets_validation_state():
+    vitals = _vitals()
+    vitals.begin()
+    vitals.observe(_phys([1.0, 1.0]))
+    vitals.end()
+
+    assert vitals.scalars() == {}

@@ -6,7 +6,7 @@ from torch.utils.data import DataLoader
 from pipelines.backbone.training.loss        import Loss
 from pipelines.backbone.training.loss_probe  import LossScaleProbe
 from pipelines.backbone.training.docs        import TrainingDocs
-from pipelines.backbone.training.diagnostics import ParamSampler, ReconstructionFigures
+from pipelines.backbone.training.diagnostics import ParamSampler, ReconstructionFigures, SlotVitals
 from tools.training                          import BaseTrainer
 
 
@@ -71,6 +71,7 @@ class Trainer(BaseTrainer):
         self.norm_stats       = norm_stats
         self.emit_docs        = emit_docs
         self.param_sampler    = ParamSampler(config.gaussian.params_per_gaussian, self.initial_loss_cfg.amp_zero_thr)
+        self.slot_vitals      = SlotVitals(config.gaussian.params_per_gaussian, self.initial_loss_cfg.amp_zero_thr)
 
         super().__init__(model, config, run_dir, logger, x_axis)
 
@@ -118,7 +119,7 @@ class Trainer(BaseTrainer):
         stage = "curriculum.warmup" if self.curriculum.enabled else "curriculum.complete (curriculum disabled)"
         self.logger.subsection(f"Loss built from {stage}")
 
-        return Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.initial_loss_cfg, norm_stats=self.norm_stats, geometry_cfg=self.config.geometry, log_all_losses=self.config.training.log_all_losses, sampler=self.param_sampler)
+        return Loss(self.x_axis, self.logger, self.tracker, self.gaussian_cfg, self.initial_loss_cfg, norm_stats=self.norm_stats, geometry_cfg=self.config.geometry, log_all_losses=self.config.training.log_all_losses, sampler=self.param_sampler, slot_vitals=self.slot_vitals)
 
     def _warn_nonfinite(self, tensor: torch.Tensor, name: str) -> None:
         if torch.isnan(tensor).any() or torch.isinf(tensor).any():
@@ -138,6 +139,9 @@ class Trainer(BaseTrainer):
         if self.tracker.debug:
             self._warn_nonfinite(pred_params, "model predictions")
 
+        if self.tracker.active and torch.is_tensor(pred_params) and pred_params.requires_grad:
+            pred_params.register_hook(self.slot_vitals.observe_gradient)
+
         return self.criterion(pred_params, gt_params, kz_map)
 
     def _before_training(self, train_loader: DataLoader) -> None:
@@ -156,6 +160,7 @@ class Trainer(BaseTrainer):
             return
 
         self.param_sampler.begin()
+        self.slot_vitals.begin()
         self.recon_figures.capture_reference(val_loader, self.criterion)
 
     def _after_eval(self, val_loss: float, epoch: int) -> None:
@@ -173,7 +178,11 @@ class Trainer(BaseTrainer):
         for name, values in self.param_sampler.histograms().items():
             self.tracker.log_histogram(f"param_hist/{name}/val", values, epoch)
 
+        for name, value in self.slot_vitals.scalars().items():
+            self.tracker.log_scalar(f"{name}/val", value, epoch)
+
         self.param_sampler.end()
+        self.slot_vitals.end()
 
         with self.ema.applied(self.model):
             self.recon_figures.log(self.model, self.criterion, epoch)
@@ -182,6 +191,9 @@ class Trainer(BaseTrainer):
         if self.curriculum.enabled:
             in_complete_phase = float(epoch >= self.curriculum.swap_epoch)
             self.tracker.log_scalar("controls/curriculum_phase", in_complete_phase, epoch)
+
+        for name, value in self.slot_vitals.gradient_scalars().items():
+            self.tracker.log_scalar(f"{name}/train", value, epoch)
 
     def _trial_callback(self, val_loss: float, epoch: int) -> None:
         pass

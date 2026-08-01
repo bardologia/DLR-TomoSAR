@@ -11,7 +11,7 @@ from tools.sar.tomo_geometry                import TomoGeometry
 
 
 class Loss:
-    def __init__(self, x_axis, logger, tracker, gaussian_cfg, loss_cfg, norm_stats, geometry_cfg, log_all_losses=False, sampler=None):
+    def __init__(self, x_axis, logger, tracker, gaussian_cfg, loss_cfg, norm_stats, geometry_cfg, log_all_losses=False, sampler=None, slot_vitals=None):
         self.x_axis          = x_axis
         self.logger          = logger
         self.tracker         = tracker
@@ -21,6 +21,7 @@ class Loss:
         self.norm_stats      = norm_stats
         self.geometry_cfg    = geometry_cfg
         self.sampler         = sampler
+        self.slot_vitals     = slot_vitals
         self.geometry        = TomoGeometry(self.geometry_cfg, x_axis)
         self.dx              = float(x_axis[1] - x_axis[0])
         self.log_all_losses  = log_all_losses
@@ -276,6 +277,9 @@ class Loss:
 
         if self.sampler is not None and self.sampler.active:
             self.sampler.observe(pred_params_phys)
+
+        if self.slot_vitals is not None and self.slot_vitals.active:
+            self.slot_vitals.observe(pred_params_phys)
 
         if kz_map is not None:
             kz_map = kz_map.to(device=pred_curves.device, dtype=pred_curves.dtype)
