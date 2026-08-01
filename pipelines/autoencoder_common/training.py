@@ -51,6 +51,7 @@ class AutoencoderTrainingPipeline:
             "Architecture"         : self.ae_model_name,
             self.model_dim_label   : model_dim,
             "Embedding Dim"        : self.autoencoder_cfg.embedding_dim,
+            "Embedding Norm"       : self.autoencoder_cfg.embedding_norm,
             "Trainable Parameters" : f"{n_params:,}",
         })
 
@@ -61,6 +62,8 @@ class AutoencoderTrainingPipeline:
         check = OverfitCheck(self.entry.overfit_check, run_meta.run_directory, logger)
         if not check.enabled:
             return
+
+        check.announce()
 
         gate_arch_config    = check.sanitized_model_config(self.autoencoder_cfg)
         gate_trainer_config = check.sanitized_trainer_config(self.trainer_config)

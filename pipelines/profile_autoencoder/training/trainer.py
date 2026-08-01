@@ -9,7 +9,16 @@ class Trainer(AutoencoderTrainer):
     section_title = "[Profile Autoencoder Training]"
 
     def _build_criterion(self):
-        return Loss(self.config.ae_loss)
+        cfg = self.config.ae_loss
+
+        self.logger.section("[Loss Function]")
+        self.logger.kv_table({
+            "Curve kind"      : cfg.curve_kind,
+            "Huber delta"     : f"{cfg.huber_delta:g} (used only when kind=huber)",
+            "Charbonnier eps" : f"{cfg.charbonnier_eps:g} (used only when kind=charbonnier)",
+        })
+
+        return Loss(cfg)
 
     def _compute_loss(self, batch):
         curve        = batch.to(self.device).unsqueeze(-1).unsqueeze(-1)
