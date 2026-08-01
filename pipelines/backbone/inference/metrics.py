@@ -579,4 +579,25 @@ class Metrics:
             "label_r2_frac_below_05" : float((finite < 0.5).mean()),
         }
 
+        stats.update(self._label_noise_split(r2_map))
+
         return r2_map.astype(np.float32), stats
+
+    def _label_noise_split(self, r2_map: np.ndarray, threshold: float = 0.5) -> Dict[str, float]:
+        err  = np.asarray(self.result.pixel_mse, dtype=np.float64).reshape(-1)
+        r2   = np.asarray(r2_map, dtype=np.float64).reshape(-1)
+        both = np.isfinite(err) & np.isfinite(r2)
+
+        low  = err[both & (r2 < threshold)]
+        high = err[both & (r2 >= threshold)]
+
+        if not high.size:
+            return {"label_err_split_status": float("nan")}
+
+        out = {"label_err_mean_high_r2": float(high.mean())}
+
+        if low.size:
+            out["label_err_mean_low_r2"]    = float(low.mean())
+            out["label_err_ratio_low_high"] = float(low.mean() / max(high.mean(), 1e-12))
+
+        return out

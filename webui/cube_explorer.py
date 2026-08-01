@@ -113,6 +113,7 @@ class CubeExplorer:
         "label_r2"                 : "label R2",
         "flip_consistency"         : "flip disagreement",
         "failure_mode"             : "failure mode",
+        "label_suspect"            : "label suspect",
     }
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:

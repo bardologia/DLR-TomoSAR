@@ -82,3 +82,38 @@ def test_uninformative_confidence_gives_flat_curve():
 
     assert scalars["aurc"] == pytest.approx(scalars["full_coverage_risk"])
     assert all(row["risk"] == pytest.approx(1.0) for row in rows)
+
+
+def test_label_suspects_flag_confident_wrong_pixels():
+    from pipelines.backbone.inference.seed_disagreement import LabelSuspects
+
+    disagreement = np.full((H, W), 0.5)
+    risk         = np.full((H, W), 1.0)
+
+    disagreement[0, 0] = 0.0
+    risk[0, 0]         = 100.0
+    risk[0, 1]         = 100.0
+    disagreement[0, 1] = 5.0
+
+    mask, scalars = LabelSuspects(disagreement, risk).run()
+
+    assert mask[0, 0] == 1
+    assert mask[0, 1] == 0
+    assert scalars["label_suspect_n"] == 1.0
+
+
+def test_label_suspects_report_label_r2_of_flagged_pixels():
+    from pipelines.backbone.inference.seed_disagreement import LabelSuspects
+
+    disagreement       = np.full((H, W), 0.5)
+    risk               = np.full((H, W), 1.0)
+    label_r2           = np.full((H, W), 0.9)
+
+    disagreement[0, 0] = 0.0
+    risk[0, 0]         = 100.0
+    label_r2[0, 0]     = 0.1
+
+    _mask, scalars = LabelSuspects(disagreement, risk, label_r2).run()
+
+    assert scalars["label_suspect_label_r2_mean"]    == pytest.approx(0.1)
+    assert scalars["label_suspect_label_r2_overall"] >  0.85

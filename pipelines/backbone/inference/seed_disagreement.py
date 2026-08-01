@@ -47,6 +47,48 @@ class SeedDisagreementPlots(PlotBase):
         return self._save(fig, path)
 
 
+class LabelSuspects:
+
+    STD_QUANTILE = 0.5
+    ERR_QUANTILE = 0.9
+    MIN_PIXELS   = 4
+
+    def __init__(self, disagreement_map: np.ndarray, risk_map: np.ndarray, label_r2_map: np.ndarray | None = None) -> None:
+        self.disagreement = np.asarray(disagreement_map, dtype=np.float64)
+        self.risk         = np.asarray(risk_map, dtype=np.float64)
+        self.label_r2     = np.asarray(label_r2_map, dtype=np.float64) if label_r2_map is not None else None
+
+        if self.disagreement.shape != self.risk.shape:
+            raise ValueError(f"Disagreement map {self.disagreement.shape} and risk map {self.risk.shape} disagree in shape")
+
+    def run(self) -> tuple[np.ndarray, dict]:
+        both = np.isfinite(self.disagreement) & np.isfinite(self.risk)
+        if both.sum() < self.MIN_PIXELS:
+            raise ValueError(f"Label-suspect detection needs at least {self.MIN_PIXELS} pixels with finite disagreement and error")
+
+        std_thr = float(np.quantile(self.disagreement[both], self.STD_QUANTILE))
+        err_thr = float(np.quantile(self.risk[both], self.ERR_QUANTILE))
+
+        mask = both & (self.disagreement <= std_thr) & (self.risk > err_thr)
+
+        scalars = {
+            "label_suspect_n"       : float(mask.sum()),
+            "label_suspect_frac"    : float(mask.mean()),
+            "label_suspect_std_thr" : std_thr,
+            "label_suspect_err_thr" : err_thr,
+        }
+
+        if self.label_r2 is not None:
+            finite_r2 = np.isfinite(self.label_r2)
+
+            if (mask & finite_r2).any():
+                scalars["label_suspect_label_r2_mean"] = float(self.label_r2[mask & finite_r2].mean())
+            if finite_r2.any():
+                scalars["label_suspect_label_r2_overall"] = float(self.label_r2[finite_r2].mean())
+
+        return mask.astype(np.uint8), scalars
+
+
 class RiskCoverage:
 
     COVERAGES  = tuple(np.round(np.linspace(0.05, 1.0, 20), 3))
@@ -259,6 +301,28 @@ class SeedDisagreementMaps:
 
         return rows
 
+    def _label_r2_map(self) -> np.ndarray | None:
+        path = self.cube_dirs[0] / "label_r2.npy"
+        return np.asarray(np.load(path), dtype=np.float64) if path.is_file() else None
+
+    def _flag_label_suspects(self, maps: dict[str, np.ndarray], summary: dict, figures: dict[str, Path]) -> None:
+        mask, scalars = LabelSuspects(maps["seed_std_profile"], self._mean_risk_map(), self._label_r2_map()).run()
+
+        summary.update(scalars)
+
+        for cube_dir in self.cube_dirs:
+            np.save(cube_dir / "label_suspect.npy", mask)
+
+        az_offset, rg_offset    = self._offsets()
+        figures["label_suspect"] = SeedDisagreementPlots().map_figure(
+            mask.astype(np.float64),
+            title          = "Label suspects: seeds agree with each other, not with the label",
+            colorbar_label = "Suspect",
+            az_offset      = az_offset,
+            rg_offset      = rg_offset,
+            path           = self.figures_dir / "label_suspect.png",
+        )
+
     def run(self) -> dict:
         self._validate_cubes()
         FileIO.ensure_dirs(self.figures_dir)
@@ -270,6 +334,8 @@ class SeedDisagreementMaps:
         summary  = self._summarize(maps)
         figures  = self._render_figures(maps)
         coverage = self._risk_coverage(maps, summary, figures)
+
+        self._flag_label_suspects(maps, summary, figures)
 
         self.logger.info(f"Seed-disagreement maps written into {len(self.cube_dirs)} seed cube dirs: {sorted(maps)}")
 
