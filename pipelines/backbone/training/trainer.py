@@ -28,7 +28,7 @@ class CurriculumController:
 
         self.logger.section(f"[Curriculum Loss Swap @ epoch {epoch + 1}]")
         self.criterion.set_curriculum(lc.complete)
-        self.logger.subsection("Loss config replaced with curriculum.loss.complete.")
+        self.logger.subsection("Loss config replaced with curriculum.complete.")
 
         self.early_stopping.reset()
         self.logger.subsection("Early stopping reset.")
@@ -78,6 +78,17 @@ class Trainer(BaseTrainer):
 
         if self.curriculum.enabled and self.curriculum.swap_epoch >= self.epochs:
             raise ValueError(f"curriculum.swap_epoch={self.curriculum.swap_epoch} must be below training.epochs={self.epochs}; the complete loss phase would never run")
+
+        if self.curriculum.enabled:
+            self.logger.section("[Curriculum]")
+            self.logger.kv_table({
+                "Initial stage"   : "curriculum.warmup",
+                "Swap to complete": f"epoch {self.curriculum.swap_epoch + 1} of {self.epochs}",
+                "Reset LR"        : self.curriculum.reset_lr,
+                "Reset warmup"    : self.curriculum.reset_warmup,
+                "Reset optimizer" : self.curriculum.reset_optimizer,
+                "Inherit"         : f"{self.curriculum.inherit} (warmup adopts complete-stage values overridden only on curriculum.complete)",
+            })
 
         self.docs = TrainingDocs(self.model, self.model_cfg, self.logger, self.run_dir, enabled=self.emit_docs)
 
@@ -129,12 +140,6 @@ class Trainer(BaseTrainer):
 
         return self.criterion(pred_params, gt_params, kz_map)
 
-    def _log_train_banner(self, train_loader: DataLoader, val_loader: DataLoader, test_loader: DataLoader) -> None:
-        self.logger.subsection(f"Train loader size      = {len(train_loader)}")
-        self.logger.subsection(f"Validation loader size = {len(val_loader)}")
-        self.logger.subsection(f"Test loader size       = {len(test_loader)}")
-        self.logger.subsection(f"Device                 = {self.device} \n")
-
     def _before_training(self, train_loader: DataLoader) -> None:
         self.docs.emit(train_loader, self.device)
 
@@ -143,7 +148,7 @@ class Trainer(BaseTrainer):
 
     def _on_state_restored(self, state: dict) -> None:
         if self.curriculum.enabled and state["epoch"] + 1 > self.curriculum.swap_epoch:
-            self.criterion.set_curriculum(self.curriculum.complete)
+            self.criterion.set_curriculum(self.curriculum.complete, context="re-applied on resume")
             self.logger.subsection("Resumed past the curriculum swap; complete loss configuration re-applied.")
 
     def _before_validation(self, epoch: int, val_loader: DataLoader) -> None:

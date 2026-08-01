@@ -74,6 +74,8 @@ class TrainingPipeline:
         if not check.enabled:
             return
 
+        check.announce()
+
         gate_trainer_config = check.sanitized_trainer_config(self.trainer_config)
 
         gate_stage                          = gate_trainer_config.curriculum.initial_stage
@@ -108,14 +110,16 @@ class TrainingPipeline:
     def _build_model(self, in_channels: int, out_channels: int):
         model, model_cfg = self._model_factory()(self.backbone_name, config=self.model_config, **self._model_overrides(in_channels, out_channels))
 
-        n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        n_total     = sum(p.numel() for p in model.parameters())
+        n_trainable = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        params      = f"{n_trainable:,} trainable" if n_total == n_trainable else f"{n_trainable:,} trainable ({n_total:,} total, {n_total - n_trainable:,} frozen)"
 
         self.logger.section("[Model Built]")
         self.logger.subsection(f"Architecture : {self._architecture_label()}")
         self.logger.subsection(f"Head         : {model_cfg.head}")
         self.logger.subsection(f"In Channels  : {in_channels}")
         self.logger.subsection(f"Out Channels : {out_channels}")
-        self.logger.subsection(f"Parameters   : {n_params:,}")
+        self.logger.subsection(f"Parameters   : {params}")
         return model, model_cfg
 
     def _architecture_label(self) -> str:
@@ -157,7 +161,7 @@ class TrainingPipeline:
         model, model_cfg = self._model_factory()(self.backbone_name, config=self.model_config, **self._model_overrides(in_channels, out_channels))
 
         trainer = self._make_trainer(model, model_cfg, x_axis, dataset.normalizer, work_dir, logger, emit_docs=False)
-        trainer.criterion.set_curriculum(LossComponentCatalog.probe_union(self.trainer_config.curriculum))
+        trainer.criterion.set_curriculum(LossComponentCatalog.probe_union(self.trainer_config.curriculum), context="probe union of all curriculum stages")
 
         return trainer, dataset, model
 
@@ -171,9 +175,16 @@ class TrainingPipeline:
         self.logger = self.run_metadata.logger
 
         if resolved_entry_config is not None:
-            ConfigCli.save_resolved(resolved_entry_config, self.run_metadata.run_directory / "docs" / "resolved_entry_config.json")
+            resolved_path = self.run_metadata.run_directory / "docs" / "resolved_entry_config.json"
+            ConfigCli.save_resolved(resolved_entry_config, resolved_path)
+            self.logger.info(f"Resolved entry config saved: {resolved_path}")
 
         self.logger.section("[PyTorch Training Pipeline Execution]")
+        self.logger.kv_table({
+            "Seed"           : self.seed,
+            "Gaussian slots" : self.trainer_config.gaussian.n_default_gaussians,
+            "Elevation axis" : f"[{self.trainer_config.gaussian.x_min:g}, {self.trainer_config.gaussian.x_max:g}] m (sample count set by the dataset profile length)",
+        })
 
         self.dataset_pipeline = self._build_dataset_pipeline(self.run_metadata.run_directory, self.logger)
 

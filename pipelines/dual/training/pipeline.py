@@ -58,8 +58,11 @@ class DualTrainingPipeline(TrainingPipeline):
         params_arm    = sum(p.numel() for name, p in model.named_parameters() if name.startswith(("trunk_params.", "gaussian_heads.")))
         existence_arm = sum(p.numel() for name, p in model.named_parameters() if not name.startswith(("trunk_params.", "gaussian_heads.")))
 
-        self.logger.subsection(f"Params Trunk : {model_cfg.params_backbone} | input {'+'.join(model_cfg.params_input)} | channels {list(model_cfg.params_channels)} | features {list(model_cfg.params_features)} | {params_arm:,} params")
-        self.logger.subsection(f"Exist Trunk  : {model_cfg.existence_backbone} | input {'+'.join(model_cfg.existence_input)} | channels {list(model_cfg.existence_channels)} | features {list(model_cfg.existence_features)} | {existence_arm:,} params")
+        params_features    = list(model_cfg.params_features)    or "backbone default"
+        existence_features = list(model_cfg.existence_features) or "backbone default"
+
+        self.logger.subsection(f"Params Trunk : {model_cfg.params_backbone} | input {'+'.join(model_cfg.params_input)} | channels {list(model_cfg.params_channels)} | features {params_features} | {params_arm:,} params")
+        self.logger.subsection(f"Exist Trunk  : {model_cfg.existence_backbone} | input {'+'.join(model_cfg.existence_input)} | channels {list(model_cfg.existence_channels)} | features {existence_features} | {existence_arm:,} params")
         return model, model_cfg
 
     def _architecture_label(self) -> str:
