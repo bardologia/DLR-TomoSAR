@@ -154,6 +154,16 @@ class SeedComparisonReport:
         out.append("\n".join(table.render()))
         out.append("")
 
+        aurc = summary.get("risk_coverage_aurc")
+        if aurc is not None:
+            out.append(
+                f"Selective prediction under seed-disagreement confidence: AURC {self._fmt(aurc)}, "
+                f"risk at 50% coverage {self._fmt(summary['risk_coverage_risk_at_half_coverage'])} vs "
+                f"{self._fmt(summary['risk_coverage_full_coverage_risk'])} at full coverage; "
+                f"disagreement-error rank correlation {self._fmt(summary['risk_coverage_disagreement_error_spearman'])}."
+            )
+            out.append("")
+
         for name, figure_path in self.disagreement["figures"].items():
             out.append(f"![{name}]({os.path.relpath(figure_path, self.output_dir)})")
             out.append("")

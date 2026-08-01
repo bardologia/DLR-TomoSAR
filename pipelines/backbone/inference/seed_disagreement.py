@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 from tools.data.io            import FileIO
@@ -28,11 +29,83 @@ class SeedDisagreementPlots(PlotBase):
             path           = path,
         )
 
+    def risk_coverage_curve(self, rows: list[dict], full_risk: float, path: Path) -> Path:
+        self._apply_style()
+
+        coverages = [row["coverage"] * 100.0 for row in rows]
+        risks     = [row["risk"] for row in rows]
+
+        fig, ax = plt.subplots(figsize=self.figsize(self.FULL_WIDTH))
+        ax.plot(coverages, risks, marker="o", color="#0072B2", linewidth=1.4)
+        ax.axhline(full_risk, color="0.4", linestyle="--", linewidth=1.0)
+        ax.set_xlabel("Coverage [% of pixels kept, most confident first]")
+        ax.set_ylabel("Mean pixel curve MSE among kept pixels")
+        ax.set_title("Risk-coverage under seed-disagreement confidence")
+        ax.grid(True, alpha=0.3)
+        fig.tight_layout()
+
+        return self._save(fig, path)
+
+
+class RiskCoverage:
+
+    COVERAGES  = tuple(np.round(np.linspace(0.05, 1.0, 20), 3))
+    MIN_PIXELS = 4
+
+    def __init__(self, disagreement_map: np.ndarray, risk_map: np.ndarray) -> None:
+        confidence = np.asarray(disagreement_map, dtype=np.float64).reshape(-1)
+        risk       = np.asarray(risk_map, dtype=np.float64).reshape(-1)
+
+        if confidence.shape != risk.shape:
+            raise ValueError(f"Disagreement map ({confidence.size}) and risk map ({risk.size}) disagree in size")
+
+        both = np.isfinite(confidence) & np.isfinite(risk)
+        if both.sum() < self.MIN_PIXELS:
+            raise ValueError(f"Risk-coverage needs at least {self.MIN_PIXELS} pixels with finite disagreement and error")
+
+        order = np.argsort(confidence[both], kind="stable")
+
+        self.sorted_risk       = risk[both][order]
+        self.sorted_confidence = confidence[both][order]
+
+    def curve(self) -> list[dict]:
+        n = self.sorted_risk.size
+
+        rows = []
+        for coverage in self.COVERAGES:
+            keep = max(1, int(round(coverage * n)))
+            rows.append({
+                "coverage"  : float(coverage),
+                "n"         : keep,
+                "risk"      : float(self.sorted_risk[:keep].mean()),
+                "threshold" : float(self.sorted_confidence[keep - 1]),
+            })
+
+        return rows
+
+    def run(self) -> tuple[list[dict], dict]:
+        rows      = self.curve()
+        full_risk = rows[-1]["risk"]
+
+        rank_conf = np.argsort(np.argsort(self.sorted_confidence)).astype(np.float64)
+        rank_risk = np.argsort(np.argsort(self.sorted_risk)).astype(np.float64)
+        spearman  = float(np.corrcoef(rank_conf, rank_risk)[0, 1])
+
+        scalars = {
+            "aurc"                  : float(np.mean([row["risk"] for row in rows])),
+            "full_coverage_risk"    : full_risk,
+            "risk_at_half_coverage" : next(row["risk"] for row in rows if row["coverage"] >= 0.5),
+            "disagreement_error_spearman": spearman,
+        }
+
+        return rows, scalars
+
 
 class SeedDisagreementMaps:
 
     PROFILE_CUBE = "pred_curves.npy"
     PARAMS_CUBE  = "params_pred.npy"
+    RISK_CUBE    = "pixel_mse.npy"
     MIN_ACTIVE   = 2
 
     MAP_TITLES = {
@@ -56,7 +129,7 @@ class SeedDisagreementMaps:
 
     def _validate_cubes(self) -> None:
         for cube_dir in self.cube_dirs:
-            for name in (self.PROFILE_CUBE, self.PARAMS_CUBE):
+            for name in (self.PROFILE_CUBE, self.PARAMS_CUBE, self.RISK_CUBE):
                 if not (cube_dir / name).is_file():
                     raise FileNotFoundError(f"{cube_dir / name} is missing; re-run inference with save_cubes enabled for every seed, or disable compute_disagreement")
 
@@ -172,6 +245,20 @@ class SeedDisagreementMaps:
 
         return figures
 
+    def _mean_risk_map(self) -> np.ndarray:
+        risks = self._open_cubes(self.RISK_CUBE)
+        return np.mean([np.asarray(risk, dtype=np.float64) for risk in risks], axis=0)
+
+    def _risk_coverage(self, maps: dict[str, np.ndarray], summary: dict, figures: dict[str, Path]) -> list[dict]:
+        rows, scalars = RiskCoverage(maps["seed_std_profile"], self._mean_risk_map()).run()
+
+        for key, value in scalars.items():
+            summary[f"risk_coverage_{key}"] = value
+
+        figures["risk_coverage"] = SeedDisagreementPlots().risk_coverage_curve(rows, scalars["full_coverage_risk"], self.figures_dir / "risk_coverage.png")
+
+        return rows
+
     def run(self) -> dict:
         self._validate_cubes()
         FileIO.ensure_dirs(self.figures_dir)
@@ -179,10 +266,11 @@ class SeedDisagreementMaps:
         maps = {"seed_std_profile": self._profile_map()}
         maps.update(self._param_maps())
 
-        written = self._write_maps(maps)
-        summary = self._summarize(maps)
-        figures = self._render_figures(maps)
+        written  = self._write_maps(maps)
+        summary  = self._summarize(maps)
+        figures  = self._render_figures(maps)
+        coverage = self._risk_coverage(maps, summary, figures)
 
         self.logger.info(f"Seed-disagreement maps written into {len(self.cube_dirs)} seed cube dirs: {sorted(maps)}")
 
-        return {"summary": summary, "figures": figures, "maps_written": written}
+        return {"summary": summary, "figures": figures, "maps_written": written, "risk_coverage": coverage}

@@ -37,6 +37,7 @@ def _seed_run(group: Path, name: str, pred_curves: np.ndarray, params_pred: np.n
     (run_dir / "meta").mkdir(exist_ok=True)
     np.save(cubes_dir / "pred_curves.npy", pred_curves.astype(np.float32))
     np.save(cubes_dir / "params_pred.npy", params_pred.astype(np.float32))
+    np.save(cubes_dir / "pixel_mse.npy",   pred_curves.mean(axis=0).astype(np.float32) + 0.1)
 
     (out_dir / "metrics.json").write_text(json.dumps({"curve_mse_gt": 1.0, "split_region": [0, N_AZ, 0, N_RG]}), encoding="utf-8")
     (out_dir / "report.md").write_text("# per-seed report", encoding="utf-8")
@@ -168,7 +169,10 @@ def test_comparison_writes_maps_figures_and_report_section(tmp_path, monkeypatch
 
     assert "Seed disagreement maps" in text
     assert "seed_std_profile"       in text
+    assert "AURC" in text
     assert payload["disagreement"]["seed_std_amp_mean"] == pytest.approx(math.sqrt(0.5))
+    assert payload["disagreement"]["risk_coverage_aurc"] > 0.0
+    assert (group / "inference" / "agg" / "figures" / "seed_disagreement" / "risk_coverage.png").is_file()
 
     for seed in ("seed0", "seed1"):
         for name in SeedDisagreementMaps.MAP_TITLES:

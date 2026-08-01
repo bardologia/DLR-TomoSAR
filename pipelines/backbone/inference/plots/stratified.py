@@ -60,6 +60,23 @@ class StratifiedErrorPlotter(PlotTools):
             path           = out_path,
         )
 
+    def plot_presence_reliability(self, rows: list[dict], out_path: Path) -> Path:
+        self._apply_style()
+
+        amps       = [row["amp_mean"] for row in rows]
+        precisions = [row["precision"] * 100.0 for row in rows]
+
+        fig, ax = plt.subplots(figsize=self.figsize(self.FULL_WIDTH))
+        ax.plot(amps, precisions, marker="o", color="#009E73", linewidth=1.4)
+        ax.set_xlabel("Predicted amplitude (bin mean)")
+        ax.set_ylabel("Matched to a GT scatterer [%]")
+        ax.set_title("Presence reliability: precision by predicted amplitude")
+        ax.set_ylim(0.0, 102.0)
+        ax.grid(True, alpha=0.3)
+        fig.tight_layout()
+
+        return self._save(fig, out_path)
+
     def plot_miss_by_separation(self, rows: list[dict], out_path: Path) -> Path:
         self._apply_style()
 

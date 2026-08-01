@@ -68,6 +68,7 @@ class MetricSectionGrouper:
         ("Flip Consistency",             re.compile(r"^flip_")),
         ("Stratified Errors",            re.compile(r"^strat")),
         ("Failure Modes",                re.compile(r"^failure_")),
+        ("Presence Calibration",         re.compile(r"^presence_")),
     ]
 
     LEFTOVER_TITLE = "Other Metrics"

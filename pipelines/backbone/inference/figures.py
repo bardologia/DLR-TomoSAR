@@ -155,6 +155,12 @@ class FigureComposer:
                 out_path = meta.figures_dir / "pixel_maps" / "miss_by_separation.png",
             )]
 
+        if result.presence_rows:
+            figure_paths["presence_reliability"] = [self.plotter.stratified.plot_presence_reliability(
+                result.presence_rows,
+                out_path = meta.figures_dir / "pixel_maps" / "presence_reliability.png",
+            )]
+
         for key, fname, data, title, label, extra in pixel_map_specs:
             figure_paths[key] = [slice_plotter.plot_pixel_metric_map(
                 metric_map = data,

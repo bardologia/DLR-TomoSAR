@@ -27,7 +27,7 @@ class FailureModes:
     def _channels(self, params: np.ndarray, offset: int) -> np.ndarray:
         return np.stack([params[3 * k + offset] for k in range(self.n_gaussians)], axis=0).reshape(self.n_gaussians, -1)
 
-    def _pair_errors(self) -> dict:
+    def pair_predictions(self) -> dict:
         n_K = self.n_gaussians
         sel = GaussianMatcher().assignment(self.params_pred, self.params_gt, n_K)
 
@@ -70,14 +70,16 @@ class FailureModes:
         n_halluc = (act_pred & ~pred_matched).sum(axis=0)
 
         return {
-            "act_gt"   : act_gt,
-            "act_pred" : act_pred,
-            "mu_gt"    : mu_gt,
-            "n_missed" : n_missed,
-            "n_halluc" : n_halluc,
-            "any_pos"  : any_pos,
-            "any_width": any_width,
-            "any_amp"  : any_amp,
+            "act_gt"       : act_gt,
+            "act_pred"     : act_pred,
+            "amp_pred"     : amp_pred,
+            "mu_gt"        : mu_gt,
+            "pred_matched" : pred_matched,
+            "n_missed"     : n_missed,
+            "n_halluc"     : n_halluc,
+            "any_pos"      : any_pos,
+            "any_width"    : any_width,
+            "any_amp"      : any_amp,
         }
 
     def _mode_map(self, pairs: dict) -> np.ndarray:
@@ -151,7 +153,7 @@ class FailureModes:
         return out
 
     def run(self) -> tuple[np.ndarray, list[dict], dict]:
-        pairs    = self._pair_errors()
+        pairs    = self.pair_predictions()
         mode_map = self._mode_map(pairs)
         by_sep   = self._miss_by_separation(pairs)
         scalars  = self._scalars(pairs, mode_map)

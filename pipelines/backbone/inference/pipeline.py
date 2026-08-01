@@ -18,6 +18,7 @@ from pipelines.backbone.inference.plots              import Plotter
 from pipelines.backbone.inference.predictor          import Predictor
 from pipelines.backbone.inference.reduced            import ReducedTomogramSynthesizer
 from pipelines.backbone.inference.failure_modes      import FailureModes
+from pipelines.backbone.inference.presence_calibration import PresenceCalibration
 from pipelines.backbone.inference.report             import Report, ReportPayloadBuilder
 from pipelines.backbone.inference.stratified         import StratifiedErrors
 from tools.monitoring.logger                         import Logger
@@ -292,6 +293,25 @@ class InferencePipeline:
 
         logger.subsection(f"Failure modes : miss rate {scalars['failure_miss_rate'] * 100.0:.2f}%, hallucination rate {scalars['failure_halluc_rate'] * 100.0:.2f}%, clean pixels {scalars['failure_frac_ok'] * 100.0:.1f}%")
 
+    def _calibrate_presence(self, meta: InferenceMetadata, run, result, global_metrics: dict, logger: Logger) -> None:
+        if result.params_pred is None or result.params_gt is None:
+            logger.section("[Inference: Presence Calibration skipped]")
+            logger.subsection("No parameter cubes are available; the presence reliability curve is absent from metrics, figures, and report.")
+            global_metrics["presence_status"] = "skipped: no parameter cubes"
+            Metrics.write_json(global_metrics, meta.metrics_path)
+            return
+
+        logger.section("[Inference: Presence Calibration]")
+
+        rows, scalars        = PresenceCalibration(result.params_pred, result.params_gt, run.n_gaussians).run()
+        result.presence_rows = rows
+
+        global_metrics["presence_status"] = "computed"
+        global_metrics.update(scalars)
+        Metrics.write_json(global_metrics, meta.metrics_path)
+
+        logger.subsection(f"Presence calibration : overall precision {scalars['presence_overall_precision'] * 100.0:.1f}%, amp-precision rank correlation {scalars['presence_rank_corr']:.3f}")
+
     def _audit_normalization(self, meta: InferenceMetadata, run, result, global_metrics: dict, logger: Logger) -> None:
         logger.section("[Inference: Normalization Audit]")
 
@@ -361,6 +381,7 @@ class InferencePipeline:
         self._evaluate_flip_consistency(cfg, meta, run, result, global_metrics, logger)
         self._stratify_errors(cfg, meta, run, result, global_metrics, logger)
         self._classify_failures(cfg, meta, run, result, global_metrics, logger)
+        self._calibrate_presence(meta, run, result, global_metrics, logger)
         self._audit_normalization(meta, run, result, global_metrics, logger)
 
         figure_paths = {}

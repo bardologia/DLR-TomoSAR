@@ -604,6 +604,7 @@ class Report:
         ("3.15 Flip-equivariance consistency",                   lambda k: k.startswith("flip_")),
         ("3.16 Stratified errors (by scene covariate)",          lambda k: k.startswith("strat")),
         ("3.17 Failure-mode classification",                     lambda k: k.startswith("failure_")),
+        ("3.18 Presence calibration",                            lambda k: k.startswith("presence_")),
         ("3.10 Matched Gaussian errors (permutation-invariant)", lambda k: k.startswith("matched_")),
         ("3.9b Per-slot parameter statistics by activity",       lambda k: k.startswith("slot_") and ("_amp_" in k or "_mu_" in k or "_sig_" in k)),
         ("3.9 Slot occupancy & active count",                    lambda k: k.startswith(("active_frac", "active_count", "count_")) or (k.startswith("slot_") and "_active_" in k)),
@@ -725,6 +726,7 @@ class Report:
             ("param_error_maps",       "6.3 Parameter absolute-error maps |Pred − GT|"),
             ("param_error_hists",      "6.4 Parameter error histograms (matched Pred − GT)"),
             ("active_count_map",       "6.5 Active Gaussian count map"),
+            ("presence_reliability",   "6.6 Presence reliability (precision by predicted amplitude)"),
         )
         if any(fp.get(key) for key, _title in param_groups):
             out.append("\n## 6. Gaussian parameter analysis\n")

@@ -52,6 +52,7 @@ class Result:
     stratified       : Optional[dict]              = None
     failure_mode_map : Optional[np.ndarray]        = None
     miss_by_sep      : Optional[list]              = None
+    presence_rows    : Optional[list]              = None
 
 
 class Metrics:
