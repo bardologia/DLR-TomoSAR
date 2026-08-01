@@ -183,7 +183,7 @@ class TrainScheduler:
         if mode == "ablation":
             return AblationTrialPlanner(self.config.ablation_features, self.config.ablation_include_full)
 
-        raise ValueError(f"Unknown trials_mode '{mode}', expected 'curriculum', 'warmup', 'presence', 'physics', 'pair', 'secondary', 'patch', 'input', 'context', 'reach', 'head', 'augmentation', 'normalization' or 'ablation'")
+        raise ValueError(f"Unknown trials_mode '{mode}', expected one of {sorted(self.MODE_SUBDIRS)}")
 
     def _seed_units(self, experiments: list[tuple[str, dict]], seeds: list[int]) -> list[tuple[str, dict]]:
         if len(seeds) == 1:
@@ -247,19 +247,20 @@ class TrainScheduler:
 
         self.logger.section(f"Training trials: {self.config.trials_mode}")
         self.logger.kv_table({
-            "Model"         : self._model_key(),
-            "Mode"          : self.config.trials_mode,
+            "Model (base config)"  : f"{self._model_key()} (per-trial settings may override the backbone/head)",
+            "Mode"                 : self.config.trials_mode,
             **planner.summary(),
-            "Trials"        : len(experiments),
-            "Seeds"         : seeds,
-            "GPU jobs"      : len(units),
-            "GPUs"          : self.config.gpus,
-            "GPU pool file" : str(self.stage.pool_file),
-            "Infer after"   : self.config.infer_after,
-            "Infer at end"  : self.config.infer_at_end,
-            "Resume"        : self.config.resume,
-            "CLI overrides" : self.forward_overrides or "—",
-            "Log dir"       : str(self.log_dir),
+            "Trials"               : len(experiments),
+            "Seeds"                : seeds,
+            "GPU jobs"             : len(units),
+            "GPUs"                 : self.config.gpus,
+            "GPU pool file"        : str(self.stage.pool_file),
+            "Infer after"          : self.config.infer_after,
+            "Infer at end"         : self.config.infer_at_end,
+            "Unit resume"          : f"{self.config.resume} (reuse completed run dirs, delete unfinished ones)",
+            "Trainer resume"       : self.config.training.resume,
+            "Forwarded overrides (scheduler options excluded; per-trial settings win)" : self.forward_overrides or "—",
+            "Log dir"              : str(self.log_dir),
         }, title="Configuration")
 
         jobs    = [self._job(run_name, overrides) for run_name, overrides in units]

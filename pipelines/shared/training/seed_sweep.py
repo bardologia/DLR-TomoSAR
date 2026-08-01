@@ -147,7 +147,7 @@ class SeedFanoutScheduler:
             "GPUs"          : self.config.gpus,
             "GPU pool file" : str(self.stage.pool_file),
             "Infer at end"  : self.infer_at_end,
-            "CLI overrides" : self.forward_overrides or "—",
+            "Forwarded overrides (scheduler options excluded)" : self.forward_overrides or "—",
             "Log dir"       : str(self.log_dir),
         }, title="Configuration")
 
