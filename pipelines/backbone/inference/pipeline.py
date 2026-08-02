@@ -272,7 +272,7 @@ class InferencePipeline:
 
         logger.section("[Inference: Failure Modes]")
 
-        mode_map, by_sep, scalars = FailureModes(result.params_pred, result.params_gt, run.n_gaussians).run()
+        mode_map, by_sep, scalars = FailureModes(result.params_pred, result.params_gt, run.n_gaussians, assignment=result.assignment(run.n_gaussians)).run()
 
         result.failure_mode_map = mode_map
         result.miss_by_sep      = by_sep
@@ -296,7 +296,7 @@ class InferencePipeline:
 
         logger.section("[Inference: Presence Calibration]")
 
-        rows, scalars        = PresenceCalibration(result.params_pred, result.params_gt, run.n_gaussians).run()
+        rows, scalars        = PresenceCalibration(result.params_pred, result.params_gt, run.n_gaussians, assignment=result.assignment(run.n_gaussians)).run()
         result.presence_rows = rows
 
         global_metrics["presence_status"] = "computed"

@@ -1,20 +1,17 @@
 from __future__ import annotations
 
 import math
-import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from configuration.diagnostics             import ReceptiveFieldConfig
-from pipelines.backbone.inference.loader   import RunLoader
-from pipelines.backbone.inference.probes   import ModelDevice, ProbeWindows
-from tools.data.io                         import FileIO
-from tools.reporting.markdown              import MarkdownDoc, MarkdownTable
-from tools.reporting.plotting              import PlotBase
-from tools.runtime.run_selector            import RunSelector
+from pipelines.backbone.inference.analysis.run_batch import AnalysisRun, RunBatch
+from pipelines.backbone.inference.probes             import ModelDevice, ProbeWindows
+from tools.data.io                                   import FileIO
+from tools.reporting.markdown                        import MarkdownDoc, MarkdownTable
+from tools.reporting.plotting                        import PlotBase
 
 
 class ErfComputation:
@@ -102,27 +99,14 @@ class ReceptiveFieldPlots(PlotBase):
         return self._save(fig, path)
 
 
-class RunReceptiveField:
+class RunReceptiveField(AnalysisRun):
 
     GRAD_FILENAME    = "erf_gradient.npy"
     SUMMARY_FILENAME = "receptive_field.json"
     REPORT_FILENAME  = "receptive_field.md"
 
-    def __init__(self, run_dir: Path, config: ReceptiveFieldConfig, logger) -> None:
-        self.run_dir = Path(run_dir)
-        self.config  = config
-        self.logger  = logger
-
-        self.output_dir = self.run_dir / config.output_subdir
-
-    def _load_run(self):
-        return RunLoader(self.run_dir, logger=self.logger).load(
-            split           = self.config.split,
-            batch_size      = 1,
-            num_workers     = 0,
-            device          = self.config.device,
-            checkpoint_name = self.config.checkpoint_name,
-        )
+    def _batch_size(self) -> int:
+        return 1
 
     def _write_summary(self, run, centers, sigma_az: float, sigma_rg: float, masses: dict[int, float]) -> Path:
         payload = {
@@ -190,27 +174,8 @@ class RunReceptiveField:
         return {"sigma_az": sigma_az, "sigma_rg": sigma_rg, "masses": masses, "report": report_path}
 
 
-class ReceptiveFieldBatch:
+class ReceptiveFieldBatch(RunBatch):
 
-    def __init__(self, config: ReceptiveFieldConfig, logger) -> None:
-        self.config = config
-        self.logger = logger
-
-    def _select_runs(self) -> list[Path]:
-        selector = RunSelector(self.config.runs_dir, self.config.checkpoint_name, self.logger, action="measure")
-
-        if self.config.run_filter:
-            return selector.filter(self.config.run_filter)
-        if sys.stdin.isatty():
-            return selector.select()
-        return selector.all()
-
-    def run(self) -> list[dict]:
-        self.logger.section("Receptive-field measurement")
-
-        results = []
-        for run_dir in self._select_runs():
-            self.logger.subsection(f"Run: {run_dir}")
-            results.append(RunReceptiveField(run_dir, self.config, self.logger).run())
-
-        return results
+    SELECTOR_ACTION = "measure"
+    SECTION_TITLE   = "Receptive-field measurement"
+    RUN_CLASS       = RunReceptiveField

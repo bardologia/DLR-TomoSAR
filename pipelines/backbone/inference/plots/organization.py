@@ -134,10 +134,11 @@ class SlotOrganizationPlotter(PlotTools):
         params_gt     : np.ndarray,
         n_gaussians   : int,
         out_dir       : Path,
-        amp_threshold : float = ParamMatcher.ACTIVE_AMP_THR,
+        assignment    : np.ndarray | None    = None,
+        amp_threshold : float                = ParamMatcher.ACTIVE_AMP_THR,
     ) -> List[Path]:
 
-        counts = SlotOrganization.assignment_matrix(params_pred, params_gt, n_gaussians, amp_threshold)
+        counts = SlotOrganization.assignment_matrix(params_pred, params_gt, n_gaussians, amp_threshold, assignment=assignment)
         diag   = SlotOrganization.diagonality(counts)
         matrix = SlotOrganization.row_normalized(counts)
 

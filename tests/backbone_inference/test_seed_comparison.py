@@ -7,7 +7,7 @@ from types   import SimpleNamespace
 
 import pytest
 
-from pipelines.backbone.inference.seed_comparison import SeedComparison, SeedComparisonReport, SeedInferenceResolver
+from pipelines.backbone.inference.analysis.seed_comparison import SeedComparison, SeedComparisonReport, SeedInferenceResolver
 
 from tests.conftest import SilentLogger
 

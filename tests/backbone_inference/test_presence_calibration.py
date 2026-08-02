@@ -3,8 +3,8 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from pipelines.backbone.inference.presence_calibration import PresenceCalibration
-from pipelines.backbone.inference.seed_disagreement    import RiskCoverage
+from pipelines.backbone.inference.analysis.seed_disagreement import RiskCoverage
+from pipelines.backbone.inference.presence_calibration       import PresenceCalibration
 
 
 H, W = 40, 30
@@ -85,7 +85,7 @@ def test_uninformative_confidence_gives_flat_curve():
 
 
 def test_label_suspects_flag_confident_wrong_pixels():
-    from pipelines.backbone.inference.seed_disagreement import LabelSuspects
+    from pipelines.backbone.inference.analysis.seed_disagreement import LabelSuspects
 
     disagreement = np.full((H, W), 0.5)
     risk         = np.full((H, W), 1.0)
@@ -103,7 +103,7 @@ def test_label_suspects_flag_confident_wrong_pixels():
 
 
 def test_label_suspects_report_label_r2_of_flagged_pixels():
-    from pipelines.backbone.inference.seed_disagreement import LabelSuspects
+    from pipelines.backbone.inference.analysis.seed_disagreement import LabelSuspects
 
     disagreement       = np.full((H, W), 0.5)
     risk               = np.full((H, W), 1.0)

@@ -9,7 +9,7 @@ import torch
 from configuration.diagnostics                      import AttentionCaptureConfig
 from models.backbone                                import get_backbone
 from models.blocks                                  import AttentionTap
-from pipelines.backbone.inference.attention_capture import AttentionCapture, AttentionCaptureRun, AttentionSummary
+from pipelines.backbone.inference.analysis.attention_capture import AttentionCapture, AttentionCaptureRun, AttentionSummary
 
 from tests.conftest                 import SilentLogger
 from tests.models_backbone._helpers import SMALL_OVERRIDES, WINDOW

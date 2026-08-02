@@ -11,13 +11,14 @@ class PresenceCalibration:
     N_BINS        = 10
     MIN_BIN_COUNT = 30
 
-    def __init__(self, params_pred: np.ndarray, params_gt: np.ndarray, n_gaussians: int) -> None:
+    def __init__(self, params_pred: np.ndarray, params_gt: np.ndarray, n_gaussians: int, assignment: np.ndarray | None = None) -> None:
         self.params_pred = params_pred
         self.params_gt   = params_gt
         self.n_gaussians = int(n_gaussians)
+        self.assignment  = assignment
 
     def run(self) -> tuple[list[dict], dict]:
-        pairs = FailureModes(self.params_pred, self.params_gt, self.n_gaussians).pair_predictions()
+        pairs = FailureModes(self.params_pred, self.params_gt, self.n_gaussians, assignment=self.assignment).pair_predictions()
 
         active = pairs["act_pred"].reshape(-1)
         amps   = pairs["amp_pred"].reshape(-1)[active]

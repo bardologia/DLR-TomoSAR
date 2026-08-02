@@ -17,10 +17,11 @@ class FailureModes:
     N_SEP_BINS    = 8
     MIN_BIN_COUNT = 30
 
-    def __init__(self, params_pred: np.ndarray, params_gt: np.ndarray, n_gaussians: int) -> None:
+    def __init__(self, params_pred: np.ndarray, params_gt: np.ndarray, n_gaussians: int, assignment: np.ndarray | None = None) -> None:
         self.params_pred = np.asarray(params_pred, dtype=np.float64)
         self.params_gt   = np.asarray(params_gt, dtype=np.float64)
         self.n_gaussians = int(n_gaussians)
+        self.assignment  = assignment
 
         self.shape = self.params_pred.shape[1:]
 
@@ -29,7 +30,7 @@ class FailureModes:
 
     def pair_predictions(self) -> dict:
         n_K = self.n_gaussians
-        sel = GaussianMatcher().assignment(self.params_pred, self.params_gt, n_K)
+        sel = GaussianMatcher().assignment(self.params_pred, self.params_gt, n_K) if self.assignment is None else self.assignment
 
         amp_pred = self._channels(self.params_pred, 0)
         mu_pred  = self._channels(self.params_pred, 1)
@@ -38,8 +39,8 @@ class FailureModes:
         mu_gt    = self._channels(self.params_gt, 1)
         sig_gt   = self._channels(self.params_gt, 2)
 
-        act_pred = amp_pred > ParamMatcher.ACTIVE_AMP_THR
-        act_gt   = amp_gt   > ParamMatcher.ACTIVE_AMP_THR
+        act_pred = ParamMatcher.is_active(amp_pred)
+        act_gt   = ParamMatcher.is_active(amp_gt)
 
         n_pixels     = mu_pred.shape[1]
         rows         = np.arange(n_pixels)

@@ -9,10 +9,10 @@ from _bootstrap import EnvironmentPinner
 def main() -> None:
     EnvironmentPinner.threads()
 
-    from configuration.diagnostics                   import ActivationXrayConfig
-    from pipelines.backbone.inference.activation_xray import ActivationXrayBatch
-    from tools.runtime.config_cli                    import ConfigCli
-    from tools.monitoring.logger                     import Logger
+    from configuration.diagnostics                             import ActivationXrayConfig
+    from pipelines.backbone.inference.analysis.activation_xray import ActivationXrayBatch
+    from tools.runtime.config_cli                              import ConfigCli
+    from tools.monitoring.logger                               import Logger
 
     config = ConfigCli(ActivationXrayConfig(), description="X-ray the activations of trained backbone runs on real data: hook every leaf module, run a few batches, and report dead layers, dead channels, exploding or constant activations with depth profiles, per-layer histograms, a JSON dump and a markdown report inside each run directory").apply()
 

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import torch
@@ -102,12 +101,7 @@ class WeightXrayBatch:
 
     def _select_runs(self) -> list[Path]:
         selector = RunSelector(self.entry_config.runs_dir, self.entry_config.checkpoint_filename, self.logger, action="x-ray")
-
-        if self.entry_config.run_filter:
-            return selector.filter(self.entry_config.run_filter)
-        if sys.stdin.isatty():
-            return selector.select()
-        return selector.all()
+        return selector.resolve(self.entry_config.run_filter)
 
     def _xray_run(self, run_dir: Path) -> dict:
         config = self.entry_config.to_config(run_dir)

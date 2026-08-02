@@ -1491,11 +1491,11 @@ class EquationLibrary:
                 },
                 {
                     "title" : "Gaussian active-count accuracy",
-                    "tex"   : r"c^{s}_{a,r} = \sum_{k=1}^{K} \mathbb{1}\!\left[a^{s}_k > \tau_a\right], \qquad \mathrm{ExactFrac} = \frac{1}{HW}\sum_{a,r}\mathbb{1}\!\left[c^{\mathrm{pred}}_{a,r} = c^{\mathrm{GT}}_{a,r}\right], \qquad \mathrm{Acc}_{\mathrm{gt}=k} = \Pr\!\left(c^{\mathrm{pred}} = k \mid c^{\mathrm{GT}} = k\right)",
-                    "note"  : "Active Gaussians (amplitude strictly above 1e-3) are counted per pixel for prediction and GT; the run reports exact/under/over count fractions, overall and per-slot active fractions (the predicted per-slot fraction uses the GT-aligned assignment), and exact-count accuracy conditioned on the GT active count (count_acc_gt{k}) and also on the predicted count (count_acc_pred{k}) (metrics.py _active_count_stats).",
+                    "tex"   : r"c^{s}_{a,r} = \sum_{k=1}^{K} \mathbb{1}\!\left[a^{s}_k \ge \tau_a\right], \qquad \mathrm{ExactFrac} = \frac{1}{HW}\sum_{a,r}\mathbb{1}\!\left[c^{\mathrm{pred}}_{a,r} = c^{\mathrm{GT}}_{a,r}\right], \qquad \mathrm{Acc}_{\mathrm{gt}=k} = \Pr\!\left(c^{\mathrm{pred}} = k \mid c^{\mathrm{GT}} = k\right)",
+                    "note"  : "Active Gaussians (amplitude at or above 1e-4) are counted per pixel for prediction and GT; the run reports exact/under/over count fractions, overall and per-slot active fractions (the predicted per-slot fraction uses the GT-aligned assignment), and exact-count accuracy conditioned on the GT active count (count_acc_gt{k}) and also on the predicted count (count_acc_pred{k}) (metrics.py _active_count_stats).",
                     "vars"  : [
                         {"sym": r"c^{s}_{a,r}",                  "desc": "per-pixel active-Gaussian count for source s (pred or GT)"},
-                        {"sym": r"\tau_a",                       "desc": "active-amplitude threshold, ACTIVE_AMP_THR = 1e-4 (strict >)"},
+                        {"sym": r"\tau_a",                       "desc": "active-amplitude threshold, ParamMatcher.is_active with ACTIVE_AMP_THR = 1e-4"},
                         {"sym": r"\mathrm{ExactFrac}",           "desc": "fraction of pixels whose predicted and GT counts match"},
                         {"sym": r"\mathrm{Acc}_{\mathrm{gt}=k}", "desc": "exact-count accuracy among pixels with k active GT slots"},
                     ],

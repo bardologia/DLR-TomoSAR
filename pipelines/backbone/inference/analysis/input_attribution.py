@@ -1,19 +1,16 @@
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from configuration.diagnostics           import InputAttributionConfig
-from pipelines.backbone.inference.loader import RunLoader
-from pipelines.backbone.inference.probes import ModelDevice, PredictionCurves, ProbeWindows
-from tools.data.io                       import FileIO
-from tools.reporting.markdown            import MarkdownDoc, MarkdownTable
-from tools.reporting.plotting            import PlotBase
-from tools.runtime.run_selector          import RunSelector
+from pipelines.backbone.inference.analysis.run_batch import AnalysisRun, RunBatch
+from pipelines.backbone.inference.probes             import ModelDevice, PredictionCurves, ProbeWindows
+from tools.data.io                                   import FileIO
+from tools.reporting.markdown                        import MarkdownDoc, MarkdownTable
+from tools.reporting.plotting                        import PlotBase
 
 
 class ChannelLabeler:
@@ -161,26 +158,10 @@ class InputAttributionPlots(PlotBase):
         return self._save(fig, path)
 
 
-class InputAttributionRun:
+class InputAttributionRun(AnalysisRun):
 
     SUMMARY_FILENAME = "input_attribution.json"
     REPORT_FILENAME  = "input_attribution.md"
-
-    def __init__(self, run_dir: Path, config: InputAttributionConfig, logger) -> None:
-        self.run_dir = Path(run_dir)
-        self.config  = config
-        self.logger  = logger
-
-        self.output_dir = self.run_dir / config.output_subdir
-
-    def _load_run(self):
-        return RunLoader(self.run_dir, logger=self.logger).load(
-            split           = self.config.split,
-            batch_size      = self.config.batch_size,
-            num_workers     = 0,
-            device          = self.config.device,
-            checkpoint_name = self.config.checkpoint_name,
-        )
 
     def _gradient_importance(self, run) -> dict[str, np.ndarray]:
         probes  = ProbeWindows(run, self.config.window)
@@ -269,27 +250,8 @@ class InputAttributionRun:
         return payload
 
 
-class InputAttributionBatch:
+class InputAttributionBatch(RunBatch):
 
-    def __init__(self, config: InputAttributionConfig, logger) -> None:
-        self.config = config
-        self.logger = logger
-
-    def _select_runs(self) -> list[Path]:
-        selector = RunSelector(self.config.runs_dir, self.config.checkpoint_name, self.logger, action="attribute")
-
-        if self.config.run_filter:
-            return selector.filter(self.config.run_filter)
-        if sys.stdin.isatty():
-            return selector.select()
-        return selector.all()
-
-    def run(self) -> list[dict]:
-        self.logger.section("Input attribution")
-
-        results = []
-        for run_dir in self._select_runs():
-            self.logger.subsection(f"Run: {run_dir}")
-            results.append(InputAttributionRun(run_dir, self.config, self.logger).run())
-
-        return results
+    SELECTOR_ACTION = "attribute"
+    SECTION_TITLE   = "Input attribution"
+    RUN_CLASS       = InputAttributionRun

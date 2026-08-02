@@ -4,9 +4,9 @@ import numpy as np
 import pytest
 import torch
 
-from pipelines.backbone.inference.input_attribution import TrackChannels
-from pipelines.backbone.inference.probes            import PredictionCurves
-from pipelines.backbone.inference.robustness        import RobustnessCore
+from pipelines.backbone.inference.analysis.input_attribution import TrackChannels
+from pipelines.backbone.inference.analysis.robustness        import RobustnessCore
+from pipelines.backbone.inference.probes                     import PredictionCurves
 
 from types import SimpleNamespace
 

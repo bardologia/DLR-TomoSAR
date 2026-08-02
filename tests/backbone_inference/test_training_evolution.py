@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 import torch
 
-from pipelines.backbone.inference.training_evolution import EvolutionFrames, TrainingEvolutionRun
+from pipelines.backbone.inference.analysis.training_evolution import EvolutionFrames, TrainingEvolutionRun
 from configuration.diagnostics                       import TrainingEvolutionConfig
 
 from tests.conftest import SilentLogger

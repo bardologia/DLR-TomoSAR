@@ -6,8 +6,8 @@ from types   import SimpleNamespace
 
 import pytest
 
-from configuration.diagnostics                   import PaperFigurePackConfig
-from pipelines.backbone.inference.paper_figures  import PaperFigurePack
+from configuration.diagnostics                           import PaperFigurePackConfig
+from pipelines.backbone.inference.analysis.paper_figures import PaperFigurePack
 
 from tests.conftest import SilentLogger
 

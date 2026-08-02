@@ -46,7 +46,7 @@ class ModelProbe:
 
     def _load_worker(self, run_path: str, split: str, device: str) -> None:
         try:
-            from pipelines.backbone.inference.input_attribution import ChannelLabeler
+            from pipelines.backbone.inference.analysis.input_attribution import ChannelLabeler
             from pipelines.backbone.inference.loader            import RunLoader
             from pipelines.backbone.inference.probes            import PredictionCurves
             from tools.diagnostics.activation_recorder          import ActivationRecorder
@@ -157,7 +157,7 @@ class ModelProbe:
                 "amp"    : amp,
                 "mu"     : float(params_center[3 * k + 1]),
                 "sigma"  : float(params_center[3 * k + 2]),
-                "active" : bool(amp > ParamMatcher.ACTIVE_AMP_THR),
+                "active" : bool(ParamMatcher.is_active(amp)),
             })
         return slots
 

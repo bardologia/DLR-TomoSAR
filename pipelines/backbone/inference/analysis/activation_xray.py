@@ -1,42 +1,23 @@
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import torch
 
-from configuration.diagnostics                   import ActivationXrayConfig
-from pipelines.backbone.inference.loader         import RunLoader
-from tools.data.io                               import FileIO
-from tools.diagnostics.activation_recorder       import ActivationRecorder, LayerActivationStats
-from tools.diagnostics.activation_xray_analysis  import ActivationIssueDetector, ActivationXraySummarizer
-from tools.diagnostics.activation_xray_plots     import ActivationXrayPlots
-from tools.diagnostics.weight_xray_analysis      import SEVERITY_RANK
-from tools.reporting.markdown                    import MarkdownDoc, MarkdownTable
-from tools.reporting.plotting                    import PlotBase
-from tools.runtime.run_selector                  import RunSelector
+from pipelines.backbone.inference.analysis.run_batch import AnalysisRun, RunBatch
+from tools.data.io                                   import FileIO
+from tools.diagnostics.activation_recorder           import ActivationRecorder, LayerActivationStats
+from tools.diagnostics.activation_xray_analysis      import ActivationIssueDetector, ActivationXraySummarizer
+from tools.diagnostics.activation_xray_plots         import ActivationXrayPlots
+from tools.diagnostics.weight_xray_analysis          import SEVERITY_RANK
+from tools.reporting.markdown                        import MarkdownDoc, MarkdownTable
+from tools.reporting.plotting                        import PlotBase
 
 
-class ActivationXrayRun:
+class ActivationXrayRun(AnalysisRun):
 
     SUMMARY_FILENAME = "activation_xray.json"
     REPORT_FILENAME  = "activation_xray.md"
-
-    def __init__(self, run_dir: Path, config: ActivationXrayConfig, logger) -> None:
-        self.run_dir = Path(run_dir)
-        self.config  = config
-        self.logger  = logger
-
-        self.output_dir = self.run_dir / config.output_subdir
-
-    def _load_run(self):
-        return RunLoader(self.run_dir, logger=self.logger).load(
-            split           = self.config.split,
-            batch_size      = self.config.batch_size,
-            num_workers     = 0,
-            device          = self.config.device,
-            checkpoint_name = self.config.checkpoint_name,
-        )
 
     def _record(self, run) -> dict[str, dict]:
         recorder = ActivationRecorder(run.model.module)
@@ -129,27 +110,8 @@ class ActivationXrayRun:
         return payload
 
 
-class ActivationXrayBatch:
+class ActivationXrayBatch(RunBatch):
 
-    def __init__(self, config: ActivationXrayConfig, logger) -> None:
-        self.config = config
-        self.logger = logger
-
-    def _select_runs(self) -> list[Path]:
-        selector = RunSelector(self.config.runs_dir, self.config.checkpoint_name, self.logger, action="x-ray")
-
-        if self.config.run_filter:
-            return selector.filter(self.config.run_filter)
-        if sys.stdin.isatty():
-            return selector.select()
-        return selector.all()
-
-    def run(self) -> list[dict]:
-        self.logger.section("Activation x-ray")
-
-        results = []
-        for run_dir in self._select_runs():
-            self.logger.subsection(f"Run: {run_dir}")
-            results.append(ActivationXrayRun(run_dir, self.config, self.logger).run())
-
-        return results
+    SELECTOR_ACTION = "x-ray"
+    SECTION_TITLE   = "Activation x-ray"
+    RUN_CLASS       = ActivationXrayRun

@@ -8,8 +8,8 @@ from types   import SimpleNamespace
 import numpy as np
 import pytest
 
-from pipelines.backbone.inference.seed_comparison   import SeedComparison
-from pipelines.backbone.inference.seed_disagreement import SeedDisagreementMaps
+from pipelines.backbone.inference.analysis.seed_comparison   import SeedComparison
+from pipelines.backbone.inference.analysis.seed_disagreement import SeedDisagreementMaps
 
 from tests.conftest import SilentLogger
 

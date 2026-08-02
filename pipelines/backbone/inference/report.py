@@ -628,24 +628,27 @@ class Report:
         digits = "".join(ch for ch in number if ch.isdigit())
         return (int(digits), number[len(digits):])
 
+    @classmethod
+    def group_metric_keys(cls, keys) -> List[Tuple[str, List[str]]]:
+        groups: Dict[str, List[str]] = {title: [] for title, _match in cls._METRIC_TAXONOMY}
+
+        for key in sorted(keys):
+            if cls._is_per_slice_ssim(key) or key in cls._METRIC_SKIP_KEYS:
+                continue
+
+            title = next(title for title, match in cls._METRIC_TAXONOMY if match(key))
+            groups[title].append(key)
+
+        ordered = sorted((title for title in groups if groups[title]), key=cls._section_order)
+        return [(title, groups[title]) for title in ordered]
+
     def _build_full_metrics(self) -> List[str]:
         gm  = self.global_metrics
         out = ["\n## 3. Full metric tables\n"]
 
-        groups: Dict[str, Dict] = {title: {} for title, _match in self._METRIC_TAXONOMY}
-
-        for k, v in sorted(gm.items()):
-            if self._is_per_slice_ssim(k) or k in self._METRIC_SKIP_KEYS:
-                continue
-
-            title            = next(title for title, match in self._METRIC_TAXONOMY if match(k))
-            groups[title][k] = v
-
-        for title in sorted(groups, key=self._section_order):
-            if not groups[title]:
-                continue
+        for title, keys in self.group_metric_keys(gm):
             out.append(f"\n### {title}\n")
-            out.append(self._dict_table(groups[title]))
+            out.append(self._dict_table({key: gm[key] for key in keys}))
             out.append("")
 
         return out

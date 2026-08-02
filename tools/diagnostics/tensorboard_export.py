@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import sys
 import textwrap
 
 from dataclasses import dataclass
@@ -326,12 +325,7 @@ class TensorboardExportBatch:
 
     def _select_runs(self) -> list[Path]:
         selector = TensorboardRunSelector(self.entry_config.runs_dir, self.entry_config.tensorboard_dirname, self.logger)
-
-        if self.entry_config.run_filter:
-            return selector.filter(self.entry_config.run_filter)
-        if sys.stdin.isatty():
-            return selector.select()
-        return selector.all()
+        return selector.resolve(self.entry_config.run_filter)
 
     def _export_run(self, run_dir: Path) -> dict:
         config = self.entry_config.to_config(run_dir)

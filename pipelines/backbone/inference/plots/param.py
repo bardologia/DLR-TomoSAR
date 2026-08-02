@@ -29,14 +29,14 @@ class SlotAlignment:
 
         return cached.shape == candidate.shape and cached.strides == candidate.strides and cached.ctypes.data == candidate.ctypes.data
 
-    def of(self, params_pred: np.ndarray, params_gt: np.ndarray, n_gaussians: int) -> np.ndarray:
+    def of(self, params_pred: np.ndarray, params_gt: np.ndarray, n_gaussians: int, assignment: Optional[np.ndarray] = None) -> np.ndarray:
         if self.n_gaussians == n_gaussians and self._is_same(self.params_pred, params_pred) and self._is_same(self.params_gt, params_gt):
             return self.aligned
 
         self.params_pred = params_pred
         self.params_gt   = params_gt
         self.n_gaussians = n_gaussians
-        self.aligned     = GaussianMatcher().aligned_prediction(params_pred, params_gt, n_gaussians)
+        self.aligned     = GaussianMatcher().aligned_prediction(params_pred, params_gt, n_gaussians, assignment=assignment)
 
         return self.aligned
 
@@ -52,18 +52,19 @@ class ParamPlotter(PlotTools):
         params_gt   : Optional[np.ndarray],
         n_gaussians : int,
         out_dir     : Path,
+        assignment  : Optional[np.ndarray] = None,
         bins        : int = 80,
     ) -> List[Path]:
 
         matched     = params_gt is not None
-        pred_source = self.alignment.of(params_pred, params_gt, n_gaussians) if matched else params_pred
+        pred_source = self.alignment.of(params_pred, params_gt, n_gaussians, assignment) if matched else params_pred
         paths       = []
 
         for k in range(n_gaussians):
             amp_ch = 3 * k
             if matched and amp_ch < params_gt.shape[0]:
                 gt_amp_flat = params_gt[amp_ch].reshape(-1)
-                active_mask = np.isfinite(gt_amp_flat) & (gt_amp_flat > ParamMatcher.ACTIVE_AMP_THR)
+                active_mask = np.isfinite(gt_amp_flat) & ParamMatcher.is_active(gt_amp_flat)
             else:
                 active_mask = None
 
@@ -193,16 +194,17 @@ class ParamPlotter(PlotTools):
         params_gt   : np.ndarray,
         n_gaussians : int,
         out_dir     : Path,
+        assignment  : Optional[np.ndarray] = None,
         max_points  : int = 8_000,
         seed        : int = 0,
     ) -> List[Path]:
 
-        aligned = self.alignment.of(params_pred, params_gt, n_gaussians)
+        aligned = self.alignment.of(params_pred, params_gt, n_gaussians, assignment)
         paths   = []
 
         for k in range(n_gaussians):
             gt_amp_flat = params_gt[3 * k].reshape(-1)
-            is_active   = np.isfinite(gt_amp_flat) & (gt_amp_flat > ParamMatcher.ACTIVE_AMP_THR)
+            is_active   = np.isfinite(gt_amp_flat) & ParamMatcher.is_active(gt_amp_flat)
 
             for j, (fname, lbl) in enumerate(self.PARAM_LABELS):
                 ch    = 3 * k + j
@@ -257,15 +259,16 @@ class ParamPlotter(PlotTools):
         out_dir     : Path,
         az_offset   : int,
         rg_offset   : int,
+        assignment  : Optional[np.ndarray] = None,
     ) -> List[Path]:
 
-        aligned = self.alignment.of(params_pred, params_gt, n_gaussians)
+        aligned = self.alignment.of(params_pred, params_gt, n_gaussians, assignment)
         H, W    = params_pred.shape[-2:]
         extent  = [rg_offset, rg_offset + W, az_offset + H, az_offset]
         paths   = []
 
         for k in range(n_gaussians):
-            gt_active = params_gt[3 * k] > ParamMatcher.ACTIVE_AMP_THR
+            gt_active = ParamMatcher.is_active(params_gt[3 * k])
 
             for j, (fname, _) in enumerate(self.PARAM_LABELS):
                 ch    = 3 * k + j
@@ -303,15 +306,16 @@ class ParamPlotter(PlotTools):
         params_gt   : np.ndarray,
         n_gaussians : int,
         out_dir     : Path,
+        assignment  : Optional[np.ndarray] = None,
         bins        : int = 80,
     ) -> List[Path]:
 
-        aligned = self.alignment.of(params_pred, params_gt, n_gaussians)
+        aligned = self.alignment.of(params_pred, params_gt, n_gaussians, assignment)
         paths   = []
 
         for k in range(n_gaussians):
             gt_amp_flat = params_gt[3 * k].reshape(-1)
-            is_active   = np.isfinite(gt_amp_flat) & (gt_amp_flat > ParamMatcher.ACTIVE_AMP_THR)
+            is_active   = np.isfinite(gt_amp_flat) & ParamMatcher.is_active(gt_amp_flat)
 
             for j, (fname, lbl) in enumerate(self.PARAM_LABELS):
                 ch    = 3 * k + j

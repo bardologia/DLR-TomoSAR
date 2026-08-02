@@ -9,10 +9,10 @@ from _bootstrap import EnvironmentPinner
 def main() -> None:
     EnvironmentPinner.threads()
 
-    from configuration.diagnostics                  import LayerProbeConfig
-    from pipelines.backbone.inference.layer_probes  import LayerProbeBatch
-    from tools.runtime.config_cli                   import ConfigCli
-    from tools.monitoring.logger                    import Logger
+    from configuration.diagnostics                          import LayerProbeConfig
+    from pipelines.backbone.inference.analysis.layer_probes import LayerProbeBatch
+    from tools.runtime.config_cli                           import ConfigCli
+    from tools.monitoring.logger                            import Logger
 
     config = ConfigCli(LayerProbeConfig(), description="Probe trained backbone runs layer by layer: ridge readouts on sampled real pixels predict the GT active Gaussian count and dominant scatterer elevation from each layer's features, and the held-out R² by depth shows where each quantity becomes linearly decodable; figures, JSON and a markdown report land inside each run directory").apply()
 

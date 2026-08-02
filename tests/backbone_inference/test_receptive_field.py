@@ -7,7 +7,7 @@ import pytest
 import torch
 
 from pipelines.backbone.inference.probes          import ProbeWindows
-from pipelines.backbone.inference.receptive_field import ErfComputation
+from pipelines.backbone.inference.analysis.receptive_field import ErfComputation
 
 
 WINDOW = 16

@@ -1,19 +1,16 @@
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from configuration.diagnostics           import AttentionCaptureConfig
-from models.blocks                       import AttentionTap
-from pipelines.backbone.inference.loader import RunLoader
-from tools.data.io                       import FileIO
-from tools.reporting.markdown            import MarkdownDoc, MarkdownTable
-from tools.reporting.plotting            import PlotBase
-from tools.runtime.run_selector          import RunSelector
+from models.blocks                                   import AttentionTap
+from pipelines.backbone.inference.analysis.run_batch import AnalysisRun, RunBatch
+from tools.data.io                                   import FileIO
+from tools.reporting.markdown                        import MarkdownDoc, MarkdownTable
+from tools.reporting.plotting                        import PlotBase
 
 
 class AttentionCapture:
@@ -161,26 +158,10 @@ class AttentionCapturePlots(PlotBase):
         return self._save(fig, path)
 
 
-class AttentionCaptureRun:
+class AttentionCaptureRun(AnalysisRun):
 
     SUMMARY_FILENAME = "attention_capture.json"
     REPORT_FILENAME  = "attention_capture.md"
-
-    def __init__(self, run_dir: Path, config: AttentionCaptureConfig, logger) -> None:
-        self.run_dir = Path(run_dir)
-        self.config  = config
-        self.logger  = logger
-
-        self.output_dir = self.run_dir / config.output_subdir
-
-    def _load_run(self):
-        return RunLoader(self.run_dir, logger=self.logger).load(
-            split           = self.config.split,
-            batch_size      = self.config.batch_size,
-            num_workers     = 0,
-            device          = self.config.device,
-            checkpoint_name = self.config.checkpoint_name,
-        )
 
     def _capture(self, run) -> dict:
         capture = AttentionCapture(run.model.module)
@@ -267,27 +248,8 @@ class AttentionCaptureRun:
         return summary
 
 
-class AttentionCaptureBatch:
+class AttentionCaptureBatch(RunBatch):
 
-    def __init__(self, config: AttentionCaptureConfig, logger) -> None:
-        self.config = config
-        self.logger = logger
-
-    def _select_runs(self) -> list[Path]:
-        selector = RunSelector(self.config.runs_dir, self.config.checkpoint_name, self.logger, action="capture")
-
-        if self.config.run_filter:
-            return selector.filter(self.config.run_filter)
-        if sys.stdin.isatty():
-            return selector.select()
-        return selector.all()
-
-    def run(self) -> list[dict]:
-        self.logger.section("Attention capture")
-
-        results = []
-        for run_dir in self._select_runs():
-            self.logger.subsection(f"Run: {run_dir}")
-            results.append(AttentionCaptureRun(run_dir, self.config, self.logger).run())
-
-        return results
+    SELECTOR_ACTION = "capture"
+    SECTION_TITLE   = "Attention capture"
+    RUN_CLASS       = AttentionCaptureRun

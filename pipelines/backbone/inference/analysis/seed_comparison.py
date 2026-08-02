@@ -3,14 +3,14 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from pipelines.backbone.inference.report            import Report
-from pipelines.backbone.inference.seed_disagreement import SeedDisagreementMaps
-from pipelines.shared.inference.run_classifier      import RunDirectoryWalk
-from tools.data.io                             import FileIO
-from tools.metrics.scoring                     import SeedAggregation
-from tools.monitoring.logger                   import Logger
-from tools.reporting.markdown                  import MarkdownTable, ScalarFormatter
-from tools.runtime.run_tag                     import RunTag
+from pipelines.backbone.inference.analysis.seed_disagreement import SeedDisagreementMaps
+from pipelines.backbone.inference.report                     import Report
+from pipelines.shared.inference.run_classifier               import RunDirectoryWalk
+from tools.data.io                                           import FileIO
+from tools.metrics.scoring                                   import SeedAggregation
+from tools.monitoring.logger                                 import Logger
+from tools.reporting.markdown                                import MarkdownTable, ScalarFormatter
+from tools.runtime.run_tag                                   import RunTag
 
 
 class SeedInferenceResolver:
@@ -104,18 +104,8 @@ class SeedComparisonReport:
 
         return out
 
-    def _report_keys(self, means: dict) -> list[str]:
-        return [key for key in means if not Report._is_per_slice_ssim(key) and key not in Report._METRIC_SKIP_KEYS]
-
-    def _grouped_keys(self, keys: list[str]) -> list[tuple[str, list[str]]]:
-        groups: dict[str, list[str]] = {title: [] for title, _match in Report._METRIC_TAXONOMY}
-
-        for key in sorted(keys):
-            title = next(title for title, match in Report._METRIC_TAXONOMY if match(key))
-            groups[title].append(key)
-
-        ordered = sorted((title for title in groups if groups[title]), key=Report._section_order)
-        return [(title.split(" ", 1)[1], groups[title]) for title in ordered]
+    def _grouped_keys(self, means: dict) -> list[tuple[str, list[str]]]:
+        return [(title.split(" ", 1)[1], keys) for title, keys in Report.group_metric_keys(means)]
 
     def _build_metrics_section(self, per_seed: list[dict], means: dict, stds: dict) -> list[str]:
         out = ["\n## 2. Aggregated metrics\n"]
@@ -124,7 +114,7 @@ class SeedComparisonReport:
             "the ± term the across-seed sample standard deviation (ddof = 1). Per-seed columns show each run's raw value.\n"
         )
 
-        for index, (title, keys) in enumerate(self._grouped_keys(self._report_keys(means)), start=1):
+        for index, (title, keys) in enumerate(self._grouped_keys(means), start=1):
             out.append(f"\n### 2.{index} {title}\n")
 
             table = MarkdownTable(("Metric", "Mean ± seed std", *self.seeds))

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from pipelines.backbone.inference.layer_probes import FeatureSampler, LayerProbeCore, RidgeProbe
+from pipelines.backbone.inference.analysis.layer_probes import FeatureSampler, LayerProbeCore, RidgeProbe
 
 
 H, W = 16, 12

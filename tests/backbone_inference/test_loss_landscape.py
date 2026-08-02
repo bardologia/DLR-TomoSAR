@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from pipelines.backbone.inference.loss_landscape import FilterNormalizedDirection, LandscapeEvaluator, LossLandscapePlots
+from pipelines.backbone.inference.analysis.loss_landscape import FilterNormalizedDirection, LandscapeEvaluator, LossLandscapePlots
 
 
 class _TinyConv(torch.nn.Module):

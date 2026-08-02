@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import shutil
-import sys
 from pathlib import Path
 
-from configuration.diagnostics                    import PaperFigurePackConfig
-from pipelines.backbone.inference.seed_comparison import SeedInferenceResolver
-from tools.data.io                                import FileIO
-from tools.runtime.run_selector                   import ReportRunSelector
+from configuration.diagnostics                             import PaperFigurePackConfig
+from pipelines.backbone.inference.analysis.seed_comparison import SeedInferenceResolver
+from tools.data.io                                         import FileIO
+from tools.runtime.run_selector                            import ReportRunSelector
 
 
 class PaperFigurePack:
@@ -22,12 +21,7 @@ class PaperFigurePack:
 
     def _select_runs(self) -> list[Path]:
         selector = ReportRunSelector(self.config.runs_dir, "inference", self.config.report_filename, self.logger)
-
-        if self.config.run_filter:
-            return selector.filter(self.config.run_filter)
-        if sys.stdin.isatty():
-            return selector.select()
-        return selector.all()
+        return selector.resolve(self.config.run_filter)
 
     def _run_label(self, run_dir: Path) -> str:
         relative = run_dir.relative_to(self.config.runs_dir) if run_dir.is_relative_to(self.config.runs_dir) else Path(run_dir.name)

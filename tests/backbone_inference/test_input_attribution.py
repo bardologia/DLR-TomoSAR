@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 import torch
 
-from pipelines.backbone.inference.input_attribution import ChannelLabeler, ChannelOcclusion, GradientAttribution
+from pipelines.backbone.inference.analysis.input_attribution import ChannelLabeler, ChannelOcclusion, GradientAttribution
 from pipelines.backbone.inference.probes            import PredictionCurves
 
 

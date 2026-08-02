@@ -21,7 +21,7 @@ class StratifiedErrors:
         n_k    = self.loaded.n_gaussians
         amps   = np.stack([params[3 * k] for k in range(n_k)])
 
-        return (amps > ParamMatcher.ACTIVE_AMP_THR).sum(axis=0).astype(np.float64)
+        return ParamMatcher.is_active(amps).sum(axis=0).astype(np.float64)
 
     def _mean_coherence(self) -> np.ndarray | None:
         inputs = self.loaded.complex_inputs

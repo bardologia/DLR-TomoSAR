@@ -54,6 +54,13 @@ class Result:
     failure_mode_map : Optional[np.ndarray]        = None
     miss_by_sep      : Optional[list]              = None
     presence_rows    : Optional[list]              = None
+    param_assignment : Optional[np.ndarray]        = None
+
+    def assignment(self, n_gaussians: int) -> np.ndarray:
+        if self.param_assignment is None:
+            self.param_assignment = GaussianMatcher().assignment(self.params_pred, self.params_gt, n_gaussians)
+
+        return self.param_assignment
 
 
 class Metrics:
@@ -69,7 +76,6 @@ class Metrics:
         self.n_gaussians = n_gaussians
         self.x_step      = float(x_axis[1] - x_axis[0])
         self.num_workers = min(os.cpu_count() or 1, 16)
-        self._assignment = None
         self._aligned    = None
 
     @staticmethod
@@ -289,10 +295,7 @@ class Metrics:
         }
 
     def _param_assignment(self) -> np.ndarray:
-        if self._assignment is None:
-            self._assignment = GaussianMatcher().assignment(self.result.params_pred, self.result.params_gt, self.n_gaussians)
-
-        return self._assignment
+        return self.result.assignment(self.n_gaussians)
 
     def _aligned_prediction(self) -> np.ndarray:
         if self._aligned is None:

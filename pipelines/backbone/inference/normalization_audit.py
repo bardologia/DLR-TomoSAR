@@ -67,7 +67,7 @@ class NormalizationAudit:
         mus    = np.stack([params[3 * k + 1] for k in range(n_k)])
         sigmas = np.stack([params[3 * k + 2] for k in range(n_k)])
 
-        active   = amps > ParamMatcher.ACTIVE_AMP_THR
+        active   = ParamMatcher.is_active(amps)
         n_active = int(active.sum())
 
         out = {"clamp_n_active": float(n_active)}

@@ -135,9 +135,9 @@ def test_param_plotter_matches_slots_once_per_cube(tmp_path, monkeypatch):
 
     original = GaussianMatcher.aligned_prediction
 
-    def counted(self, params_pred, params_gt, n_K):
+    def counted(self, params_pred, params_gt, n_K, assignment=None):
         calls.append(n_K)
-        return original(self, params_pred, params_gt, n_K)
+        return original(self, params_pred, params_gt, n_K, assignment=assignment)
 
     monkeypatch.setattr(GaussianMatcher, "aligned_prediction", counted)
 

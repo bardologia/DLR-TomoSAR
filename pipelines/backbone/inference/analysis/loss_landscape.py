@@ -1,19 +1,16 @@
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from configuration.diagnostics           import LossLandscapeConfig
-from pipelines.backbone.inference.loader import RunLoader
-from pipelines.backbone.inference.probes import PredictionCurves
-from tools.data.io                       import FileIO
-from tools.reporting.markdown            import MarkdownDoc
-from tools.reporting.plotting            import PlotBase
-from tools.runtime.run_selector          import RunSelector
+from pipelines.backbone.inference.analysis.run_batch import AnalysisRun, RunBatch
+from pipelines.backbone.inference.probes             import PredictionCurves
+from tools.data.io                                   import FileIO
+from tools.reporting.markdown                        import MarkdownDoc
+from tools.reporting.plotting                        import PlotBase
 
 
 class FilterNormalizedDirection:
@@ -108,26 +105,10 @@ class LossLandscapePlots(PlotBase):
         return self._save(fig, path)
 
 
-class LossLandscapeRun:
+class LossLandscapeRun(AnalysisRun):
 
     SUMMARY_FILENAME = "loss_landscape.json"
     REPORT_FILENAME  = "loss_landscape.md"
-
-    def __init__(self, run_dir: Path, config: LossLandscapeConfig, logger) -> None:
-        self.run_dir = Path(run_dir)
-        self.config  = config
-        self.logger  = logger
-
-        self.output_dir = self.run_dir / config.output_subdir
-
-    def _load_run(self):
-        return RunLoader(self.run_dir, logger=self.logger).load(
-            split           = self.config.split,
-            batch_size      = self.config.batch_size,
-            num_workers     = 0,
-            device          = self.config.device,
-            checkpoint_name = self.config.checkpoint_name,
-        )
 
     def _loss_fn(self, run):
         renderer = PredictionCurves(run.n_gaussians, run.x_axis)
@@ -219,27 +200,8 @@ class LossLandscapeRun:
         return payload
 
 
-class LossLandscapeBatch:
+class LossLandscapeBatch(RunBatch):
 
-    def __init__(self, config: LossLandscapeConfig, logger) -> None:
-        self.config = config
-        self.logger = logger
-
-    def _select_runs(self) -> list[Path]:
-        selector = RunSelector(self.config.runs_dir, self.config.checkpoint_name, self.logger, action="map")
-
-        if self.config.run_filter:
-            return selector.filter(self.config.run_filter)
-        if sys.stdin.isatty():
-            return selector.select()
-        return selector.all()
-
-    def run(self) -> list[dict]:
-        self.logger.section("Loss landscape")
-
-        results = []
-        for run_dir in self._select_runs():
-            self.logger.subsection(f"Run: {run_dir}")
-            results.append(LossLandscapeRun(run_dir, self.config, self.logger).run())
-
-        return results
+    SELECTOR_ACTION = "map"
+    SECTION_TITLE   = "Loss landscape"
+    RUN_CLASS       = LossLandscapeRun

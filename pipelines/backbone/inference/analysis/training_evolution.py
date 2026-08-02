@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -8,13 +7,11 @@ import numpy as np
 import torch
 from PIL import Image
 
-from configuration.diagnostics           import TrainingEvolutionConfig
-from pipelines.backbone.inference.loader import RunLoader
-from pipelines.backbone.inference.probes import PredictionCurves, ProbeWindows
-from tools.data.io                       import FileIO
-from tools.reporting.markdown            import MarkdownDoc
-from tools.reporting.plotting            import PlotBase
-from tools.runtime.run_selector          import RunSelector
+from pipelines.backbone.inference.analysis.run_batch import AnalysisRun, RunBatch
+from pipelines.backbone.inference.probes             import PredictionCurves, ProbeWindows
+from tools.data.io                                   import FileIO
+from tools.reporting.markdown                        import MarkdownDoc
+from tools.reporting.plotting                        import PlotBase
 
 
 class EvolutionFrames(PlotBase):
@@ -39,17 +36,10 @@ class EvolutionFrames(PlotBase):
         return image
 
 
-class TrainingEvolutionRun:
+class TrainingEvolutionRun(AnalysisRun):
 
     SUMMARY_FILENAME = "training_evolution.json"
     REPORT_FILENAME  = "training_evolution.md"
-
-    def __init__(self, run_dir: Path, config: TrainingEvolutionConfig, logger) -> None:
-        self.run_dir = Path(run_dir)
-        self.config  = config
-        self.logger  = logger
-
-        self.output_dir = self.run_dir / config.output_subdir
 
     def _snapshots(self) -> list[Path]:
         snapshots = sorted((self.run_dir / "checkpoints").glob("epoch_*.pt"))
@@ -58,14 +48,8 @@ class TrainingEvolutionRun:
 
         return snapshots
 
-    def _load_run(self):
-        return RunLoader(self.run_dir, logger=self.logger).load(
-            split           = self.config.split,
-            batch_size      = 1,
-            num_workers     = 0,
-            device          = self.config.device,
-            checkpoint_name = self.config.checkpoint_name,
-        )
+    def _batch_size(self) -> int:
+        return 1
 
     def _gt_curve(self, run, renderer: PredictionCurves, az: int, rg: int) -> np.ndarray:
         params = np.asarray(run.dataset.gt_parameters[:, az, rg], dtype=np.float64)
@@ -137,27 +121,8 @@ class TrainingEvolutionRun:
         return payload
 
 
-class TrainingEvolutionBatch:
+class TrainingEvolutionBatch(RunBatch):
 
-    def __init__(self, config: TrainingEvolutionConfig, logger) -> None:
-        self.config = config
-        self.logger = logger
-
-    def _select_runs(self) -> list[Path]:
-        selector = RunSelector(self.config.runs_dir, self.config.checkpoint_name, self.logger, action="animate")
-
-        if self.config.run_filter:
-            return selector.filter(self.config.run_filter)
-        if sys.stdin.isatty():
-            return selector.select()
-        return selector.all()
-
-    def run(self) -> list[dict]:
-        self.logger.section("Training evolution animation")
-
-        results = []
-        for run_dir in self._select_runs():
-            self.logger.subsection(f"Run: {run_dir}")
-            results.append(TrainingEvolutionRun(run_dir, self.config, self.logger).run())
-
-        return results
+    SELECTOR_ACTION = "animate"
+    SECTION_TITLE   = "Training evolution animation"
+    RUN_CLASS       = TrainingEvolutionRun

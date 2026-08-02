@@ -9,10 +9,10 @@ from _bootstrap import EnvironmentPinner
 def main() -> None:
     EnvironmentPinner.threads()
 
-    from configuration.diagnostics                import RobustnessConfig
-    from pipelines.backbone.inference.robustness  import RobustnessBatch
-    from tools.runtime.config_cli                 import ConfigCli
-    from tools.monitoring.logger                  import Logger
+    from configuration.diagnostics                        import RobustnessConfig
+    from pipelines.backbone.inference.analysis.robustness import RobustnessBatch
+    from tools.runtime.config_cli                         import ConfigCli
+    from tools.monitoring.logger                          import Logger
 
     config = ConfigCli(RobustnessConfig(), description="Stress trained backbone runs with controlled input degradation: curve-MSE-vs-severity under gaussian noise on the normalized inputs and under whole-track dropout (secondary + interferogram channels zeroed, averaged over random subsets); curves, JSON and a markdown report land inside each run directory").apply()
 

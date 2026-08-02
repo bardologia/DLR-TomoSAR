@@ -188,12 +188,14 @@ class FigureComposer:
         slot_plotter  = self.plotter.slot
         meta          = self.meta
         logger        = self.logger
+        assignment    = result.assignment(run.n_gaussians) if result.params_gt is not None else None
 
         figure_paths["param_distributions"] = param_plotter.plot_param_distributions(
             params_pred = result.params_pred[: run.n_gaussians * 3],
             params_gt   = (result.params_gt[: run.n_gaussians * 3] if result.params_gt is not None else None),
             n_gaussians = run.n_gaussians,
             out_dir     = meta.figures_dir / "param_distributions",
+            assignment  = assignment,
         )
 
         figure_paths["param_scatter"] = param_plotter.plot_param_scatter(
@@ -201,6 +203,7 @@ class FigureComposer:
             params_gt   = result.params_gt  [: run.n_gaussians * 3],
             n_gaussians = run.n_gaussians,
             out_dir     = meta.figures_dir / "param_scatter",
+            assignment  = assignment,
         )
 
         figure_paths["param_error_maps"] = param_plotter.plot_param_error_maps(
@@ -210,6 +213,7 @@ class FigureComposer:
             out_dir     = meta.figures_dir / "param_error_maps",
             az_offset   = result.azimuth_offset,
             rg_offset   = result.range_offset,
+            assignment  = assignment,
         )
 
         figure_paths["param_error_hists"] = param_plotter.plot_param_error_hists(
@@ -217,6 +221,7 @@ class FigureComposer:
             params_gt   = result.params_gt  [: run.n_gaussians * 3],
             n_gaussians = run.n_gaussians,
             out_dir     = meta.figures_dir / "param_error_hists",
+            assignment  = assignment,
         )
 
         figure_paths["active_count_map"] = slot_plotter.plot_active_count_map(
@@ -245,7 +250,7 @@ class FigureComposer:
         figure_paths["slot_mu_rank"]    = org_plotter.plot_mu_rank_matrix(params_pred, n_K, out_dir)
 
         if params_gt is not None:
-            figure_paths["slot_assignment"] = org_plotter.plot_assignment_matrix(params_pred, params_gt, n_K, out_dir)
+            figure_paths["slot_assignment"] = org_plotter.plot_assignment_matrix(params_pred, params_gt, n_K, out_dir, assignment=result.assignment(n_K))
 
         logger.subsection(f"Slot organization : usage, per-slot distributions, μ-rank and GT-assignment matrices written to {out_dir}")
 

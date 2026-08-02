@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 
@@ -110,6 +111,14 @@ class RunSelector:
         self._present(run_dirs)
         self.logger.ok(f"Selected all {len(run_dirs)} run(s)")
         return run_dirs
+
+    def resolve(self, run_filter: list[str] | None) -> list[Path]:
+        if run_filter:
+            return self.filter(run_filter)
+        if sys.stdin.isatty():
+            return self.select()
+
+        return self.all()
 
 
 class ReportRunSelector(RunSelector):

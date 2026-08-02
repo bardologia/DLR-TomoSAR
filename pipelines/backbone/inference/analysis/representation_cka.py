@@ -1,23 +1,22 @@
 from __future__ import annotations
 
-import sys
 from itertools import combinations
-from pathlib import Path
+from pathlib   import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from configuration.diagnostics             import CkaConfig
-from pipelines.backbone.inference.loader   import RunLoader
-from pipelines.backbone.inference.layer_probes import FeatureSampler
-from pipelines.backbone.inference.probes import ModelDevice
-from tools.data.io                         import FileIO
-from tools.diagnostics.activation_recorder import ActivationRecorder
-from tools.reporting.markdown              import MarkdownDoc, MarkdownTable
-from tools.reporting.plotting              import PlotBase
-from tools.runtime.run_selector            import RunSelector
-from tools.runtime.run_tag                 import RunTag
+from configuration.diagnostics                          import CkaConfig
+from pipelines.backbone.inference.analysis.layer_probes import FeatureSampler
+from pipelines.backbone.inference.loader                import RunLoader
+from pipelines.backbone.inference.probes                import ModelDevice
+from tools.data.io                                      import FileIO
+from tools.diagnostics.activation_recorder              import ActivationRecorder
+from tools.reporting.markdown                           import MarkdownDoc, MarkdownTable
+from tools.reporting.plotting                           import PlotBase
+from tools.runtime.run_selector                         import RunSelector
+from tools.runtime.run_tag                              import RunTag
 
 
 class CkaComputation:
@@ -107,13 +106,7 @@ class CkaComparison:
 
     def _select_runs(self) -> list[Path]:
         selector = RunSelector(self.config.runs_dir, self.config.checkpoint_name, self.logger, action="compare")
-
-        if self.config.run_filter:
-            run_dirs = selector.filter(self.config.run_filter)
-        elif sys.stdin.isatty():
-            run_dirs = selector.select()
-        else:
-            run_dirs = selector.all()
+        run_dirs = selector.resolve(self.config.run_filter)
 
         if len(run_dirs) < 2:
             raise ValueError(f"CKA needs at least two runs, got {len(run_dirs)}")

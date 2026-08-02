@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-import sys
 from pathlib import Path
 from typing  import List
 
@@ -110,12 +109,7 @@ class ReportCollectionBatch:
 
     def _select_runs(self) -> list[Path]:
         selector = ReportRunSelector(self.entry_config.runs_dir, self.entry_config.inference_dirname, self.entry_config.report_filename, self.logger)
-
-        if self.entry_config.run_filter:
-            return selector.filter(self.entry_config.run_filter)
-        if sys.stdin.isatty():
-            return selector.select()
-        return selector.all()
+        return selector.resolve(self.entry_config.run_filter)
 
     def _check_collisions(self, run_dirs: list[Path]) -> None:
         names      = [ReportCollection.run_label(run_dir) for run_dir in run_dirs]

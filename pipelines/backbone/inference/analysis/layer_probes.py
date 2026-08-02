@@ -1,21 +1,18 @@
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 
-from configuration.diagnostics             import LayerProbeConfig
-from pipelines.backbone.inference.loader   import RunLoader
-from pipelines.backbone.inference.probes   import ModelDevice
-from tools.data.io                         import FileIO
-from tools.diagnostics.activation_recorder import ActivationRecorder
-from tools.loss.param_loss                 import ParamMatcher
-from tools.reporting.markdown              import MarkdownDoc, MarkdownTable
-from tools.reporting.plotting              import PlotBase
-from tools.runtime.run_selector            import RunSelector
+from pipelines.backbone.inference.analysis.run_batch import AnalysisRun, RunBatch
+from pipelines.backbone.inference.probes             import ModelDevice
+from tools.data.io                                   import FileIO
+from tools.diagnostics.activation_recorder           import ActivationRecorder
+from tools.loss.param_loss                           import ParamMatcher
+from tools.reporting.markdown                        import MarkdownDoc, MarkdownTable
+from tools.reporting.plotting                        import PlotBase
 
 
 class RidgeProbe:
@@ -198,26 +195,10 @@ class LayerProbePlots(PlotBase):
         return self._save(fig, path)
 
 
-class LayerProbeRun:
+class LayerProbeRun(AnalysisRun):
 
     SUMMARY_FILENAME = "layer_probes.json"
     REPORT_FILENAME  = "layer_probes.md"
-
-    def __init__(self, run_dir: Path, config: LayerProbeConfig, logger) -> None:
-        self.run_dir = Path(run_dir)
-        self.config  = config
-        self.logger  = logger
-
-        self.output_dir = self.run_dir / config.output_subdir
-
-    def _load_run(self):
-        return RunLoader(self.run_dir, logger=self.logger).load(
-            split           = self.config.split,
-            batch_size      = self.config.batch_size,
-            num_workers     = 0,
-            device          = self.config.device,
-            checkpoint_name = self.config.checkpoint_name,
-        )
 
     def _select_layers(self, run) -> list[str]:
         names = ActivationRecorder(run.model.module).leaf_names()
@@ -298,27 +279,8 @@ class LayerProbeRun:
         return payload
 
 
-class LayerProbeBatch:
+class LayerProbeBatch(RunBatch):
 
-    def __init__(self, config: LayerProbeConfig, logger) -> None:
-        self.config = config
-        self.logger = logger
-
-    def _select_runs(self) -> list[Path]:
-        selector = RunSelector(self.config.runs_dir, self.config.checkpoint_name, self.logger, action="probe")
-
-        if self.config.run_filter:
-            return selector.filter(self.config.run_filter)
-        if sys.stdin.isatty():
-            return selector.select()
-        return selector.all()
-
-    def run(self) -> list[dict]:
-        self.logger.section("Layer-wise linear probes")
-
-        results = []
-        for run_dir in self._select_runs():
-            self.logger.subsection(f"Run: {run_dir}")
-            results.append(LayerProbeRun(run_dir, self.config, self.logger).run())
-
-        return results
+    SELECTOR_ACTION = "probe"
+    SECTION_TITLE   = "Layer-wise linear probes"
+    RUN_CLASS       = LayerProbeRun

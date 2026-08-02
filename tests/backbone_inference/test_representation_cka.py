@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from configuration.diagnostics                       import CkaConfig
-from pipelines.backbone.inference.representation_cka import CkaComparison, CkaComputation
+from pipelines.backbone.inference.analysis.representation_cka import CkaComparison, CkaComputation
 
 from tests.conftest import SilentLogger
 
