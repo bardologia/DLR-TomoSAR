@@ -18,7 +18,8 @@ from configuration.sar.processing_config  import (
 from pipelines.processing.generation.base import GeneratorBase
 from tools.sar.pyrat_env                  import PyRatEnvironment
 from tools.sar.tomogram_worker            import PyRatJob, run_pyrat_job
-from tools                                import FileIO, ProcessPoolRunner
+from tools.data.io                        import FileIO
+from tools.orchestration.pool             import ProcessPoolRunner
 from tools.monitoring.logger              import Logger
 from tools.data.regions                   import CropRegion
 

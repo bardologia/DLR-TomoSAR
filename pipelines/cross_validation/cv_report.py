@@ -8,11 +8,12 @@ import numpy as np
 from pipelines.shared.comparison.comparison_report import ComparisonReport
 from pipelines.shared.comparison.trial_collection  import TrialRecord
 from pipelines.cross_validation.folds              import FoldPlanner
-from tools                    import FileIO, MetricSectionGrouper
-from tools.metrics.scoring    import FiniteScalar
-from tools.monitoring.logger  import Logger
-from tools.reporting.markdown import MarkdownTable, ScalarFormatter
-from tools.runtime.run_tag    import RunTag
+from tools.data.io             import FileIO
+from tools.reporting.reporting import MetricSectionGrouper
+from tools.metrics.scoring     import FiniteScalar
+from tools.monitoring.logger   import Logger
+from tools.reporting.markdown  import MarkdownTable, ScalarFormatter
+from tools.runtime.run_tag     import RunTag
 
 
 class CrossValidationReport:

@@ -9,10 +9,10 @@ from configuration.training.backbone        import default_curriculum
 from configuration.training.general.loss    import LossConfig, ParamMatching
 from pipelines.backbone.training.loss       import Loss
 from pipelines.backbone.training.loss_terms import LOSS_TERMS, LossComponentCatalog
+from tools.monitoring.logger                import NullLogger
+from tools.monitoring.tracker               import NullTracker
 
 from tests.backbone_training._helpers import build_loss, gaussian_config, geometry_config, identity_normalizer, log1p_normalizer, param_tensor, spock_normalizer, valid_param_tensor, x_axis_tensor, zscore_normalizer
-
-import tools
 
 
 def test_loss_terms_table_is_consistent():
@@ -460,8 +460,8 @@ def test_loss_on_real_tomogram_param_target(parameters):
 
     loss = Loss(
         x_axis       = x_axis_tensor(),
-        logger       = tools.NullLogger(),
-        tracker      = tools.NullTracker(),
+        logger       = NullLogger(),
+        tracker      = NullTracker(),
         gaussian_cfg = gaussian_config(n_gaussians),
         loss_cfg     = LossConfig(use_param_l1=True, weight_param_l1=1.0),
         norm_stats   = identity_normalizer(n_channels),

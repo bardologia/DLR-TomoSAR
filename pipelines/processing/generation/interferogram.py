@@ -11,7 +11,7 @@ from configuration.sar.processing_config  import (
     ProcessingConfig,
 )
 from tools.sar.pyrat_env                  import PyRatEnvironment
-from tools                                import FileIO
+from tools.data.io                        import FileIO
 from tools.monitoring.logger              import Logger
 from tools.data.regions                   import CropRegion
 from pipelines.processing.generation.base import GeneratorBase

@@ -3,7 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from configuration.sar.processing_config import PathConfig, TomogramConfig
-from tools                               import FileIO
+from tools.data.io                       import FileIO
 from tools.monitoring.logger             import Logger
 
 

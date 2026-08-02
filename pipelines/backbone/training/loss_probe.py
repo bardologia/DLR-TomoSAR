@@ -9,7 +9,8 @@ import torch
 
 from pipelines.backbone.training.loss       import Loss
 from pipelines.backbone.training.loss_terms import LOSS_TERMS
-from tools                                  import NullLogger, NullTracker
+from tools.monitoring.logger                import NullLogger
+from tools.monitoring.tracker               import NullTracker
 
 
 class LossScaleProbe:

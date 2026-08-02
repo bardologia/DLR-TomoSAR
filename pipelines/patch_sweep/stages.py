@@ -7,7 +7,8 @@ from configuration.patch_sweep            import PatchSweepConfig
 from pipelines.patch_sweep.planner        import PatchSweepPlanner
 from pipelines.patch_sweep.report         import PatchSweepReport, SweepCollector
 from pipelines.shared.training.seed_sweep import SeedSet
-from tools                                import ExperimentStage, GpuJob, QueuedTrainingStage
+from tools.orchestration.gpu_queue        import GpuJob
+from tools.orchestration.stages           import ExperimentStage, QueuedTrainingStage
 from tools.monitoring.logger              import Logger
 from tools.runtime.run_tag                import RunTag
 

@@ -7,7 +7,7 @@ import pytest
 
 from configuration.sar.processing_config  import PathConfig, TomogramConfig
 from pipelines.processing.generation.base import GeneratorBase
-from tools                                import FileIO
+from tools.data.io                        import FileIO
 from tools.monitoring.logger              import Logger
 
 

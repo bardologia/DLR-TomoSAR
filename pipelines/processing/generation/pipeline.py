@@ -7,7 +7,7 @@ from typing  import Tuple
 from configuration.sar.processing_config       import ProcessingConfig
 from pipelines.processing.generation.artifacts import ArtifactRegistry, MetadataManager
 from pipelines.shared.orchestration.session_scheduler import SequentialSessionScheduler
-from tools                                     import FileIO
+from tools.data.io                             import FileIO
 from tools.monitoring.logger                   import Logger
 from tools.sar                                 import GeometryField, GeometryFieldBuilder, InterferogramLauncher, TomogramLauncher, TrackParameters
 from tools.baselines                           import TrackBaselines, TrackProfiles

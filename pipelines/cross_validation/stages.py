@@ -9,10 +9,11 @@ from pipelines.cross_validation.cv_report import CrossValidationReport
 from pipelines.cross_validation.folds     import FoldPlanner, FoldRunNaming
 from pipelines.cross_validation.workers   import FoldCollector
 from pipelines.shared.training.seed_sweep import SeedSet
-from tools                    import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
-from tools.monitoring.logger  import Logger
-from tools.runtime.completion import CompletionMarker
-from tools.runtime.run_tag    import RunTag
+from tools.orchestration.gpu_queue import GpuJob
+from tools.orchestration.stages    import ExperimentStage, QueuedInferenceStage, QueuedTrainingStage
+from tools.monitoring.logger       import Logger
+from tools.runtime.completion      import CompletionMarker
+from tools.runtime.run_tag         import RunTag
 
 
 class FoldTrainingStage(QueuedTrainingStage):

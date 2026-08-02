@@ -12,10 +12,8 @@ from pipelines.shared.model.model_builder import ModelBuilder
 from pipelines.tuning.plots               import StudyPlotter
 from pipelines.tuning.storage             import TuningStorage
 from pipelines.tuning.tuners              import BestConfigWriter
-from tools                                import FileIO
-from tools                                import GpuJob
-from tools                                import GpuPoolFile
-from tools                                import GpuQueue
+from tools.data.io                        import FileIO
+from tools.orchestration.gpu_queue        import GpuJob, GpuPoolFile, GpuQueue
 from tools.monitoring.logger              import Logger
 from tools.runtime.config_cli             import ConfigCli
 

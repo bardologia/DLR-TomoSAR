@@ -3,7 +3,6 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-import tools
 from configuration.normalization           import ChannelStats, ChannelStrategy, NormMethod, OutputClampConfig
 from configuration.sar.gaussian_config     import GaussianConfig
 from configuration.sar.geometry_config     import GeometryConfig
@@ -13,6 +12,8 @@ from pipelines.backbone.dataset.normalizer import Normalizer
 from pipelines.backbone.dataset.stats      import Stats
 from pipelines.backbone.training.loss      import Loss
 from models                                import get_backbone
+from tools.monitoring.logger               import NullLogger
+from tools.monitoring.tracker              import NullTracker
 
 
 X_MIN = -20.0
@@ -101,8 +102,8 @@ def build_loss(n_gaussians: int = 2, loss_cfg: LossConfig | None = None, log_all
 
     return Loss(
         x_axis         = x_axis_tensor(length),
-        logger         = tools.NullLogger(),
-        tracker        = tools.NullTracker(),
+        logger         = NullLogger(),
+        tracker        = NullTracker(),
         gaussian_cfg   = gaussian_config(n_gaussians),
         loss_cfg       = loss_cfg,
         norm_stats     = norm_stats if norm_stats is not None else identity_normalizer(n_channels),

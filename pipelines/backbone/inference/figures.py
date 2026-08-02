@@ -11,7 +11,7 @@ from pipelines.backbone.inference.failure_modes      import FailureModes
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 from pipelines.backbone.inference.metrics            import Metrics, Result
 from pipelines.backbone.inference.plots              import Plotter
-from tools                                           import ProfileNormalizer
+from tools.data.preprocessing                        import ProfileNormalizer
 from tools.monitoring.logger                         import Logger
 
 

@@ -10,10 +10,9 @@ from configuration.training                 import BackboneEntryConfig, LossScal
 from configuration.training.general.loss    import LossConfig
 from pipelines.backbone.training.launcher   import SingleTrainRunner
 from pipelines.backbone.training.loss_probe import LossScaleProbe
+from tools.monitoring.logger                import NullLogger
 
 from tests.backbone_training._helpers import gaussian_config, geometry_config, identity_normalizer, tiny_model, x_axis_tensor
-
-import tools
 
 
 def _loader(in_channels: int = 2, n_gaussians: int = 2, n: int = 4, hw: int = 12) -> DataLoader:
@@ -30,7 +29,7 @@ def _probe(probe_cfg: LossScaleProbeConfig, n_channels: int = 6) -> LossScalePro
         gaussian_cfg = gaussian_config(n_channels // 3),
         geometry_cfg = geometry_config(),
         norm_stats   = identity_normalizer(n_channels),
-        logger       = tools.NullLogger(),
+        logger       = NullLogger(),
     )
 
 

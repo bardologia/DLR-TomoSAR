@@ -11,12 +11,9 @@ from project_paths import ProjectPaths
 class ScriptConfigResolver:
 
     BOOTSTRAP = (
-        "import json, os, sys, types\n"
+        "import json, sys\n"
         "repo = sys.argv[1]\n"
         "sys.path.insert(0, repo)\n"
-        "package = types.ModuleType('tools')\n"
-        "package.__path__ = [os.path.join(repo, 'tools')]\n"
-        "sys.modules['tools'] = package\n"
         "from dataclasses import fields, is_dataclass\n"
         "from enum import Enum\n"
         "from pathlib import Path\n"
