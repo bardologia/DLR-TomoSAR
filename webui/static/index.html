@@ -38,6 +38,7 @@
     <a href="#/cube" data-route="cube">Cube</a>
     <a href="#/slices" data-route="slices">Slices</a>
     <a href="#/fitlab" data-route="fitlab">Fit Lab</a>
+    <a href="#/microscope" data-route="microscope">Microscope</a>
     <a href="#/leaderboard" data-route="leaderboard">Leaderboard</a>
     <a href="#/feedtuner" data-route="feedtuner">Feed Tuner</a>
     <a href="#/tensorboard" data-route="tensorboard">TensorBoard</a>
@@ -706,6 +707,20 @@
     </div>
   </section>
 
+  <!-- MODEL MICROSCOPE -->
+  <section class="page page--pad" data-page="microscope">
+    <div class="page__head">
+      <h2 class="page__title">Model microscope</h2>
+      <p class="page__lead">
+        Load a trained backbone checkpoint, pick a pixel on the scene, and inspect the model
+        from the inside: the predicted profile against ground truth and the raw tomogram,
+        which input channels the prediction depends on, per-layer feature maps, and live
+        what-if perturbations of the input.
+      </p>
+    </div>
+    <div id="probe-root"></div>
+  </section>
+
   <!-- FIT LAB -->
   <section class="page page--pad" data-page="fitlab">
     <div class="page__head">
@@ -1092,6 +1107,7 @@
 <script src="/static/js/tomogram.js?v=20260714f"></script>
 <script src="/static/js/slice_collector.js?v=20260802a"></script>
 <script src="/static/js/fit_lab.js?v=20260721a"></script>
+<script src="/static/js/microscope.js?v=20260802a"></script>
 <script src="/static/js/tensorboard.js?v=20260702r"></script>
 <script src="/static/js/feed_tuner.js?v=20260624a"></script>
 <script src="/static/js/app.js?v=20260802a"></script>

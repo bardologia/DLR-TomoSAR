@@ -231,6 +231,8 @@ class App {
 
     this.leaderboardView = new window.LeaderboardView(document.getElementById("leaderboard-root"));
 
+    this.microscopeView = new window.MicroscopeView(document.getElementById("probe-root"));
+
     this.fitLabView = new window.FitLabView({
       baseInput        : document.getElementById("fl-base"),
       scanBtn          : document.getElementById("fl-scan"),
@@ -471,6 +473,7 @@ class App {
     else this.tomogramView.leave();
     if (route === "slices") this.sliceCollectorView.enter();
     if (route === "fitlab") this.fitLabView.enter();
+    if (route === "microscope") this.microscopeView.enter();
     if (route === "console") this.runConsole.onShow();
     setTimeout(() => this.reveal.scan(), 60);
   }
