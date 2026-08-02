@@ -5,9 +5,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 
-from tools.data.io            import FileIO
-from tools.loss.param_loss    import ParamMatcher
-from tools.reporting.plotting import PlotBase
+from tools.data.io                   import FileIO
+from tools.metrics.gaussian_matching import GaussianMatcher
+from tools.reporting.plotting        import PlotBase
 
 
 class SeedDisagreementPlots(PlotBase):
@@ -147,14 +147,15 @@ class SeedDisagreementMaps:
 
     PROFILE_CUBE = "pred_curves.npy"
     PARAMS_CUBE  = "params_pred.npy"
+    GT_CUBE      = "params_gt.npy"
     RISK_CUBE    = "pixel_mse.npy"
     MIN_ACTIVE   = 2
 
     MAP_TITLES = {
         "seed_std_profile" : "Across-seed std of the reconstructed profile (mean over elevation)",
-        "seed_std_amp"     : "Across-seed std of predicted amplitude (mean over slots)",
-        "seed_std_mu"      : "Across-seed std of predicted mu (active slots, metres)",
-        "seed_std_sigma"   : "Across-seed std of predicted sigma (active slots, metres)",
+        "seed_std_amp"     : "Across-seed std of predicted amplitude (GT-matched slots)",
+        "seed_std_mu"      : "Across-seed std of predicted mu (GT-matched slots, metres)",
+        "seed_std_sigma"   : "Across-seed std of predicted sigma (GT-matched slots, metres)",
     }
 
     def __init__(self, group_dir: Path, run_dirs: list[Path], inference_dirs: list[Path], cubes_subdir: str, metrics_filename: str, output_dir: Path, logger) -> None:
@@ -171,7 +172,7 @@ class SeedDisagreementMaps:
 
     def _validate_cubes(self) -> None:
         for cube_dir in self.cube_dirs:
-            for name in (self.PROFILE_CUBE, self.PARAMS_CUBE, self.RISK_CUBE):
+            for name in (self.PROFILE_CUBE, self.PARAMS_CUBE, self.GT_CUBE, self.RISK_CUBE):
                 if not (cube_dir / name).is_file():
                     raise FileNotFoundError(f"{cube_dir / name} is missing; re-run inference with save_cubes enabled for every seed, or disable compute_disagreement")
 
@@ -211,32 +212,39 @@ class SeedDisagreementMaps:
 
         return np.sqrt(var)
 
-    def _param_maps(self) -> dict[str, np.ndarray]:
-        params       = self._open_cubes(self.PARAMS_CUBE)
-        n_ch, n_az, n_rg = params[0].shape
-        n_k          = n_ch // 3
+    def _aligned_params(self) -> list[np.ndarray]:
+        preds   = self._open_cubes(self.PARAMS_CUBE)
+        gt      = np.asarray(np.load(self.cube_dirs[0] / self.GT_CUBE), dtype=np.float32)
+        n_k     = preds[0].shape[0] // 3
+        matcher = GaussianMatcher()
 
-        amp_acc = np.zeros((n_az, n_rg), dtype=np.float64)
-        sums    = {"mu": np.zeros((n_az, n_rg), dtype=np.float64), "sigma": np.zeros((n_az, n_rg), dtype=np.float64)}
-        counts  = {"mu": np.zeros((n_az, n_rg), dtype=np.int32),   "sigma": np.zeros((n_az, n_rg), dtype=np.int32)}
+        return [matcher.aligned_prediction(np.asarray(pred, dtype=np.float32), gt, n_k) for pred in preds]
+
+    def _param_maps(self) -> dict[str, np.ndarray]:
+        aligned          = self._aligned_params()
+        n_ch, n_az, n_rg = aligned[0].shape
+        n_k              = n_ch // 3
+
+        sums   = {field: np.zeros((n_az, n_rg), dtype=np.float64) for field in ("amp", "mu", "sigma")}
+        counts = {field: np.zeros((n_az, n_rg), dtype=np.int32)   for field in ("amp", "mu", "sigma")}
 
         for k in range(n_k):
-            amps   = np.stack([np.asarray(p[3 * k],     dtype=np.float64) for p in params])
-            mus    = np.stack([np.asarray(p[3 * k + 1], dtype=np.float64) for p in params])
-            sigmas = np.stack([np.asarray(p[3 * k + 2], dtype=np.float64) for p in params])
+            stacks = {
+                "amp"   : np.stack([np.asarray(seed[3 * k],     dtype=np.float64) for seed in aligned]),
+                "mu"    : np.stack([np.asarray(seed[3 * k + 1], dtype=np.float64) for seed in aligned]),
+                "sigma" : np.stack([np.asarray(seed[3 * k + 2], dtype=np.float64) for seed in aligned]),
+            }
+            present = np.isfinite(stacks["amp"])
 
-            amp_acc += amps.std(axis=0, ddof=1)
-            active   = amps > ParamMatcher.ACTIVE_AMP_THR
-
-            for field, values in (("mu", mus), ("sigma", sigmas)):
-                std = self._masked_std(values, active)
+            for field, values in stacks.items():
+                std = self._masked_std(np.nan_to_num(values), present & np.isfinite(values))
                 ok  = np.isfinite(std)
 
                 sums[field][ok]  += std[ok]
                 counts[field]    += ok
 
-        maps = {"seed_std_amp": (amp_acc / n_k).astype(np.float32)}
-        for field in ("mu", "sigma"):
+        maps = {}
+        for field in ("amp", "mu", "sigma"):
             with np.errstate(invalid="ignore"):
                 slot_mean = np.divide(sums[field], counts[field], out=np.full(sums[field].shape, np.nan), where=counts[field] > 0)
             maps[f"seed_std_{field}"] = slot_mean.astype(np.float32)

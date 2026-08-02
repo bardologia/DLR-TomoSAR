@@ -141,7 +141,8 @@ class SeedComparisonReport:
         out = ["\n## 3. Seed disagreement maps\n"]
         out.append(
             "Per-pixel across-seed standard deviation of the model outputs, written as cubes into every seed's inference cube directory "
-            "(they appear as metric-map layers in the cube explorer). Mu and sigma disagreement is measured over slots active in at "
+            "(they appear as metric-map layers in the cube explorer). Predicted slots are first matched to the shared GT slots per seed, "
+            "so the parameter maps compare the same physical scatterer across seeds; a slot contributes where it is matched in at "
             f"least {SeedDisagreementMaps.MIN_ACTIVE} seeds.\n"
         )
 
@@ -219,7 +220,10 @@ class SeedComparison:
         return self.config.output_subdir or self.config.inference_subdir or RunTag.now()
 
     def _compare_group(self, group_dir: Path, resolver: SeedInferenceResolver, output_subdir: str, logger: Logger) -> Path:
-        run_dirs       = sorted(RunDirectoryWalk.walk(group_dir))
+        run_dirs = sorted(RunDirectoryWalk.walk(group_dir))
+        if len(run_dirs) < 2:
+            raise ValueError(f"A seed comparison needs at least two seed runs inside {group_dir}, got {len(run_dirs)}: {[str(d) for d in run_dirs]}")
+
         inference_dirs = [resolver.resolve(run_dir) for run_dir in run_dirs]
 
         disagreement = None
