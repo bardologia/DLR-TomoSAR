@@ -120,6 +120,7 @@ class ProjectPaths:
         "map_loss_landscape"              : "analysis",
         "stress_inputs"                   : "analysis",
         "animate_training"                : "analysis",
+        "export_paper_figures"            : "analysis",
         "export_tensorboard_plots"        : "analysis",
         "collect_reports"                 : "analysis",
     }

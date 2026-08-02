@@ -2559,6 +2559,19 @@
         "fps": "Frames per second of the rendered GIFs (one frame per epoch snapshot)",
         "figure_style": "PlotBase figure style the frames are rendered with (report or paper)"
       }
+    },
+    "diagnostics::PaperFigurePackConfig": {
+      "summary": "Entry config that packs inference figures from selected runs into the publication figures directory under stable names with a JSON manifest of every source",
+      "fields": {
+        "runs_dir": "Root directory scanned recursively for runs holding a finished inference report; each selected run contributes figures",
+        "run_filter": "Run directory names (or names of parent directories whose nested runs are expanded) to pack; empty selects interactively on a TTY and every discovered run otherwise",
+        "inference_subdir": "Fixed inference stamp to read figures from; empty picks each run's latest inference holding a metrics file",
+        "metrics_filename": "Filename marking a finished inference when resolving the latest stamp",
+        "report_filename": "Report filename used as the run-discovery marker",
+        "figures_subdir": "Name of the figures directory inside each inference stamp the patterns are matched against",
+        "patterns": "Glob patterns relative to the figures directory selecting which figures enter the pack",
+        "output_dir": "Publication figures directory the stable-named copies and the manifest are written into"
+      }
     }
   }
 }

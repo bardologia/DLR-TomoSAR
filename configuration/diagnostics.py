@@ -369,3 +369,18 @@ class TrainingEvolutionConfig:
     fps              : int = 4
 
     figure_style : str = "report"
+
+
+@dataclass
+class PaperFigurePackConfig:
+    runs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
+    run_filter : List[str] = field(default_factory=list)
+
+    inference_subdir : str = ""
+    metrics_filename : str = "metrics.json"
+    report_filename  : str = "report.md"
+    figures_subdir   : str = "figures"
+
+    patterns : List[str] = field(default_factory=lambda: ["pixel_maps/*.png", "param_scatter/*.png", "stratified/*.png", "profiles/*.png", "data_consistency/*.png"])
+
+    output_dir : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/publications/neurips2027/figures")

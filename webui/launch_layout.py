@@ -1463,6 +1463,26 @@ class LaunchLayout:
                 ]},
             ],
         },
+        "export_paper_figures": {
+            "sections": [
+                {"key": "config", "title": "Configuration", "panels": [
+                    {"kind": "fields", "groups": [
+                        {"title": "Runs", "fields": [
+                            "runs_dir",
+                            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir"}},
+                            "inference_subdir",
+                        ]},
+                        {"title": "Pack", "fields": [
+                            {"path": "patterns", "widget": {"kind": "multi"}},
+                            "figures_subdir",
+                            "metrics_filename",
+                            "report_filename",
+                            "output_dir",
+                        ]},
+                    ]},
+                ]},
+            ],
+        },
         "collect_reports": {
             "sections": [
                 {"key": "config", "title": "Configuration", "panels": [

@@ -215,6 +215,11 @@ class JobDescriber:
             ("runs", "run_filter", "list", "all runs"),
             ("root", "runs_dir",   "opt_tail"),
         ],
+        "export_paper_figures": [
+            ("runs", "run_filter", "list", "all runs"),
+            ("root", "runs_dir",   "opt_tail"),
+            ("into", "output_dir", "opt_tail"),
+        ],
         "export_tensorboard_plots": [
             ("runs", "run_filter", "list", "all runs"),
             ("root", "runs_dir",   "opt_tail"),

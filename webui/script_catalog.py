@@ -192,6 +192,11 @@ class ScriptCatalog:
             "category"  : "Analysis",
             "purpose"   : "Scan a runs directory for training runs with TensorBoard event logs, select one or more, and export every scalar series as a publication-quality figure inside each run directory, mirroring the tag hierarchy as folders. Train and validation series of the same metric share one figure. When sibling seed runs of one trial are selected, the trial directory additionally receives one overlay figure per metric with every seed's curve.",
         },
+        "export_paper_figures": {
+            "title"     : "Export Paper Figures",
+            "category"  : "Analysis",
+            "purpose"   : "Pack inference figures from selected runs into the publication figures directory under stable names (<run>__<figure-path>) with a JSON manifest of every source. Render in paper style first by running inference with figure_style=paper; the pack then feeds publications/neurips2027 without hand-copying.",
+        },
         "collect_reports": {
             "title"     : "Collect Reports",
             "category"  : "Analysis",
