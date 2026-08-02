@@ -123,3 +123,28 @@ def test_cbar_png_whitelist(tmp_path):
 
     assert explorer.cbar_png("viridis")[:4] == b"\x89PNG"
     assert explorer.cbar_png("banana") is None
+
+
+def test_selective_metrics_keep_low_confidence_share(tmp_path):
+    explorer, cube_id = _loaded_explorer(tmp_path)
+
+    full = explorer.selective_metrics(cube_id, "pixel_r2", coverage=1.0)
+    half = explorer.selective_metrics(cube_id, "pixel_r2", coverage=0.5)
+
+    assert full["ok"] and half["ok"]
+    assert full["n_kept"]  == full["n_total"]
+    assert half["n_kept"]  <  full["n_kept"]
+    assert half["coverage"] <= 0.6
+
+    r2_full = next(row for row in full["rows"] if row["key"] == "pixel_r2")
+    r2_half = next(row for row in half["rows"] if row["key"] == "pixel_r2")
+
+    assert r2_full["kept"] == r2_full["full"]
+    assert r2_half["kept"] <= r2_half["full"]
+
+
+def test_selective_metrics_reject_unknown_layer(tmp_path):
+    explorer, cube_id = _loaded_explorer(tmp_path)
+
+    assert explorer.selective_metrics(cube_id, "banana", coverage=0.5)["ok"] is False
+    assert explorer.selective_metrics("wrong", "pixel_r2", coverage=0.5)["ok"] is False

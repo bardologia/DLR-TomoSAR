@@ -327,6 +327,9 @@ class App {
         coords : document.getElementById("cube-metric-coords"),
         readout: document.getElementById("cube-metric-readout"),
         open   : document.getElementById("cube-metric-open"),
+        selCov : document.getElementById("cube-selective-cov"),
+        selVal : document.getElementById("cube-selective-val"),
+        selTab : document.getElementById("cube-selective-table"),
       },
       transect      : {
         at      : document.getElementById("cube-transect-at"),

@@ -448,6 +448,9 @@ class TomogramMetrics {
     this.coordsEl = refs.coords;
     this.readoutEl = refs.readout;
     this.openBtn = refs.open;
+    this.selCovEl = refs.selCov;
+    this.selValEl = refs.selVal;
+    this.selTabEl = refs.selTab;
 
     this.layers = [];
     this.layer = null;
@@ -457,6 +460,9 @@ class TomogramMetrics {
     this.debounceTimer = null;
     this.hoverQueued = null;
     this.hoverFetching = false;
+    this.selectiveTimer = null;
+
+    if (this.selCovEl) this.selCovEl.addEventListener("input", () => this._onCoverage());
 
     this.vminEl.addEventListener("change", () => this._refresh());
     this.vmaxEl.addEventListener("change", () => this._refresh());
@@ -493,13 +499,50 @@ class TomogramMetrics {
     if (!this.layer) return;
     this._syncBtns();
     this._refresh();
+    this._onCoverage();
   }
 
   _setLayer(key) {
     if (this.layer && key === this.layer.key) return;
     this.layer = this.layers.find((l) => l.key === key);
     this._resetControls();
+    if (this.selTabEl) this.selTabEl.innerHTML = "";
     this.render();
+    this._onCoverage();
+  }
+
+  _onCoverage() {
+    if (!this.selCovEl || !this.layer) return;
+    const pct = Number(this.selCovEl.value);
+    this.selValEl.textContent = `${pct}%`;
+
+    clearTimeout(this.selectiveTimer);
+    this.selectiveTimer = setTimeout(() => this._fetchSelective(pct / 100), 220);
+  }
+
+  async _fetchSelective(coverage) {
+    if (!this.layer) return;
+    try {
+      const data = await window.apiGet(
+        `/api/cubes/selective?id=${encodeURIComponent(this.host.selectedId)}&key=${encodeURIComponent(this.layer.key)}&coverage=${coverage}`
+      );
+      if (!data.ok) {
+        this.selTabEl.innerHTML = `<p class="cube-hint">${data.error || "selective metrics unavailable"}</p>`;
+        return;
+      }
+
+      let html = `<table class="cube-metrics cube-metrics--params"><thead><tr>` +
+        `<th scope="col">metric</th><th scope="col">kept ${(data.coverage * 100).toFixed(0)}%</th><th scope="col">full</th></tr></thead><tbody>`;
+      data.rows.forEach((row) => {
+        const kept = row.kept === null ? "–" : this.host._fmt(row.kept);
+        html += `<tr><td>${row.label}</td><td>${kept}</td><td>${this.host._fmt(row.full)}</td></tr>`;
+      });
+      html += `</tbody></table>`;
+      html += `<p class="cube-hint">${data.n_kept.toLocaleString()} of ${data.n_total.toLocaleString()} pixels kept (layer ≤ ${this.host._fmt(data.threshold)})</p>`;
+      this.selTabEl.innerHTML = html;
+    } catch (err) {
+      this.selTabEl.innerHTML = `<p class="cube-hint">selective metrics failed</p>`;
+    }
   }
 
   _setMode(mode) {

@@ -642,6 +642,56 @@ class CubeExplorer:
             return None
         return data, primary
 
+    SELECTIVE_KEYS = ("pixel_mse", "pixel_mae", "pixel_r2", "pixel_cos", "pixel_peak")
+
+    def selective_metrics(self, cube_id: str, key: str, coverage: float) -> dict:
+        resolved = self._metric_state(cube_id, key)
+        if resolved is None:
+            return {"ok": False, "error": f"unknown confidence layer: {key}"}
+
+        confidence, _primary = resolved
+
+        with self.lock:
+            if self.loaded is None or self.loaded["id"] != cube_id:
+                return {"ok": False, "error": "cube changed while computing"}
+            maps = {name: data for name, data in self.loaded["metric_maps"].items() if name in self.SELECTIVE_KEYS}
+
+        if not maps:
+            return {"ok": False, "error": "no pixel metric maps are loaded for this cube"}
+
+        coverage = float(np.clip(coverage, 0.01, 1.0))
+        finite   = np.isfinite(confidence)
+
+        if not finite.any():
+            return {"ok": False, "error": f"confidence layer '{key}' holds no finite value"}
+
+        threshold = float(np.quantile(confidence[finite], coverage))
+        keep      = finite & (confidence <= threshold)
+
+        rows = []
+        for name, data in sorted(maps.items()):
+            valid = np.isfinite(data)
+            kept  = data[keep & valid]
+            full  = data[valid]
+            if not full.size:
+                continue
+            rows.append({
+                "key"   : name,
+                "label" : self.METRIC_LABELS.get(name, name),
+                "kept"  : float(kept.mean()) if kept.size else None,
+                "full"  : float(full.mean()),
+            })
+
+        return {
+            "ok"        : True,
+            "layer"     : key,
+            "coverage"  : float(keep.sum() / max(finite.sum(), 1)),
+            "threshold" : threshold,
+            "n_kept"    : int(keep.sum()),
+            "n_total"   : int(finite.sum()),
+            "rows"      : rows,
+        }
+
     def transect_png(self, cube_id: str, source: str, az0: int, rg0: int, az1: int, rg1: int, space: str = "physical", cmap: str = "jet") -> bytes | None:
         entry = self._entry(cube_id, source)
         if entry is None:

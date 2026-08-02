@@ -277,6 +277,15 @@ class RequestRouter:
             )
             self._send_json(handler, result, 200 if result.get("ok") else 404)
             return
+        if path == "/api/cubes/selective":
+            query  = parse_qs(urlparse(handler.path).query)
+            result = self.cubes.selective_metrics(
+                cube_id  = (query.get("id") or [""])[0],
+                key      = (query.get("key") or [""])[0],
+                coverage = float((query.get("coverage") or ["1.0"])[0]),
+            )
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
         if path == "/api/cubes/points":
             query = parse_qs(urlparse(handler.path).query)
             blob  = self.cubes.points_bin(

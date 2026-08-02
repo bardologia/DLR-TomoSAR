@@ -598,6 +598,13 @@
               <p class="cube-coords" id="cube-metric-coords">Hover the map to read the value under the cursor; click to lock a pixel and read every layer.</p>
               <div class="cube-pside__table" id="cube-metric-readout"></div>
               <button type="button" class="btn btn--mini" id="cube-metric-open" hidden>Open cuts at this pixel</button>
+              <div class="cube-mctl" id="cube-selective-wrap">
+                <label for="cube-selective-cov">coverage</label>
+                <input type="range" id="cube-selective-cov" min="5" max="100" value="100" />
+                <span class="cube-mctl__val" id="cube-selective-val">100%</span>
+              </div>
+              <p class="cube-hint">Selective prediction: keep the lowest-valued pixels of the selected layer (its most confident share) and compare the kept-pixel metric means against the full region.</p>
+              <div class="cube-pside__table" id="cube-selective-table"></div>
             </aside>
           </div>
         </div>
