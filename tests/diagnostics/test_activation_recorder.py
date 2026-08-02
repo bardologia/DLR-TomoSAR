@@ -144,3 +144,39 @@ def test_nonfinite_activations_are_critical():
 
     assert reports[0].severity == "critical"
     assert any(issue.code == "nonfinite_activations" for issue in reports[0].issues)
+
+
+def test_store_mode_survives_inplace_activations():
+    class _InplaceNet(torch.nn.Module):
+        def __init__(self) -> None:
+            super().__init__()
+            self.conv = torch.nn.Conv2d(2, 4, kernel_size=1, bias=True)
+            self.act  = torch.nn.ReLU(inplace=True)
+
+        def forward(self, x):
+            return self.act(self.conv(x))
+
+    torch.manual_seed(0)
+    model    = _InplaceNet()
+    recorder = ActivationRecorder(model)
+    recorder.attach_store(["conv"])
+
+    with torch.no_grad():
+        model(torch.randn(1, 2, 6, 6))
+
+    recorder.detach()
+    stored = recorder.stored()["conv"]
+
+    assert float(stored.min()) < 0.0
+
+
+def test_stats_record_forward_order():
+    stats = _record(_TinyNet(), [torch.randn(1, 2, 8, 8)])
+
+    assert stats["conv"]["first_seen"] < stats["act"]["first_seen"] < stats["head"]["first_seen"]
+
+
+def test_abs_percentile_reports_overflow_via_max_abs():
+    stats = _record(_TinyNet(), [torch.randn(2, 2, 8, 8) * 1e6])
+
+    assert stats["conv"]["abs_p99"] == stats["conv"]["max_abs"]

@@ -44,7 +44,7 @@ class ActivationXrayPlots(PlotBase):
         self._apply_style()
 
         fig, ax = plt.subplots(figsize=self.figsize(self.FULL_WIDTH))
-        counts  = np.asarray(stats["hist_counts"], dtype=np.float64)
+        counts  = np.asarray(stats["hist_counts"], dtype=np.float64)[1:-1]
         centers = np.sqrt(edges[:-1] * edges[1:])
 
         ax.step(centers, counts, where="mid")

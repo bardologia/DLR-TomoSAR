@@ -108,6 +108,7 @@ class ActivationXrayRun:
 
         detector = ActivationIssueDetector(self.config)
         reports  = detector.run(all_stats)
+        reports.sort(key=lambda report: report.stats["first_seen"])
         summary  = ActivationXraySummarizer().build(reports, self.run_dir, min(self.config.max_batches, len(run.loader)))
 
         ordered_stats = [report.stats for report in reports]

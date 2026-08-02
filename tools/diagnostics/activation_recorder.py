@@ -7,6 +7,7 @@ import torch
 class LayerActivationStats:
 
     HIST_EDGES       = np.logspace(-8.0, 4.0, 25)
+    COUNT_EDGES      = np.concatenate([[0.0], np.logspace(-8.0, 4.0, 25), [np.inf]])
     DEAD_CHANNEL_ABS = 1e-8
 
     def __init__(self, name: str, module_type: str) -> None:
@@ -14,6 +15,7 @@ class LayerActivationStats:
         self.module_type = module_type
 
         self.shape           = None
+        self.first_seen      = None
         self.n_batches       = 0
         self.n_elements      = 0
         self.n_zero          = 0
@@ -22,14 +24,17 @@ class LayerActivationStats:
         self.value_sumsq     = 0.0
         self.max_abs         = 0.0
         self.channel_max_abs = None
-        self.hist_counts     = np.zeros(self.HIST_EDGES.size - 1, dtype=np.int64)
+        self.hist_counts     = np.zeros(self.COUNT_EDGES.size - 1, dtype=np.int64)
 
-    def update(self, tensor: torch.Tensor) -> None:
+    def update(self, tensor: torch.Tensor, order: int) -> None:
         t    = tensor.detach()
         flat = t.reshape(-1).float()
 
         finite_mask = torch.isfinite(flat)
         finite      = flat[finite_mask]
+
+        if self.first_seen is None:
+            self.first_seen = order
 
         self.shape        = tuple(t.shape[1:])
         self.n_batches   += 1
@@ -41,11 +46,10 @@ class LayerActivationStats:
             self.value_sum    += float(finite.sum())
             self.value_sumsq  += float((finite * finite).sum())
             self.max_abs       = max(self.max_abs, float(finite.abs().max()))
-            self.hist_counts  += np.histogram(finite.abs().cpu().numpy(), bins=self.HIST_EDGES)[0]
+            self.hist_counts  += np.histogram(finite.abs().cpu().numpy(), bins=self.COUNT_EDGES)[0]
 
-        if t.ndim >= 2:
-            reduce_dims = [d for d in range(t.ndim) if d != 1]
-            channel_max = t.float().abs().nan_to_num(0.0).amax(dim=reduce_dims).cpu().numpy()
+        if t.ndim == 4:
+            channel_max = t.float().abs().nan_to_num(0.0).amax(dim=(0, 2, 3)).cpu().numpy()
 
             if self.channel_max_abs is None:
                 self.channel_max_abs = channel_max
@@ -61,7 +65,8 @@ class LayerActivationStats:
         idx        = int(np.searchsorted(cumulative, q * total))
         idx        = min(idx, self.hist_counts.size - 1)
 
-        return float(self.HIST_EDGES[idx + 1])
+        upper = self.COUNT_EDGES[idx + 1]
+        return self.max_abs if not np.isfinite(upper) else float(upper)
 
     def finalize(self) -> dict:
         if self.n_elements == 0:
@@ -79,6 +84,7 @@ class LayerActivationStats:
             "name"              : self.name,
             "module_type"       : self.module_type,
             "shape"             : list(self.shape) if self.shape is not None else None,
+            "first_seen"        : self.first_seen,
             "n_batches"         : self.n_batches,
             "n_elements"        : self.n_elements,
             "nonfinite_frac"    : self.n_nonfinite / self.n_elements,
@@ -100,9 +106,10 @@ class ActivationRecorder:
         self.model   = model
         self.include = list(include) if include is not None else None
 
-        self._handles = []
-        self._stats   = {}
-        self._store   = {}
+        self._handles    = []
+        self._stats      = {}
+        self._store      = {}
+        self._call_index = 0
 
     def leaf_names(self) -> list[str]:
         names = [name for name, module in self.model.named_modules() if name and not any(module.children())]
@@ -130,14 +137,15 @@ class ActivationRecorder:
         def hook(module, args, output):
             tensor = self._first_tensor(output)
             if tensor is not None:
-                self._stats[name].update(tensor)
+                self._call_index += 1
+                self._stats[name].update(tensor, order=self._call_index)
         return hook
 
     def _store_hook(self, name: str):
         def hook(module, args, output):
             tensor = self._first_tensor(output)
             if tensor is not None:
-                self._store[name] = tensor.detach().cpu()
+                self._store[name] = tensor.detach().clone().cpu()
         return hook
 
     def attach_stats(self) -> None:
