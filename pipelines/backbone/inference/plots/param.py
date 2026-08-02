@@ -15,7 +15,37 @@ from tools.loss.param_loss                   import ParamMatcher
 from tools.metrics.gaussian_matching         import GaussianMatcher
 
 
+class SlotAlignment:
+    def __init__(self) -> None:
+        self.params_pred = None
+        self.params_gt   = None
+        self.n_gaussians = 0
+        self.aligned     = None
+
+    @staticmethod
+    def _is_same(cached: Optional[np.ndarray], candidate: np.ndarray) -> bool:
+        if cached is None:
+            return False
+
+        return cached.shape == candidate.shape and cached.strides == candidate.strides and cached.ctypes.data == candidate.ctypes.data
+
+    def of(self, params_pred: np.ndarray, params_gt: np.ndarray, n_gaussians: int) -> np.ndarray:
+        if self.n_gaussians == n_gaussians and self._is_same(self.params_pred, params_pred) and self._is_same(self.params_gt, params_gt):
+            return self.aligned
+
+        self.params_pred = params_pred
+        self.params_gt   = params_gt
+        self.n_gaussians = n_gaussians
+        self.aligned     = GaussianMatcher().aligned_prediction(params_pred, params_gt, n_gaussians)
+
+        return self.aligned
+
+
 class ParamPlotter(PlotTools):
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.alignment = SlotAlignment()
+
     def plot_param_distributions(
         self,
         params_pred : np.ndarray,
@@ -26,7 +56,7 @@ class ParamPlotter(PlotTools):
     ) -> List[Path]:
 
         matched     = params_gt is not None
-        pred_source = GaussianMatcher().aligned_prediction(params_pred, params_gt, n_gaussians) if matched else params_pred
+        pred_source = self.alignment.of(params_pred, params_gt, n_gaussians) if matched else params_pred
         paths       = []
 
         for k in range(n_gaussians):
@@ -167,7 +197,7 @@ class ParamPlotter(PlotTools):
         seed        : int = 0,
     ) -> List[Path]:
 
-        aligned = GaussianMatcher().aligned_prediction(params_pred, params_gt, n_gaussians)
+        aligned = self.alignment.of(params_pred, params_gt, n_gaussians)
         paths   = []
 
         for k in range(n_gaussians):
@@ -229,7 +259,7 @@ class ParamPlotter(PlotTools):
         rg_offset   : int,
     ) -> List[Path]:
 
-        aligned = GaussianMatcher().aligned_prediction(params_pred, params_gt, n_gaussians)
+        aligned = self.alignment.of(params_pred, params_gt, n_gaussians)
         H, W    = params_pred.shape[-2:]
         extent  = [rg_offset, rg_offset + W, az_offset + H, az_offset]
         paths   = []
@@ -276,7 +306,7 @@ class ParamPlotter(PlotTools):
         bins        : int = 80,
     ) -> List[Path]:
 
-        aligned = GaussianMatcher().aligned_prediction(params_pred, params_gt, n_gaussians)
+        aligned = self.alignment.of(params_pred, params_gt, n_gaussians)
         paths   = []
 
         for k in range(n_gaussians):

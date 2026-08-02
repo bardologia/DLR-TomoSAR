@@ -55,7 +55,6 @@ class TriageBoard:
     AUX_LAYERS = ("label_r2", "seed_std_profile", "flip_consistency")
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
-        self.paths  = paths
         self.logger = logger
         self.store  = TriageStore(paths.logs_dir / "triage")
 

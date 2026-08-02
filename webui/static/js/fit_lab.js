@@ -158,7 +158,8 @@ class FitLabView {
     this.showComponents = true;
 
     this.entered   = false;
-    this.pollToken = 0;
+    this.loadToken = 0;
+    this.fitToken  = 0;
     this.runSeq    = 0;
 
     refs.scanBtn.addEventListener("click", () => this._scan());
@@ -253,8 +254,8 @@ class FitLabView {
     this.refs.progress.hidden = false;
     this._renderRuns();
 
-    const token = ++this.pollToken;
-    while (token === this.pollToken) {
+    const token = ++this.loadToken;
+    while (token === this.loadToken) {
       const st = await window.apiGet("/api/fitlab/status");
       if (st.state === "error") {
         this.refs.progress.hidden  = true;
@@ -434,8 +435,9 @@ class FitLabView {
     this.refs.runBtn.disabled     = true;
     this.refs.fitProgress.hidden  = false;
 
-    const token = ++this.pollToken;
-    while (token === this.pollToken) {
+    const dataset = this.loadToken;
+    const token   = ++this.fitToken;
+    while (token === this.fitToken) {
       const st = await window.apiGet("/api/fitlab/fit_status");
       if (st.state === "error") {
         this.refs.runBtn.disabled    = false;
@@ -448,10 +450,10 @@ class FitLabView {
       this.refs.fitProgressLabel.textContent = st.stage || "fitting…";
       await new Promise((r) => setTimeout(r, 350));
     }
-    if (token !== this.pollToken) return;
 
     this.refs.runBtn.disabled    = false;
     this.refs.fitProgress.hidden = true;
+    if (token !== this.fitToken || dataset !== this.loadToken) return;
 
     const result = await window.apiGet("/api/fitlab/fit_result");
     if (!result.ok) {

@@ -5,7 +5,8 @@ from pathlib import Path
 
 from tensorboard.backend.event_processing.event_accumulator import EventAccumulator
 
-from web_logger import WebLogger
+from catalog_roots import CatalogRoots
+from web_logger    import WebLogger
 
 
 class TrainingCurves:
@@ -15,15 +16,13 @@ class TrainingCurves:
 
     def __init__(self, logger: WebLogger) -> None:
         self.logger = logger
-        self.roots  = set()
+        self.roots  = CatalogRoots()
         self.cache  = {}
 
     def runs(self, base: str) -> dict:
-        root, error = self._catalog_root(base)
+        root, error = self.roots.open(base)
         if error:
             return {"ok": False, "error": error, "runs": []}
-
-        self.roots.add(str(root))
 
         run_dirs = {}
         for event_file in root.rglob("tensorboard/events.out.tfevents.*"):
@@ -112,24 +111,8 @@ class TrainingCurves:
             return None
 
         run_dir = Path(raw).resolve()
-        if not any(run_dir.is_relative_to(root) for root in self.roots):
+        if not self.roots.contains(run_dir):
             return None
         if not (run_dir / "tensorboard").is_dir():
             return None
         return run_dir
-
-    @staticmethod
-    def _catalog_root(raw: str) -> tuple[Path | None, str]:
-        raw = (raw or "").strip()
-        if not raw:
-            return None, "set the runs directory in the Results tab first"
-
-        root = Path(raw).expanduser()
-        if not root.is_absolute():
-            return None, "an absolute path is required"
-
-        root = root.resolve()
-        if not root.is_dir():
-            return None, f"not a directory: {root}"
-
-        return root, ""

@@ -142,6 +142,9 @@ class GpuWeekPanel {
 }
 
 class StatusBoard {
+  static POLL_MS    = 1000;
+  static AWAY_EVERY = 10;
+
   constructor(els) {
     this.els = els;
     this.built = false;
@@ -149,15 +152,27 @@ class StatusBoard {
     this.coreEls = [];
     this.histMax = 144;
     this.gpuCount = 0;
+    this.ticks = 0;
   }
 
   start() {
     this._poll();
-    setInterval(() => { if (!document.hidden) this._poll(); }, 250);
+    setInterval(() => this._tick(), StatusBoard.POLL_MS);
     this._pollJobs();
-    setInterval(() => { if (!document.hidden) this._pollJobs(); }, 5000);
+    setInterval(() => { if (this._showing()) this._pollJobs(); }, 5000);
     this._pollGuardHistory();
-    setInterval(() => { if (!document.hidden) this._pollGuardHistory(); }, 20000);
+    setInterval(() => { if (this._showing()) this._pollGuardHistory(); }, 20000);
+  }
+
+  _tick() {
+    if (document.visibilityState !== "visible") return;
+    this.ticks += 1;
+    if (this._showing() || this.ticks % StatusBoard.AWAY_EVERY === 0) this._poll();
+  }
+
+  _showing() {
+    if (document.visibilityState !== "visible") return false;
+    return !!(this.els.board && this.els.board.closest(".page.is-active"));
   }
 
   async _pollGuardHistory() {
@@ -622,7 +637,7 @@ class StatusBoard {
 
     gpus.forEach((g, i) => {
       const el = this.gpuEls[i];
-      const h = gpuHist[String(i)] || { util: [], mem: [] };
+      const h = gpuHist[String(g.index != null ? g.index : i)] || { util: [], mem: [] };
       if (!el) return;
       const util = g.util != null ? g.util : 0;
       const memPct = g.mem_total ? (100 * g.mem_used) / g.mem_total : 0;

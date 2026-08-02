@@ -13,7 +13,7 @@ if str(WEBUI_ROOT) not in sys.path:
     sys.path.insert(0, str(WEBUI_ROOT))
 
 from notifier        import JobNotifier
-from process_manager import ProcessManager
+from process_manager import JobStream, ProcessManager
 from web_logger      import WebLogger
 
 SLEEP_OK   = "import time\ntime.sleep(0.6)\n"
@@ -35,7 +35,7 @@ class StubPaths:
 
     def script_entry(self, key: str) -> dict:
         path = self.main_dir / "analysis" / f"{key}.py"
-        return {"path": path, "rel": f"main/analysis/{key}.py", "args": []}
+        return {"path": path, "rel": f"main/analysis/{key}.py"}
 
 
 class StubDescriber:
@@ -176,3 +176,21 @@ def test_notifications_fire_on_start_and_finish_for_direct_and_queued(manager):
 
     assert _wait_status(manager, queued["job_id"], "finished")
     assert events == [("started", "sleep_ok"), ("finished", "sleep_ok"), ("started", "writer_a"), ("finished", "writer_a")]
+
+
+def test_the_console_history_drops_the_oldest_ended_jobs(manager):
+    manager.HISTORY_LIMIT = 2
+
+    with manager.lock:
+        manager.jobs["live"]    = {"job_id": "live", "status": "running", "started": "2026-07-14T00:00:00"}
+        manager.streams["live"] = JobStream()
+        for index in range(4):
+            job_id                  = f"job{index}"
+            manager.jobs[job_id]    = {"job_id": job_id, "status": "finished", "started": f"2026-07-14T00:0{index + 1}:00"}
+            manager.streams[job_id] = JobStream()
+
+    manager._prune_history()
+
+    with manager.lock:
+        assert sorted(manager.jobs)    == ["job2", "job3", "live"]
+        assert sorted(manager.streams) == ["job2", "job3", "live"]

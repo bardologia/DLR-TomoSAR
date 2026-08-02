@@ -1,8 +1,8 @@
 import sys
 from pathlib import Path
 
-_vault = next(p for p in Path(__file__).resolve().parents if (p / "code" / "tools" / "logger.py").exists())
-sys.path.insert(0, str(_vault / "code"))
+_repo = next(p for p in Path(__file__).resolve().parents if (p / "tools" / "monitoring" / "logger.py").exists())
+sys.path.insert(0, str(_repo))
 
 import numpy as np
 import matplotlib
@@ -12,7 +12,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap
 
-from tools.logger import Logger
+from tools.monitoring.logger import Logger
 
 plt.style.use("default")
 
@@ -214,8 +214,7 @@ class ProfileVsGroundTruth:
 
 
 if __name__ == "__main__":
-    repo       = Path(__file__).resolve().parents[2]
-    output_dir = repo / "results" / "error_landscape"
+    output_dir = _repo / "results" / "error_landscape"
 
     JointErrorHeatmap(output_dir).build()
     ProfileVsGroundTruth(output_dir).build()

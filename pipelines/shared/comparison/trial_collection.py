@@ -14,9 +14,10 @@ from pipelines.shared.training.seed_sweep import SeedSet
 from tools.data.io                        import FileIO
 from tools.metrics.scoring                import SeedAggregation
 from tools.monitoring.logger              import Logger
+from tools.runtime.completion             import CompletionMarker
 
 _TOTAL_PARAMS_PATTERN = re.compile(r"\*\*Total Parameters:\*\*\s*`([\d,]+)`")
-_CHECKPOINT_KEYS      = ("best_val_loss", "best_epoch", "epoch", "global_step")
+_CHECKPOINT_KEYS      = ("best_val_loss", "best_epoch", "epoch")
 
 
 @dataclass
@@ -96,43 +97,30 @@ class SeedRunAggregator:
         return aggregated
 
 
-class TrialCollector:
-    def __init__(self, run_dir: Path, logger: Logger) -> None:
-        self.run_dir      = run_dir
-        self.training_dir = run_dir / "training"
-        self.pipeline_dir = run_dir / "pipeline"
-        self.logger       = logger
-
-    def _optional_json(self, path: Path) -> dict:
-        if not path.exists():
-            return {}
-        return FileIO.load_json(path)
-
-    def _parse_parameters(self, trial_dir: Path, size_match: dict) -> int | None:
-        summary_path = trial_dir / "docs" / "model_doc.md"
-
-        if summary_path.exists():
-            match = _TOTAL_PARAMS_PATTERN.search(summary_path.read_text(encoding="utf-8", errors="ignore"))
-            if match:
-                return int(match.group(1).replace(",", ""))
-
-        return size_match["parameters"] if "parameters" in size_match else None
-
+class TrialArtifactReader:
     def _read_checkpoint(self, trial_dir: Path) -> dict:
         checkpoint_path = next(trial_dir.rglob("best_model.pt"), None)
         if checkpoint_path is None:
             return {}
 
         checkpoint = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
-
-        info = {key: checkpoint.get(key) for key in _CHECKPOINT_KEYS}
-        info["n_train_epochs"] = len(checkpoint.get("train_losses") or [])
-        info["n_val_epochs"]   = len(checkpoint.get("val_losses") or [])
+        info       = {key: checkpoint.get(key) for key in _CHECKPOINT_KEYS}
 
         del checkpoint
         gc.collect()
 
+        info["n_train_epochs"] = self._epochs_completed(checkpoint_path.parent)
+
         return {key: value for key, value in info.items() if value is not None}
+
+    @staticmethod
+    def _epochs_completed(run_dir: Path) -> int | None:
+        marker_path = CompletionMarker.path(run_dir)
+
+        if not marker_path.is_file():
+            return None
+
+        return int(FileIO.load_json(marker_path)["epochs_completed"])
 
     def _attach_inference(self, record: TrialRecord) -> None:
         inference_root = record.run_dir / "inference"
@@ -157,6 +145,29 @@ class TrialCollector:
 
     def _attach_figures(self, record: TrialRecord, inference_dir: Path) -> None:
         record.figures = sorted((inference_dir / "figures").glob("*.png")) if (inference_dir / "figures").is_dir() else []
+
+
+class TrialCollector(TrialArtifactReader):
+    def __init__(self, run_dir: Path, logger: Logger) -> None:
+        self.run_dir      = run_dir
+        self.training_dir = run_dir / "training"
+        self.pipeline_dir = run_dir / "pipeline"
+        self.logger       = logger
+
+    def _optional_json(self, path: Path) -> dict:
+        if not path.exists():
+            return {}
+        return FileIO.load_json(path)
+
+    def _parse_parameters(self, trial_dir: Path, size_match: dict) -> int | None:
+        summary_path = trial_dir / "docs" / "model_doc.md"
+
+        if summary_path.exists():
+            match = _TOTAL_PARAMS_PATTERN.search(summary_path.read_text(encoding="utf-8", errors="ignore"))
+            if match:
+                return int(match.group(1).replace(",", ""))
+
+        return size_match["parameters"] if "parameters" in size_match else None
 
     def _aggregate_sources(self) -> tuple[dict, dict]:
         size_match       = self._optional_json(self.pipeline_dir / "size_match.json")
@@ -191,11 +202,11 @@ class TrialCollector:
         return runs
 
     def collect(self) -> list[TrialRecord]:
-        size_match, training_results = self._aggregate_sources()
-
         if not self.training_dir.is_dir():
             self.logger.error(f"No training directory found at: {self.training_dir}")
             return []
+
+        size_match, training_results = self._aggregate_sources()
 
         records = []
         for name, trial_dir in self._run_dirs():

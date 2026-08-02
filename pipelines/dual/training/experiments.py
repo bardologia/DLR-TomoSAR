@@ -46,11 +46,11 @@ class DualHeadMatchingTrialPlanner(HeadMatchingTrialPlanner):
 
 class DualReachTrialPlanner(ReachTrialPlanner):
 
-    def __init__(self, trials, registry_names: tuple, expected_in_channels: int, model_name: str, trunk_channels: tuple) -> None:
+    def __init__(self, trials, registry_names: tuple, expected_in_channels: int, out_channels: int, model_name: str, trunk_channels: tuple) -> None:
         self.model_name     = model_name
         self.trunk_channels = tuple(trunk_channels)
 
-        super().__init__(trials, registry_names, "set_pred", expected_in_channels)
+        super().__init__(trials, registry_names, "set_pred", expected_in_channels, out_channels)
 
     def _trunk_features(self, rung: dict) -> list[int]:
         features = rung.get("features")
@@ -65,6 +65,7 @@ class DualReachTrialPlanner(ReachTrialPlanner):
         model, _ = get_dual(
             self.model_name,
             in_channels         = self.trials.in_channels,
+            out_channels        = self.out_channels,
             params_backbone     = rung["backbone"],
             existence_backbone  = rung["backbone"],
             params_channels     = self.trunk_channels[0],

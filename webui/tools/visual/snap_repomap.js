@@ -1,7 +1,7 @@
 "use strict";
 const fs   = require("fs");
-const os   = require("os");
 const path = require("path");
+const { ChromiumResolver } = require("./chromium");
 
 class RepoMapSnapper {
 
@@ -28,19 +28,6 @@ class RepoMapSnapper {
       else if (a.startsWith("--")) throw new Error("unknown flag: " + a);
       else this.targets.push(a);
     }
-  }
-
-  resolveChromium() {
-    if (process.env.PW_CHROMIUM) return process.env.PW_CHROMIUM;
-    const root = path.join(os.homedir(), ".cache", "ms-playwright");
-    const dirs = fs.readdirSync(root).filter(d => d.startsWith("chromium")).sort().reverse();
-    for (const d of dirs) {
-      for (const rel of ["chrome-headless-shell-linux64/chrome-headless-shell", "chrome-linux/chrome"]) {
-        const exe = path.join(root, d, rel);
-        if (fs.existsSync(exe)) return exe;
-      }
-    }
-    throw new Error("no chromium found under " + root + " (set PW_CHROMIUM)");
   }
 
   async selectDiagram(page, folder, dkey) {
@@ -82,11 +69,11 @@ class RepoMapSnapper {
     const { chromium } = require("playwright-core");
     fs.mkdirSync(this.outDir, { recursive: true });
 
-    const browser = await chromium.launch({ executablePath: this.resolveChromium() });
+    const browser = await chromium.launch({ executablePath: new ChromiumResolver().resolve() });
     const page    = await browser.newPage({ viewport: { width: this.width, height: this.height } });
 
     const base = `http://127.0.0.1:${this.port}/`;
-    await page.goto(base, { waitUntil: "networkidle" });
+    await page.goto(base, { waitUntil: "domcontentloaded" });
     await page.waitForSelector("#view");
     await page.evaluate(() => { window.location.hash = "#/repomap"; });
     await page.waitForSelector(".rm-folder", { timeout: 10000 });

@@ -6,14 +6,12 @@ import os
 import sys
 from pathlib import Path
 
-import pytest
-
 from configuration.sar.processing_config import ProcessingConfig
 from tools.data.regions                  import CropRegion
 from tools.sar.interferogram_launcher    import InterferogramLauncher
 from tools.sar.pyrat_env                 import PyRatEnvironment
 from tools.sar.tomogram_launcher         import TomogramLauncher
-from tools.sar.tomogram_worker           import PyRatJob, PyRatWorker, run_pyrat_job
+from tools.sar.tomogram_worker           import PyRatJob, PyRatWorker
 
 
 def _config() -> ProcessingConfig:
@@ -130,12 +128,6 @@ def test_pyrat_worker_holds_job():
     worker = PyRatWorker(job)
 
     assert worker.job is job
-
-
-def test_run_pyrat_job_requires_pyrat_runtime():
-    pytest.importorskip("pyrat", reason="real PyRAT runtime not installed locally")
-
-    pytest.skip("does not launch the real PyRAT job in unit tests")
 
 
 def test_env_adds_conda_lib_to_ld_path(monkeypatch):

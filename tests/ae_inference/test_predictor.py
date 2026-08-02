@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
+import pytest
 import torch
 
 from pipelines.autoencoder_common.inference.predictor  import AeReconstructionPredictor, AeResult
@@ -9,12 +10,12 @@ from pipelines.image_autoencoder.inference.predictor   import ImageAePredictor, 
 from pipelines.profile_autoencoder.inference.predictor import ProfileAePredictor, ProfileAeResult
 
 
-class _Ident:
+class _Scaled:
     def denormalize_input(self, x):
-        return x
+        return x * 4.0
 
     def denormalize(self, x):
-        return x
+        return x * 4.0
 
 
 class _ImageModel:
@@ -40,7 +41,7 @@ def test_predictors_share_base():
 
 def test_image_predictor_run_inference():
     x   = torch.rand(2, 1, 4, 4)
-    run = SimpleNamespace(model=_ImageModel(), normalizer=_Ident(), loader=[(x,)])
+    run = SimpleNamespace(model=_ImageModel(), normalizer=_Scaled(), loader=[(x,)])
 
     res = ImageAePredictor(run, "cpu", _logger()).run_inference()
 
@@ -51,10 +52,23 @@ def test_image_predictor_run_inference():
 
 def test_profile_predictor_run_inference():
     x   = torch.rand(2, 20)
-    run = SimpleNamespace(model=_ProfileModel(), normalizer=_Ident(), loader=[x])
+    run = SimpleNamespace(model=_ProfileModel(), normalizer=_Scaled(), loader=[x])
 
     res = ProfileAePredictor(run, "cpu", _logger()).run_inference()
 
     assert res.gt.shape == (2, 20)
     assert res.embeddings.shape == (2, 8)
     assert isinstance(res, ProfileAeResult)
+
+
+def test_normalized_errors_are_measured_before_denormalization():
+    x   = torch.rand(2, 20)
+    run = SimpleNamespace(model=_ProfileModel(), normalizer=_Scaled(), loader=[x])
+
+    res = ProfileAePredictor(run, "cpu", _logger()).run_inference()
+
+    expected_mse = float(((x * 0.9 - x) ** 2).double().mean())
+    expected_mae = float((x * 0.9 - x).abs().double().mean())
+
+    assert res.normalized_errors["mse_mean_normalized"] == pytest.approx(expected_mse, rel=1e-6)
+    assert res.normalized_errors["mae_mean_normalized"] == pytest.approx(expected_mae, rel=1e-6)

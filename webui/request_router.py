@@ -574,6 +574,11 @@ class RequestRouter:
             if not interpreter and self.paths.has_script(key):
                 interpreter = self._preferred_interpreter(key)
 
+            error = self._interpreter_error(interpreter)
+            if error:
+                self._send_json(handler, {"ok": False, "error": error}, 400)
+                return
+
             result = self.saved_runs.save({**body, "interpreter": interpreter})
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
@@ -732,7 +737,13 @@ class RequestRouter:
 
         if path == "/api/tensorboard/start":
             interpreter = body.get("interpreter") or self._preferred_interpreter(body.get("script_key", "train_backbone"))
-            logdir      = body.get("logdir") or self._training_logdir(body.get("script_key", "train_backbone"), {}, interpreter)
+
+            error = self._interpreter_error(interpreter)
+            if error:
+                self._send_json(handler, {"ok": False, "error": error}, 400)
+                return
+
+            logdir = body.get("logdir") or self._training_logdir(body.get("script_key", "train_backbone"), {}, interpreter)
 
             if not logdir:
                 self._send_json(handler, {"ok": False, "error": "could not resolve a training log directory"}, 400)
@@ -750,7 +761,16 @@ class RequestRouter:
 
         self._send_json(handler, {"error": "not found"}, 404)
 
+    def _interpreter_error(self, interpreter: str) -> str:
+        if any(item["path"] == interpreter for item in self.paths.discover_interpreters()):
+            return ""
+        return f"unknown interpreter '{interpreter}'; pick one of the environments listed by the console"
+
     def _execute_run(self, key: str, interpreter: str, overrides: dict, follow_up: str | None, detach: bool, queue: bool) -> dict:
+        error = self._interpreter_error(interpreter)
+        if error:
+            return {"ok": False, "error": error}
+
         if queue:
             result = self.processes.enqueue(key, interpreter, overrides, follow_up, detach)
         else:
@@ -959,7 +979,7 @@ class RequestRouter:
         handler.wfile.write(data)
 
     def _serve_static(self, handler, relative: str) -> None:
-        target = (self.paths.static_dir / relative).resolve()
+        target = (self.paths.static_dir / unquote(relative)).resolve()
         if not target.is_relative_to(self.paths.static_dir.resolve()):
             self._send_json(handler, {"error": "forbidden"}, 403)
             return

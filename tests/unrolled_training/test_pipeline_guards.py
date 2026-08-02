@@ -7,11 +7,12 @@ import torch
 
 from configuration.training               import UnrolledEntryConfig
 from models.unrolled                      import get_unrolled
-from pipelines.unrolled.training.pipeline import UnrolledOverfitGate, UnrolledTrainingPipeline
+from pipelines.unrolled.training.pipeline import UnrolledOverfitGate, UnrolledSingleTrainRunner, UnrolledTrainingPipeline
 
 from tests.backbone_training._helpers import identity_normalizer, x_axis_numpy
 
-from tools.monitoring.logger import Logger
+from tools.monitoring.logger  import Logger
+from tools.runtime.completion import CompletionMarker
 
 
 HW     = 8
@@ -141,3 +142,31 @@ def test_pipeline_stays_silent_without_input_noise(force_cpu):
     UnrolledTrainingPipeline(UnrolledEntryConfig())._warn_inert_augmentation(logger)
 
     assert logger.warnings == []
+
+
+def test_completed_run_is_reused_instead_of_retrained(tmp_path, force_cpu):
+    config          = UnrolledEntryConfig()
+    config.logdir   = tmp_path
+    config.run_name = "unit"
+
+    run_directory = tmp_path / "unit"
+    run_directory.mkdir(parents=True)
+    CompletionMarker.stamp(run_directory, {"stage": "training"})
+
+    assert UnrolledSingleTrainRunner(config).run() is None
+
+
+def test_unfinished_run_directory_is_deleted_before_retraining(tmp_path, force_cpu):
+    config          = UnrolledEntryConfig()
+    config.logdir   = tmp_path
+    config.run_name = "unit"
+
+    run_directory = tmp_path / "unit"
+    (run_directory / "checkpoints").mkdir(parents=True)
+    (run_directory / "checkpoints" / "last.pt").write_bytes(b"")
+
+    runner = UnrolledSingleTrainRunner(config)
+    runner._resolve_run_directory()
+
+    assert runner._build_unit_resume().skip_training() is False
+    assert not (run_directory / "checkpoints").exists()

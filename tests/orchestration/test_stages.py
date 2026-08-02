@@ -41,6 +41,11 @@ def _mark_complete(directory: Path) -> None:
     CompletionMarker.stamp(directory, {"stage": "test"})
 
 
+def _mark_inference_complete(directory: Path, split: str) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    CompletionMarker.stamp(directory, {"stage": "inference", "split": split})
+
+
 def _ran_result(name: str, gpu: int = 0, status: str = "DONE", returncode: int = 0) -> dict:
     return {
         "name"       : name,
@@ -211,7 +216,7 @@ def test_inference_reuses_existing_inference_on_resume(tmp_path, logger):
     stage  = QueuedInferenceStage(config=config, entry_script=Path("entry.py"), run_tag="t1", items=items, logger=logger)
 
     _mark_complete(stage.stage_dir / "model")
-    _mark_complete(stage.stage_dir / "model" / "inference" / "run0")
+    _mark_inference_complete(stage.stage_dir / "model" / "inference" / "run0", "val")
 
     recorder = []
     _patch_queue(stage, recorder)
@@ -221,6 +226,22 @@ def test_inference_reuses_existing_inference_on_resume(tmp_path, logger):
     assert recorder == []
     assert results[0]["status"]     == "DONE"
     assert results[0]["returncode"] == 0
+
+
+def test_inference_for_another_split_is_not_reused(tmp_path, logger):
+    items  = ["model"]
+    config = _config(tmp_path, resume=True)
+    stage  = QueuedInferenceStage(config=config, entry_script=Path("entry.py"), run_tag="t1", items=items, logger=logger)
+
+    _mark_complete(stage.stage_dir / "model")
+    _mark_inference_complete(stage.stage_dir / "model" / "inference" / "run0", "test")
+
+    recorder = []
+    _patch_queue(stage, recorder)
+
+    stage.run()
+
+    assert recorder == [["model"]]
 
 
 def test_inference_unfinished_output_is_not_reused_and_gets_purged(tmp_path, logger):
@@ -249,7 +270,7 @@ def test_inference_no_resume_reruns_despite_existing_inference(tmp_path, logger)
     stage  = QueuedInferenceStage(config=config, entry_script=Path("entry.py"), run_tag="t1", items=items, logger=logger)
 
     _mark_complete(stage.stage_dir / "model")
-    _mark_complete(stage.stage_dir / "model" / "inference" / "run0")
+    _mark_inference_complete(stage.stage_dir / "model" / "inference" / "run0", "val")
 
     recorder = []
     _patch_queue(stage, recorder)
@@ -267,7 +288,7 @@ def test_inference_mixed_skip_cached_pending(tmp_path, logger):
     for name in ("pending", "cached"):
         _mark_complete(stage.stage_dir / name)
 
-    _mark_complete(stage.stage_dir / "cached" / "inference" / "r0")
+    _mark_inference_complete(stage.stage_dir / "cached" / "inference" / "r0", "val")
 
     recorder = []
     _patch_queue(stage, recorder)

@@ -5,11 +5,12 @@ class TriageView {
   static VERDICTS     = ["label problem", "model problem", "interesting"];
 
   constructor(root) {
-    this.root   = root;
-    this.cubes  = [];
-    this.cubeId = null;
-    this.cases  = [];
-    this.built  = false;
+    this.root    = root;
+    this.cubes   = [];
+    this.cubeId  = null;
+    this.cases   = [];
+    this.payload = null;
+    this.built   = false;
   }
 
   enter() {
@@ -80,39 +81,24 @@ class TriageView {
       return;
     }
 
-    this.cases = data.cases;
-    this._renderCases(data);
+    this.cases   = data.cases;
+    this.payload = data;
+    this._renderCases();
   }
 
-  _renderCases(data) {
+  _renderCases() {
     if (!this.cases.length) {
       this.refs.cases.innerHTML = `<p class="cube-hint">no triage cases; every block is below the error floor</p>`;
       return;
     }
 
-    const cards = this.cases.map((row, index) => this._card(row, index, data)).join("");
+    const cards = this.cases.map((row, index) => this._card(row, index)).join("");
     this.refs.cases.innerHTML = `<div class="script-grid">${cards}</div>`;
-
-    this.refs.cases.querySelectorAll("[data-open]").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const row = this.cases[Number(btn.dataset.open)];
-        if (window.tomogramView) {
-          window.tomogramView.openAt(this.cubeId, row.worst_az, row.worst_rg);
-          window.location.hash = "#/cube";
-        }
-      });
-    });
-
-    this.refs.cases.querySelectorAll("[data-verdict]").forEach((btn) => {
-      btn.addEventListener("click", () => this._annotate(Number(btn.dataset.case), btn.dataset.verdict));
-    });
-
-    this.refs.cases.querySelectorAll("[data-note]").forEach((input) => {
-      input.addEventListener("change", () => this._annotate(Number(input.dataset.note), null, input.value));
-    });
+    this._wire(this.refs.cases);
   }
 
-  _card(row, index, data) {
+  _card(row, index) {
+    const data       = this.payload || {};
     const annotation = row.annotation || {};
     const modeBadge  = data.has_modes && row.mode ? `<span class="cube-coords">mode: ${this._esc(row.mode)} (${(row.fail_frac * 100).toFixed(0)}% failing)</span><br>` : "";
     const aux        = (data.aux || [])
@@ -155,18 +141,41 @@ class TriageView {
 
     if (out.ok) {
       row.annotation = out.annotation || null;
-      this._renderCases({ has_modes: this.cases.some((r) => r.mode), aux: this._auxKeys() });
+      this._repaintCard(index);
     }
   }
 
-  _auxKeys() {
-    const keys = new Set();
-    this.cases.forEach((row) => {
-      ["label_r2", "seed_std_profile", "flip_consistency"].forEach((name) => {
-        if (row[name] !== null && row[name] !== undefined) keys.add(name);
+  _repaintCard(index) {
+    const grid = this.refs.cases.querySelector(".script-grid");
+    const old  = grid ? grid.children[index] : null;
+    if (!old) return;
+
+    const holder = document.createElement("div");
+    holder.innerHTML = this._card(this.cases[index], index);
+    const card = holder.firstElementChild;
+
+    old.replaceWith(card);
+    this._wire(card);
+  }
+
+  _wire(scope) {
+    scope.querySelectorAll("[data-open]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const row = this.cases[Number(btn.dataset.open)];
+        if (window.tomogramView) {
+          window.tomogramView.openAt(this.cubeId, row.worst_az, row.worst_rg);
+          window.location.hash = "#/cube";
+        }
       });
     });
-    return [...keys];
+
+    scope.querySelectorAll("[data-verdict]").forEach((btn) => {
+      btn.addEventListener("click", () => this._annotate(Number(btn.dataset.case), btn.dataset.verdict));
+    });
+
+    scope.querySelectorAll("[data-note]").forEach((input) => {
+      input.addEventListener("change", () => this._annotate(Number(input.dataset.note), null, input.value));
+    });
   }
 
   _esc(text) {

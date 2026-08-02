@@ -47,8 +47,8 @@ class SlotOrganization:
         return counts
 
     @staticmethod
-    def assignment_matrix(params_pred: np.ndarray, params_gt: np.ndarray, n_K: int, amp_threshold: float = ParamMatcher.ACTIVE_AMP_THR) -> np.ndarray:
-        sel = GaussianMatcher(amp_threshold=amp_threshold).assignment(params_pred, params_gt, n_K)
+    def assignment_matrix(params_pred: np.ndarray, params_gt: np.ndarray, n_K: int, amp_threshold: float = ParamMatcher.ACTIVE_AMP_THR, assignment: np.ndarray | None = None) -> np.ndarray:
+        sel = GaussianMatcher(amp_threshold=amp_threshold).assignment(params_pred, params_gt, n_K) if assignment is None else assignment
 
         amp_pred = np.stack([params_pred[3 * k] for k in range(n_K)], axis=0).reshape(n_K, -1)
         amp_gt   = np.stack([params_gt  [3 * k] for k in range(n_K)], axis=0).reshape(n_K, -1)

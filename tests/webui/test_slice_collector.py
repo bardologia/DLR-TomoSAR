@@ -33,7 +33,7 @@ def _make_run(base: Path, group: str, name: str, stamp: str = "stamp_1", sources
 
 
 def _collector(base: Path) -> tuple[SliceCollector, list]:
-    cubes   = CubeExplorer(paths=None, logger=WebLogger())
+    cubes   = CubeExplorer(WebLogger())
     listing = cubes.list_cubes(str(base))
     assert listing["ok"], listing
 

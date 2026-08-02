@@ -156,6 +156,7 @@ class GpuSchedule:
         self.lock         = threading.Lock()
         self.path         = self.paths.logs_dir / self.FILE_NAME
         self.applied      = {}
+        self.pending      = {}
         self.settings     = dict(self.DEFAULTS)
         self.last_tick    = None
         self.last_sweep   = None
@@ -233,21 +234,44 @@ class GpuSchedule:
         with self.lock:
             return set(self.gifted)
 
+    def _enter(self, job_id: str, phase: str, enabled: bool) -> bool:
+        with self.lock:
+            record = self.applied.get(job_id)
+            if record is None:
+                self.applied[job_id] = {"phase": phase, "withheld": []}
+                return False
+
+            if not enabled:
+                record["phase"] = phase
+                return False
+
+            return record["phase"] != phase
+
     def _cross(self, job_id: str, phase: str) -> list[str]:
         target   = self.gpus_for(phase)
         gifts    = self._gifts()
         granted  = [gpu for gpu in self.availability.grant(target) if gpu not in gifts]
         withheld = [gpu for gpu in target if gpu not in granted]
 
-        self.applied[job_id]["withheld"] = withheld
+        with self.lock:
+            self.applied[job_id]["withheld"] = withheld
+            announced                        = self.pending.get(job_id) == phase
+            self.pending[job_id]             = phase
 
         if not granted:
-            self.logger.warning(f"gpu schedule left job {job_id} where it is: every GPU in the {phase} pool {target} is busy with someone else's work")
+            if not announced:
+                self.logger.warning(f"gpu schedule left job {job_id} where it is: every GPU in the {phase} pool {target} is busy with someone else's work, so the move stays pending until one frees")
             return []
 
         result = self.processes.set_gpus(job_id, granted)
         if not result.get("ok"):
+            if not announced:
+                self.logger.warning(f"gpu schedule could not move job {job_id} onto the {phase} pool {granted}: {result.get('error', 'the pool write failed')}, so the move stays pending")
             return []
+
+        with self.lock:
+            self.applied[job_id]["phase"] = phase
+            self.pending.pop(job_id, None)
 
         if withheld:
             self.logger.ok(f"gpu schedule moved job {job_id} onto the {phase} pool {granted}; {withheld} held by someone else")
@@ -266,15 +290,12 @@ class GpuSchedule:
         live    = self._live_jobs()
 
         for job_id in live:
-            previous             = self.applied.get(job_id)
-            self.applied[job_id] = {"phase": phase, "withheld": []} if previous is None else {**previous, "phase": phase}
+            if self._enter(job_id, phase, enabled):
+                applied += self._cross(job_id, phase)
 
-            if not enabled or previous is None or previous["phase"] == phase:
-                continue
-
-            applied += self._cross(job_id, phase)
-
-        self.applied = {job_id: record for job_id, record in self.applied.items() if job_id in live}
+        with self.lock:
+            self.applied = {job_id: record for job_id, record in self.applied.items() if job_id in live}
+            self.pending = {job_id: pending for job_id, pending in self.pending.items() if job_id in live}
 
         return applied
 
@@ -330,9 +351,10 @@ class GpuSchedule:
                 continue
 
             donors.append(job_id)
-            record = self.applied.get(job_id)
-            if record is not None and gpu not in record["withheld"]:
-                record["withheld"].append(gpu)
+            with self.lock:
+                record = self.applied.get(job_id)
+                if record is not None and gpu not in record["withheld"]:
+                    record["withheld"].append(gpu)
 
         if not donors:
             return []
@@ -370,17 +392,17 @@ class GpuSchedule:
 
         return self._donate(gpu, releasable[gpu], attempt, moment)
 
-    def _claim(self, job_id: str, current: list[int], freed: list[int]) -> list[str]:
+    def _claim(self, job_id: str, current: list[int], freed: list[int]) -> list[int]:
         merged = sorted(set(current) | set(freed))
         if merged == sorted(current):
-            return []
+            return merged
 
         result = self.processes.set_gpus(job_id, merged)
         if not result.get("ok"):
-            return []
+            return sorted(current)
 
         self.logger.ok(f"gpu schedule grew job {job_id} onto {merged}: {freed} came free")
-        return [job_id]
+        return merged
 
     def sweep(self, moment: datetime) -> list[str]:
         with self.lock:
@@ -394,20 +416,27 @@ class GpuSchedule:
         claimed = []
 
         for job_id in self._live_jobs():
-            record = self.applied.get(job_id)
-            if record is None or not record["withheld"]:
+            with self.lock:
+                record   = self.applied.get(job_id)
+                withheld = list(record["withheld"]) if record is not None else []
+
+            if not withheld:
                 continue
 
             current = self.processes.gpu_pool(job_id).get("gpus", [])
             if not current:
                 continue
 
-            freed = self.availability.grant(record["withheld"])
+            freed = self.availability.grant(withheld)
             if not freed:
                 continue
 
-            claimed += self._claim(job_id, current, freed)
-            record["withheld"] = [gpu for gpu in record["withheld"] if gpu not in freed]
+            pool = self._claim(job_id, current, freed)
+            if pool != sorted(current):
+                claimed.append(job_id)
+
+            with self.lock:
+                record["withheld"] = [gpu for gpu in record["withheld"] if gpu not in pool]
 
         return claimed
 
@@ -445,9 +474,9 @@ class GpuSchedule:
             nap      = self.nap_until.isoformat(timespec="seconds") if self.nap_until else None
             gifts    = sorted(self.gifted)
             given    = dict(self.last_charity) if self.last_charity else None
+            waiting  = sorted({gpu for record in self.applied.values() for gpu in record["withheld"]})
 
-        phase   = self.phase(datetime.now())
-        waiting = sorted({gpu for record in self.applied.values() for gpu in record["withheld"]})
+        phase = self.phase(datetime.now())
 
         return {
             **settings,

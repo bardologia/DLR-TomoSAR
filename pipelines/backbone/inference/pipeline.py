@@ -98,7 +98,7 @@ class InferencePipeline:
     @staticmethod
     def _equal_indices(n_total: int, n_slices: int) -> np.ndarray:
         n_slices = max(1, min(n_slices, n_total))
-        return np.linspace(n_total * 0.1, n_total * 0.9, n_slices).round().astype(int)
+        return np.unique(np.linspace(n_total * 0.1, n_total * 0.9, n_slices).round().astype(int))
 
     def _compute_slice_indices(self, cfg: InferenceConfig, n_elev: int, n_az: int, n_rg: int) -> dict:
         return {
@@ -194,13 +194,6 @@ class InferencePipeline:
             np.save(meta.cube_dir / "physics_valid_mask.npy",       consistency.valid_mask)
 
     def _evaluate_label_quality(self, cfg: InferenceConfig, meta: InferenceMetadata, run, result, x_axis_np: np.ndarray, global_metrics: dict, logger: Logger) -> None:
-        if run.full_curves is None:
-            logger.section("[Inference: Label Quality skipped]")
-            logger.subsection("No raw tomogram was loaded for this run; the label-quality R² map is absent from metrics, figures, and report.")
-            global_metrics["label_quality_status"] = "skipped: no raw tomogram loaded"
-            Metrics.write_json(global_metrics, meta.metrics_path)
-            return
-
         r2_map, stats = Metrics(result, x_axis_np, run.n_gaussians).label_quality(run.full_curves)
 
         result.label_r2 = r2_map

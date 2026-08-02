@@ -36,10 +36,6 @@ class TrainingLoopConfig:
 
 @dataclass
 class MemoryConfig:
-    clear_cache_every_n_steps : int  = 0
-    clear_cache_after_eval    : bool = False
-    clear_cache_after_epoch   : bool = False
-
     reserve_vram      : bool  = False
     vram_keep_free_gb : float = 1.0
 

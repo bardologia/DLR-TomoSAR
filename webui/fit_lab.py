@@ -12,7 +12,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from configuration.param_extraction import ExtractionConfig, FitMode
-from project_paths                  import ProjectPaths
 from tools.data.preprocessing       import ProfilePreprocessor
 from tools.reporting.plotting       import PlotBase
 from web_logger                     import WebLogger
@@ -29,8 +28,7 @@ class FitLab:
 
     CONFIG_KEYS = ("k_max", "lambda_k", "mode", "threshold_factor", "truncation_index", "prominence_frac", "sigma_init_divisor", "activity_threshold", "adam_steps", "adam_lr")
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
-        self.paths  = paths
+    def __init__(self, logger: WebLogger) -> None:
         self.logger = logger
         self.lock   = threading.Lock()
 

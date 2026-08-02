@@ -18,9 +18,14 @@ class GaussianMixture:
     EXPON_CEIL  = 0.0
 
     @classmethod
-    def _safe_sigma_sq(cls, sigmas: np.ndarray) -> np.ndarray:
+    def safe_sigma_sq(cls, sigmas: np.ndarray) -> np.ndarray:
         clamped = np.maximum(sigmas, cls.SIGMA_FLOOR)
         return 2.0 * clamped ** 2
+
+    @classmethod
+    def kernel(cls, amp: np.ndarray, mu: np.ndarray, sig: np.ndarray, x: np.ndarray) -> np.ndarray:
+        expon = np.clip(-((x - mu) ** 2) / cls.safe_sigma_sq(sig), cls.EXPON_FLOOR, cls.EXPON_CEIL)
+        return amp * np.exp(expon)
 
     @classmethod
     def evaluate_batch(cls, height_axis: np.ndarray, amps: np.ndarray, mus: np.ndarray, sigs: np.ndarray) -> np.ndarray:
@@ -28,12 +33,7 @@ class GaussianMixture:
         h    = height_axis[None, :]
 
         for g in range(amps.shape[1]):
-            amp_g  = amps[:, g:g + 1]
-            mu_g   = mus [:, g:g + 1]
-            sig_sq = cls._safe_sigma_sq(sigs[:, g:g + 1])
-
-            expon  = np.clip(-((h - mu_g) ** 2) / sig_sq, cls.EXPON_FLOOR, cls.EXPON_CEIL)
-            pred  += amp_g * np.exp(expon)
+            pred += cls.kernel(amps[:, g:g + 1], mus[:, g:g + 1], sigs[:, g:g + 1], h)
 
         return pred
 
@@ -42,13 +42,7 @@ class GaussianMixture:
         reconstructed = np.zeros(parameters_array.shape[1:], dtype=np.float32)
 
         for k in range(n_gaussians):
-            amp    = parameters_array[3 * k    ]
-            mu     = parameters_array[3 * k + 1]
-            sig    = parameters_array[3 * k + 2]
-            sig_sq = cls._safe_sigma_sq(sig)
-
-            expon          = np.clip(-((h_val - mu) ** 2) / sig_sq, cls.EXPON_FLOOR, cls.EXPON_CEIL)
-            reconstructed += amp * np.exp(expon)
+            reconstructed += cls.kernel(parameters_array[3 * k], parameters_array[3 * k + 1], parameters_array[3 * k + 2], h_val)
 
         return reconstructed
 
@@ -58,13 +52,7 @@ class GaussianMixture:
         total      = np.zeros_like(height_axis, dtype=np.float64)
 
         for k in range(n_gaussians):
-            amp    = float(params[3 * k    ])
-            mu     = float(params[3 * k + 1])
-            sig    = float(params[3 * k + 2])
-            sig_sq = 2.0 * max(sig, cls.SIGMA_FLOOR) ** 2
-
-            expon = np.clip(-((height_axis - mu) ** 2) / sig_sq, cls.EXPON_FLOOR, cls.EXPON_CEIL)
-            comp  = amp * np.exp(expon)
+            comp = cls.kernel(float(params[3 * k]), float(params[3 * k + 1]), float(params[3 * k + 2]), height_axis)
             components.append(comp)
             total += comp
 
@@ -73,30 +61,18 @@ class GaussianMixture:
 
 class GaussianReconstructor:
     @staticmethod
-    def _single(a: np.ndarray, mu: np.ndarray, sig: np.ndarray, x: np.ndarray) -> np.ndarray:
-        return a * np.exp(-((x - mu) ** 2) / (2.0 * sig * sig + 1e-8))
-
-    @staticmethod
     def reconstruct_batch(gauss: np.ndarray, x: np.ndarray) -> np.ndarray:
-        a   = np.maximum(gauss[:, :, 0:1], 0.0)
+        a   = gauss[:, :, 0:1]
         mu  = gauss[:, :, 1:2]
         sig = gauss[:, :, 2:3]
 
-        out = GaussianReconstructor._single(a, mu, sig, x).sum(axis=1)
+        out = GaussianMixture.kernel(a, mu, sig, x).sum(axis=1)
 
         return out.astype(np.float32)
 
     @staticmethod
     def components(params: np.ndarray, x_axis: np.ndarray, n_gaussians: int) -> List[np.ndarray]:
-        out = []
-
-        for k in range(n_gaussians):
-            a   = float(params[3 * k])
-            mu  = float(params[3 * k + 1])
-            sig = float(params[3 * k + 2])
-            out.append(GaussianReconstructor._single(a, mu, sig, x_axis))
-
-        return out
+        return [GaussianMixture.kernel(float(params[3 * k]), float(params[3 * k + 1]), float(params[3 * k + 2]), x_axis) for k in range(n_gaussians)]
 
 
 class GaussianCurve:

@@ -24,7 +24,7 @@ from tools.training.pretraining.batch_finder import BatchSizeFinder, TrainStepMe
 class MaxBatchProbe:
     CONTEXT_WARN_GB = 1.5
 
-    def __init__(self, config: BenchmarkConfig, model_name: str, overrides: dict) -> None:
+    def __init__(self, config: BenchmarkConfig, model_name: str, overrides: dict, work_dir: Path) -> None:
         self.config     = config
         self.model_name = model_name
         self.overrides  = overrides
@@ -36,7 +36,7 @@ class MaxBatchProbe:
 
         self.device     = torch.device("cuda")
         self.context_gb = 0.0
-        self.work_dir   = Path(config.paths.log_base_dir) / "max_batch_probe" / model_name
+        self.work_dir   = Path(work_dir)
         self.work_dir.mkdir(parents=True, exist_ok=True)
         self.logger = Logger(log_dir=str(self.work_dir / "logs"), name="max_batch", level="INFO")
 

@@ -101,9 +101,14 @@ def test_save_run_summary_payload(metadata):
 @pytest.mark.real_data
 def test_context_manager_closes_writer(trainer_config, tmp_path):
     with TrainingRunMetadata(trainer_config, "resunet", tmp_path / "runs", run_name="ctx") as meta:
-        assert meta.writer is not None
+        meta.writer.add_scalar("probe/value", 1.0, 0)
+        assert meta.writer.all_writers
 
-    assert meta.writer is not None
+    assert meta.writer.all_writers is None
+
+    events = list(meta.tensorboard_dir.glob("events.out.tfevents.*"))
+    assert len(events) == 1
+    assert events[0].stat().st_size > 0
 
 
 @pytest.mark.real_data

@@ -71,7 +71,7 @@ def test_preflight_writes_inside_the_run_directory(tmp_path, monkeypatch):
         label           = "image_ae",
     ).run()
 
-    assert _FakeOrchestrator.captured["result_dir"] == run_directory / "pretrain"
+    assert _FakeOrchestrator.captured["label"] == "image_ae"
     assert (run_directory / "pretrain").is_dir()
     assert (run_directory / "pretrain" / "logs").is_dir()
 

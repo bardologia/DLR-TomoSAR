@@ -16,9 +16,6 @@ class ComplexSmoother:
             return uniform_filter(array.real, self.window) + 1j * uniform_filter(array.imag, self.window)
         return uniform_filter(array, self.window)
 
-    def smooth_phase(self, phase: np.ndarray) -> np.ndarray:
-        return np.angle(self.smooth(np.exp(1j * phase)))
-
 
 class CoherenceEstimator:
     def __init__(self, window: Tuple[int, int] = (7, 7)) -> None:

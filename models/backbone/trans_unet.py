@@ -2,10 +2,9 @@ from __future__ import annotations
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as functional
 
 from configuration.architectures import TransUNetConfig
-from ..blocks                    import ConvBlock, OutputHeadsMixin, PatchEmbedding, TransformerBlock, build_upsample, initialize_weights, match_spatial_size, tokens_to_feature_map
+from ..blocks                    import ConvBlock, OutputHeadsMixin, PatchEmbedding, TransformerBlock, build_upsample, initialize_weights, match_spatial_size, resize_positional_embedding, tokens_to_feature_map
 
 
 class TransUNet(nn.Module, OutputHeadsMixin):
@@ -116,19 +115,7 @@ class TransUNet(nn.Module, OutputHeadsMixin):
 
         tokens, grid_height, grid_width = self.patch_embedding(x)
 
-        pos_embed = self.positional_embedding
-        if grid_height != self.expected_grid_size or grid_width != self.expected_grid_size:
-            pos_embed = pos_embed.transpose(1, 2).view(
-                1, -1, self.expected_grid_size, self.expected_grid_size
-            )
-            pos_embed = functional.interpolate(
-                input         = pos_embed,
-                size          = (grid_height, grid_width),
-                mode          = "bilinear",
-                align_corners = False,
-            )
-            pos_embed = pos_embed.flatten(2).transpose(1, 2)
-        tokens = tokens + pos_embed
+        tokens = tokens + resize_positional_embedding(self.positional_embedding, self.expected_grid_size, grid_height, grid_width)
 
         for transformer_block in self.transformer_blocks:
             tokens = transformer_block(tokens)

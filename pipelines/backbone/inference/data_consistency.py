@@ -102,11 +102,6 @@ class DataConsistencyEvaluator:
     def _chunk_rows(self, n_elev: int, width: int) -> int:
         return max(1, int(4_000_000 // max(1, n_elev * width)))
 
-    def _synth_unit(self, curves: torch.Tensor, kz_track: torch.Tensor, x_axis: torch.Tensor, dx: float) -> torch.Tensor:
-        gamma = PhysicalLoss.synthesise_track(curves, kz_track, x_axis, dx)
-
-        return gamma / (gamma.abs() + 1e-30)
-
     def _evaluate_chunks(self, pred: np.ndarray, gt: np.ndarray, kz: np.ndarray, measured: np.ndarray, x_axis_np: np.ndarray) -> dict:
         n_elev, H, W = gt.shape
         n_tracks     = kz.shape[0]
@@ -136,24 +131,26 @@ class DataConsistencyEvaluator:
                 gt_t   = torch.from_numpy(np.ascontiguousarray(gt[:, a0:a1],   dtype=np.float32)).unsqueeze(0).to(self.device)
                 kz_t   = torch.from_numpy(np.ascontiguousarray(kz[:, a0:a1])).unsqueeze(0).to(self.device)
 
-                coh_val, mask = PhysicalLoss.coherence_resynthesis_pp_map(pred_t, gt_t, kz_t, x_axis, dx, floor)
-                cov_val, _    = PhysicalLoss.covariance_matching_pp_map(pred_t, gt_t, kz_t, x_axis, dx, floor)
+                cov_val, _ = PhysicalLoss.covariance_matching_pp_map(pred_t, gt_t, kz_t, x_axis, dx, floor)
 
-                coherence_map[a0:a1]  = coh_val[0].cpu().numpy()
                 covariance_map[a0:a1] = cov_val[0].cpu().numpy()
-                mask_map[a0:a1]       = mask[0].cpu().numpy()
 
+                t0  = gt_t.sum(dim=1) * dx
                 p0c = (pred_t.sum(dim=1) * dx).clamp(min=floor)
-                t0c = (gt_t.sum(dim=1)   * dx).clamp(min=floor)
+                t0c = t0.clamp(min=floor)
 
-                mask_np    = mask[0].cpu().numpy() > 0.0
-                mask_count = float(mask_np.sum())
+                mask_np       = (t0 > floor)[0].cpu().numpy()
+                mask_count    = float(mask_np.sum())
+                coherence_sum = np.zeros((a1 - a0, W), dtype=np.float64)
+
+                mask_map[a0:a1] = mask_np.astype(np.float32)
 
                 for track in range(n_tracks):
                     gp = PhysicalLoss.synthesise_track(pred_t, kz_t[:, track], x_axis, dx) / p0c
                     gs = PhysicalLoss.synthesise_track(gt_t,   kz_t[:, track], x_axis, dx) / t0c
 
-                    err = ((gp - gs).abs() ** 2)[0].cpu().numpy()
+                    err            = ((gp - gs).abs() ** 2)[0].cpu().numpy()
+                    coherence_sum += err
 
                     track_error_sum[track] += float(err[mask_np].sum())
                     track_mask_sum[track]  += mask_count
@@ -162,8 +159,8 @@ class DataConsistencyEvaluator:
                         continue
 
                     syn_unit = {
-                        "gt"   : self._synth_unit(gt_t,   kz_t[:, track], x_axis, dx)[0].cpu().numpy(),
-                        "pred" : self._synth_unit(pred_t, kz_t[:, track], x_axis, dx)[0].cpu().numpy(),
+                        "gt"   : (gs / (gs.abs() + 1e-30))[0].cpu().numpy(),
+                        "pred" : (gp / (gp.abs() + 1e-30))[0].cpu().numpy(),
                     }
 
                     meas  = measured[track - 1, a0:a1]
@@ -173,6 +170,8 @@ class DataConsistencyEvaluator:
                     for source in ("gt", "pred"):
                         aligned_sum[source][track - 1] += complex((meas[valid] * np.conj(syn_unit[source][valid])).sum())
                         flipped_sum[source][track - 1] += complex((meas[valid] * syn_unit[source][valid]).sum())
+
+                coherence_map[a0:a1] = (coherence_sum / n_tracks).astype(np.float32)
 
         return {
             "coherence_map"   : coherence_map,

@@ -16,9 +16,8 @@ WEBUI_ROOT = REPO_ROOT / "webui"
 if str(WEBUI_ROOT) not in sys.path:
     sys.path.insert(0, str(WEBUI_ROOT))
 
-from fit_lab       import FitLab
-from project_paths import ProjectPaths
-from web_logger    import WebLogger
+from fit_lab    import FitLab
+from web_logger import WebLogger
 
 
 _HAS_JAX = importlib.util.find_spec("jax") is not None
@@ -81,7 +80,7 @@ def _fit(lab: FitLab, body: dict) -> dict:
 
 def test_datasets_listing(tmp_path):
     dataset = _make_dataset(tmp_path)
-    lab     = FitLab(ProjectPaths(), WebLogger())
+    lab     = FitLab(WebLogger())
 
     listing = lab.datasets(str(tmp_path))
     assert listing["ok"]
@@ -96,7 +95,7 @@ def test_datasets_listing(tmp_path):
 
 def test_load_meta_and_maps(tmp_path):
     dataset = _make_dataset(tmp_path)
-    lab     = FitLab(ProjectPaths(), WebLogger())
+    lab     = FitLab(WebLogger())
 
     _load(lab, dataset)
 
@@ -112,7 +111,7 @@ def test_load_meta_and_maps(tmp_path):
 
 
 def test_load_error_on_missing_tomogram(tmp_path):
-    lab = FitLab(ProjectPaths(), WebLogger())
+    lab = FitLab(WebLogger())
     assert lab.start_load(str(tmp_path))["ok"]
 
     deadline = time.time() + 30
@@ -126,7 +125,7 @@ def test_load_error_on_missing_tomogram(tmp_path):
 
 def test_fit_request_validation(tmp_path):
     dataset = _make_dataset(tmp_path)
-    lab     = FitLab(ProjectPaths(), WebLogger())
+    lab     = FitLab(WebLogger())
 
     assert "no dataset" in lab.start_fit({"pixels": [{"az": 0, "rg": 0}], "config": BASE_CONFIG})["error"]
 
@@ -147,7 +146,7 @@ def test_fit_request_validation(tmp_path):
 @pytest.mark.skipif(not _HAS_JAX, reason="jax not installed in this environment")
 def test_fit_recovers_synthetic_gaussian(tmp_path):
     dataset = _make_dataset(tmp_path)
-    lab     = FitLab(ProjectPaths(), WebLogger())
+    lab     = FitLab(WebLogger())
 
     _load(lab, dataset)
     result = _fit(lab, {"pixels": [{"az": 3, "rg": 7}, {"az": 0, "rg": 0}], "config": BASE_CONFIG})
@@ -176,7 +175,7 @@ def test_fit_recovers_synthetic_gaussian(tmp_path):
 @pytest.mark.skipif(not _HAS_JAX, reason="jax not installed in this environment")
 def test_fit_modes_share_kernel(tmp_path):
     dataset = _make_dataset(tmp_path)
-    lab     = FitLab(ProjectPaths(), WebLogger())
+    lab     = FitLab(WebLogger())
 
     _load(lab, dataset)
     sigma_only = _fit(lab, {"pixels": [{"az": 3, "rg": 7}], "config": BASE_CONFIG})
@@ -193,7 +192,7 @@ def test_fit_modes_share_kernel(tmp_path):
 @pytest.mark.skipif(not _HAS_JAX, reason="jax not installed in this environment")
 def test_fit_composition_freezes_sigma(tmp_path):
     dataset = _make_dataset(tmp_path)
-    lab     = FitLab(ProjectPaths(), WebLogger())
+    lab     = FitLab(WebLogger())
 
     _load(lab, dataset)
     result = _fit(lab, {"pixels": [{"az": 3, "rg": 7}], "config": {**BASE_CONFIG, "mode": "amp_mu"}})

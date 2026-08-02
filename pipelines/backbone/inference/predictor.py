@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import os
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from collections        import deque
+from concurrent.futures import ProcessPoolExecutor
 from typing             import List, Optional, Tuple
 
 import numpy as np
@@ -194,24 +195,6 @@ class Predictor:
 
         return all_indices, all_pred_params, all_gt_params
 
-    def _compute_metrics(self, all_pred_params : List[np.ndarray], all_gt_params : List[np.ndarray]) -> List[tuple]:
-        run = self.run
-        n_K = run.n_gaussians
-
-        tasks = [(pred, gt, run.x_axis, n_K, self.render_amp_floor) for pred, gt in zip(all_pred_params, all_gt_params)]
-        results: List[tuple | None] = [None] * len(tasks)
-
-        with self.logger.track(transient=True) as prog:
-            task_id = prog.add_task("[section]CPU Metrics[/section]", total=len(tasks))
-            with ProcessPoolExecutor(max_workers=self.cpu_workers) as pool:
-                futures = {pool.submit(Predictor._cpu_worker, t): i for i, t in enumerate(tasks)}
-                for fut in as_completed(futures):
-                    idx = futures[fut]
-                    results[idx] = fut.result()
-                    prog.advance(task_id)
-
-        return results
-
     @staticmethod
     def _render_masked(gauss: np.ndarray, amp_floor: float) -> np.ndarray:
         if amp_floor <= 0.0:
@@ -234,7 +217,7 @@ class Predictor:
         pred_gauss = pred_params_chunk[:, :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
         gt_gauss   = gt_params_chunk[:,   :n_K * 3].reshape(B, n_K, 3, H, W).astype(np.float32)
 
-        sort_key   = np.where(gt_gauss[:, :, 0] > ParamMatcher.ACTIVE_AMP_THR, gt_gauss[:, :, 1], np.inf)
+        sort_key   = np.where(ParamMatcher.is_active(gt_gauss[:, :, 0]), gt_gauss[:, :, 1], np.inf)
         sort_idx   = np.argsort(sort_key, axis=1)
         sort_idx_e = sort_idx[:, :, None, :, :].repeat(3, axis=2)
 
@@ -253,7 +236,7 @@ class Predictor:
             gt_gauss_flat,
         )
 
-    def _stitch_results(self, all_indices : List[List[int]], cpu_results : List[tuple]) -> Result:
+    def _stitch_results(self, all_indices : List[List[int]], all_pred_params : List[np.ndarray], all_gt_params : List[np.ndarray]) -> Result:
         run    = self.run
         n_K    = run.n_gaussians
         out_ch = run.out_channels
@@ -264,12 +247,29 @@ class Predictor:
         param_pred_stitcher = self._create_param_stitcher(out_ch,  "params_pred")
         gt_param_stitcher   = self._create_param_stitcher(n_K * 3, "params_gt")
 
-        for batch_indices, (pred_curves, gt_curves, pred_params, gt_params) in zip(all_indices, cpu_results):
-            for b, idx in enumerate(batch_indices):
-                pred_curve_stitcher.add_patch(idx, pred_curves[b].astype(self.cube_dtype))
-                gt_curve_stitcher.add_patch(  idx, gt_curves  [b].astype(self.cube_dtype))
-                param_pred_stitcher.add_patch(idx, pred_params [b].astype(self.cube_dtype))
-                gt_param_stitcher.add_patch(  idx, gt_params   [b].astype(self.cube_dtype))
+        tasks     = [(pred, gt, run.x_axis, n_K, self.render_amp_floor) for pred, gt in zip(all_pred_params, all_gt_params)]
+        in_flight = 2 * self.cpu_workers
+
+        with self.logger.track(transient=True) as prog:
+            task_id = prog.add_task("[section]CPU Metrics[/section]", total=len(tasks))
+            with ProcessPoolExecutor(max_workers=self.cpu_workers) as pool:
+                pending : deque = deque()
+                submitted       = 0
+
+                for batch_indices in all_indices:
+                    while submitted < len(tasks) and len(pending) < in_flight:
+                        pending.append(pool.submit(Predictor._cpu_worker, tasks[submitted]))
+                        submitted += 1
+
+                    pred_curves, gt_curves, pred_params, gt_params = pending.popleft().result()
+
+                    for b, idx in enumerate(batch_indices):
+                        pred_curve_stitcher.add_patch(idx, pred_curves[b].astype(self.cube_dtype))
+                        gt_curve_stitcher.add_patch(  idx, gt_curves  [b].astype(self.cube_dtype))
+                        param_pred_stitcher.add_patch(idx, pred_params[b].astype(self.cube_dtype))
+                        gt_param_stitcher.add_patch(  idx, gt_params  [b].astype(self.cube_dtype))
+
+                    prog.advance(task_id)
 
         return self._finalize_results(
             pred_curve_stitcher, gt_curve_stitcher,
@@ -311,7 +311,7 @@ class Predictor:
         n_K = self.run.n_gaussians
         for k in range(n_K):
             a_gt    = params_gt_cube[3 * k]
-            mask_gt = ~(a_gt > ParamMatcher.ACTIVE_AMP_THR)
+            mask_gt = ~ParamMatcher.is_active(a_gt)
             params_gt_cube[3 * k + 1][mask_gt] = np.nan
             params_gt_cube[3 * k + 2][mask_gt] = np.nan
 
@@ -371,7 +371,6 @@ class Predictor:
         })
 
         all_indices, all_pred_params, all_gt_params = self._forward_pass()
-        cpu_results = self._compute_metrics(all_pred_params, all_gt_params)
-        results     = self._stitch_results(all_indices, cpu_results)
+        results = self._stitch_results(all_indices, all_pred_params, all_gt_params)
 
         return results

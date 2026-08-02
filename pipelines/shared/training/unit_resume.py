@@ -35,7 +35,7 @@ class UnitResume:
 
         return False
 
-    def skip_inference(self) -> bool:
+    def skip_inference(self, split: str) -> bool:
         if not self.enabled:
             return False
 
@@ -48,8 +48,10 @@ class UnitResume:
                 shutil.rmtree(candidate)
                 self._log(f"{self.run_directory.name}: unfinished inference '{candidate.name}' deleted")
 
-        if any(CompletionMarker.is_complete(candidate) for candidate in inference_dir.iterdir() if candidate.is_dir()):
-            self._log(f"{self.run_directory.name}: existing inference reused")
+        completed = [candidate for candidate in inference_dir.iterdir() if candidate.is_dir() and CompletionMarker.is_complete(candidate)]
+
+        if any(CompletionMarker.payload(candidate)["split"] == split for candidate in completed):
+            self._log(f"{self.run_directory.name}: existing '{split}' inference reused")
             return True
 
         return False

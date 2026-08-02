@@ -6,9 +6,11 @@ import re
 import statistics
 from pathlib import Path
 
-from tools.metrics.significance import SignificanceVsLeader
-from tools.reporting.reporting  import MetricSectionGrouper
-from web_logger                 import WebLogger
+from catalog_roots                             import CatalogRoots
+from pipelines.shared.inference.run_classifier import RunArtifacts
+from tools.metrics.significance                import SignificanceVsLeader
+from tools.reporting.reporting                 import MetricSectionGrouper
+from web_logger                                import WebLogger
 
 
 class RunAxes:
@@ -93,21 +95,26 @@ class RunLeaderboard:
     CONFIG_FILES = (
         ("summary", Path("meta") / "run_summary.json"),
         ("trainer", Path("docs") / "trainer_config.json"),
-        ("model",   Path("meta") / "model_config.json"),
+    )
+
+    MODEL_CONFIGS = (
+        RunArtifacts.BACKBONE_CONFIG,
+        RunArtifacts.PROFILE_AE_CONFIG,
+        RunArtifacts.IMAGE_AE_CONFIG,
+        RunArtifacts.UNROLLED_CONFIG,
+        RunArtifacts.DUAL_CONFIG,
     )
 
     SEED_DIR = re.compile(r"^seed(\d+)$")
 
     def __init__(self, logger: WebLogger) -> None:
         self.logger = logger
-        self.roots  = set()
+        self.roots  = CatalogRoots()
 
     def table(self, base: str) -> dict:
-        root, error = self._catalog_root(base)
+        root, error = self.roots.open(base)
         if error:
             return {"ok": False, "error": error, "rows": []}
-
-        self.roots.add(str(root))
 
         rows, errors = [], []
         seed_latest  = {}
@@ -204,11 +211,9 @@ class RunLeaderboard:
                     unit["metrics"][key]["is_best"]   = False
 
     def trials(self, base: str) -> dict:
-        root, error = self._catalog_root(base)
+        root, error = self.roots.open(base)
         if error:
             return {"ok": False, "error": error, "experiments": []}
-
-        self.roots.add(str(root))
 
         latest = {}
         for metrics_path in sorted(root.rglob("inference/*/metrics.json")):
@@ -314,7 +319,7 @@ class RunLeaderboard:
         if "error" in config:
             return config
 
-        return {"id": str(stamp_dir), "run": run_dir.name, "stamp": stamp_dir.name, "axes": RunAxes.parse(run_dir.name), "metrics": numeric, "config": config["config"]}
+        return {"id": str(stamp_dir), "run": run_dir.name, "stamp": stamp_dir.name, "axes": RunAxes.parse(run_dir.name), "metrics": numeric, "config": config["config"], "config_notes": config["notes"]}
 
     def _unit_side(self, unit_dir: Path) -> dict:
         latest = {}
@@ -348,13 +353,16 @@ class RunLeaderboard:
             return config
 
         stamp = f"mean of {len(per_seed)} seed{'s' if len(per_seed) > 1 else ''}"
-        return {"id": str(unit_dir), "run": unit_dir.name, "stamp": stamp, "axes": RunAxes.parse(unit_dir.name), "n_seeds": len(per_seed), "metrics": means, "config": config["config"]}
+        return {"id": str(unit_dir), "run": unit_dir.name, "stamp": stamp, "axes": RunAxes.parse(unit_dir.name), "n_seeds": len(per_seed), "metrics": means, "config": config["config"], "config_notes": config["notes"]}
 
     def _run_config(self, run_dir: Path) -> dict:
         config = {}
+        notes  = []
+
         for label, rel in self.CONFIG_FILES:
             path = run_dir / rel
             if not path.is_file():
+                notes.append(f"{rel} is missing")
                 continue
             try:
                 payload = json.loads(path.read_text(encoding="utf-8"))
@@ -362,7 +370,18 @@ class RunLeaderboard:
                 return {"error": f"could not read {path}: {exc}"}
             self._flatten(label, payload, config)
 
-        return {"config": config}
+        model_paths = [run_dir / "meta" / name for name in self.MODEL_CONFIGS if (run_dir / "meta" / name).is_file()]
+        if not model_paths:
+            notes.append(f"no model config under meta/ (looked for {', '.join(self.MODEL_CONFIGS)})")
+
+        for path in model_paths:
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as exc:
+                return {"error": f"could not read {path}: {exc}"}
+            self._flatten("model", payload, config)
+
+        return {"config": config, "notes": notes}
 
     def _flatten(self, prefix: str, value, out: dict) -> None:
         if isinstance(value, dict):
@@ -377,7 +396,7 @@ class RunLeaderboard:
             return None
 
         target = Path(raw).resolve()
-        if not any(target.is_relative_to(root) for root in self.roots):
+        if not self.roots.contains(target):
             return None
         if not target.is_dir():
             return None
@@ -394,19 +413,3 @@ class RunLeaderboard:
     @staticmethod
     def _is_number(value) -> bool:
         return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
-
-    @staticmethod
-    def _catalog_root(raw: str) -> tuple[Path | None, str]:
-        raw = (raw or "").strip()
-        if not raw:
-            return None, "set the runs directory in the Results tab first"
-
-        root = Path(raw).expanduser()
-        if not root.is_absolute():
-            return None, "an absolute path is required"
-
-        root = root.resolve()
-        if not root.is_dir():
-            return None, f"not a directory: {root}"
-
-        return root, ""

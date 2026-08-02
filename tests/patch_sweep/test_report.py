@@ -204,6 +204,20 @@ def test_collector_aggregates_nested_seed_runs(tmp_path, logger):
     assert [run["name"] for run in records[0].seed_runs] == [f"{unit.name}/seed0", f"{unit.name}/seed1"]
 
 
+def test_n_seeds_counts_only_the_seeds_that_reported_a_test_loss(tmp_path, logger):
+    planner = make_planner(tmp_path, ["w20_10"], maximum=(16, 16))
+    populate_seeded_runs(tmp_path, planner, seeds=[0, 1])
+
+    for unit in planner.units():
+        (tmp_path / "training" / unit.name / "seed1" / "meta" / "test_metrics.json").unlink()
+
+    records = SweepCollector(run_dir=tmp_path, planner=planner, logger=logger).collect()
+
+    assert all(record.n_seeds     == 1 for record in records)
+    assert all(record.n_seed_runs == 2 for record in records)
+    assert all(record.test_loss_std is None for record in records)
+
+
 def test_report_annotates_dispersion_for_seeded_runs(tmp_path, logger):
     planner = make_planner(tmp_path, ["w20_10"], maximum=(16, 16))
     populate_seeded_runs(tmp_path, planner, seeds=[0, 1])

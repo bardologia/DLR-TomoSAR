@@ -4,9 +4,8 @@ import re
 from dataclasses import dataclass
 from pathlib     import Path
 
-from pipelines.shared.comparison.trial_collection import SeedRunAggregator
-from pipelines.shared.comparison.trial_collection import TrialCollector as BaseTrialCollector
-from pipelines.shared.comparison.trial_collection import TrialRecord    as BaseTrialRecord
+from pipelines.shared.comparison.trial_collection import SeedRunAggregator, TrialArtifactReader
+from pipelines.shared.comparison.trial_collection import TrialRecord as BaseTrialRecord
 from tools.monitoring.logger import Logger
 
 
@@ -21,7 +20,7 @@ class TrialRecord(BaseTrialRecord):
         return path if path.is_dir() else None
 
 
-class TrialCollector(BaseTrialCollector):
+class TrialCollector(TrialArtifactReader):
 
     SEED_DIR_PATTERN = re.compile(r"seed\d+")
 

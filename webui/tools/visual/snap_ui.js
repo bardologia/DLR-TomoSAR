@@ -1,7 +1,7 @@
 "use strict";
 const fs   = require("fs");
-const os   = require("os");
 const path = require("path");
+const { ChromiumResolver } = require("./chromium");
 
 class UiSnapper {
 
@@ -31,20 +31,6 @@ class UiSnapper {
     }
   }
 
-  resolveChromium() {
-    if (process.env.PW_CHROMIUM) return process.env.PW_CHROMIUM;
-
-    const root = path.join(os.homedir(), ".cache", "ms-playwright");
-    const dirs = fs.readdirSync(root).filter(d => d.startsWith("chromium")).sort().reverse();
-    for (const d of dirs) {
-      for (const rel of ["chrome-headless-shell-linux64/chrome-headless-shell", "chrome-linux/chrome"]) {
-        const exe = path.join(root, d, rel);
-        if (fs.existsSync(exe)) return exe;
-      }
-    }
-    throw new Error("no chromium found under " + root + " (set PW_CHROMIUM)");
-  }
-
   async snapRoute(page, route) {
     await page.evaluate((r) => { window.location.hash = "#/" + r; }, route);
     await page.waitForSelector(`.page[data-page="${route.split("/")[0]}"].is-active`);
@@ -61,7 +47,7 @@ class UiSnapper {
     const { chromium } = require("playwright-core");
     fs.mkdirSync(this.outDir, { recursive: true });
 
-    const browser = await chromium.launch({ executablePath: this.resolveChromium() });
+    const browser = await chromium.launch({ executablePath: new ChromiumResolver().resolve() });
     const page    = await browser.newPage({ viewport: { width: this.width, height: this.height } });
 
     const base = `http://127.0.0.1:${this.port}/`;

@@ -13,6 +13,11 @@ def mark_complete(directory: Path) -> None:
     CompletionMarker.stamp(directory, {"stage": "test"})
 
 
+def mark_inference_complete(directory: Path, split: str) -> None:
+    directory.mkdir(parents=True, exist_ok=True)
+    CompletionMarker.stamp(directory, {"stage": "inference", "split": split})
+
+
 def unit(tmp_path: Path, enabled: bool = True, trainer_resume: bool = False) -> UnitResume:
     return UnitResume(tmp_path / "run", enabled=enabled, trainer_resume=trainer_resume)
 
@@ -69,14 +74,22 @@ def test_no_inference_directory_runs_inference(tmp_path):
     resume = unit(tmp_path)
     resume.run_directory.mkdir(parents=True)
 
-    assert not resume.skip_inference()
+    assert not resume.skip_inference("val")
 
 
 def test_complete_inference_is_reused(tmp_path):
     resume = unit(tmp_path)
-    mark_complete(resume.run_directory / "inference" / "stamp0")
+    mark_inference_complete(resume.run_directory / "inference" / "stamp0", "val")
 
-    assert resume.skip_inference()
+    assert resume.skip_inference("val")
+
+
+def test_inference_for_another_split_is_not_reused(tmp_path):
+    resume = unit(tmp_path)
+    mark_inference_complete(resume.run_directory / "inference" / "stamp0", "test")
+
+    assert not resume.skip_inference("val")
+    assert (resume.run_directory / "inference" / "stamp0").exists()
 
 
 def test_unfinished_inference_is_purged_and_rerun(tmp_path):
@@ -86,28 +99,28 @@ def test_unfinished_inference_is_purged_and_rerun(tmp_path):
     unfinished.mkdir(parents=True)
     (unfinished / "metrics.json").write_text("{}")
 
-    assert not resume.skip_inference()
+    assert not resume.skip_inference("val")
     assert not unfinished.exists()
 
 
 def test_mixed_inference_purges_unfinished_and_reuses_complete(tmp_path):
     resume = unit(tmp_path)
-    mark_complete(resume.run_directory / "inference" / "done")
+    mark_inference_complete(resume.run_directory / "inference" / "done", "val")
 
     unfinished = resume.run_directory / "inference" / "partial"
     unfinished.mkdir(parents=True)
     (unfinished / "metrics.json").write_text("{}")
 
-    assert resume.skip_inference()
+    assert resume.skip_inference("val")
     assert not unfinished.exists()
     assert (resume.run_directory / "inference" / "done").exists()
 
 
 def test_disabled_inference_check_is_inert(tmp_path):
     resume = unit(tmp_path, enabled=False)
-    mark_complete(resume.run_directory / "inference" / "stamp0")
+    mark_inference_complete(resume.run_directory / "inference" / "stamp0", "val")
 
-    assert not resume.skip_inference()
+    assert not resume.skip_inference("val")
 
 
 class _StubPipeline:

@@ -14,7 +14,6 @@ def test_single_add_reduces_to_same_values():
     agg = MetricAggregator()
     agg.add(_loss_dict({"a": 2.0}, {"m": 6.0}))
 
-    assert agg.count                == 1
     assert agg.reduce_components()  == {"a": 2.0}
     assert agg.reduce_monitor()     == {"m": 6.0}
 
@@ -25,7 +24,6 @@ def test_mean_over_multiple_batches():
     agg.add(_loss_dict({"a": 3.0}, {"m": 200.0}))
     agg.add(_loss_dict({"a": 5.0}, {"m": 300.0}))
 
-    assert agg.count                    == 3
     assert agg.reduce_components()["a"] == pytest.approx(3.0)
     assert agg.reduce_monitor()["m"]    == pytest.approx(200.0)
 
@@ -61,7 +59,6 @@ def test_sparse_occupancy_key_not_diluted_by_absent_batches():
 
 def test_reduce_on_empty_returns_empty():
     agg = MetricAggregator()
-    assert agg.count               == 0
     assert agg.reduce_components() == {}
 
 

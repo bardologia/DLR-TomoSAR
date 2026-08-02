@@ -23,6 +23,7 @@ class PatchDataset(Dataset):
         split_name       : str,
         n_secondaries    : int,
         n_interferograms : int,
+        n_primary        : int                        = 1,
         normalizer       : Optional[Normalizer]       = None,
         n_gaussians      : int                        = 1,
         augmenter        : Optional[SpatialAugmenter] = None,
@@ -43,12 +44,16 @@ class PatchDataset(Dataset):
         self.kz_field      = kz_field
         self.input_layers  = int(inputs.shape[0])
 
+        self.n_primary        = n_primary
         self.n_secondaries    = n_secondaries
         self.n_interferograms = n_interferograms
 
-        expected_layers = 1 + n_secondaries + n_interferograms
+        expected_layers = n_primary + n_secondaries + n_interferograms
         if expected_layers != self.input_layers:
-            raise ValueError(f"Input stack has {self.input_layers} layers but the dataset artifacts describe {expected_layers} (1 primary + {n_secondaries} secondaries + {n_interferograms} interferograms)")
+            raise ValueError(f"Input stack has {self.input_layers} layers but the dataset artifacts describe {expected_layers} ({n_primary} primary + {n_secondaries} secondaries + {n_interferograms} interferograms)")
+
+        if input_config.use_primary and n_primary == 0:
+            raise ValueError("Input config requests the primary but the cropped stack does not carry it. Rebuild the crop with the primary or set use_primary=False.")
 
         if input_config.use_secondaries and n_secondaries == 0:
             raise ValueError("Input config requests secondaries but the dataset stack contains none. Rebuild the dataset with secondaries or set use_secondaries=False.")
@@ -70,9 +75,11 @@ class PatchDataset(Dataset):
             raise ValueError(f"Configured n_gaussians={n_gaussians} indexes ground-truth parameter channel {required_gt_channels - 1} but the dataset provides only {available_gt_channels} ({available_gt_channels // 3} Gaussians). Set n_gaussians to match the parameter extraction used for this dataset.")
 
     def _build_input_tensor(self, complex_patch: np.ndarray, dem_patch: Optional[np.ndarray] = None) -> np.ndarray:
-        primary_data        = complex_patch[                       : 1                                              ]
-        secondaries_data    = complex_patch[1                      : 1 + self.n_secondaries                         ]
-        interferograms_data = complex_patch[1 + self.n_secondaries : 1 + self.n_secondaries + self.n_interferograms ]
+        ifg_offset          = self.n_primary + self.n_secondaries
+
+        primary_data        = complex_patch[               : self.n_primary                        ]
+        secondaries_data    = complex_patch[self.n_primary : ifg_offset                            ]
+        interferograms_data = complex_patch[ifg_offset     : ifg_offset + self.n_interferograms    ]
 
         p_h, p_w     = complex_patch.shape[-2], complex_patch.shape[-1]
         input_tensor = np.empty((self.input_channels, p_h, p_w), dtype=np.float32)
@@ -171,18 +178,20 @@ class MultiRegionDataset(Dataset):
         for part in parts[1:]:
             matches = (
                 part.input_channels   == first.input_channels   and
+                part.n_primary        == first.n_primary        and
                 part.n_secondaries    == first.n_secondaries    and
                 part.n_interferograms == first.n_interferograms and
                 part.gt_channels      == first.gt_channels
             )
             if not matches:
-                raise ValueError(f"MultiRegionDataset parts disagree on channel structure: part '{part.split_name}' has (input={part.input_channels}, secondaries={part.n_secondaries}, interferograms={part.n_interferograms}, gt={part.gt_channels}) but the first part has (input={first.input_channels}, secondaries={first.n_secondaries}, interferograms={first.n_interferograms}, gt={first.gt_channels}).")
+                raise ValueError(f"MultiRegionDataset parts disagree on channel structure: part '{part.split_name}' has (input={part.input_channels}, primary={part.n_primary}, secondaries={part.n_secondaries}, interferograms={part.n_interferograms}, gt={part.gt_channels}) but the first part has (input={first.input_channels}, primary={first.n_primary}, secondaries={first.n_secondaries}, interferograms={first.n_interferograms}, gt={first.gt_channels}).")
 
         self.input_config           = first.input_config
         self.output_config          = first.output_config
         self.split_name             = first.split_name
         self.n_gaussians            = first.n_gaussians
         self.input_layers           = first.input_layers
+        self.n_primary              = first.n_primary
         self.n_secondaries          = first.n_secondaries
         self.n_interferograms       = first.n_interferograms
         self.input_channels         = first.input_channels

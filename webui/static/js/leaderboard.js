@@ -792,6 +792,11 @@ class LeaderboardView {
     let html = `<section class="lb-diff__section" id="lb-diff-config"><h4 class="res-section__cap">Config differences <span>${differs.length} of ${keys.length}</span></h4>`;
     index.push({ id: "lb-diff-config", title: "Config differences", count: differs.length });
 
+    const notes = sides.flatMap((side, i) => side.config_notes.map((note) => `${tags[i]}: ${note}`));
+    if (notes.length) {
+      html += `<div class="res-empty res-empty--tight">${notes.map((note) => this._esc(note)).join("<br>")}</div>`;
+    }
+
     if (!keys.length) {
       return html + `<div class="res-empty res-empty--tight">No resolved config files were found for these runs.</div></section>`;
     }

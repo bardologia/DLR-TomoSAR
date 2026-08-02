@@ -51,7 +51,7 @@ class ConfigFactory:
             parameters_path             = self.config.paths.parameters_path,
             split_regions               = self.split_regions(),
             secondary_labels            = self._secondary_labels(),
-            patch                       = PatchConfig(size=training.patch_size, stride=training.patch_stride, use_symmetric_padding=True),
+            patch                       = PatchConfig(size=training.patch_size, stride=training.patch_stride, use_symmetric_padding=training.use_symmetric_padding),
             input_config                = self.benchmark_input_config(),
             output_config               = self._output_config(),
             normalization               = self.config.normalization,
@@ -100,6 +100,7 @@ class ConfigFactory:
                 use_ema                     = training.use_ema,
                 ema_decay                   = training.ema_decay,
                 resume                      = training.resume,
+                snapshot_every_n_epochs     = training.snapshot_every_n_epochs,
             ),
 
             curriculum = default_curriculum(),

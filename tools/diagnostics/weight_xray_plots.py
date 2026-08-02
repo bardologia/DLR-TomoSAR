@@ -9,7 +9,8 @@ import torch
 
 from matplotlib.ticker import MaxNLocator
 
-from tools.reporting.plotting import PlotBase
+from tools.reporting.plotting               import PlotBase
+from tools.diagnostics.weight_xray_analysis import SEVERITY_RANK
 
 from configuration.diagnostics import WeightXrayConfig
 
@@ -116,7 +117,7 @@ class WeightXrayPlots(PlotBase):
 
     def _flagged_histograms(self, reports, state_dict: dict) -> List[Path]:
         flagged = [report for report in reports if report.role == "weight" and report.severity in ("warning", "critical")]
-        flagged = flagged[: self.config.max_layer_histograms]
+        flagged = sorted(flagged, key=lambda report: -SEVERITY_RANK[report.severity])[: self.config.max_layer_histograms]
 
         paths = []
         for report in flagged:
@@ -135,9 +136,9 @@ class WeightXrayPlots(PlotBase):
         thresholds     = self.config.thresholds
 
         produced = [
-            self._series_plot([report.l2_norm   for report in weight_reports], "L2 norm",              "Per-tensor weight L2 norm",        "layer_l2_norm.png",   log_y=True),
-            self._series_plot([report.std       for report in reports],        "Standard deviation",   "Per-tensor weight dispersion",     "layer_std.png",       log_y=True),
-            self._series_plot([report.frac_dead for report in reports],        "Dead fraction",        "Per-tensor dead-weight fraction",  "layer_sparsity.png",  threshold=thresholds.dead_fraction_warn),
+            self._series_plot([report.l2_norm    for report in weight_reports], "L2 norm",              "Per-tensor weight L2 norm",        "layer_l2_norm.png",    log_y=True),
+            self._series_plot([report.std        for report in weight_reports], "Standard deviation",   "Per-tensor weight dispersion",     "layer_std.png",        log_y=True),
+            self._series_plot([report.frac_dead  for report in weight_reports], "Dead fraction",        "Per-tensor dead-weight fraction",  "layer_sparsity.png",   threshold=thresholds.dead_fraction_warn),
             self._series_plot([report.rank_ratio for report in weight_reports], "Effective rank ratio", "Per-tensor effective rank ratio",  "layer_rank_ratio.png", threshold=thresholds.rank_ratio_warn),
             self._histogram_plot(self._global_sample(reports, state_dict), "Pooled weight distribution", "weight_histogram.png"),
         ]

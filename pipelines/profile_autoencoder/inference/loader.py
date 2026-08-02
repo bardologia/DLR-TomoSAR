@@ -30,7 +30,6 @@ class ProfileAeRun:
     dataset                     : ProfileDataset
     loader                      : DataLoader
     split_name                  : str
-    n_curves                    : int
     checkpoint_meta             : dict
     preprocessing_run_directory : Path
     split_regions               : list[CropRegion]
@@ -153,7 +152,6 @@ class ProfileAeRunLoader:
             dataset                     = dataset,
             loader                      = loader,
             split_name                  = config.split,
-            n_curves                    = len(dataset),
             checkpoint_meta             = ckpt_meta,
             preprocessing_run_directory = Path(dataset_config.preprocessing_run_directory),
             split_regions               = regions,

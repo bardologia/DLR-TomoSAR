@@ -10,14 +10,6 @@ from pipelines.shared.inference.run_classifier import RunType
 
 class InferenceEntry:
 
-    RUNNERS = {
-        RunType.BACKBONE   : "BackboneInferenceRunner",
-        RunType.PROFILE_AE : "ProfileAeInferenceRunner",
-        RunType.IMAGE_AE   : "ImageAeInferenceRunner",
-        RunType.UNROLLED   : "UnrolledInferenceRunner",
-        RunType.DUAL       : "DualInferenceRunner",
-    }
-
     CONFIGS = {
         RunType.BACKBONE   : "BackboneInferenceEntryConfig",
         RunType.PROFILE_AE : "ProfileAeInferenceEntryConfig",
@@ -34,7 +26,7 @@ class InferenceEntry:
         RunType.DUAL       : "Dual-trunk model inference: sliding-window prediction, stitched cubes, and reports over every dual run found at any depth under the runs directory.",
     }
 
-    def __init__(self, entry_script: Path, run_type: str) -> None:
+    def __init__(self, entry_script: Path, run_type: RunType) -> None:
         self.entry_script = Path(entry_script)
         self.run_type     = run_type
 
@@ -50,16 +42,16 @@ class InferenceEntry:
         from tools.runtime.config_cli           import ConfigCli
 
         runners = {
-            "BackboneInferenceRunner"  : BackboneInferenceRunner,
-            "ProfileAeInferenceRunner" : ProfileAeInferenceRunner,
-            "ImageAeInferenceRunner"   : ImageAeInferenceRunner,
-            "UnrolledInferenceRunner"  : UnrolledInferenceRunner,
-            "DualInferenceRunner"      : DualInferenceRunner,
+            RunType.BACKBONE   : BackboneInferenceRunner,
+            RunType.PROFILE_AE : ProfileAeInferenceRunner,
+            RunType.IMAGE_AE   : ImageAeInferenceRunner,
+            RunType.UNROLLED   : UnrolledInferenceRunner,
+            RunType.DUAL       : DualInferenceRunner,
         }
 
         config = ConfigCli.load_resolved(self._entry_config(), Path(config_path))
 
-        runners[self.RUNNERS[self.run_type]](config).run(Path(run_dir))
+        runners[self.run_type](config).run(Path(run_dir))
 
     def _scheduler(self) -> None:
         EnvironmentPinner.threads()

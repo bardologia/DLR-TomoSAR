@@ -5,9 +5,8 @@ from pathlib import Path
 
 import numpy as np
 
-from project_paths          import ProjectPaths
-from tools.metrics.scoring  import MetricOrientation
-from web_logger             import WebLogger
+from tools.metrics.scoring import MetricOrientation
+from web_logger            import WebLogger
 
 
 class AbAutopsy:
@@ -17,8 +16,7 @@ class AbAutopsy:
     MAX_HOTSPOTS = 3
     SKIP_PREFIX  = ("tracks", "track_positions", "split", "x_axis")
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
-        self.paths  = paths
+    def __init__(self, logger: WebLogger) -> None:
         self.logger = logger
 
     def _metrics(self, stamp: Path) -> dict:
@@ -138,11 +136,20 @@ class AbAutopsy:
             pred_b = self._cube(stamp_b, "pred_curves")
             gt     = self._cube(stamp_a, "gt_curves")
 
+            if pred_b.shape != pred_a.shape:
+                return {"ok": False, "error": f"runs cover different cubes: {pred_a.shape} vs {pred_b.shape}"}
             if not (0 <= az < pred_a.shape[1] and 0 <= rg < pred_a.shape[2]):
                 return {"ok": False, "error": f"pixel ({az}, {rg}) is outside the region {pred_a.shape[1:]}"}
 
-            metrics = self._metrics(stamp_a)
-            x_axis  = np.linspace(float(metrics["x_axis_min"]), float(metrics["x_axis_max"]), pred_a.shape[0])
+            metrics   = self._metrics(stamp_a)
+            metrics_b = self._metrics(stamp_b)
+            bounds    = (float(metrics["x_axis_min"]), float(metrics["x_axis_max"]))
+            bounds_b  = (float(metrics_b["x_axis_min"]), float(metrics_b["x_axis_max"]))
+
+            if bounds_b != bounds:
+                return {"ok": False, "error": f"runs cover different elevation axes: {bounds} vs {bounds_b}"}
+
+            x_axis = np.linspace(bounds[0], bounds[1], pred_a.shape[0])
 
             return {
                 "ok"     : True,
@@ -153,5 +160,5 @@ class AbAutopsy:
                 "b"      : [float(v) for v in pred_b[:, az, rg]],
                 "gt"     : [float(v) for v in gt[:, az, rg]],
             }
-        except (OSError, ValueError, FileNotFoundError, KeyError) as error:
+        except (OSError, ValueError, FileNotFoundError, IndexError, KeyError) as error:
             return {"ok": False, "error": str(error)}

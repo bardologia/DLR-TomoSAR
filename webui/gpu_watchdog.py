@@ -18,6 +18,7 @@ class GpuWatchdog:
     INTERVAL          = 4.0
     GRACE_S           = 30.0
     CRITICAL_WINDOW_S = 300.0
+    INCIDENT_HOLD_S   = 900.0
     EVENT_LIMIT       = 50
     LOG_NAME          = "intrusions.jsonl"
 
@@ -95,6 +96,7 @@ class GpuWatchdog:
 
         self._register(intruders, server_gpus)
         self._escalate(intruders, server_gpus)
+        self._forget(time.monotonic())
 
         with self.lock:
             self.gpus = server_gpus
@@ -206,6 +208,7 @@ class GpuWatchdog:
                 with self.lock:
                     incident["status"]           = "survived"
                     incident["record"]["status"] = "survived"
+                    incident["closed"]           = now
                     self.bounced.append(dict(incident["record"]))
 
     def _fate(self, incident: dict, pid: int) -> str:
@@ -220,6 +223,7 @@ class GpuWatchdog:
             if not incident["mine_pids"]:
                 incident["status"]           = "ended"
                 incident["record"]["status"] = "ended"
+                incident["closed"]           = time.monotonic()
 
         detail = ", ".join(f"{pid} {fates[pid]}" for pid in gone)
         if incident["status"] == "ended":
@@ -229,6 +233,7 @@ class GpuWatchdog:
         with self.lock:
             record                = incident["record"]
             incident["status"]    = "critical"
+            incident["closed"]    = time.monotonic()
             record["status"]      = "critical"
             record["dead_pids"]   = dead
             record["critical_at"] = datetime.now().isoformat(timespec="seconds")
@@ -237,6 +242,15 @@ class GpuWatchdog:
 
         self._persist(record, server_gpus, "critical")
         self.logger.error(f"CRITICAL: your pid(s) {dead} on gpu {record['gpu_index']} [{record['gpu_name']}] DIED within {self.CRITICAL_WINDOW_S:.0f}s of {record['user']} (pid {record['pid']}) invading it")
+
+    def _forget(self, now: float) -> None:
+        with self.lock:
+            done = {key: incident["record"] for key, incident in self.incidents.items() if incident["status"] != "active" and now - incident["closed"] >= self.INCIDENT_HOLD_S}
+            for key in done:
+                del self.incidents[key]
+
+        for record in done.values():
+            self.logger.muted(f"gpu incident on gpu {record['gpu_index']} ({record['user']} pid {record['pid']}, {record['status']}) left the live panel after {self.INCIDENT_HOLD_S / 60:.0f} min; the journal keeps it")
 
     def _persist(self, record: dict, server_gpus: list[dict], kind: str) -> None:
         entry = {

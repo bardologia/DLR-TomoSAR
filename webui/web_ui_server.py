@@ -88,22 +88,22 @@ class WebUIServer:
         self.saved_runs        = SavedRunStore(self.paths, self.logger)
         self.nuke              = ProcessNuke(self.logger)
         self.detacher          = ServerDetacher(self.paths, self.logger)
-        self.system            = SystemMonitor(self.paths)
+        self.system            = SystemMonitor(self.paths, self.logger)
         self.watchdog          = ResourceWatchdog(self.processes, self.logger)
         self.contention        = ContentionMonitor(self.paths, self.logger, self.nuke)
         self.gpu_guard         = GpuWatchdog(self.system, self.paths, self.logger, self.processes)
         self.gpu_schedule      = GpuSchedule(self.paths, self.logger, self.processes, self.system, self.gpu_guard)
         self.tensorboard       = TensorboardManager(self.paths, self.logger)
         self.results           = ResultsBrowser(self.logger)
-        self.cubes             = CubeExplorer(self.paths, self.logger)
+        self.cubes             = CubeExplorer(self.logger)
         self.slices            = SliceCollector(self.cubes, self.logger)
         self.datasets          = DatasetBrowser(self.logger)
         self.leaderboard       = RunLeaderboard(self.logger)
         self.curves            = TrainingCurves(self.logger)
-        self.fitlab            = FitLab(self.paths, self.logger)
-        self.probe             = ModelProbe(self.paths, self.logger)
+        self.fitlab            = FitLab(self.logger)
+        self.probe             = ModelProbe(self.logger)
         self.triage            = TriageBoard(self.paths, self.logger)
-        self.autopsy           = AbAutopsy(self.paths, self.logger)
+        self.autopsy           = AbAutopsy(self.logger)
 
         self.router = RequestRouter(
             paths             = self.paths,
@@ -145,15 +145,15 @@ class WebUIServer:
         )
 
     def serve(self) -> None:
+        server        = _Server((self.host, self.port), _Handler)
+        server.router = self.router
+
         self._report_ready()
         self.watchdog.start()
         self.contention.start()
         self.gpu_guard.start()
         self.gpu_schedule.start()
         self.progress_watch.start()
-
-        server        = _Server((self.host, self.port), _Handler)
-        server.router = self.router
 
         worker = threading.Thread(target=server.serve_forever, name="HttpServer", daemon=True)
         worker.start()

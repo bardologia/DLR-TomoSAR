@@ -18,13 +18,13 @@ def test_head_total_channels():
 
 
 def test_safe_sigma_sq_floor():
-    out = GaussianMixture._safe_sigma_sq(np.array([0.0]))
+    out = GaussianMixture.safe_sigma_sq(np.array([0.0]))
 
     assert out[0] == 2.0 * GaussianMixture.SIGMA_FLOOR ** 2
 
 
 def test_safe_sigma_sq_value():
-    out = GaussianMixture._safe_sigma_sq(np.array([3.0]))
+    out = GaussianMixture.safe_sigma_sq(np.array([3.0]))
 
     assert np.isclose(out[0], 18.0)
 
@@ -95,15 +95,18 @@ def test_reconstruct_batch_shape_and_dtype():
     assert out.dtype == np.float32
 
 
-def test_reconstruct_batch_clamps_negative_amp():
-    gauss = np.zeros((1, 1, 3), dtype=np.float32)
-    gauss[0, 0, 0] = -5.0
-    gauss[0, 0, 2] = 1.0
-    x = np.linspace(-3.0, 3.0, 10).astype(np.float32)
+def test_reconstruct_batch_matches_the_torch_evaluator():
+    rng   = np.random.default_rng(0)
+    gauss = rng.uniform(-1.0, 3.0, size=(4, 2, 3)).astype(np.float32)
+    x     = np.linspace(-3.0, 3.0, 32).astype(np.float32)
 
-    out = GaussianReconstructor.reconstruct_batch(gauss, x)
+    numpy_curves = GaussianReconstructor.reconstruct_batch(gauss, x)
+    torch_curves = GaussianCurve.reconstruct(
+        torch.from_numpy(gauss.reshape(4, 6, 1, 1)),
+        torch.from_numpy(x),
+    )
 
-    assert np.all(out == 0.0)
+    assert np.allclose(numpy_curves, torch_curves.numpy().reshape(4, 32), atol=1e-6)
 
 
 def test_reconstructor_components_count():

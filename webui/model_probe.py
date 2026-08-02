@@ -11,7 +11,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from project_paths            import ProjectPaths
 from tools.reporting.plotting import PlotBase
 from web_logger               import WebLogger
 
@@ -20,9 +19,9 @@ class ModelProbe:
 
     FAMILIES      = ("amp", "mu", "sigma")
     PERTURBATIONS = ("drop_channel", "scale_channel", "noise")
+    LOADER_NAME   = "model_probe"
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
-        self.paths  = paths
+    def __init__(self, logger: WebLogger) -> None:
         self.logger = logger
         self.lock   = threading.Lock()
 
@@ -51,10 +50,11 @@ class ModelProbe:
             from pipelines.backbone.inference.loader            import RunLoader
             from pipelines.backbone.inference.probes            import PredictionCurves
             from tools.diagnostics.activation_recorder          import ActivationRecorder
+            from tools.monitoring.logger                        import Logger
 
             self._set_load(0.1, "loading checkpoint and dataset")
 
-            run = RunLoader(Path(run_path), logger=self.logger).load(
+            run = RunLoader(Path(run_path), logger=Logger(log_dir="", name=self.LOADER_NAME)).load(
                 split           = split,
                 batch_size      = 1,
                 num_workers     = 0,
@@ -191,7 +191,7 @@ class ModelProbe:
                     gt_slots  = self._slots(center)
                     gt_curve  = [float(v) for v in renderer.render(center.reshape(1, -1, 1, 1))[0, :, 0, 0]]
 
-                raw_curve = [float(v) for v in run.full_curves[:, az, rg]] if run.full_curves is not None else None
+                raw_curve = [float(v) for v in run.full_curves[:, az, rg]]
 
                 return {
                     "ok"        : True,
@@ -320,15 +320,17 @@ class ModelProbe:
 
             stored = recorder.stored().get(layer)
 
-        if stored is None or stored.ndim < 4:
+        if stored is None:
             return None
+        if stored.ndim != 4:
+            raise ValueError(f"layer '{layer}' emits a {stored.ndim}-D activation; the feature grid renders 4-D (B, C, H, W) maps only")
 
         maps   = stored[0].numpy()
-        energy = np.abs(maps).sum(axis=(1, 2)) if maps.ndim == 3 else None
-        order  = np.argsort(energy)[::-1][:max_channels] if energy is not None else range(min(max_channels, maps.shape[0]))
+        energy = np.abs(maps).sum(axis=(1, 2))
+        order  = np.argsort(energy)[::-1][:max_channels]
 
         n_cols = 4
-        n_rows = int(np.ceil(len(list(order)) / n_cols))
+        n_rows = int(np.ceil(len(order) / n_cols))
 
         fig, axes = plt.subplots(n_rows, n_cols, figsize=(n_cols * 2.2, n_rows * 2.0))
         axes      = np.atleast_2d(axes)
@@ -339,7 +341,7 @@ class ModelProbe:
             ax.set_title(f"ch {int(channel)}", fontsize=7)
             ax.axis("off")
 
-        for index in range(len(list(order)), n_rows * n_cols):
+        for index in range(len(order), n_rows * n_cols):
             axes[index // n_cols][index % n_cols].axis("off")
 
         fig.tight_layout()

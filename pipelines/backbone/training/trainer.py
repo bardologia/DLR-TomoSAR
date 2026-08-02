@@ -51,10 +51,8 @@ class CurriculumController:
             self.logger.subsection("Optimizer state (Adam moments) cleared.")
 
         if lc.reset_lr or lc.reset_warmup:
-            warmup_factor = self.warmup.factor() if (self.warmup.enabled and not self.warmup.is_finished()) else 1.0
-            immediate_lrs = [lr * warmup_factor for lr in self.lr_scheduler.base_lrs]
-            self.update_optimizer(immediate_lrs)
-            self.logger.subsection(f"Optimizer LR set to warmup-adjusted value (factor={warmup_factor:.4f}) for swap epoch.")
+            self.update_optimizer(self.lr_scheduler.effective_lrs())
+            self.logger.subsection(f"Optimizer LR set to the scheduled warmup-adjusted value (factor={self.warmup.factor():.4f}) for swap epoch.")
 
         return True
 
@@ -70,8 +68,8 @@ class Trainer(BaseTrainer):
         self.initial_loss_cfg = config.curriculum.initial_stage
         self.norm_stats       = norm_stats
         self.emit_docs        = emit_docs
-        self.param_sampler    = ParamSampler(config.gaussian.params_per_gaussian, self.initial_loss_cfg.amp_zero_thr)
-        self.slot_vitals      = SlotVitals(config.gaussian.params_per_gaussian, self.initial_loss_cfg.amp_zero_thr, grad_scale=float(config.training.gradient_accumulation_steps))
+        self.param_sampler    = ParamSampler(config.gaussian.params_per_gaussian)
+        self.slot_vitals      = SlotVitals(config.gaussian.params_per_gaussian, grad_scale=float(config.training.gradient_accumulation_steps))
 
         super().__init__(model, config, run_dir, logger, x_axis)
 
@@ -159,8 +157,8 @@ class Trainer(BaseTrainer):
         if not self.tracker.active:
             return
 
-        self.param_sampler.begin()
-        self.slot_vitals.begin()
+        self.param_sampler.begin(self.criterion.loss_cfg.amp_zero_thr)
+        self.slot_vitals.begin(self.criterion.loss_cfg.amp_zero_thr)
         self.recon_figures.capture_reference(val_loader, self.criterion)
 
     def _after_eval(self, val_loss: float, epoch: int) -> None:

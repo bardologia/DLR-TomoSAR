@@ -13,8 +13,6 @@ class MetricAggregator:
         self.occupancy_n  : dict = {}
         self.physical_n   : dict = {}
 
-        self.count = 0
-
     @staticmethod
     def _accumulate(store: dict, counts: dict, values: dict) -> None:
         for k, v in values.items():
@@ -28,8 +26,6 @@ class MetricAggregator:
         self._accumulate(self.monitor_sum,    self.monitor_n,    loss_dict["monitor"])
         self._accumulate(self.occupancy_sum,  self.occupancy_n,  loss_dict["occupancy"])
         self._accumulate(self.physical_sum,   self.physical_n,   loss_dict["physical"])
-
-        self.count += 1
 
     @staticmethod
     def _reduce(store: dict, counts: dict) -> dict:

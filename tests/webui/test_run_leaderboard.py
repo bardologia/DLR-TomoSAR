@@ -169,6 +169,41 @@ def test_diff_returns_metrics_configs_and_directions(tmp_path):
     assert result["sections"] == [{"title": "Curve-Level", "keys": ["curve_mse_gt", "overall_r2_gt"]}]
 
 
+def test_diff_includes_the_family_specific_model_config(tmp_path):
+    names = ["dual_unet_skip-set_pred-hungarian-K_2-hv-A-full.full-param_l1_1_20260727_120000",
+             "dual_resunet-set_pred-hungarian-K_2-hv-A-full.full-param_l1_1_20260727_130000"]
+    stamps = []
+
+    for name, backbone in zip(names, ("unet_skip", "resunet")):
+        stamp = _make_run(tmp_path, name, metrics={"curve_mse_gt": 0.5})
+        meta  = tmp_path / name / "meta"
+        meta.mkdir(exist_ok=True)
+        (meta / "dual_model_config.json").write_text(json.dumps({"params_backbone": backbone, "existence_backbone": backbone}))
+        stamps.append(stamp)
+
+    board = RunLeaderboard(WebLogger())
+    assert board.table(str(tmp_path))["ok"]
+
+    result = board.diff([str(s) for s in stamps])
+    assert result["ok"]
+
+    assert result["sides"][0]["config"]["model.params_backbone"] == "unet_skip"
+    assert result["sides"][1]["config"]["model.params_backbone"] == "resunet"
+    assert not any("model config" in note for note in result["sides"][0]["config_notes"])
+
+
+def test_diff_notes_a_missing_model_config(tmp_path):
+    stamps = [_make_run(tmp_path, name, metrics={"curve_mse_gt": 0.5}) for name in (STANDARD_NAME, "unet-conv-sorted_gt-K_5-hvn-none-param_l1_1_20260618_210314")]
+
+    board = RunLeaderboard(WebLogger())
+    assert board.table(str(tmp_path))["ok"]
+
+    result = board.diff([str(s) for s in stamps])
+
+    assert result["ok"]
+    assert any("no model config under meta/" in note for note in result["sides"][0]["config_notes"])
+
+
 def test_diff_compares_many_runs_and_bounds_count(tmp_path):
     stamps = [
         _make_run(tmp_path, name, metrics={"curve_mse_gt": 0.1 * (i + 1)})

@@ -52,7 +52,7 @@ class ImageAeInferencePipeline:
         return path
 
     def _evaluate_metrics(self, result, run, meta: ImageAeInferenceMetadata, logger: Logger):
-        metrics_obj = ImageAeMetrics(result, run.normalizer)
+        metrics_obj = ImageAeMetrics(result)
         metrics     = metrics_obj.compute()
 
         metrics["split"]        = run.split_name

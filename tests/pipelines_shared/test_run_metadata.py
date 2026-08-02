@@ -77,5 +77,8 @@ def test_save_run_summary_payload(tmp_path):
 def test_context_manager_closes_writer(tmp_path):
     with TrainingRunMetadata(_trainer_config(), "unet", tmp_path, run_name="run_ctx", logger=_logger(tmp_path)) as meta:
         assert meta.run_directory.is_dir()
+        assert meta.writer.all_writers is not None
 
     assert meta.run_directory.is_dir()
+    assert meta.writer.all_writers is None
+    assert meta.writer.file_writer is None

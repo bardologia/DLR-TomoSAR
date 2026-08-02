@@ -7,10 +7,14 @@ import torch
 
 class ParamMatcher:
     MAX_GAUSSIANS  = 6
-    ACTIVE_AMP_THR = 1e-3
+    ACTIVE_AMP_THR = 1e-4
 
     HUNGARIAN = "hungarian"
     SORTED_GT = "sorted_gt"
+
+    @staticmethod
+    def is_active(amplitude):
+        return amplitude >= ParamMatcher.ACTIVE_AMP_THR
 
     @staticmethod
     def _sort_gt(gt: torch.Tensor, gt_phys: torch.Tensor, active_thr: float) -> tuple[torch.Tensor, torch.Tensor]:

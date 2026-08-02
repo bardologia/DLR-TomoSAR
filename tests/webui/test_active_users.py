@@ -15,6 +15,7 @@ import os
 
 from proc_stats     import ProcStats
 from system_monitor import ActiveUsers, SystemHistory, SystemMonitor
+from web_logger     import WebLogger
 
 
 class StubPaths:
@@ -28,7 +29,7 @@ def monitor(tmp_path, monkeypatch):
     monkeypatch.setattr(SystemMonitor, "_du_loop", lambda self: None)
     monkeypatch.setattr(SystemHistory, "sample_loop", lambda self: None)
     monkeypatch.setattr(ActiveUsers, "sample_loop", lambda self: None)
-    return SystemMonitor(StubPaths(tmp_path))
+    return SystemMonitor(StubPaths(tmp_path), WebLogger())
 
 
 @pytest.fixture

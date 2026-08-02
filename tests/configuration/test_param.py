@@ -29,13 +29,6 @@ def test_fit_config_asdict_round_trips():
     assert FitConfig(**payload) == cfg
 
 
-def test_fit_settings_parameters_per_profile():
-    cfg = FitSettings()
-    assert cfg.parameters_per_profile == 3 * cfg.fit_config.k_max
-    assert cfg.fitting_method == "sigma_adam"
-    assert cfg.max_fit_iterations > 0
-
-
 def test_fit_config_default_toggles():
     cfg = FitConfig()
     assert cfg.fit_sigma     is True
@@ -160,12 +153,19 @@ def test_extraction_config_output_directory_layout():
     assert cfg.output_directory.name        == cfg.output_subdir_name
 
 
-def test_extraction_config_matches_param_extraction_meta_suffix(param_extraction_meta):
-    cfg = ExtractionConfig(
-        processed_data_path = Path("/tmp/run"),
-        fit_settings        = FitSettings(fit_config=FitConfig(k_max=5, sigma_init_divisor=4.0, lambda_k=1e-2)),
+@pytest.mark.real_data
+def test_extraction_config_matches_param_extraction_meta_suffix(param_extraction_meta, params_dir):
+    fit_config = FitConfig(
+        k_max              = param_extraction_meta["k_max"],
+        lambda_k           = param_extraction_meta["lambda_k"],
+        sigma_init_divisor = param_extraction_meta["sigma_init_divisor"],
+        fit_sigma          = param_extraction_meta["fit_sigma"],
+        fit_amplitude      = param_extraction_meta["fit_amplitude"],
+        fit_mean           = param_extraction_meta["fit_mean"],
     )
-    assert cfg.output_subdir_name == "params_k5_lam0.01_sig4_sigma"
+    cfg = ExtractionConfig(processed_data_path=Path("/tmp/run"), fit_settings=FitSettings(fit_config=fit_config))
+
+    assert cfg.output_subdir_name == params_dir.name
 
 
 def test_extraction_discover_height_range_from_state(tmp_path):

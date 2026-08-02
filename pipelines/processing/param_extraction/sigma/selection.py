@@ -49,10 +49,10 @@ class BestKSelector:
                 continue
 
             amps_norm, mus, final_sigs, _ = gpu_results[K]
-            amps_out = amps_norm * scale_all[:, None]
             idx      = np.where(mask)[0]
+            amps_out = amps_norm[idx] * scale_all[idx, None]
 
-            best_params[np.ix_(idx, list(range(0, K * 3, 3)))] = amps_out  [idx]
+            best_params[np.ix_(idx, list(range(0, K * 3, 3)))] = amps_out
             best_params[np.ix_(idx, list(range(1, K * 3, 3)))] = mus       [idx]
             best_params[np.ix_(idx, list(range(2, K * 3, 3)))] = final_sigs[idx]
 

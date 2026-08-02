@@ -10,6 +10,7 @@ from optuna.trial import TrialState
 
 from configuration.architectures.backbone import UNetConfig
 from pipelines.tuning.pipeline            import TuningScheduler
+from pipelines.tuning.storage             import TuningStorage
 from pipelines.tuning.tuners              import ParamSampler
 
 
@@ -112,7 +113,7 @@ def test_count_done_counts_complete_and_pruned(tmp_path):
     assert orch._count_state(study, TrialState.FAIL) == 1
 
 
-def test_fail_stale_running_trials(tmp_path):
+def test_running_trial_within_its_grace_period_is_left_alone(tmp_path):
     orch  = _orchestrator(tmp_path)
     orch.run_dir.mkdir(parents=True, exist_ok=True)
     study = orch._load_or_create_study("unet")
@@ -122,8 +123,21 @@ def test_fail_stale_running_trials(tmp_path):
 
     failed = orch._fail_stale_trials(study)
 
-    assert failed == 1
-    assert orch._count_state(study, TrialState.FAIL) == 1
+    assert failed == 0
+    assert orch._count_state(study, TrialState.FAIL) == 0
+    assert orch._count_state(study, TrialState.RUNNING) == 1
+
+
+def test_study_storage_carries_heartbeats(tmp_path):
+    orch = _orchestrator(tmp_path)
+    orch.run_dir.mkdir(parents=True, exist_ok=True)
+
+    assert orch._load_or_create_study("unet")._storage.get_heartbeat_interval() == TuningStorage.HEARTBEAT_INTERVAL_S
+
+    storage = TuningStorage.open(orch.storage_url)
+
+    assert storage.heartbeat_interval == TuningStorage.HEARTBEAT_INTERVAL_S
+    assert storage.grace_period       == TuningStorage.GRACE_PERIOD_S
 
 
 def test_record_summarizes_counts(tmp_path):

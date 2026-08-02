@@ -240,10 +240,11 @@ class BackboneEntryConfig:
     normalization : NormalizationConfig  = field(default_factory=NormalizationConfig)
     augmentation  : AugmentationConfig   = field(default_factory=AugmentationConfig)
 
-    probe_enabled    : bool = False
-    probe_n_batches  : int  = 1000
-    probe_reference  : str  = "param_l1"
-    probe_exit_after : bool = True
+    probe_enabled        : bool = False
+    probe_n_batches      : int  = 1000
+    probe_reference      : str  = "param_l1"
+    probe_exit_after     : bool = True
+    probe_enabled_losses : dict = field(default_factory=dict)
 
     overfit_check : OverfitCheckConfig = field(default_factory=OverfitCheckConfig)
 

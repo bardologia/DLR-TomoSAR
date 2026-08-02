@@ -127,12 +127,17 @@ class CkaComparison:
             num_workers     = 0,
             device          = self.config.device,
             checkpoint_name = self.config.checkpoint_name,
+            load_tomogram   = False,
         )
 
-    def _validate_alignment(self, runs: list) -> None:
-        regions = {run.split_region.as_tuple() for run in runs}
-        patches = {tuple(run.dataset_config.patch.size) for run in runs}
-        strides = {tuple(run.dataset_config.patch.stride) for run in runs}
+    @staticmethod
+    def _sample_grid(run) -> tuple:
+        return (run.split_region.as_tuple(), tuple(run.dataset_config.patch.size), tuple(run.dataset_config.patch.stride))
+
+    def _validate_alignment(self, grids: list[tuple]) -> None:
+        regions = {grid[0] for grid in grids}
+        patches = {grid[1] for grid in grids}
+        strides = {grid[2] for grid in grids}
 
         if len(regions) != 1 or len(patches) != 1 or len(strides) != 1:
             raise ValueError(f"Runs are not sample-aligned: regions {sorted(regions)}, patches {sorted(patches)}, strides {sorted(strides)}; CKA needs identical split regions and patch grids")
@@ -168,16 +173,16 @@ class CkaComparison:
 
             for layer in layers:
                 tensor = stored.get(layer)
-                if tensor is None or tensor.ndim != 4:
+                if tensor is None or not sampler.is_feature_map(tensor, B, H, W):
                     chunks.pop(layer, None)
                     continue
                 if layer in chunks:
-                    chunks[layer].append(sampler.features_at(tensor, b, i, j, H, W))
+                    chunks[layer].append(sampler.features_at(tensor, b, i, j, B, H, W))
 
         recorder.detach()
 
         if not chunks:
-            raise ValueError(f"Run {run.backbone_name} produced no 4-D feature maps to compare")
+            raise ValueError(f"Run {run.backbone_name} produced no (B, C, H, W) feature map on the input grid to compare")
 
         return {layer: np.concatenate(parts, axis=0) for layer, parts in chunks.items()}
 
@@ -205,11 +210,18 @@ class CkaComparison:
         PlotBase.use_style(self.config.figure_style)
 
         run_dirs = self._select_runs()
-        runs     = [self._load(run_dir) for run_dir in run_dirs]
-        self._validate_alignment(runs)
+        names    = ["/".join(run_dir.relative_to(self.config.runs_dir).parts) if run_dir.is_relative_to(self.config.runs_dir) else run_dir.name for run_dir in run_dirs]
 
-        names = ["/".join(run_dir.relative_to(self.config.runs_dir).parts) if run_dir.is_relative_to(self.config.runs_dir) else run_dir.name for run_dir in run_dirs]
-        features = [self._collect(run) for run in runs]
+        grids    = []
+        features = []
+        for run_dir in run_dirs:
+            run = self._load(run_dir)
+
+            grids.append(self._sample_grid(run))
+            self._validate_alignment(grids)
+
+            features.append(self._collect(run))
+            del run
 
         plots        = CkaPlots()
         summary      = np.eye(len(names))

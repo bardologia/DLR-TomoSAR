@@ -149,6 +149,9 @@ class TrainingPipeline:
         else:
             backbone_out = self._gaussian_out_channels()
 
+        self.backbone_in_channels  = backbone_in
+        self.backbone_out_channels = backbone_out
+
         backbone, backbone_cfg = self._build_backbone(backbone_in, backbone_out, self.dataset_config.patch.size, config=backbone_config)
         module                 = JepaModule(backbone, profile_autoencoder=profile_autoencoder, image_autoencoder=image_autoencoder)
 
@@ -243,10 +246,8 @@ class TrainingPipeline:
         if not Path(ckpt_path).is_file():
             raise FileNotFoundError(f"{label} autoencoder checkpoint '{ckpt_path}' does not exist; expected 'best_model.pt' under the selected {label} autoencoder run directory.")
 
-    def _save_metadata(self, run_meta, backbone_cfg, datasets, x_len: int) -> None:
+    def _save_metadata(self, run_meta, backbone_cfg, x_len: int) -> None:
         gaussian_cfg = self.trainer_config.gaussian
-        backbone_in  = self.image_ae_cfg.embedding_dim if self.image_ae_cfg is not None else datasets["train"].input_channels
-        backbone_out = self.autoencoder_cfg.embedding_dim if self.autoencoder_cfg is not None else self._gaussian_out_channels()
 
         run_meta.save_trainer_config()
         run_meta.save_model_config(backbone_cfg, self.backbone_name)
@@ -256,7 +257,7 @@ class TrainingPipeline:
         if self.image_ae_cfg is not None:
             ImageAutoencoderConfigIO.save(self.image_ae_cfg, self.image_ae_model_name, run_meta.metadata_directory)
 
-        run_meta.save_run_summary(self.backbone_name, in_channels=backbone_in, out_channels=backbone_out, x_axis_length=x_len, n_gaussians=gaussian_cfg.n_default_gaussians, seed=self.entry.seed)
+        run_meta.save_run_summary(self.backbone_name, in_channels=self.backbone_in_channels, out_channels=self.backbone_out_channels, x_axis_length=x_len, n_gaussians=gaussian_cfg.n_default_gaussians, seed=self.entry.seed)
 
     def _profile_normalizer(self, metadata_directory, logger):
         if self.autoencoder_cfg is None:
@@ -301,7 +302,7 @@ class TrainingPipeline:
 
         model, backbone_cfg = self._build_module(datasets, x_len, x_axis, logger)
 
-        self._save_metadata(run_meta, backbone_cfg, datasets, x_len)
+        self._save_metadata(run_meta, backbone_cfg, x_len)
 
         try:
             self._run_overfit_check(run_meta, logger, datasets, x_len, x_axis)
@@ -339,7 +340,7 @@ class SingleTrainRunner(EntryConfigTrainRunner):
     def run(self):
         results, run_directory = super().run()
 
-        if self.config.infer_after and not self.unit_resume.skip_inference():
+        if self.config.infer_after and not self.unit_resume.skip_inference(self.config.inference.split):
             self._run_inference(run_directory)
 
         return results

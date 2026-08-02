@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from pipelines.autoencoder_common.inference.predictor import AeReconstructionPredictor, AeResult
+from pipelines.autoencoder_common.inference.predictor import AeReconstructionPredictor, AeResult, BatchReconstruction
 
 
 class ProfileAeResult(AeResult):
@@ -16,7 +16,7 @@ class ProfileAePredictor(AeReconstructionPredictor):
     def _batch_input(self, batch):
         return batch
 
-    def _reconstruct_batch(self, curve_n: torch.Tensor):
+    def _reconstruct_batch(self, curve_n: torch.Tensor) -> BatchReconstruction:
         x = curve_n.to(self.device).unsqueeze(-1).unsqueeze(-1)
 
         with torch.no_grad():
@@ -26,7 +26,13 @@ class ProfileAePredictor(AeReconstructionPredictor):
         pred = self.normalizer.denormalize(curve_hat_n).squeeze(-1).squeeze(-1)
         emb  = z.squeeze(-1).squeeze(-1)
 
-        return gt.cpu().numpy(), pred.cpu().numpy(), emb.cpu().numpy()
+        return BatchReconstruction(
+            gt     = gt.cpu().numpy(),
+            pred   = pred.cpu().numpy(),
+            emb    = emb.cpu().numpy(),
+            gt_n   = x.squeeze(-1).squeeze(-1).cpu().numpy(),
+            pred_n = curve_hat_n.squeeze(-1).squeeze(-1).cpu().numpy(),
+        )
 
     def _summary(self, result) -> dict:
         return {

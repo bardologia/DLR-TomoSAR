@@ -27,8 +27,12 @@ class DistributionPlotter(PlotBase):
         flat  = r2_map.reshape(-1).astype(np.float64)
         valid = flat[np.isfinite(flat)]
 
+        if valid.size == 0:
+            self.logger.warning("R² distribution plots skipped: no finite values")
+            return {}
+
         qs    = [10, 25, 50, 75, 90]
-        pvals = np.percentile(valid, qs) if valid.size > 0 else [float("nan")] * 5
+        pvals = np.percentile(valid, qs)
         pcolors  = ["#9467bd", "#1f77b4", "#2ca02c", "#ff7f0e", "#d62728"]
         stats_tx = rf"mean={summary['r2_mean']:.4f},  median={summary['r2_median']:.4f},  neg\_frac={summary['r2_neg_frac']:.3f}"
         saved    : Dict[str, Path] = {}

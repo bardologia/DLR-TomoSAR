@@ -3,8 +3,7 @@ from __future__ import annotations
 import copy
 import shutil
 
-from datetime import datetime
-from pathlib  import Path
+from pathlib import Path
 
 import numpy as np
 
@@ -14,9 +13,11 @@ from models.unrolled                              import UNROLLED_MODEL_REGISTRY
 from pipelines.backbone.dataset.pipeline          import DatasetPipeline
 from pipelines.shared.config.config_factory       import ConfigFactory
 from pipelines.shared.config.config_persistence   import UnrolledModelConfigIO
+from pipelines.shared.config.run_metadata         import TrainingRunMetadata
 from pipelines.shared.training.overfit_check      import OverfitCheck
-from pipelines.shared.training.pretrain_preflight import PretrainPreflight
 from pipelines.shared.training.seed_sweep         import SeedFanoutScheduler, SeedSet, SeedSweepRunner
+from pipelines.shared.training.training_runner    import EntryConfigTrainRunner
+from pipelines.shared.training.unit_resume        import UnitResume
 from pipelines.unrolled.training.trainer          import UnrolledTrainer
 from tools.data.gaussians                         import GaussianAxis
 from tools.monitoring.logger                      import Logger
@@ -87,12 +88,8 @@ class UnrolledTrainingPipeline:
 
         Reproducibility.seed_everything(config.seed)
 
-    def _resolve_run_name(self) -> str:
-        stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        return self.config.run_name if self.config.run_name else f"{self.config.model_name}_{stamp}"
-
     def _run_directory(self) -> Path:
-        run_directory = Path(self.config.logdir) / self._resolve_run_name()
+        run_directory = Path(self.config.logdir) / TrainingRunMetadata.resolve_name(self.config.model_name, self.config.run_name)
         run_directory.mkdir(parents=True, exist_ok=True)
 
         return run_directory
@@ -155,22 +152,11 @@ class UnrolledTrainingPipeline:
 
         return trainer, dataset, model
 
-    def _pretrain_preflight(self, run_directory: Path) -> None:
-        PretrainPreflight(
-            pretrain_config = self.config.pretrain,
-            training_config = self.config.training,
-            build_trainer   = lambda logger: self.build_pretrain_trainer(run_directory / "pretrain" / "context", logger),
-            run_directory   = run_directory,
-            label           = self.config.model_name,
-        ).run()
-
     def run(self) -> dict:
         run_directory = self._run_directory()
         logger        = Logger(log_dir=str(run_directory / "logs"), name="unrolled_training")
 
         logger.section("[Unrolled Training Pipeline Execution]")
-
-        self._pretrain_preflight(run_directory)
 
         ConfigCli.save_resolved(self.config, run_directory / "docs" / "resolved_entry_config.json")
         logger.info(f"Resolved entry config saved: {run_directory / 'docs' / 'resolved_entry_config.json'}")
@@ -211,6 +197,22 @@ class UnrolledTrainingPipeline:
         return results
 
 
+class UnrolledSingleTrainRunner(EntryConfigTrainRunner):
+
+    pipeline_class = UnrolledTrainingPipeline
+
+    @property
+    def label(self) -> str:
+        return self.config.model_name
+
+    def _resolve_run_name(self) -> str:
+        return TrainingRunMetadata.resolve_name(self.config.model_name, self.config.run_name)
+
+    def _build_unit_resume(self) -> UnitResume:
+        self.unit_resume = UnitResume(self.run_directory, enabled=self.config.resume, trainer_resume=False)
+        return self.unit_resume
+
+
 class UnrolledTrainingLauncher:
     def __init__(self, entry_script: Path) -> None:
         self.entry_script = Path(entry_script)
@@ -224,7 +226,7 @@ class UnrolledTrainingLauncher:
 
         seeds = SeedSet.resolve(config.seeds, config.seed)
         if len(seeds) == 1:
-            SeedSweepRunner(config, UnrolledTrainingPipeline).run()
+            SeedSweepRunner(config, UnrolledSingleTrainRunner).run()
             return
 
-        SeedFanoutScheduler.for_runner(config, cli.overrides, self.entry_script, UnrolledTrainingPipeline, base_label=config.model_name).run()
+        SeedFanoutScheduler.for_runner(config, cli.overrides, self.entry_script, UnrolledSingleTrainRunner, base_label=config.model_name).run()

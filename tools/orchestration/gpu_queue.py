@@ -217,7 +217,7 @@ class GpuQueue:
 
         return previous
 
-    def _terminate_running(self, signum, frame) -> None:
+    def _shutdown_running(self) -> int:
         for record in self.running:
             if record["process"].poll() is None:
                 record["process"].terminate()
@@ -231,7 +231,15 @@ class GpuQueue:
 
             record["log_fh"].close()
 
-        self.logger.warning(f"Received signal {signum} — terminated {len(self.running)} workers, resume with --resume")
+        terminated   = len(self.running)
+        self.running = []
+
+        return terminated
+
+    def _terminate_running(self, signum, frame) -> None:
+        terminated = self._shutdown_running()
+
+        self.logger.warning(f"Received signal {signum} — terminated {terminated} workers, resume with --resume")
 
         sys.exit(128 + signum)
 
@@ -317,7 +325,12 @@ class GpuQueue:
 
         command = job.command + ["--gpu", str(gpu_id)]
         log_fh  = open(job.log_path, "w", encoding="utf-8")
-        process = subprocess.Popen(command, stdout=log_fh, stderr=log_fh)
+
+        try:
+            process = subprocess.Popen(command, stdout=log_fh, stderr=log_fh)
+        except BaseException:
+            log_fh.close()
+            raise
 
         self.logger.info(f"[GPU {gpu_id}] started   {job.name}")
 
@@ -373,6 +386,10 @@ class GpuQueue:
                 if queue or self.running:
                     time.sleep(self.poll_interval_s)
         finally:
+            if self.running:
+                terminated = self._shutdown_running()
+                self.logger.error(f"Scheduler aborted with {terminated} workers still in flight — terminated them so no unsupervised job keeps holding a GPU; resume with --resume")
+
             self._restore_signal_handlers(previous_handlers)
 
         return results

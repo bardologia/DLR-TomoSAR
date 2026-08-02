@@ -97,6 +97,34 @@ def test_backbone_pipeline_rectangular_patches_yield_rectangular_batches(test_da
 
 
 @pytest.mark.real_data
+@pytest.mark.slow
+def test_backbone_pipeline_crops_only_the_enabled_input_groups(test_data_dir, params_dir, tmp_path):
+    full    = _backbone_config(test_data_dir, params_dir)
+    trimmed = _backbone_config(test_data_dir, params_dir)
+
+    trimmed.input_config = InputConfig(
+        use_primary=False,
+        use_secondaries=False,
+        use_interferograms=True, interferograms_representation=Representation.ANGLE_ONLY,
+    )
+
+    full_datasets    = DatasetPipeline(full,    tmp_path / "full",    logger=_logger(tmp_path, "bb_full"),    seed=0).run()[3]
+    trimmed_datasets = DatasetPipeline(trimmed, tmp_path / "trimmed", logger=_logger(tmp_path, "bb_trimmed"), seed=0).run()[3]
+
+    full_train    = full_datasets["train"]
+    trimmed_train = trimmed_datasets["train"]
+
+    assert (full_train.n_primary, full_train.n_secondaries, full_train.n_interferograms)          == (1, 2, 2)
+    assert (trimmed_train.n_primary, trimmed_train.n_secondaries, trimmed_train.n_interferograms) == (0, 0, 2)
+
+    assert full_train.inputs.shape[0]    == 5
+    assert trimmed_train.inputs.shape[0] == 2
+    assert trimmed_train.input_channels  == 2
+
+    np.testing.assert_array_equal(trimmed_train.inputs, full_train.inputs[3:])
+
+
+@pytest.mark.real_data
 def test_backbone_pipeline_rejects_rot90_with_rectangular_patch(test_data_dir, params_dir, tmp_path):
     config                      = _backbone_config(test_data_dir, params_dir)
     config.patch                = PatchConfig(size=(8, 16), stride=(4, 8))

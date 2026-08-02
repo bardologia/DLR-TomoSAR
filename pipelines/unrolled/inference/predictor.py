@@ -33,6 +33,9 @@ class UnrolledPredictor:
         self.x_axis      = torch.from_numpy(np.asarray(run.x_axis, dtype=np.float32)).to(self.device)
         self.synthesiser = MeasurementSynthesiser(self.x_axis, run.ppg, run.power_floor, run.noise_std)
 
+        self.cached_chunk = None
+        self.cached_pair  = None
+
         self.run.model.to(self.device)
 
     def _chunk_rows(self) -> int:
@@ -114,7 +117,12 @@ class UnrolledPredictor:
         chunk_end   = min(chunk_start + rows, height)
         chunk_row   = int(azimuth) - chunk_start
 
-        pred, target, _mask = self._predict_rows(chunk_start, chunk_end)
+        if self.cached_chunk != (chunk_start, chunk_end):
+            pred, target, _mask = self._predict_rows(chunk_start, chunk_end)
+            self.cached_chunk   = (chunk_start, chunk_end)
+            self.cached_pair    = (pred, target)
+
+        pred, target = self.cached_pair
 
         return {
             "azimuth" : int(azimuth),

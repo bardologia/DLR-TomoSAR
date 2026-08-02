@@ -58,11 +58,14 @@ class ImageAePlots(AePlotsBase):
         pg  = mean_gt[idx]
         pp  = mean_pred[idx]
 
+        if pg.size == 0:
+            raise ValueError("The intensity scatter needs at least one reconstructed patch; the split produced none")
+
         fig, ax = plt.subplots(figsize=(5.0, 5.0))
         ax.scatter(pg, pp, s=3, alpha=0.25, color="#1f4e79", edgecolors="none")
 
-        lo = float(min(pg.min(initial=0.0), pp.min(initial=0.0)))
-        hi = float(max(pg.max(initial=0.0), pp.max(initial=0.0)))
+        lo = float(min(pg.min(), pp.min()))
+        hi = float(max(pg.max(), pp.max()))
         ax.plot([lo, hi], [lo, hi], color="#c0392b", linewidth=1.0, linestyle="--")
 
         ax.set_xlabel("mean patch intensity (ground truth)")

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
+import os
+from pathlib  import Path
+from unittest import mock
 
 import pytest
 
+import tools.data.io as io_module
 from tools.data.io import FileIO
 
 
@@ -68,8 +71,24 @@ def test_save_json_atomic_leaves_no_tmp(tmp_path):
     FileIO.save_json({"v": 7}, path, atomic=True)
 
     assert path.is_file()
-    assert not path.with_name(path.name + ".tmp").exists()
+    assert list(tmp_path.glob("atomic.json.*.tmp")) == []
     assert FileIO.load_json(path) == {"v": 7}
+
+
+def test_save_json_atomic_sidecar_is_process_private(tmp_path):
+    path    = tmp_path / "atomic.json"
+    written = []
+
+    real_replace = os.replace
+
+    def _capture(source, destination):
+        written.append(Path(source).name)
+        real_replace(source, destination)
+
+    with mock.patch.object(io_module.os, "replace", _capture):
+        FileIO.save_json({"v": 7}, path, atomic=True)
+
+    assert written == [f"atomic.json.{os.getpid()}.tmp"]
 
 
 def test_save_json_indent_applied(tmp_path):

@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from skimage.metrics import structural_similarity as ssim
 
-from project_paths              import ProjectPaths
+from catalog_roots              import CatalogRoots
 from tools.loss.param_loss      import ParamMatcher
 from tools.reporting.plotting   import PlotBase
 from tools.sar.track_parameters import TrackParameters
@@ -116,21 +116,18 @@ class CubeExplorer:
         "label_suspect"            : "label suspect",
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
-        self.paths    = paths
+    def __init__(self, logger: WebLogger) -> None:
         self.logger   = logger
         self.archiver = SliceFigureArchiver()
-        self.roots    = set()
+        self.roots    = CatalogRoots()
         self.lock     = threading.Lock()
         self.loaded   = None
         self.status   = {"state": "idle", "id": None, "progress": 0.0, "stage": "", "error": ""}
 
     def list_cubes(self, base: str) -> dict:
-        root, error = self._catalog_root(base)
+        root, error = self.roots.open(base)
         if error:
             return {"ok": False, "error": error, "cubes": []}
-
-        self.roots.add(str(root))
 
         cubes = []
         for cube_file in sorted(root.rglob("inference/*/cubes/pred_curves.npy")):
@@ -833,26 +830,11 @@ class CubeExplorer:
             return None
 
         stamp_dir = Path(cube_id).resolve()
-        if not any(stamp_dir.is_relative_to(root) for root in self.roots):
+        if not self.roots.contains(stamp_dir):
             return None
         if not (stamp_dir / "cubes" / "pred_curves.npy").is_file():
             return None
         return stamp_dir
-
-    def _catalog_root(self, raw: str) -> tuple[Path | None, str]:
-        raw = (raw or "").strip()
-        if not raw:
-            return None, "set the runs directory in the Results tab first"
-
-        root = Path(raw).expanduser()
-        if not root.is_absolute():
-            return None, "an absolute path is required"
-
-        root = root.resolve()
-        if not root.is_dir():
-            return None, f"not a directory: {root}"
-
-        return root, ""
 
     def _load_worker(self, cube_id: str, stamp_dir: Path) -> None:
         try:
@@ -1448,8 +1430,5 @@ class SliceCollector:
         }
 
     def _root_for(self, stamp_dir: Path) -> Path | None:
-        matches = [root for root in self.cubes.roots if stamp_dir.is_relative_to(root)]
-        if not matches:
-            return None
-        return Path(max(matches, key=len))
+        return self.cubes.roots.enclosing(stamp_dir)
 

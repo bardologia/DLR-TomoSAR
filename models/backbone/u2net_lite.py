@@ -5,20 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as functional
 
 from configuration.architectures import U2NetLiteConfig
-from ..blocks                    import OutputHeadsMixin, build_activation, build_norm2d, initialize_weights
-
-
-class RSUConv(nn.Module):
-    def __init__(self, input_channels: int, output_channels: int, dilation: int, activation: str, normalization: str, bias: bool):
-        super().__init__()
-        self.layers = nn.Sequential(
-            nn.Conv2d(input_channels, output_channels, kernel_size=3, padding=dilation, dilation=dilation, bias=bias),
-            build_norm2d(normalization, output_channels),
-            build_activation(activation),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.layers(x)
+from ..blocks                    import ConvNormAct, OutputHeadsMixin, initialize_weights
 
 
 class RSU(nn.Module):
@@ -28,18 +15,18 @@ class RSU(nn.Module):
             raise ValueError(f"RSU height must be at least 2; got {height}")
         self.height = height
 
-        self.conv_in = RSUConv(input_channels, output_channels, 1, activation, normalization, bias)
+        self.conv_in = ConvNormAct(input_channels, output_channels, dilation=1, activation=activation, normalization=normalization, bias=bias)
 
-        self.encoder_convs = nn.ModuleList([RSUConv(output_channels, mid_channels, 1, activation, normalization, bias)])
+        self.encoder_convs = nn.ModuleList([ConvNormAct(output_channels, mid_channels, dilation=1, activation=activation, normalization=normalization, bias=bias)])
         for _ in range(height - 2):
-            self.encoder_convs.append(RSUConv(mid_channels, mid_channels, 1, activation, normalization, bias))
+            self.encoder_convs.append(ConvNormAct(mid_channels, mid_channels, dilation=1, activation=activation, normalization=normalization, bias=bias))
 
-        self.bottom_conv = RSUConv(mid_channels, mid_channels, 2, activation, normalization, bias)
+        self.bottom_conv = ConvNormAct(mid_channels, mid_channels, dilation=2, activation=activation, normalization=normalization, bias=bias)
 
         self.decoder_convs = nn.ModuleList()
         for index in range(height - 1):
             out_channels = output_channels if index == height - 2 else mid_channels
-            self.decoder_convs.append(RSUConv(mid_channels * 2, out_channels, 1, activation, normalization, bias))
+            self.decoder_convs.append(ConvNormAct(mid_channels * 2, out_channels, dilation=1, activation=activation, normalization=normalization, bias=bias))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         x_in = self.conv_in(x)
@@ -66,20 +53,20 @@ class RSU(nn.Module):
 class RSUDilated(nn.Module):
     def __init__(self, input_channels: int, mid_channels: int, output_channels: int, activation: str, normalization: str, bias: bool):
         super().__init__()
-        self.conv_in = RSUConv(input_channels, output_channels, 1, activation, normalization, bias)
+        self.conv_in = ConvNormAct(input_channels, output_channels, dilation=1, activation=activation, normalization=normalization, bias=bias)
 
         self.encoder_convs = nn.ModuleList([
-            RSUConv(output_channels, mid_channels, 1, activation, normalization, bias),
-            RSUConv(mid_channels,    mid_channels, 2, activation, normalization, bias),
-            RSUConv(mid_channels,    mid_channels, 4, activation, normalization, bias),
+            ConvNormAct(output_channels, mid_channels, dilation=1, activation=activation, normalization=normalization, bias=bias),
+            ConvNormAct(mid_channels,    mid_channels, dilation=2, activation=activation, normalization=normalization, bias=bias),
+            ConvNormAct(mid_channels,    mid_channels, dilation=4, activation=activation, normalization=normalization, bias=bias),
         ])
 
-        self.bottom_conv = RSUConv(mid_channels, mid_channels, 8, activation, normalization, bias)
+        self.bottom_conv = ConvNormAct(mid_channels, mid_channels, dilation=8, activation=activation, normalization=normalization, bias=bias)
 
         self.decoder_convs = nn.ModuleList([
-            RSUConv(mid_channels * 2, mid_channels,    4, activation, normalization, bias),
-            RSUConv(mid_channels * 2, mid_channels,    2, activation, normalization, bias),
-            RSUConv(mid_channels * 2, output_channels, 1, activation, normalization, bias),
+            ConvNormAct(mid_channels * 2, mid_channels,    dilation=4, activation=activation, normalization=normalization, bias=bias),
+            ConvNormAct(mid_channels * 2, mid_channels,    dilation=2, activation=activation, normalization=normalization, bias=bias),
+            ConvNormAct(mid_channels * 2, output_channels, dilation=1, activation=activation, normalization=normalization, bias=bias),
         ])
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:

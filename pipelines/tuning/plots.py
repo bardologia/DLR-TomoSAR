@@ -17,7 +17,7 @@ class StudyPlotter(PlotBase):
 
     CONTOUR_MAX_PARAMS = 8
 
-    OBJECTIVE_NAME = "best validation loss (normalised params, lower is better)"
+    OBJECTIVE_NAME = "best validation loss under the trial's own objective (lower is better)"
 
     def __init__(self, logger) -> None:
         self.logger = logger

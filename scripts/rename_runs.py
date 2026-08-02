@@ -71,7 +71,8 @@ class RunRenamer:
     PATCH_FILES    = (Path("meta") / "run_summary.json", Path("docs") / "trainer_config.json", Path("docs") / "resolved_entry_config.json")
     RESULT_FILES   = ("training_results.json", "inference_results.json")
     RUNS_SUBDIRS   = ("training", "folds")
-    SCHEDULER_FILE = Path("batch_train_logs") / "train_scheduler_results.json"
+    SCHEDULER_DIR  = Path("batch_train_logs")
+    SCHEDULER_GLOB = "*_results.json"
     SEED_DIR       = re.compile(r"seed\d+")
 
     def __init__(self, roots: list[Path], apply: bool) -> None:
@@ -119,16 +120,16 @@ class RunRenamer:
             self.logger.info("nothing to rename")
             return
 
+        self._check_targets(parent, mapping)
+
+        if self.apply:
+            self._patch_scheduler_files(parent, mapping)
+
+            if parent.name in self.RUNS_SUBDIRS:
+                for name in self.RESULT_FILES:
+                    self._patch_file(parent.parent / "pipeline" / name, mapping)
+
         self._rename_runs(parent, mapping)
-
-        if not self.apply:
-            return
-
-        self._patch_file(parent / self.SCHEDULER_FILE, mapping)
-
-        if parent.name in self.RUNS_SUBDIRS:
-            for name in self.RESULT_FILES:
-                self._patch_file(parent.parent / "pipeline" / name, mapping)
 
     def _mode(self) -> str:
         return "APPLY" if self.apply else "DRY RUN"
@@ -294,21 +295,41 @@ class RunRenamer:
         known = {spec.name for spec in fields(AugmentationConfig)}
         return AugmentationConfig(**{key: value for key, value in payload.items() if key in known})
 
+    def _check_targets(self, parent: Path, mapping: dict[str, str]) -> None:
+        sources = {}
+        for old, new in mapping.items():
+            sources.setdefault(new, []).append(old)
+
+        collisions = {new: olds for new, olds in sources.items() if len(olds) > 1}
+        if collisions:
+            raise ValueError(f"{parent}: several runs rebuild to the same name: " + "; ".join(f"{new} <- {sorted(olds)}" for new, olds in sorted(collisions.items())))
+
+        taken = [new for new in sorted(sources) if (parent / new).exists()]
+        if taken:
+            raise FileExistsError(f"{parent}: rename targets already exist; refusing to overwrite {taken}")
+
     def _rename_runs(self, parent: Path, mapping: dict[str, str]) -> None:
         for old, new in mapping.items():
             source = parent / old
-            target = parent / new
-            if target.exists():
-                raise FileExistsError(f"{target} already exists; refusing to overwrite")
 
             self.logger.info(f"{old} -> {new}")
             if not self.apply:
                 continue
 
-            source.rename(target)
-            for holder in (target, *self._seed_children(target)):
+            for holder in (source, *self._seed_children(source)):
                 for relative in self.PATCH_FILES:
                     self._patch_file(holder / relative, {old: new})
+            self._patch_scheduler_files(source, {old: new})
+
+            source.rename(parent / new)
+
+    def _patch_scheduler_files(self, holder: Path, mapping: dict[str, str]) -> None:
+        directory = holder / self.SCHEDULER_DIR
+        if not directory.is_dir():
+            return
+
+        for path in sorted(directory.glob(self.SCHEDULER_GLOB)):
+            self._patch_file(path, mapping)
 
     def _seed_children(self, directory: Path) -> list[Path]:
         if not directory.is_dir():

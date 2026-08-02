@@ -55,6 +55,30 @@ def test_pack_copies_stable_names_and_writes_a_manifest(tmp_path, monkeypatch):
     assert {entry["run"] for entry in manifest["figures"]} == {"run_a", "run_b"}
 
 
+def test_pack_takes_the_vector_figures_of_the_paper_style(tmp_path):
+    run = _run_with_figures(tmp_path / "runs", "run_a")
+    (run / "inference" / "20260101_000000" / "figures" / "profiles" / "best_02.pdf").write_bytes(b"pdf-prof")
+
+    out    = tmp_path / "figures"
+    config = _config(tmp_path / "runs", out, ["run_a"])
+
+    config.patterns = ["pixel_maps/*", "profiles/*"]
+
+    payload = PaperFigurePack(config, _SilentLogger()).run()
+
+    assert (out / "run_a__profiles__best_02.pdf").read_bytes() == b"pdf-prof"
+    assert len(payload["figures"]) == 4
+
+
+def test_pack_raises_when_one_pattern_matches_nothing(tmp_path):
+    _run_with_figures(tmp_path / "runs", "run_a")
+    config          = _config(tmp_path / "runs", tmp_path / "figures", ["run_a"])
+    config.patterns = ["pixel_maps/*", "stratified/*"]
+
+    with pytest.raises(FileNotFoundError):
+        PaperFigurePack(config, _SilentLogger()).run()
+
+
 def test_pack_without_matches_raises(tmp_path):
     _run_with_figures(tmp_path / "runs", "run_a")
     config          = _config(tmp_path / "runs", tmp_path / "figures", ["run_a"])

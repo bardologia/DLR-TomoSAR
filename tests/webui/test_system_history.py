@@ -12,6 +12,7 @@ if str(WEBUI_ROOT) not in sys.path:
     sys.path.insert(0, str(WEBUI_ROOT))
 
 from system_monitor import ActiveUsers, SystemHistory, SystemMonitor
+from web_logger     import WebLogger
 
 FAKE_DEVICES = [
     {"index": 0, "util": 50,   "mem_used": 8000, "mem_total": 16000, "name": "GPU A", "temp": 40, "power": 30, "power_limit": 90, "uuid": "GPU-a"},
@@ -30,7 +31,7 @@ def monitor(tmp_path, monkeypatch):
     monkeypatch.setattr(SystemMonitor, "_du_loop", lambda self: None)
     monkeypatch.setattr(SystemHistory, "sample_loop", lambda self: None)
     monkeypatch.setattr(ActiveUsers, "sample_loop", lambda self: None)
-    instance = SystemMonitor(StubPaths(tmp_path))
+    instance = SystemMonitor(StubPaths(tmp_path), WebLogger())
     monkeypatch.setattr(instance, "_gpu_devices", lambda: FAKE_DEVICES)
     return instance
 
@@ -74,6 +75,31 @@ def test_ring_buffer_caps_history(monitor, monkeypatch):
     assert len(state["cpu"]) == 5
     assert len(state["gpus"]["0"]["util"]) == 5
     assert state["max_samples"] == 5
+
+
+def test_tracks_follow_the_device_index_not_the_listing_position(history, monitor, monkeypatch):
+    monkeypatch.setattr(monitor, "_gpu_devices", lambda: [FAKE_DEVICES[1]])
+    history.sample()
+
+    assert set(history.state()["gpus"]) == {"1"}
+
+
+def test_a_dropped_device_listing_keeps_every_series_aligned(history, monitor, monkeypatch):
+    history.sample()
+    monkeypatch.setattr(monitor, "_gpu_devices", lambda: [])
+    history.sample()
+
+    state = history.state()
+    assert len(state["cpu"])                == 2
+    assert len(state["gpus"]["0"]["util"])  == 2
+    assert len(state["gpus"]["1"]["mem"])   == 2
+
+
+def test_a_device_without_a_memory_reading_samples_as_zero(history, monitor, monkeypatch):
+    monkeypatch.setattr(monitor, "_gpu_devices", lambda: [{**FAKE_DEVICES[0], "mem_used": None}])
+    history.sample()
+
+    assert history.state()["gpus"]["0"]["mem"] == [0.0]
 
 
 def test_history_state_is_independent_of_monitor_snapshots(history, monitor):

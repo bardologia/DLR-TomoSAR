@@ -36,16 +36,18 @@ class UnrolledTrainingConfig:
     scale_lr_with_batch     : bool = True
     lr_reference_batch_size : int  = 256
 
-    patch_size    : tuple[int, int] = (64, 32)
-    patch_stride  : tuple[int, int] = (32, 16)
-    train_azimuth : tuple[int, int] = (1000, 13000)
-    val_azimuth   : tuple[int, int] = (13064, 14500)
-    test_azimuth  : tuple[int, int] = (14564, 16000)
+    patch_size            : tuple[int, int] = (64, 32)
+    patch_stride          : tuple[int, int] = (32, 16)
+    use_symmetric_padding : bool            = True
+    train_azimuth         : tuple[int, int] = (1000, 13000)
+    val_azimuth           : tuple[int, int] = (13064, 14500)
+    test_azimuth          : tuple[int, int] = (14564, 16000)
 
 
 @dataclass
 class UnrolledEntryConfig:
     run_name        : str | None = None
+    resume          : bool       = True
     model_name      : str        = "gamma_net"
     gpu             : int        = 0
     gpus            : list[int]  = field(default_factory=lambda: [0, 1, 3])

@@ -14,7 +14,7 @@ import torch
 
 from pipelines.patch_sweep.planner import PatchSweepPlanner, SweepUnit
 from tools.data.io                 import FileIO
-from tools.metrics.scoring         import SeedAggregation
+from tools.metrics.scoring         import FiniteScalar, SeedAggregation
 from tools.monitoring.logger       import Logger
 from tools.reporting.markdown      import MarkdownDoc, MarkdownTable, ScalarFormatter
 from tools.reporting.plotting      import PlotBase
@@ -29,6 +29,7 @@ class SweepRecord:
     best_val_loss     : float | None
     best_epoch        : float | None
     n_seeds           : int          = 1
+    n_seed_runs       : int          = 1
     test_loss_std     : float | None = None
     best_val_loss_std : float | None = None
     seed_runs         : list[dict]   = field(default_factory=list)
@@ -111,6 +112,10 @@ class SweepCollector:
             return "PARTIAL"
         return statuses[0] if len(set(statuses)) == 1 else "MISSING"
 
+    @staticmethod
+    def _contributing(runs: list[dict], key: str) -> int:
+        return sum(1 for run in runs if FiniteScalar.coerce(run.get(key)) is not None)
+
     def _aggregate(self, unit: SweepUnit, runs: list[dict]) -> SweepRecord:
         means, stds = SeedAggregation.aggregate(runs, ["test_loss", "best_val_loss", "best_epoch", "duration_s"])
 
@@ -121,7 +126,8 @@ class SweepCollector:
             test_loss         = means.get("test_loss"),
             best_val_loss     = means.get("best_val_loss"),
             best_epoch        = means.get("best_epoch"),
-            n_seeds           = len(runs),
+            n_seeds           = self._contributing(runs, "test_loss"),
+            n_seed_runs       = len(runs),
             test_loss_std     = stds.get("test_loss"),
             best_val_loss_std = stds.get("best_val_loss"),
             seed_runs         = runs,
@@ -277,6 +283,7 @@ class PatchSweepReport:
                     "batch_size"        : record.unit.batch_size,
                     "status"            : record.status,
                     "n_seeds"           : record.n_seeds,
+                    "n_seed_runs"       : record.n_seed_runs,
                     "test_loss"         : record.test_loss,
                     "test_loss_std"     : record.test_loss_std,
                     "best_val_loss"     : record.best_val_loss,
@@ -345,7 +352,7 @@ class PatchSweepReport:
         return rendered if std is None else f"{rendered} ± {ScalarFormatter.format_scalar(std)}"
 
     def _group_table(self, group: list[SweepRecord], best: SweepRecord | None) -> MarkdownTable:
-        table = MarkdownTable(["Patch (az x rg, px)", "Stride", "Batch", "Seeds", "Test loss", "Best val loss", "Best epoch", "Status"], align=["right"] * 8)
+        table = MarkdownTable(["Patch (az x rg, px)", "Stride", "Batch", "Seeds scored", "Test loss", "Best val loss", "Best epoch", "Status"], align=["right"] * 8)
 
         for record in group:
             label = self._patch_label(record.unit.patch_size)

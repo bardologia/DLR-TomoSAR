@@ -34,26 +34,24 @@ class FigureComposer:
         meta          = self.meta
         logger        = self.logger
 
-        if run.track_baselines is not None:
-            figure_paths["track_geometry"] = [track_plotter.plot_track_geometry(
-                baselines = run.track_baselines,
-                out_path  = meta.figures_dir / "tracks" / "track_geometry.png",
-            )]
-            logger.subsection(f"Track geometry : {meta.figures_dir / 'tracks'}")
+        figure_paths["track_geometry"] = [track_plotter.plot_track_geometry(
+            baselines = run.track_baselines,
+            out_path  = meta.figures_dir / "tracks" / "track_geometry.png",
+        )]
+        logger.subsection(f"Track geometry : {meta.figures_dir / 'tracks'}")
 
-        if run.track_profiles is not None:
-            figure_paths["track_profiles"] = track_plotter.plot_track_profiles(
-                profiles      = run.track_profiles,
-                out_dir       = meta.figures_dir / "tracks",
-                split_azimuth = (run.split_region.azimuth_start, run.split_region.azimuth_end),
-            )
-            logger.subsection(f"Track profiles : {len(figure_paths['track_profiles'])} figures in {meta.figures_dir / 'tracks'}")
+        figure_paths["track_profiles"] = track_plotter.plot_track_profiles(
+            profiles      = run.track_profiles,
+            out_dir       = meta.figures_dir / "tracks",
+            split_azimuth = (run.split_region.azimuth_start, run.split_region.azimuth_end),
+        )
+        logger.subsection(f"Track profiles : {len(figure_paths['track_profiles'])} figures in {meta.figures_dir / 'tracks'}")
 
-            figure_paths["track_flight_3d"] = [track_plotter.plot_track_flight_3d(
-                profiles = run.track_profiles,
-                out_path = meta.figures_dir / "tracks" / "flight_tracks_3d.png",
-            )]
-            logger.subsection(f"Flight tracks 3D : {meta.figures_dir / 'tracks' / 'flight_tracks_3d.png'}")
+        figure_paths["track_flight_3d"] = [track_plotter.plot_track_flight_3d(
+            profiles = run.track_profiles,
+            out_path = meta.figures_dir / "tracks" / "flight_tracks_3d.png",
+        )]
+        logger.subsection(f"Flight tracks 3D : {meta.figures_dir / 'tracks' / 'flight_tracks_3d.png'}")
 
     def _compose_input_channels(self, result: Result, run, figure_paths: Dict[str, List[Path]]) -> None:
         slice_plotter = self.plotter.slice
@@ -68,7 +66,7 @@ class FigureComposer:
                 out_dir        = meta.figures_dir / "input_channels",
                 az_offset      = result.azimuth_offset,
                 rg_offset      = result.range_offset,
-                primary_label  = run.track_baselines.reference if run.track_baselines is not None else "primary",
+                primary_label  = run.track_baselines.reference,
             )
             logger.subsection(f"Input channels : {len(figure_paths['input_channels'])} figures in {meta.figures_dir / 'input_channels'}")
 
@@ -185,7 +183,7 @@ class FigureComposer:
             meta.figures_dir / "histograms",
         )
 
-    def _compose_param_plots(self, result: Result, run, global_metrics: dict, figure_paths: Dict[str, List[Path]]) -> None:
+    def _compose_param_plots(self, result: Result, run, figure_paths: Dict[str, List[Path]]) -> None:
         param_plotter = self.plotter.param
         slot_plotter  = self.plotter.slot
         meta          = self.meta
@@ -277,7 +275,7 @@ class FigureComposer:
 
         pred_norm = ProfileNormalizer.unit_area(result.pred_curves)
         gt_norm   = ProfileNormalizer.unit_area(result.gt_curves)
-        full_norm = ProfileNormalizer.unit_area(run.full_curves) if run.full_curves is not None else None
+        full_norm = ProfileNormalizer.unit_area(run.full_curves)
 
         self._slice_set(
             pred_cube      = pred_norm,
@@ -462,7 +460,7 @@ class FigureComposer:
 
         gt_n   = reduced.gt_norm
         red_n  = reduced.reduced_norm
-        full_n = ProfileNormalizer.unit_area(run.full_curves) if run.full_curves is not None else None
+        full_n = ProfileNormalizer.unit_area(run.full_curves)
 
         _N_elev, _az, _rg = red_n.shape
 
@@ -607,7 +605,7 @@ class FigureComposer:
         self._compose_pixel_maps(result, figure_paths)
 
         if param_space:
-            self._compose_param_plots(result, run, global_metrics, figure_paths)
+            self._compose_param_plots(result, run, figure_paths)
             self._compose_slot_organization(result, run, figure_paths)
 
         self._compose_slices(result, run, global_metrics, x_axis_np, indices, figure_paths)

@@ -1,7 +1,7 @@
 "use strict";
 const fs   = require("fs");
-const os   = require("os");
 const path = require("path");
+const { ChromiumResolver } = require("./chromium");
 
 class DiagramRenderer {
 
@@ -30,19 +30,6 @@ class DiagramRenderer {
       else throw new Error("unknown/positional arg: " + a);
     }
     if (!this.jsonFile || !this.out) throw new Error("need --json <file> and --out <png>");
-  }
-
-  resolveChromium() {
-    if (process.env.PW_CHROMIUM) return process.env.PW_CHROMIUM;
-    const root = path.join(os.homedir(), ".cache", "ms-playwright");
-    const dirs = fs.readdirSync(root).filter(d => d.startsWith("chromium")).sort().reverse();
-    for (const d of dirs) {
-      for (const rel of ["chrome-headless-shell-linux64/chrome-headless-shell", "chrome-linux/chrome"]) {
-        const exe = path.join(root, d, rel);
-        if (fs.existsSync(exe)) return exe;
-      }
-    }
-    throw new Error("no chromium found under " + root + " (set PW_CHROMIUM)");
   }
 
   pick() {
@@ -75,7 +62,7 @@ class DiagramRenderer {
     fs.mkdirSync(path.dirname(this.out), { recursive: true });
     const { folderMeta, diagram } = this.pick();
 
-    const browser = await chromium.launch({ executablePath: this.resolveChromium() });
+    const browser = await chromium.launch({ executablePath: new ChromiumResolver().resolve() });
     const page    = await browser.newPage({ viewport: { width: this.width, height: 1000 } });
     const errs = [];
     page.on("pageerror", (e) => errs.push(String(e)));

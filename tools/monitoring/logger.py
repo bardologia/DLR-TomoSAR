@@ -25,9 +25,6 @@ from rich.table import Table
 from rich.text  import Text
 from rich.theme import Theme
 
-from tools.reporting.markdown import MarkdownDoc, MarkdownTable
-from tools.runtime.run_tag    import RunTag
-
 
 class LiveMonitor:
     def __init__(self, console: Console, title: str = "Training Monitor") -> None:
@@ -365,29 +362,6 @@ class Logger:
             self.error(f"Aborted by {exc_type.__name__}: {exc_val}")
         self.close()
         return False
-
-    def save_profiler_results(self, stats, output):
-        sorted_stats = sorted(stats.stats.items(), key=lambda x: x[1][3], reverse=True)
-
-        columns = ["Function", "Calls", "Total Time (s)", "Per Call (s)", "Cumulative Time (s)", "Cumulative Per Call (s)", "Location"]
-        align   = ["left", "right", "right", "right", "right", "right", "left"]
-        table   = MarkdownTable(columns, align=align)
-
-        for func, (cc, nc, tt, ct, callers) in sorted_stats:
-            filename, lineno, func_name = func
-
-            per_call_total = tt / nc if nc > 0 else 0
-            per_call_cum   = ct / nc if nc > 0 else 0
-
-            table.add_row(func_name, nc, f"{tt:.6f}", f"{per_call_total:.6f}", f"{ct:.6f}", f"{per_call_cum:.6f}", f"{filename}:{lineno}")
-
-        doc = MarkdownDoc("Profiler Results")
-        doc.paragraph(f"Generated: {RunTag.timestamp()}")
-        doc.table(table)
-        doc.save(output)
-
-        self.info(f"Full profiler results saved to: {output}")
-        return output
 
 
 class NullLogger:

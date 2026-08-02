@@ -1,29 +1,19 @@
 "use strict";
 
-class DialGauge extends CanvasBase {
+class AnimatedGauge extends CanvasBase {
 
-  constructor(canvas, opts) {
+  constructor(canvas, opts, tuning) {
     super(canvas);
-    this.min    = opts.min != null ? opts.min : 0;
-    this.max    = opts.max != null ? opts.max : 100;
-    this.label  = opts.label || "";
-    this.unit   = opts.unit || "";
-    this.color  = opts.color || "111, 155, 255";
-    this.zones  = opts.zones || [];
-    this.majors = opts.majors != null ? opts.majors : 5;
-    this.minors = opts.minors != null ? opts.minors : 4;
-    this.digits = opts.digits != null ? opts.digits : 0;
-    this.big    = !!opts.big;
-    this.a0     = -Math.PI * 1.2;
-    this.a1     = Math.PI * 0.2;
+    this.min    = opts.min != null ? opts.min : tuning.min;
+    this.max    = opts.max != null ? opts.max : tuning.max;
+    this.ease   = tuning.ease;
+    this.settle = tuning.settle;
     this.v      = this.min;
     this.t      = this.min;
     this.peak   = this.min;
     this.peakAt = 0;
     this._raf   = null;
     this._tick  = this._tick.bind(this);
-    this._ready = true;
-    this._draw();
   }
 
   onResize() {
@@ -46,8 +36,8 @@ class DialGauge extends CanvasBase {
   }
 
   _tick() {
-    this.v += (this.t - this.v) * 0.14;
-    if (Math.abs(this.t - this.v) < (this.max - this.min) * 0.0005) {
+    this.v += (this.t - this.v) * this.ease;
+    if (Math.abs(this.t - this.v) < (this.max - this.min) * this.settle) {
       this.v    = this.t;
       this._raf = null;
       this._draw();
@@ -55,6 +45,25 @@ class DialGauge extends CanvasBase {
     }
     this._draw();
     this._raf = requestAnimationFrame(this._tick);
+  }
+}
+
+class DialGauge extends AnimatedGauge {
+
+  constructor(canvas, opts) {
+    super(canvas, opts, { min: 0, max: 100, ease: 0.14, settle: 0.0005 });
+    this.label  = opts.label || "";
+    this.unit   = opts.unit || "";
+    this.color  = opts.color || "111, 155, 255";
+    this.zones  = opts.zones || [];
+    this.majors = opts.majors != null ? opts.majors : 5;
+    this.minors = opts.minors != null ? opts.minors : 4;
+    this.digits = opts.digits != null ? opts.digits : 0;
+    this.big    = !!opts.big;
+    this.a0     = -Math.PI * 1.2;
+    this.a1     = Math.PI * 0.2;
+    this._ready = true;
+    this._draw();
   }
 
   _angle(v) {
@@ -156,56 +165,17 @@ class DialGauge extends CanvasBase {
   }
 }
 
-class LinearMeter extends CanvasBase {
+class LinearMeter extends AnimatedGauge {
 
   constructor(canvas, opts) {
-    super(canvas);
-    this.min    = opts.min != null ? opts.min : 0;
-    this.max    = opts.max != null ? opts.max : 100;
+    super(canvas, opts, { min: 0, max: 100, ease: 0.14, settle: 0.0005 });
     this.label  = opts.label || "";
     this.unit   = opts.unit || "";
     this.color  = opts.color || "111, 155, 255";
     this.zones  = opts.zones || [];
     this.digits = opts.digits != null ? opts.digits : 0;
-    this.v      = this.min;
-    this.t      = this.min;
-    this.peak   = this.min;
-    this.peakAt = 0;
-    this._raf   = null;
-    this._tick  = this._tick.bind(this);
     this._ready = true;
     this._draw();
-  }
-
-  onResize() {
-    if (this._ready) this._draw();
-  }
-
-  range(max) {
-    if (max != null && max > this.min && max !== this.max) this.max = max;
-  }
-
-  set(value) {
-    const now = performance.now();
-    const v   = Math.max(this.min, Math.min(this.max, value == null ? this.min : value));
-
-    if (v >= this.peak || now - this.peakAt > 60000) { this.peak = v; this.peakAt = now; }
-    this.t = v;
-
-    if (REDUCED_MOTION) { this.v = v; this._draw(); return; }
-    if (this._raf == null) this._raf = requestAnimationFrame(this._tick);
-  }
-
-  _tick() {
-    this.v += (this.t - this.v) * 0.14;
-    if (Math.abs(this.t - this.v) < (this.max - this.min) * 0.0005) {
-      this.v    = this.t;
-      this._raf = null;
-      this._draw();
-      return;
-    }
-    this._draw();
-    this._raf = requestAnimationFrame(this._tick);
   }
 
   _x(v, x0, x1) {
@@ -296,39 +266,13 @@ class LinearMeter extends CanvasBase {
   }
 }
 
-class TankGauge extends CanvasBase {
+class TankGauge extends AnimatedGauge {
 
   constructor(canvas, opts) {
-    super(canvas);
+    super(canvas, opts, { min: 0, max: 1, ease: 0.14, settle: 0.0006 });
     this.color  = opts.color || "45, 212, 191";
-    this.f      = 0;
-    this.t      = 0;
-    this._raf   = null;
-    this._tick  = this._tick.bind(this);
     this._ready = true;
     this._draw();
-  }
-
-  onResize() {
-    if (this._ready) this._draw();
-  }
-
-  set(frac) {
-    this.t = Math.max(0, Math.min(1, frac == null ? 0 : frac));
-    if (REDUCED_MOTION) { this.f = this.t; this._draw(); return; }
-    if (this._raf == null) this._raf = requestAnimationFrame(this._tick);
-  }
-
-  _tick() {
-    this.f += (this.t - this.f) * 0.14;
-    if (Math.abs(this.t - this.f) < 0.0006) {
-      this.f    = this.t;
-      this._raf = null;
-      this._draw();
-      return;
-    }
-    this._draw();
-    this._raf = requestAnimationFrame(this._tick);
   }
 
   _draw() {
@@ -360,7 +304,7 @@ class TankGauge extends CanvasBase {
       ctx.stroke();
     }
 
-    const fh = this.f * (th - 2);
+    const fh = this.v * (th - 2);
     const fy = y0 + th - 1 - fh;
     if (fh > 0.5) {
       const grad = ctx.createLinearGradient(0, fy, 0, y0 + th);
@@ -382,7 +326,7 @@ class TankGauge extends CanvasBase {
       ctx.shadowBlur = 0;
     }
 
-    const pct  = Math.round(this.f * 100);
+    const pct  = Math.round(this.v * 100);
     const high = fy < y0 + 16;
     ctx.font         = "600 9.5px 'JetBrains Mono', ui-monospace, monospace";
     ctx.textAlign    = "center";
@@ -392,40 +336,14 @@ class TankGauge extends CanvasBase {
   }
 }
 
-class SegMeter extends CanvasBase {
+class SegMeter extends AnimatedGauge {
 
   constructor(canvas, opts) {
-    super(canvas);
+    super(canvas, opts, { min: 0, max: 1, ease: 0.16, settle: 0.0006 });
     this.color   = opts.color || "45, 212, 191";
     this.redFrom = opts.redFrom != null ? opts.redFrom : 0.92;
-    this.f      = 0;
-    this.t      = 0;
-    this._raf   = null;
-    this._tick  = this._tick.bind(this);
-    this._ready = true;
+    this._ready  = true;
     this._draw();
-  }
-
-  onResize() {
-    if (this._ready) this._draw();
-  }
-
-  set(frac) {
-    this.t = Math.max(0, Math.min(1, frac == null ? 0 : frac));
-    if (REDUCED_MOTION) { this.f = this.t; this._draw(); return; }
-    if (this._raf == null) this._raf = requestAnimationFrame(this._tick);
-  }
-
-  _tick() {
-    this.f += (this.t - this.f) * 0.16;
-    if (Math.abs(this.t - this.f) < 0.0006) {
-      this.f    = this.t;
-      this._raf = null;
-      this._draw();
-      return;
-    }
-    this._draw();
-    this._raf = requestAnimationFrame(this._tick);
   }
 
   _draw() {
@@ -438,7 +356,7 @@ class SegMeter extends CanvasBase {
     const gap  = 2;
     const segs = Math.max(16, Math.min(56, Math.floor(w / 14)));
     const sw   = (w - (segs - 1) * gap) / segs;
-    const lit  = this.f * segs;
+    const lit  = this.v * segs;
 
     for (let i = 0; i < segs; i++) {
       const x    = i * (sw + gap);

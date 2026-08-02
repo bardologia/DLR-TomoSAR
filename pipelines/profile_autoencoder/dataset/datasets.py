@@ -61,6 +61,9 @@ class ProfileDataset(Dataset):
         active_idx = np.flatnonzero(active)
         empty_idx  = np.flatnonzero(~active)
 
+        if len(active_idx) == 0:
+            raise ValueError(f"Split '{self.split_name}' holds no pixel with an amplitude above amp_zero_thr={amp_zero_thr}; lower the threshold or pick a split region that carries scatterers.")
+
         if 0.0 < pixel_subsample < 1.0:
             keep       = max(1, int(round(len(active_idx) * pixel_subsample)))
             active_idx = rng.choice(active_idx, size=keep, replace=False)

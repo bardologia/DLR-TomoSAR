@@ -2,6 +2,7 @@
 const fs   = require("fs");
 const os   = require("os");
 const path = require("path");
+const { ChromiumResolver } = require("./chromium");
 
 class FrameDumper {
   constructor(animFile, key, duration, step, outDir) {
@@ -11,20 +12,6 @@ class FrameDumper {
     this.step     = step;
     this.outDir   = path.resolve(outDir);
     this.toolDir  = __dirname;
-  }
-
-  resolveChromium() {
-    if (process.env.PW_CHROMIUM) return process.env.PW_CHROMIUM;
-
-    const root = path.join(os.homedir(), ".cache", "ms-playwright");
-    const dirs = fs.readdirSync(root).filter(d => d.startsWith("chromium")).sort().reverse();
-    for (const d of dirs) {
-      for (const rel of ["chrome-headless-shell-linux64/chrome-headless-shell", "chrome-linux/chrome"]) {
-        const exe = path.join(root, d, rel);
-        if (fs.existsSync(exe)) return exe;
-      }
-    }
-    throw new Error("no chromium found under " + root + " (set PW_CHROMIUM)");
   }
 
   stage() {
@@ -51,7 +38,7 @@ class FrameDumper {
     fs.mkdirSync(this.outDir, { recursive: true });
 
     const stageDir = this.stage();
-    const browser  = await chromium.launch({ executablePath: this.resolveChromium(), args: ["--allow-file-access-from-files"] });
+    const browser  = await chromium.launch({ executablePath: new ChromiumResolver().resolve(), args: ["--allow-file-access-from-files"] });
     const page     = await browser.newPage({ viewport: { width: 940, height: 480 } });
 
     await page.goto("file://" + path.join(stageDir, "harness.html"));

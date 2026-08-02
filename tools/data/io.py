@@ -21,7 +21,7 @@ class FileIO:
         path = Path(path)
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        target = path.with_name(path.name + ".tmp") if atomic else path
+        target = path.with_name(f"{path.name}.{os.getpid()}.tmp") if atomic else path
         with open(target, "w", encoding="utf-8") as f:
             json.dump(payload, f, indent=indent, default=str)
 

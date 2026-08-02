@@ -10,18 +10,12 @@ from configuration.sar.geometry_config          import GeometryConfig
 from configuration.normalization.general        import NormalizationConfig
 from configuration.training.backbone            import HeadMatchingTrialsConfig, NormalizationTrialsConfig, PairTrialsConfig, PatchTrialsConfig, PhysicsTrialsConfig, ReachTrialsConfig, SecondaryTrialsConfig, _default_augmentation_trials, _default_complete_losses, _default_context_trials, _default_inference, _default_input_trials, _default_presence_trials, _default_warmup_losses, default_curriculum
 from configuration.training.general.ablation    import AblationCatalog
-from configuration.training.general.loss        import LossCurriculumConfig, ParamMatching
+from configuration.training.general.loss        import LossCurriculumConfig
 from configuration.training.general.runtime     import OverfitCheckConfig
 from configuration.training.general.pretraining import PretrainConfig
 
 
-def dual_curriculum() -> LossCurriculumConfig:
-    curriculum = default_curriculum()
-
-    curriculum.warmup.param_matching   = ParamMatching.HUNGARIAN
-    curriculum.complete.param_matching = ParamMatching.HUNGARIAN
-
-    return curriculum
+dual_curriculum = default_curriculum
 
 
 def _parity_resunet_features() -> list[int]:
@@ -109,10 +103,11 @@ class DualEntryConfig:
     normalization : NormalizationConfig  = field(default_factory=NormalizationConfig)
     augmentation  : AugmentationConfig   = field(default_factory=AugmentationConfig)
 
-    probe_enabled    : bool = False
-    probe_n_batches  : int  = 1000
-    probe_reference  : str  = "param_l1"
-    probe_exit_after : bool = True
+    probe_enabled        : bool = False
+    probe_n_batches      : int  = 1000
+    probe_reference      : str  = "param_l1"
+    probe_exit_after     : bool = True
+    probe_enabled_losses : dict = field(default_factory=dict)
 
     overfit_check : OverfitCheckConfig = field(default_factory=OverfitCheckConfig)
 

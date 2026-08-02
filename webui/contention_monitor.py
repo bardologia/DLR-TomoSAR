@@ -6,7 +6,7 @@ import time
 from collections import deque
 from datetime    import datetime
 
-from proc_stats import ProcStats
+from proc_stats import MemInfo, ProcStats
 from web_logger import WebLogger
 
 
@@ -18,6 +18,7 @@ class ContentionMonitor:
     MEM_PSI_SOME        = 10.0
     MEM_PSI_FULL        = 3.0
     IO_PSI_SOME         = 25.0
+    IO_PSI_FULL         = 3.0
     IO_UTIL             = 80.0
     CPU_PSI_SOME        = 40.0
     LOAD_RATIO          = 1.0
@@ -37,17 +38,17 @@ class ContentionMonitor:
         self.logger = logger
         self.nuke   = nuke
         self.lock   = threading.Lock()
-        self.armed  = False
         self.uid    = os.getuid()
         self.clk    = os.sysconf("SC_CLK_TCK")
         self.page   = os.sysconf("SC_PAGE_SIZE")
         self.cores  = os.cpu_count() or 1
         self.device = self._resolve_device()
 
-        self.signals = {}
-        self.active  = {}
-        self.events  = deque(maxlen=20)
-        self.streaks = {}
+        self.signals   = {}
+        self.active    = {}
+        self.events    = deque(maxlen=20)
+        self.streaks   = {}
+        self.announced = set()
 
         self.auto_nuke   = False
         self.nuke_streak = 0
@@ -57,13 +58,12 @@ class ContentionMonitor:
 
         self.prev_swap = None
         self.prev_disk = None
-        self.prev_mine = None
+        self.prev_mine = {}
         self.prev_t    = 0.0
 
     def start(self) -> None:
         worker = threading.Thread(target=self._watch, name="ContentionMonitor", daemon=True)
         worker.start()
-        self.armed = True
         self.logger.muted(f"contention monitor armed (device {self.device or 'n/a'}, share {self.SHARE:.0%})")
 
     def arm(self, value: bool) -> dict:
@@ -75,28 +75,12 @@ class ContentionMonitor:
         return self.state()
 
     def state(self) -> dict:
-        limits = {
-            "mem_psi_some" : self.MEM_PSI_SOME,
-            "io_psi_some"  : self.IO_PSI_SOME,
-            "cpu_psi_some" : self.CPU_PSI_SOME,
-            "load_ratio"   : self.LOAD_RATIO,
-            "swap_out_mbs" : self.SWAP_OUT_MBS,
-            "share"        : self.SHARE,
-            "interval"     : self.INTERVAL,
-            "nuke_after_s" : self.NUKE_SUSTAIN * self.INTERVAL,
-        }
-
         with self.lock:
             return {
-                "armed"       : self.armed,
-                "auto_nuke"   : self.auto_nuke,
-                "nuke_streak" : self.nuke_streak,
-                "device"      : self.device,
-                "limits"      : limits,
-                "signals"     : dict(self.signals),
-                "impacting"   : any(a["mine"] for a in self.active.values()),
-                "active"      : list(self.active.values()),
-                "events"      : list(self.events),
+                "auto_nuke" : self.auto_nuke,
+                "signals"   : dict(self.signals),
+                "active"    : list(self.active.values()),
+                "events"    : list(self.events),
             }
 
     def _watch(self) -> None:
@@ -176,12 +160,8 @@ class ContentionMonitor:
         return {"in_mbs": in_mbs, "out_mbs": out_mbs}
 
     def _read_memory(self) -> dict:
-        info = {}
-        try:
-            for line in open("/proc/meminfo").read().splitlines():
-                key, _, rest = line.partition(":")
-                info[key]    = int(rest.split()[0]) * 1024
-        except (OSError, ValueError, IndexError):
+        info = MemInfo.fields()
+        if not info:
             return {"used_pct": 0.0, "used_gb": 0.0}
 
         total     = info.get("MemTotal", 0)
@@ -240,11 +220,10 @@ class ContentionMonitor:
 
     def _scan(self, now: float, dt: float) -> dict:
         mine_mem = 0
-        jiffies  = 0
-        io_bytes = 0
         nproc    = 0
         per_mem  = {}
         per_comm = {}
+        counters = {}
         user_mem = {}
         user_n   = {}
         top      = (0, None, "", self.uid)
@@ -254,43 +233,36 @@ class ContentionMonitor:
                 continue
             pid = int(entry)
             try:
-                uid  = os.stat(f"/proc/{pid}").st_uid
-                stat = open(f"/proc/{pid}/stat").read()
+                uid = os.stat(f"/proc/{pid}").st_uid
             except OSError:
                 continue
 
-            try:
-                comm     = stat[stat.index("(") + 1 : stat.rindex(")")]
-                fields   = stat[stat.rindex(")") + 2:].split()
-                proc_rss = int(fields[21]) * self.page
-                j        = int(fields[11]) + int(fields[12])
-            except (ValueError, IndexError):
+            stat = ProcStats.stat(pid)
+            if stat is None:
                 continue
 
             attributed = ProcStats.attributed(pid)
-            proc_mem   = attributed if attributed is not None else proc_rss
+            proc_mem   = attributed if attributed is not None else stat["rss"]
 
             user_mem[uid] = user_mem.get(uid, 0) + proc_mem
             user_n  [uid] = user_n.get(uid, 0) + 1
             if proc_mem > top[0]:
-                top = (proc_mem, pid, comm, uid)
+                top = (proc_mem, pid, stat["comm"], uid)
 
             if uid == self.uid:
-                jiffies      += j
                 mine_mem     += proc_mem
                 nproc        += 1
-                io_bytes     += self._pid_io(pid)
+                counters[pid] = (stat["jiffies"], self._pid_io(pid))
                 per_mem [pid] = proc_mem
-                per_comm[pid] = comm
+                per_comm[pid] = stat["comm"]
 
         prev           = self.prev_mine
-        self.prev_mine = (jiffies, io_bytes)
+        self.prev_mine = counters
 
-        cpu_pct = 0.0
-        io_mbs  = 0.0
-        if prev is not None:
-            cpu_pct = max(0.0, 100.0 * (jiffies - prev[0]) / self.clk / dt)
-            io_mbs  = max(0.0, (io_bytes - prev[1]) / dt / (1024.0 ** 2))
+        jiffies  = sum(max(0, counter[0] - prev[pid][0]) for pid, counter in counters.items() if pid in prev)
+        io_bytes = sum(max(0, counter[1] - prev[pid][1]) for pid, counter in counters.items() if pid in prev)
+        cpu_pct  = 100.0 * jiffies / self.clk / dt
+        io_mbs   = io_bytes / dt / (1024.0 ** 2)
 
         leak = self._growth_candidate(now, per_mem, per_comm)
 
@@ -378,7 +350,7 @@ class ContentionMonitor:
         io_breach = psi["io"]["some"] >= self.IO_PSI_SOME or disk["util"] >= self.IO_UTIL
         io_clear  = psi["io"]["some"] < self.IO_PSI_SOME * self.CLEAR_MARGIN and disk["util"] < self.IO_UTIL * self.CLEAR_MARGIN
         io_mine   = disk["mine_share"] >= self.SHARE
-        io_level  = "danger" if psi["io"]["full"] >= self.MEM_PSI_FULL else "warn"
+        io_level  = "danger" if psi["io"]["full"] >= self.IO_PSI_FULL else "warn"
         self._track("io", io_level, io_breach, io_clear, io_mine,
                     f"disk contention on {disk['device']}: {disk['util']:.0f}% busy, tasks stalled {psi['io']['some']:.0f}%; "
                     f"you drive {disk['mine_share']:.0%} of the I/O ({disk['mine_mbs']:.0f} MB/s)")
@@ -442,18 +414,27 @@ class ContentionMonitor:
             known = self.active.get(kind)
             if known is None:
                 self.active[kind] = {"kind": kind, "level": level, "mine": mine, "message": message, "since": datetime.now().isoformat(timespec="seconds")}
-                if mine:
-                    self.events.append({"kind": kind, "level": level, "message": message, "time": datetime.now().isoformat(timespec="seconds")})
-                    self.logger.warning(f"neighbour impact: {message}")
+                announce          = mine
             else:
+                announce         = mine and (not known["mine"] or (level == "danger" and known["level"] != "danger"))
                 known["level"]   = level
                 known["mine"]    = mine
                 known["message"] = message
 
+            if announce:
+                self.events.append({"kind": kind, "level": level, "message": message, "time": datetime.now().isoformat(timespec="seconds")})
+                self.announced.add(kind)
+
+        if announce:
+            self.logger.warning(f"neighbour impact: {message}")
+
     def _drop(self, kind: str) -> None:
         with self.lock:
-            known = self.active.pop(kind, None)
-        if known is not None and known.get("mine"):
+            known     = self.active.pop(kind, None)
+            announced = kind in self.announced
+            self.announced.discard(kind)
+
+        if known is not None and announced:
             self.logger.muted(f"contention cleared: {kind}")
 
     def _resolve_device(self):

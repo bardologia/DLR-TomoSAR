@@ -76,7 +76,6 @@ class HRNetLite(nn.Module, OutputHeadsMixin):
 
         base            = config.base_channels
         branch_channels = [base * (2 ** index) for index in range(config.n_branches)]
-        self.branch_channels = branch_channels
 
         self.stem = ResidualConvBlock(
             input_channels  = config.in_channels,

@@ -47,7 +47,7 @@ def _make_cube_run(base: Path) -> Path:
 
 def _loaded_explorer(base: Path) -> tuple[CubeExplorer, str]:
     _make_cube_run(base)
-    explorer = CubeExplorer(paths=None, logger=WebLogger())
+    explorer = CubeExplorer(WebLogger())
 
     listing = explorer.list_cubes(str(base))
     assert listing["ok"] and len(listing["cubes"]) == 1
@@ -110,7 +110,7 @@ def test_save_slices_rejects_unknown_space(tmp_path):
 
 def test_save_slices_requires_loaded_cube(tmp_path):
     stamp    = _make_cube_run(tmp_path)
-    explorer = CubeExplorer(paths=None, logger=WebLogger())
+    explorer = CubeExplorer(WebLogger())
 
     result = explorer.save_slices(str(stamp), az=0, rg=0)
     assert not result["ok"]

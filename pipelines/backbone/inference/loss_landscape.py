@@ -28,7 +28,7 @@ class FilterNormalizedDirection:
                 direction[name] = torch.zeros_like(param)
                 continue
 
-            random = torch.randn(param.shape, generator=generator)
+            random = torch.randn(param.shape, generator=generator).to(param.device)
             flat_w = param.detach().reshape(param.shape[0], -1)
             flat_d = random.reshape(param.shape[0], -1)
 
@@ -89,6 +89,9 @@ class LossLandscapePlots(PlotBase):
         return self._save(fig, path)
 
     def contour_2d(self, alphas: np.ndarray, betas: np.ndarray, losses: np.ndarray, path: Path) -> Path:
+        if not losses.max() > losses.min():
+            raise ValueError(f"The sampled landscape is flat at {float(losses.min()):.6g} over the whole grid; a filled contour needs a loss range, so widen span or check that the loss depends on the perturbed weights")
+
         self._apply_style()
 
         fig, ax = plt.subplots(figsize=self.figsize(self.FULL_WIDTH, aspect=0.85))

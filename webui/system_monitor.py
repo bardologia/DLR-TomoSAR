@@ -8,18 +8,70 @@ import threading
 import time
 from collections import deque
 
-from proc_stats import ProcStats
+from proc_stats import CpuCounters, MemInfo, ProcStats
+from web_logger import WebLogger
+
+
+class GpuProbe:
+
+    DEVICE_QUERY = "index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit,uuid"
+    APP_QUERY    = "pid,used_gpu_memory,gpu_uuid"
+    CACHE_TTL_S  = 0.5
+    TIMEOUT_S    = 3
+
+    def __init__(self) -> None:
+        self.lock  = threading.Lock()
+        self.cache = {}
+
+    def devices(self) -> list[list[str]]:
+        return self._cached(f"--query-gpu={self.DEVICE_QUERY}", 9)
+
+    def apps(self) -> list[list[str]]:
+        return self._cached(f"--query-compute-apps={self.APP_QUERY}", 3)
+
+    def _cached(self, flag: str, width: int) -> list[list[str]]:
+        now = time.monotonic()
+
+        with self.lock:
+            entry = self.cache.get(flag)
+            if entry is not None and now - entry[0] < self.CACHE_TTL_S:
+                return entry[1]
+
+        rows = self._rows(flag, width)
+
+        with self.lock:
+            self.cache[flag] = (time.monotonic(), rows)
+
+        return rows
+
+    def _rows(self, flag: str, width: int) -> list[list[str]]:
+        try:
+            out = subprocess.run(["nvidia-smi", flag, "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=self.TIMEOUT_S)
+        except (OSError, subprocess.TimeoutExpired):
+            return []
+
+        if out.returncode != 0:
+            return []
+
+        rows = []
+        for line in out.stdout.strip().splitlines():
+            cells = [cell.strip() for cell in line.split(",")]
+            if len(cells) >= width:
+                rows.append(cells)
+
+        return rows
 
 
 class SystemMonitor:
 
-    GPU_QUERY    = "index,name,utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit,uuid"
     PROC_LIMIT   = 30
     DU_REFRESH_S = 600.0
 
-    def __init__(self, paths) -> None:
+    def __init__(self, paths, logger: WebLogger) -> None:
         self.paths       = paths
+        self.logger      = logger
         self.lock        = threading.Lock()
+        self.probe       = GpuProbe()
         self.prev_cpu    = {}
         self.prev_proc   = {}
         self.prev_proc_t = 0.0
@@ -36,29 +88,11 @@ class SystemMonitor:
         threading.Thread(target=self.history.sample_loop, daemon=True).start()
         threading.Thread(target=self.users.sample_loop, daemon=True).start()
 
-    @staticmethod
-    def _cpu_counters() -> dict:
-        counters = {}
-        try:
-            lines = open("/proc/stat").read().splitlines()
-        except OSError:
-            return counters
-
-        for line in lines:
-            if not line.startswith("cpu"):
-                continue
-            parts = line.split()
-            vals  = [int(v) for v in parts[1:9]]
-            busy  = sum(vals) - vals[3] - vals[4]
-            counters[parts[0]] = (busy, sum(vals))
-
-        return counters
-
     def _cpu_percents(self) -> tuple[list[float], float]:
         cores = []
         total = 0.0
 
-        for key, (busy, whole) in self._cpu_counters().items():
+        for key, (busy, whole) in CpuCounters.read().items():
             prev = self.prev_cpu.get(key)
             self.prev_cpu[key] = (busy, whole)
 
@@ -86,38 +120,30 @@ class SystemMonitor:
             try:
                 if os.stat(f"/proc/{pid}").st_uid != self.uid:
                     continue
-                stat = open(f"/proc/{pid}/stat").read()
             except OSError:
                 continue
 
-            try:
-                close   = stat.rindex(")")
-                comm    = stat[stat.index("(") + 1 : close]
-                fields  = stat[close + 2 :].split()
-                state   = fields[0]
-                jiff    = int(fields[11]) + int(fields[12])
-                threads = int(fields[17])
-                rss     = int(fields[21]) * self.page
-            except (ValueError, IndexError):
+            stat = ProcStats.stat(pid)
+            if stat is None:
                 continue
 
             prev = self.prev_proc.get(pid)
             cpu  = 0.0
             if prev is not None and self.prev_proc_t > 0 and dt > 0:
-                cpu = max(0.0, round(100.0 * (jiff - prev) / self.clk / dt, 1))
-            self.prev_proc[pid] = jiff
+                cpu = max(0.0, round(100.0 * (stat["jiffies"] - prev) / self.clk / dt, 1))
+            self.prev_proc[pid] = stat["jiffies"]
             seen.add(pid)
 
             cmd = self._pid_cmd(pid)
 
             rows.append({
                 "pid"     : pid,
-                "state"   : state,
+                "state"   : stat["state"],
                 "cpu"     : cpu,
-                "rss"     : rss,
-                "threads" : threads,
+                "rss"     : stat["rss"],
+                "threads" : stat["threads"],
                 "gpu"     : gpu_mem.get(pid, 0),
-                "cmd"     : (cmd or comm)[:200],
+                "cmd"     : (cmd or stat["comm"])[:200],
             })
 
         self.prev_proc_t = now
@@ -133,22 +159,8 @@ class SystemMonitor:
         return top
 
     def _gpu_devices(self) -> list[dict]:
-        try:
-            out = subprocess.run(
-                ["nvidia-smi", f"--query-gpu={self.GPU_QUERY}", "--format=csv,noheader,nounits"],
-                capture_output=True, text=True, timeout=3,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            return []
-
-        if out.returncode != 0:
-            return []
-
         devices = []
-        for line in out.stdout.strip().splitlines():
-            cells = [c.strip() for c in line.split(",")]
-            if len(cells) < 9:
-                continue
+        for cells in self.probe.devices():
             devices.append({
                 "index"       : self._num(cells[0]),
                 "name"        : cells[1],
@@ -163,22 +175,8 @@ class SystemMonitor:
         return devices
 
     def _compute_apps(self) -> dict:
-        try:
-            out = subprocess.run(
-                ["nvidia-smi", "--query-compute-apps=pid,used_gpu_memory,gpu_uuid", "--format=csv,noheader,nounits"],
-                capture_output=True, text=True, timeout=3,
-            )
-        except (OSError, subprocess.TimeoutExpired):
-            return {}
-
-        if out.returncode != 0:
-            return {}
-
         grouped = {}
-        for line in out.stdout.strip().splitlines():
-            cells = [c.strip() for c in line.split(",")]
-            if len(cells) < 3:
-                continue
+        for cells in self.probe.apps():
             try:
                 pid = int(cells[0])
                 mem = float(cells[1])
@@ -196,13 +194,12 @@ class SystemMonitor:
 
     def pid_owner(self, pid: int) -> str | None:
         try:
-            uid   = os.stat(f"/proc/{pid}").st_uid
-            stat  = open(f"/proc/{pid}/stat").read()
-            state = stat[stat.rindex(")") + 2:].split()[0]
-        except (OSError, ValueError, IndexError):
+            uid = os.stat(f"/proc/{pid}").st_uid
+        except OSError:
             return None
 
-        if state == "Z":
+        stat = ProcStats.stat(pid)
+        if stat is None or stat["state"] == "Z":
             return None
 
         return ProcStats.username(uid)
@@ -219,12 +216,8 @@ class SystemMonitor:
         return [{**device, "procs": apps.get(device["uuid"], [])} for device in self._gpu_devices()]
 
     def _memory(self) -> dict:
-        info = {}
-        try:
-            for line in open("/proc/meminfo").read().splitlines():
-                key, _, rest = line.partition(":")
-                info[key]    = int(rest.split()[0]) * 1024
-        except (OSError, ValueError, IndexError):
+        info = MemInfo.fields()
+        if not info:
             return {}
 
         return {
@@ -267,8 +260,12 @@ class SystemMonitor:
 
     def _du_loop(self) -> None:
         while True:
-            self.du_usage["repo"] = self._du(self.paths.repo_root)
-            self.du_usage["user"] = self._du(self.user_root) if self.user_root != self.paths.repo_root else self.du_usage["repo"]
+            try:
+                self.du_usage["repo"] = self._du(self.paths.repo_root)
+                self.du_usage["user"] = self._du(self.user_root) if self.user_root != self.paths.repo_root else self.du_usage["repo"]
+            except Exception as error:
+                self.logger.error(f"disk usage sweep failed: {error}")
+
             time.sleep(self.DU_REFRESH_S)
 
     def _du(self, path) -> int | None:
@@ -375,7 +372,7 @@ class SystemHistory:
         self.gpus    = {}
 
     def _cpu_percent(self) -> float:
-        current   = self.monitor._cpu_counters().get("cpu")
+        current   = CpuCounters.read().get("cpu")
         prev      = self.prev
         self.prev = current
 
@@ -389,6 +386,9 @@ class SystemHistory:
             return 0.0
         return round(100.0 * (mem["total"] - mem["available"]) / mem["total"], 1)
 
+    def _track(self, key: str) -> dict:
+        return self.gpus.setdefault(key, {"util": deque(maxlen=self.MAX_SAMPLES), "mem": deque(maxlen=self.MAX_SAMPLES)})
+
     def sample(self) -> None:
         cpu     = self._cpu_percent()
         ram     = self._ram_percent()
@@ -397,12 +397,24 @@ class SystemHistory:
         with self.lock:
             self.cpu.append(cpu)
             self.ram.append(ram)
-            for position, device in enumerate(devices):
-                track = self.gpus.setdefault(str(position), {"util": deque(maxlen=self.MAX_SAMPLES), "mem": deque(maxlen=self.MAX_SAMPLES)})
+
+            sampled = set()
+            for device in devices:
+                if device["index"] is None:
+                    continue
+
+                key   = str(device["index"])
+                track = self._track(key)
                 util  = device["util"] if device["util"] is not None else 0.0
-                mpct  = round(100.0 * device["mem_used"] / device["mem_total"], 1) if device["mem_total"] else 0.0
+                mpct  = round(100.0 * device["mem_used"] / device["mem_total"], 1) if device["mem_total"] and device["mem_used"] is not None else 0.0
                 track["util"].append(util)
                 track["mem"].append(mpct)
+                sampled.add(key)
+
+            for key, track in self.gpus.items():
+                if key not in sampled:
+                    track["util"].append(0.0)
+                    track["mem"].append(0.0)
 
     def state(self) -> dict:
         with self.lock:
@@ -416,7 +428,11 @@ class SystemHistory:
 
     def sample_loop(self) -> None:
         while True:
-            self.sample()
+            try:
+                self.sample()
+            except Exception as error:
+                self.monitor.logger.error(f"system history sampling failed: {error}")
+
             time.sleep(self.SAMPLE_PERIOD_S)
 
 
@@ -446,24 +462,21 @@ class ActiveUsers:
                 continue
             pid = int(entry)
             try:
-                uid  = os.stat(f"/proc/{pid}").st_uid
-                stat = open(f"/proc/{pid}/stat").read()
+                uid = os.stat(f"/proc/{pid}").st_uid
             except OSError:
                 continue
 
-            try:
-                fields = stat[stat.rindex(")") + 2 :].split()
-                jiff   = int(fields[11]) + int(fields[12])
-            except (ValueError, IndexError):
+            stat = ProcStats.stat(pid)
+            if stat is None:
                 continue
 
-            cur[pid] = jiff
+            cur[pid] = stat["jiffies"]
             agg      = users.setdefault(uid, {"nproc": 0, "mem": 0, "jdelta": 0})
 
             agg["nproc"] += 1
             agg["mem"]   += ProcStats.attributed(pid) or 0
             if pid in prev:
-                agg["jdelta"] += max(0, jiff - prev[pid])
+                agg["jdelta"] += max(0, stat["jiffies"] - prev[pid])
 
         self.prev   = cur
         self.prev_t = now
@@ -520,7 +533,7 @@ class ActiveUsers:
                 "mem"       : agg["mem"],
                 "mem_share" : min(100.0, round(100.0 * agg["mem"] / mem_used, 1)) if mem_used else 0.0,
                 "gpu_mem"   : held["mem"],
-                "gpus"      : sorted(held["gpus"]),
+                "gpus"      : sorted(index for index in held["gpus"] if index is not None),
             })
 
         rows.sort(key=lambda r: (-r["cpu"], -r["gpu_mem"], -r["mem"]))
@@ -539,5 +552,9 @@ class ActiveUsers:
 
     def sample_loop(self) -> None:
         while True:
-            self.sample()
+            try:
+                self.sample()
+            except Exception as error:
+                self.monitor.logger.error(f"active users sampling failed: {error}")
+
             time.sleep(self.SAMPLE_PERIOD_S)

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing  import Any, Dict, List, Optional, Tuple
+from typing  import Any, Dict, List, Tuple
 
 import numpy as np
 
@@ -74,7 +74,6 @@ class Report:
         figure_paths     : Dict[str, Path],
         gif_paths        : Dict[str, Path],
         report_path      : Path,
-        extra_sections   : Optional[List[str]] = None,
     ) -> None:
 
         self.report_path      = Path(report_path)
@@ -85,7 +84,6 @@ class Report:
         self.global_metrics   = global_metrics
         self.figure_paths     = figure_paths
         self.gif_paths        = gif_paths
-        self.extra_sections   = extra_sections or []
         self.assets           = ReportAssets(self.output_dir)
 
     @staticmethod
@@ -293,7 +291,7 @@ class Report:
         n_K = self.run_summary["n_gaussians"]
         out = [f"\n### {self._next_subsection()} Slot occupancy (GT vs Pred)\n"]
         out.append(
-            "Per-slot and overall fraction of pixels carrying an active Gaussian (amplitude > 1e-3), "
+            "Per-slot and overall fraction of pixels carrying an active Gaussian (amplitude above the active threshold), "
             "ground truth versus prediction, over the full stitched test cube. Because Hungarian matching "
             "makes the training loss invariant to predicted slot ordering, the raw predicted slot index is "
             "arbitrary and not comparable to the GT slot index. The per-slot predicted fractions are therefore "
@@ -337,13 +335,15 @@ class Report:
         out = [f"\n### {self._next_subsection()} Per-slot parameter statistics (GT vs Pred, by activity)\n"]
         out.append(
             "Mean ± std of each Gaussian parameter per GT slot, split by that slot's GT activity "
-            "(amplitude > 1e-3): the active population, its inactive complement, and all pixels. "
-            "GT columns average the ground-truth parameter maps directly, so the inactive rows expose "
+            "(amplitude above the active threshold): the active population, its inactive complement, and "
+            "all pixels. GT amplitudes are averaged over all three populations, so the inactive row exposes "
             "the placeholder fill and the active-vs-global gap shows how much it dilutes unconditioned "
-            "averages. Pred columns average the Hungarian-aligned emissions placed in this slot (as in "
-            "§6); pixels where the model emitted no active Gaussian for the slot carry no value and are "
-            "excluded — §2.4 gives the corresponding emission fractions. The inactive Pred rows therefore "
-            "characterise the model's false fires in slots the GT leaves empty.\n"
+            "averages; GT μ and σ exist only where the slot is active, since inactive GT slots carry no "
+            "position or width, and their inactive and global cells are therefore left empty rather than "
+            "restated from the active population. Pred columns average the Hungarian-aligned emissions "
+            "placed in this slot (as in §6); pixels where the model emitted no active Gaussian for the slot "
+            "carry no value and are excluded — §2.4 gives the corresponding emission fractions. The inactive "
+            "Pred rows therefore characterise the model's false fires in slots the GT leaves empty.\n"
         )
 
         for k in range(n_K):
@@ -352,11 +352,12 @@ class Report:
             table = MarkdownTable(("Parameter", "Population", "GT mean", "GT std", "Pred mean", "Pred std"))
             for param, label in (("amp", "a"), ("mu", "μ"), ("sig", "σ")):
                 for scope in ("active", "inactive", "global"):
+                    gt_measured = param == "amp" or scope == "active"
                     table.add_row(
                         label,
                         scope,
-                        self._fmt(gm.get(f"slot_{k}_{param}_{scope}_gt_mean",   float("nan"))),
-                        self._fmt(gm.get(f"slot_{k}_{param}_{scope}_gt_std",    float("nan"))),
+                        self._fmt(gm[f"slot_{k}_{param}_{scope}_gt_mean"]) if gt_measured else "—",
+                        self._fmt(gm[f"slot_{k}_{param}_{scope}_gt_std"])  if gt_measured else "—",
                         self._fmt(gm.get(f"slot_{k}_{param}_{scope}_pred_mean", float("nan"))),
                         self._fmt(gm.get(f"slot_{k}_{param}_{scope}_pred_std",  float("nan"))),
                     )
@@ -591,6 +592,8 @@ class Report:
 
     _METRIC_SKIP_KEYS = ("tracks", "track_positions", "split", "split_region")
 
+    _SLOT_ORGANIZATION_KEYS = frozenset({"slot_usage_entropy", "slot_mu_rank_diag", "slot_gt_alignment"})
+
     @staticmethod
     def _is_reduced_key(k: str) -> bool:
         return ("_red" in k) or k.startswith("reduced_") or k.startswith("ssim_red") or ("predn" in k)
@@ -606,6 +609,7 @@ class Report:
         ("3.17 Failure-mode classification",                     lambda k: k.startswith("failure_")),
         ("3.18 Presence calibration",                            lambda k: k.startswith("presence_")),
         ("3.10 Matched Gaussian errors (permutation-invariant)", lambda k: k.startswith("matched_")),
+        ("3.9c Slot internal organization (emergent)",           lambda k: k in Report._SLOT_ORGANIZATION_KEYS),
         ("3.9b Per-slot parameter statistics by activity",       lambda k: k.startswith("slot_") and ("_amp_" in k or "_mu_" in k or "_sig_" in k)),
         ("3.9 Slot occupancy & active count",                    lambda k: k.startswith(("active_frac", "active_count", "count_")) or (k.startswith("slot_") and "_active_" in k)),
         ("3.8 NN improvement over baseline",                     lambda k: k in Report._IMPROVEMENT_KEYS),
@@ -631,7 +635,7 @@ class Report:
         groups: Dict[str, Dict] = {title: {} for title, _match in self._METRIC_TAXONOMY}
 
         for k, v in sorted(gm.items()):
-            if self._is_per_slice_ssim(k) or "_raw" in k or k in self._METRIC_SKIP_KEYS:
+            if self._is_per_slice_ssim(k) or k in self._METRIC_SKIP_KEYS:
                 continue
 
             title            = next(title for title, match in self._METRIC_TAXONOMY if match(k))
@@ -902,12 +906,6 @@ class Report:
         lines += self._build_headline_metrics()
         lines += self._build_full_metrics()
         lines += self._build_figures()
-
-        if self.extra_sections:
-            lines.append("\n## 11. Notes\n")
-            for s in self.extra_sections:
-                lines.append(s)
-                lines.append("")
 
         report_path.write_text("\n".join(lines), encoding="utf-8")
         return report_path

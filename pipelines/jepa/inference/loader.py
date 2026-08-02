@@ -28,6 +28,12 @@ class JepaInferenceModel(nn.Module):
 
 
 class JepaRunLoader(RunLoader):
+    def _validate_out_channels(self, out_channels: int, n_gaussians: int) -> None:
+        ae_cfg, _ = ProfileAutoencoderConfigIO.load(self.meta_directory)
+
+        if out_channels != ae_cfg.embedding_dim:
+            raise ValueError(f"JEPA run '{self.run_directory}' persists out_channels={out_channels} but its profile autoencoder embeds into {ae_cfg.embedding_dim} channels; the backbone width in the run summary does not describe this run.")
+
     def _image_frontend(self, dataset_in_channels: int):
         if not ImageAutoencoderConfigIO.exists(self.meta_directory):
             return None, dataset_in_channels

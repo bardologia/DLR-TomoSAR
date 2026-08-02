@@ -19,11 +19,23 @@ class GaussianMatcher:
 
     @staticmethod
     def _best_perm(cost: np.ndarray, perms: np.ndarray, n_K: int) -> np.ndarray:
-        idx        = np.arange(n_K)
-        perm_costs = np.stack([cost[:, idx, perm].sum(axis=1) for perm in perms], axis=1)
-        return perm_costs.argmin(axis=1)
+        idx  = np.arange(n_K)
+        best = np.zeros(cost.shape[0], dtype=np.int64)
+        low  = cost[:, idx, perms[0]].sum(axis=1)
+
+        for position, perm in enumerate(perms[1:], start=1):
+            candidate = cost[:, idx, perm].sum(axis=1)
+            improved  = candidate < low
+
+            low  = np.where(improved, candidate, low)
+            best = np.where(improved, position, best)
+
+        return best
 
     def assignment(self, params_pred: np.ndarray, params_gt: np.ndarray, n_K: int) -> np.ndarray:
+        if n_K > ParamMatcher.MAX_GAUSSIANS:
+            raise ValueError(f"GaussianMatcher.assignment enumerates n_K! permutations; n_K={n_K} exceeds MAX_GAUSSIANS={ParamMatcher.MAX_GAUSSIANS}")
+
         mu_pred  = self._channel(params_pred, n_K, 1)
         mu_gt    = self._channel(params_gt,   n_K, 1)
         act_pred = self._channel(params_pred, n_K, 0) >= self.amp_threshold
@@ -48,10 +60,10 @@ class GaussianMatcher:
 
         return sel
 
-    def aligned_prediction(self, params_pred: np.ndarray, params_gt: np.ndarray, n_K: int) -> np.ndarray:
+    def aligned_prediction(self, params_pred: np.ndarray, params_gt: np.ndarray, n_K: int, assignment: np.ndarray | None = None) -> np.ndarray:
         ppg  = self.ppg
         H, W = params_pred.shape[-2:]
-        sel  = self.assignment(params_pred, params_gt, n_K)
+        sel  = self.assignment(params_pred, params_gt, n_K) if assignment is None else assignment
 
         act_pred = self._channel(params_pred, n_K, 0) >= self.amp_threshold
         n_pixels = sel.shape[0]

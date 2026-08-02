@@ -9,6 +9,19 @@ import numpy as np
 import torch
 
 
+class TorchIO:
+    @staticmethod
+    def save_atomic(payload, path) -> Path:
+        path = Path(path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        target = path.with_name(path.name + ".tmp")
+        torch.save(payload, str(target))
+        os.replace(target, path)
+
+        return path
+
+
 class Checkpoint:
     def __init__(self, logger, tracker, save_path: str):
         self.logger          = logger
@@ -46,8 +59,7 @@ class Checkpoint:
 
         weights = "EMA weights" if trainer.ema.enabled else "raw weights"
         self.logger.info(f"Saving checkpoint ({weights}) at epoch {epoch + 1} to {path}")
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        torch.save(checkpoint, path)
+        TorchIO.save_atomic(checkpoint, path)
 
     def restore_best(self, model, device) -> None:
         if self.best_epoch < 0:
@@ -166,7 +178,7 @@ class TrainerState:
 
     @staticmethod
     def save(trainer, epoch: int, path, loader_generator=None) -> None:
-        torch.save(TrainerState.capture(trainer, epoch, loader_generator), str(path))
+        TorchIO.save_atomic(TrainerState.capture(trainer, epoch, loader_generator), path)
 
     @staticmethod
     def restore(trainer, path, loader_generator=None) -> int:

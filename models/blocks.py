@@ -119,6 +119,13 @@ def initialize_weights(module: nn.Module, mode: str) -> None:
                 nn.init.xavier_uniform_(m.weight)
             if m.bias is not None:
                 nn.init.zeros_(m.bias)
+        elif isinstance(m, nn.MultiheadAttention):
+            if mode == "kaiming":
+                nn.init.kaiming_normal_(m.in_proj_weight, mode="fan_in", nonlinearity="relu")
+            elif mode == "xavier":
+                nn.init.xavier_uniform_(m.in_proj_weight)
+            if m.in_proj_bias is not None:
+                nn.init.zeros_(m.in_proj_bias)
         elif isinstance(m, (nn.BatchNorm1d, nn.BatchNorm2d, nn.GroupNorm, nn.InstanceNorm1d, nn.InstanceNorm2d, nn.LayerNorm)):
             if hasattr(m, "weight") and m.weight is not None:
                 nn.init.ones_(m.weight)
@@ -135,6 +142,29 @@ def match_spatial_size(source: torch.Tensor, reference: torch.Tensor) -> torch.T
             align_corners = False,
         )
     return source
+
+
+class ConvNormAct(nn.Module):
+    def __init__(
+        self,
+        input_channels:  int,
+        output_channels: int,
+        kernel_size:     int = 3,
+        dilation:        int = 1,
+        activation:      str = "relu",
+        normalization:   str = "batch",
+        bias:            bool = False,
+    ):
+        super().__init__()
+        padding = dilation * (kernel_size - 1) // 2
+        self.layers = nn.Sequential(
+            nn.Conv2d(input_channels, output_channels, kernel_size=kernel_size, padding=padding, dilation=dilation, bias=bias),
+            build_norm2d(normalization, output_channels),
+            build_activation(activation),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.layers(x)
 
 
 class ConvBlock(nn.Module):
@@ -622,3 +652,17 @@ class PatchEmbedding(nn.Module):
 def tokens_to_feature_map(tokens: torch.Tensor, height: int, width: int) -> torch.Tensor:
     batch_size, _, channels = tokens.shape
     return tokens.transpose(1, 2).view(batch_size, channels, height, width)
+
+
+def resize_positional_embedding(embedding: torch.Tensor, grid_size: int, height: int, width: int) -> torch.Tensor:
+    if height == grid_size and width == grid_size:
+        return embedding
+
+    resized = embedding.transpose(1, 2).view(1, -1, grid_size, grid_size)
+    resized = functional.interpolate(
+        input         = resized,
+        size          = (height, width),
+        mode          = "bilinear",
+        align_corners = False,
+    )
+    return resized.flatten(2).transpose(1, 2)

@@ -73,7 +73,22 @@ class FeatureSampler:
 
         return ix // (H * W), (ix // W) % H, ix % W
 
-    def features_at(self, stored: torch.Tensor, b: np.ndarray, i: np.ndarray, j: np.ndarray, H: int, W: int) -> np.ndarray:
+    @staticmethod
+    def is_feature_map(stored: torch.Tensor, B: int, H: int, W: int) -> bool:
+        if stored.ndim != 4:
+            return False
+
+        n, _C, h, w = stored.shape
+
+        if n != B or h > H or w > W:
+            return False
+
+        return H % h == 0 and W % w == 0 and H // h == W // w
+
+    def features_at(self, stored: torch.Tensor, b: np.ndarray, i: np.ndarray, j: np.ndarray, B: int, H: int, W: int) -> np.ndarray:
+        if not self.is_feature_map(stored, B, H, W):
+            raise ValueError(f"Activation of shape {tuple(stored.shape)} is not a (B, C, H, W) map of a {B}x{H}x{W} input; its leading dimension is not the batch or its grid is not a uniform downsample of the input")
+
         maps        = stored.numpy()
         _B, C, h, w = maps.shape
 
@@ -136,16 +151,16 @@ class LayerProbeCore:
 
             for layer in self.layers:
                 tensor = stored.get(layer)
-                if tensor is None or tensor.ndim != 4:
+                if tensor is None or not self.sampler.is_feature_map(tensor, B, H, W):
                     store.pop(layer, None)
                     continue
                 if layer in store:
-                    store[layer].append(self.sampler.features_at(tensor, b, i, j, H, W))
+                    store[layer].append(self.sampler.features_at(tensor, b, i, j, B, H, W))
 
         recorder.detach()
 
         if not store:
-            raise ValueError("No probed layer produced a 4-D feature map; nothing to probe")
+            raise ValueError("No probed layer produced a (B, C, H, W) feature map on the input grid; nothing to probe")
 
         counts = np.concatenate(counts_all)
         mus    = np.concatenate(mus_all)
@@ -259,7 +274,8 @@ class LayerProbeRun:
             ppg               = 3,
             amp_thr           = ParamMatcher.ACTIVE_AMP_THR,
             samples_per_batch = self.config.samples_per_batch,
-            probe             = RidgeProbe(self.config.ridge_lambda, self.config.test_fraction),
+            probe             = RidgeProbe(self.config.ridge_lambda, self.config.test_fraction, self.config.seed),
+            seed              = self.config.seed,
         )
 
         results = core.collect(self._batches(run))

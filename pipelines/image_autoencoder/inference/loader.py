@@ -10,8 +10,8 @@ from configuration.inference.image_autoencoder  import ImageAeInferenceConfig
 from models.image_autoencoder                   import get_image_autoencoder
 from pipelines.backbone.dataset.normalizer      import Normalizer
 from pipelines.backbone.dataset.stats           import Stats
-from pipelines.backbone.inference.loader        import RunLoader
 from pipelines.shared.config.config_persistence import ImageAutoencoderConfigIO
+from pipelines.shared.inference.run_artifacts   import RunArtifactLoader
 from tools.data.regions                         import CropRegion
 
 
@@ -22,17 +22,15 @@ class ImageAeRun:
     embedding_dim               : int
     in_channels                 : int
     normalizer                  : Normalizer
-    dataset                     : object
     loader                      : DataLoader
     split_name                  : str
-    n_patches                   : int
     patch_size                  : Tuple[int, int]
     checkpoint_meta             : dict
     preprocessing_run_directory : Path
     split_region                : CropRegion
 
 
-class ImageAeRunLoader(RunLoader):
+class ImageAeRunLoader(RunArtifactLoader):
     def _read_run_summary(self) -> dict:
         summary = self._read_json("run_summary.json")
 
@@ -75,6 +73,7 @@ class ImageAeRunLoader(RunLoader):
             x_axis         = x_axis,
             n_gaussians    = dataset_config.n_gaussians,
             norm_stats     = norm_stats,
+            load_tomogram  = False,
         )
 
         if dataset.input_channels != int(summary["in_channels"]):
@@ -105,10 +104,8 @@ class ImageAeRunLoader(RunLoader):
             embedding_dim               = embedding_dim,
             in_channels                 = dataset.input_channels,
             normalizer                  = Normalizer(norm_stats),
-            dataset                     = dataset,
             loader                      = loader,
             split_name                  = config.split,
-            n_patches                   = grid.grid.number_of_patches,
             patch_size                  = tuple(dataset_config.patch.size),
             checkpoint_meta             = ckpt_meta,
             preprocessing_run_directory = Path(dataset_config.preprocessing_run_directory),

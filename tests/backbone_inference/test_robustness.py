@@ -58,6 +58,23 @@ def test_drop_curve_degrades_with_more_tracks():
     assert rows[2]["dropped"] == 2
 
 
+def test_drop_curve_evaluates_each_distinct_subset_once():
+    batches, renderer = _batches()
+    calls             = []
+
+    def counting_model(images):
+        calls.append(images)
+        return _model(images)
+
+    core = RobustnessCore(counting_model, renderer)
+    rows = core.drop_curve(batches, [[1], [2]], draws=8)
+
+    assert len(calls) == 4
+
+    assert rows[1]["mse_std"] is not None
+    assert rows[2]["mse_std"] is None
+
+
 def test_track_channels_map_secondaries_and_interferograms():
     input_config = SimpleNamespace(
         use_primary                      = True,

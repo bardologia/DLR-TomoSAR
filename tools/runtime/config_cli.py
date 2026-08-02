@@ -238,10 +238,14 @@ class ConfigCli:
         with open(path, "r", encoding="utf-8") as f:
             mapping = json.load(f)
 
-        known   = {leaf for leaf, _ in cls._leaves(config)}
+        known   = set(cls.to_mapping(config))
         unknown = sorted(key for key in mapping if key not in known)
         if unknown:
             raise KeyError(f"Unknown key(s) in resolved config {path}: {', '.join(unknown)}. Known keys belong to {type(config).__name__}")
+
+        missing = sorted(known - set(mapping))
+        if missing:
+            raise KeyError(f"Resolved config {path} is missing key(s): {', '.join(missing)}. It was written by an older {type(config).__name__}; regenerate the run instead of silently resuming it under today's defaults")
 
         for leaf, current in list(cls._leaves(config)):
             if leaf not in mapping:

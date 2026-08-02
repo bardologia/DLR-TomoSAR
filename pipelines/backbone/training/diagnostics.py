@@ -12,14 +12,15 @@ class ParamSampler:
     MAX_VALUES_PER_BATCH = 2048
     MAX_VALUES_TOTAL     = 200_000
 
-    def __init__(self, params_per_gaussian: int, amp_zero_thr: float):
+    def __init__(self, params_per_gaussian: int):
         self.ppg    = params_per_gaussian
-        self.thr    = amp_zero_thr
+        self.thr    = None
         self.active = False
 
         self._reset_store()
 
-    def begin(self) -> None:
+    def begin(self, amp_zero_thr: float) -> None:
+        self.thr    = amp_zero_thr
         self.active = True
         self._reset_store()
 
@@ -65,16 +66,17 @@ class ParamSampler:
 
 class SlotVitals:
 
-    def __init__(self, params_per_gaussian: int, amp_zero_thr: float, grad_scale: float = 1.0):
+    def __init__(self, params_per_gaussian: int, grad_scale: float = 1.0):
         self.ppg        = params_per_gaussian
-        self.thr        = amp_zero_thr
+        self.thr        = None
         self.grad_scale = float(grad_scale)
         self.active     = False
 
         self._reset_val()
         self._reset_grad()
 
-    def begin(self) -> None:
+    def begin(self, amp_zero_thr: float) -> None:
+        self.thr    = amp_zero_thr
         self.active = True
         self._reset_val()
 

@@ -8,6 +8,9 @@ import pytest
 from tools.sar.geometry_field import GeometryField
 
 
+PYRAT_BEAMFORMING_SIGN = -1.0
+
+
 def _geometry_field(meta_dir) -> GeometryField:
     path = meta_dir / GeometryField.FILENAME
     if not path.exists():
@@ -50,7 +53,11 @@ def _beamform_peaks(interferograms: np.ndarray, kz_secondary: np.ndarray, z: np.
     return z[spectrum.argmax(1)]
 
 
-def _sampled(meta_dir, tomogram_full, interferograms, convention: str, max_pixels: int = 2000):
+def _rayleigh(field: GeometryField, convention: str) -> float:
+    return 2.0 * math.pi / float(np.ptp(field.kz(convention)[:, field.n_azimuth // 2, field.n_range // 2]))
+
+
+def _sampled(meta_dir, tomogram_full, interferograms, convention: str, sign: float = PYRAT_BEAMFORMING_SIGN, max_pixels: int = 2000):
     field  = _geometry_field(meta_dir)
     n_elev = tomogram_full.shape[0]
     z      = _height_axis(n_elev)
@@ -69,15 +76,9 @@ def _sampled(meta_dir, tomogram_full, interferograms, convention: str, max_pixel
     kz_sec = kz[1:, ys, xs]
     ifg    = np.asarray(interferograms[:, az][:, :, rg])[:, ys, xs]
 
-    best_peaks = None
-    best_error = None
-    for sign in (+1.0, -1.0):
-        peaks = _beamform_peaks(ifg, kz_sec, z, sign)
-        error = np.median(np.abs(peaks - reference))
-        if best_error is None or error < best_error:
-            best_error, best_peaks = error, peaks
+    peaks = _beamform_peaks(ifg, kz_sec, z, sign)
 
-    return best_peaks, reference, field, z
+    return peaks, reference, field, z
 
 
 @pytest.mark.real_data
@@ -108,13 +109,29 @@ def test_reference_track_kz_is_zero(meta_dir):
 def test_beamformed_peaks_match_pyrat_tomogram_axis(meta_dir, tomogram_full, interferograms):
     peaks, reference, field, z = _sampled(meta_dir, tomogram_full, interferograms, "height")
 
-    rayleigh = 2.0 * math.pi / float(np.ptp(field.kz("height")[:, field.n_azimuth // 2, field.n_range // 2]))
+    rayleigh = _rayleigh(field, "height")
 
     median_error = float(np.median(np.abs(peaks - reference)))
     within_band  = float((np.abs(peaks - reference) < 3.0).mean())
 
     assert median_error < rayleigh
     assert within_band  > 0.7
+
+
+@pytest.mark.real_data
+@pytest.mark.slow
+def test_flipped_beamforming_sign_misses_the_pyrat_tomogram_axis(meta_dir, tomogram_full, interferograms):
+    aligned, reference, field, _ = _sampled(meta_dir, tomogram_full, interferograms, "height")
+    flipped, _,         _,     _ = _sampled(meta_dir, tomogram_full, interferograms, "height", sign=-PYRAT_BEAMFORMING_SIGN)
+
+    rayleigh = _rayleigh(field, "height")
+
+    aligned_error = float(np.median(np.abs(aligned - reference)))
+    flipped_error = float(np.median(np.abs(flipped - reference)))
+
+    assert aligned_error < rayleigh
+    assert flipped_error > rayleigh
+    assert flipped_error > 3.0 * aligned_error
 
 
 @pytest.mark.real_data

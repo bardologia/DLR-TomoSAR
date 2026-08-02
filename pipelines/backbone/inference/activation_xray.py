@@ -11,6 +11,7 @@ from tools.data.io                               import FileIO
 from tools.diagnostics.activation_recorder       import ActivationRecorder, LayerActivationStats
 from tools.diagnostics.activation_xray_analysis  import ActivationIssueDetector, ActivationXraySummarizer
 from tools.diagnostics.activation_xray_plots     import ActivationXrayPlots
+from tools.diagnostics.weight_xray_analysis      import SEVERITY_RANK
 from tools.reporting.markdown                    import MarkdownDoc, MarkdownTable
 from tools.reporting.plotting                    import PlotBase
 from tools.runtime.run_selector                  import RunSelector
@@ -59,7 +60,9 @@ class ActivationXrayRun:
             "max_abs_by_depth"       : plots.max_abs_by_depth(ordered_stats, self.output_dir / "plots" / "max_abs_by_depth.png"),
         }
 
-        for report in flagged[: self.config.max_layer_histograms]:
+        by_severity = sorted(flagged, key=lambda report: -SEVERITY_RANK[report.severity])
+
+        for report in by_severity[: self.config.max_layer_histograms]:
             safe_name = report.name.replace(".", "_")
             figures[f"hist_{safe_name}"] = plots.layer_histogram(report.stats, LayerActivationStats.HIST_EDGES, self.output_dir / "plots" / "histograms" / f"{safe_name}.png")
 

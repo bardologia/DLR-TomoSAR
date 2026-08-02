@@ -49,12 +49,7 @@ class ChannelOrder:
 
 @dataclass
 class FitSettings:
-    max_fit_iterations : int       = 5000
-    fit_config         : FitConfig = field(default_factory=FitConfig)
-
-    @property
-    def parameters_per_profile(self) -> int:
-        return 3 * self.fit_config.k_max
+    fit_config : FitConfig = field(default_factory=FitConfig)
 
     @property
     def free_parameters(self) -> Tuple[str, ...]:

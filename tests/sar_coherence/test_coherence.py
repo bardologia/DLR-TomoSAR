@@ -36,15 +36,6 @@ def test_smooth_complex_filters_real_and_imag_separately(slc):
     assert np.allclose(smoothed.imag, smoother.smooth(slc.imag.copy()))
 
 
-def test_smooth_phase_handles_wrapping():
-    phase    = np.full((16, 16), np.pi - 0.05)
-    phase[:, ::2] = -np.pi + 0.05
-
-    smoothed = ComplexSmoother((3, 3)).smooth_phase(phase)
-
-    assert np.abs(np.abs(smoothed) - np.pi).max() < 0.1
-
-
 def test_identical_slcs_give_unit_coherence_zero_phase(slc):
     magnitude, phase = CoherenceEstimator((7, 7)).estimate(slc, slc)
 

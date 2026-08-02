@@ -19,7 +19,7 @@ class ConvNeXt2dImageEncoder(nn.Module):
 
         self.stem  = nn.Conv2d(config.in_channels, config.base_channels, kernel_size=3, padding=1)
         self.start = nn.Sequential(*[
-            ConvNeXtBlock(config.base_channels, FFN_RATIO, config.dropout, config.activation, LAYER_SCALE_INIT)
+            ConvNeXtBlock(config.base_channels, FFN_RATIO, config.stochastic_depth_rate, config.activation, LAYER_SCALE_INIT)
             for _ in range(max(1, config.depth))
         ])
 
@@ -30,7 +30,7 @@ class ConvNeXt2dImageEncoder(nn.Module):
             downs.append(ChannelLayerNorm(channels))
             downs.append(nn.Conv2d(channels, nxt, kernel_size=2, stride=2))
             for _ in range(max(1, config.depth)):
-                downs.append(ConvNeXtBlock(nxt, FFN_RATIO, config.dropout, config.activation, LAYER_SCALE_INIT))
+                downs.append(ConvNeXtBlock(nxt, FFN_RATIO, config.stochastic_depth_rate, config.activation, LAYER_SCALE_INIT))
             channels = nxt
         self.downsample = nn.Sequential(*downs)
 
@@ -57,13 +57,13 @@ class ConvNeXt2dImageDecoder(nn.Module):
             nxt = channels // 2
             ups.append(build_upsample(config.upsample_mode, channels, nxt, scale_factor=2))
             for _ in range(max(1, config.depth)):
-                ups.append(ConvNeXtBlock(nxt, FFN_RATIO, config.dropout, config.activation, LAYER_SCALE_INIT))
+                ups.append(ConvNeXtBlock(nxt, FFN_RATIO, config.stochastic_depth_rate, config.activation, LAYER_SCALE_INIT))
             channels = nxt
         self.upsample = nn.Sequential(*ups)
 
         refine = []
         for _ in range(max(0, config.depth - 1)):
-            refine.append(ConvNeXtBlock(channels, FFN_RATIO, config.dropout, config.activation, LAYER_SCALE_INIT))
+            refine.append(ConvNeXtBlock(channels, FFN_RATIO, config.stochastic_depth_rate, config.activation, LAYER_SCALE_INIT))
         self.refine = nn.Sequential(*refine)
 
         self.head = nn.Conv2d(channels, config.in_channels, kernel_size=1)
@@ -80,6 +80,8 @@ class ConvNeXt2dImageAutoencoder(ImageAutoencoderBase):
         config = config if config is not None else ConvNeXt2dImageAutoencoderConfig()
         if config.normalization != "layernorm":
             raise ValueError(f"convnext2d_ae hardcodes LayerNorm and does not honor normalization='{config.normalization}'; leave the field at 'layernorm'.")
+        if config.dropout != 0.0:
+            raise ValueError(f"convnext2d_ae has no dropout layers and regularizes through stochastic_depth_rate; leave dropout at 0.0 (got {config.dropout}).")
 
         encoder = ConvNeXt2dImageEncoder(config)
         decoder = ConvNeXt2dImageDecoder(config, encoder.bottleneck_channels)

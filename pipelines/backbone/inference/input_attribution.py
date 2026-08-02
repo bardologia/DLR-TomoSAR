@@ -223,7 +223,7 @@ class InputAttributionRun:
         doc.paragraph(
             f"Gradient attribution on {self.config.n_azimuth_probes * self.config.n_range_probes} probe windows of the '{self.config.split}' split: "
             "the share of |∂ output / ∂ input| falling on each input channel, per output family. "
-            "Occlusion, when computed, is the mean shift of the predicted profile when one normalized channel is zeroed (its mean)."
+            "Occlusion, when computed, is the mean shift of the predicted profile when one channel is zeroed in normalized units, which puts it at that channel's normalization location: the median of the log1p values for the amplitude channels, zero phase for the interferogram phase channels, the mean only for z-scored channels."
         )
 
         header = ("Channel", "amp", "mu", "sigma") + (("occlusion MSE",) if occlusion is not None else ())

@@ -109,10 +109,11 @@ class WindowMetrics:
     def _chunk_maps(self, amp: np.ndarray) -> tuple:
         contrast, peak = ContrastEstimator.contrast_from_amplitude(amp, self.FLOOR_FRACTION)
 
-        middle  = amp[1:-1]
-        is_peak = (middle > amp[:-2]) & (middle >= amp[2:]) & (middle > self.SPURIOUS_FRACTION * peak[None, :, :])
+        middle   = amp[1:-1]
+        is_peak  = (middle > amp[:-2]) & (middle >= amp[2:]) & (middle > self.SPURIOUS_FRACTION * peak[None, :, :])
+        dominant = np.arange(1, amp.shape[0] - 1, dtype=np.int64)[:, None, None] == amp.argmax(axis=0)[None, :, :]
 
-        return contrast, peak, is_peak.sum(axis=0).astype(np.float32)
+        return contrast, peak, (is_peak & ~dominant).sum(axis=0).astype(np.float32)
 
     def _summarise(self, contrast: np.ndarray, peak_map: np.ndarray, spurious_map: np.ndarray) -> dict:
         valid = np.isfinite(contrast)

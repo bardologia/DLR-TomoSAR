@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 import sys
 from pathlib import Path
 
@@ -56,8 +57,10 @@ class RobustnessCore:
                 rows.append({"dropped": 0, "mse": self._mse(batches, lambda images: images)})
                 continue
 
-            values = []
-            for _draw in range(draws):
+            n_draws = min(draws, math.comb(n_tracks, n_dropped))
+            values  = []
+
+            for _draw in range(n_draws):
                 chosen   = self.rng.choice(n_tracks, size=n_dropped, replace=False)
                 channels = [index for track in chosen for index in per_track[track]]
 
@@ -68,7 +71,7 @@ class RobustnessCore:
 
                 values.append(self._mse(batches, transform))
 
-            rows.append({"dropped": n_dropped, "mse": float(np.mean(values)), "mse_std": float(np.std(values))})
+            rows.append({"dropped": n_dropped, "mse": float(np.mean(values)), "mse_std": float(np.std(values)) if n_draws > 1 else None})
 
         return rows
 
@@ -149,7 +152,7 @@ class RobustnessRun:
         doc.paragraph(
             f"Curve-MSE degradation on {self.config.max_batches} '{self.config.split}' batches under two controlled stresses: "
             "gaussian noise added to the normalized inputs, and whole tracks zeroed (their secondary and interferogram channels), "
-            f"averaged over {self.config.draws_per_count} random track subsets per count."
+            f"averaged over up to {self.config.draws_per_count} random track subsets per count, capped at the number of distinct subsets that exist; counts with a single possible subset report no spread."
         )
 
         noise_table = MarkdownTable(("Noise sigma", "Curve MSE"))
@@ -159,7 +162,8 @@ class RobustnessRun:
 
         drop_table = MarkdownTable(("Tracks dropped", "Curve MSE", "± across draws"))
         for row in drop_rows:
-            drop_table.add_row(str(row["dropped"]), f"{row['mse']:.4g}", f"{row.get('mse_std', 0.0):.2g}")
+            spread = row.get("mse_std")
+            drop_table.add_row(str(row["dropped"]), f"{row['mse']:.4g}", f"{spread:.2g}" if spread is not None else "n/a")
         doc.table(drop_table)
 
         for name, path in figures.items():

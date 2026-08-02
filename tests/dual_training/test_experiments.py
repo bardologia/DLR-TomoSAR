@@ -537,7 +537,7 @@ def test_dual_reach_planner_counts_whole_dual_models_and_emits_trunk_settings():
     ]
     trials = ReachTrialsConfig(rungs=rungs, match_tolerance=10.0)
 
-    planner = DualReachTrialPlanner(trials, ("local_cnn", "unet"), 9, "dual_resunet", (tuple(range(9)), tuple(range(9))))
+    planner = DualReachTrialPlanner(trials, ("local_cnn", "unet"), 9, 6, "dual_resunet", (tuple(range(9)), tuple(range(9))))
 
     assert set(planner.parameter_counts) == {"cnn", "unet"}
     assert all(count > 0 for count in planner.parameter_counts.values())
@@ -553,7 +553,7 @@ def test_dual_reach_planner_counts_whole_dual_models_and_emits_trunk_settings():
 
 def test_dual_reach_default_rungs_hold_the_capacity_match():
     config  = DualEntryConfig()
-    planner = DualReachTrialPlanner(config.reach_trials, ("local_cnn", "unet"), 9, "dual_resunet", (tuple(range(9)), tuple(range(9))))
+    planner = DualReachTrialPlanner(config.reach_trials, ("local_cnn", "unet"), 9, 6, "dual_resunet", (tuple(range(9)), tuple(range(9))))
 
     assert set(planner.parameter_counts) == {"cnn33", "unet"}
 

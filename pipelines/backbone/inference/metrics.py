@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import os
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from collections        import deque
+from concurrent.futures import ProcessPoolExecutor
 from dataclasses        import dataclass
 from pathlib            import Path
 from typing             import Dict, Optional, Tuple
@@ -68,6 +69,8 @@ class Metrics:
         self.n_gaussians = n_gaussians
         self.x_step      = float(x_axis[1] - x_axis[0])
         self.num_workers = min(os.cpu_count() or 1, 16)
+        self._assignment = None
+        self._aligned    = None
 
     @staticmethod
     def curve_pixel_metrics(pred: np.ndarray, ref: np.ndarray) -> Dict[str, np.ndarray]:
@@ -182,41 +185,45 @@ class Metrics:
         return out
 
     def _slice_ssim(self, pred : np.ndarray, ref : np.ndarray, elev_indices : Optional[np.ndarray], range_indices : Optional[np.ndarray], az_indices : Optional[np.ndarray], prefix : str) -> Dict[str, float]:
-        out   : Dict[str, float]                         = {}
-        tasks : list[tuple[str, np.ndarray, np.ndarray]] = []
+        out   : Dict[str, float]                = {}
+        specs : list[tuple[str, str, int, int]] = []
 
-        self._enqueue_tasks(tasks, pred, ref, prefix, elev_indices,  axis=0, label="elev")
-        self._enqueue_tasks(tasks, pred, ref, prefix, range_indices, axis=2, label="range")
-        self._enqueue_tasks(tasks, pred, ref, prefix, az_indices,    axis=1, label="azimuth")
+        self._enqueue_specs(specs, prefix, elev_indices,  axis=0, label="elev")
+        self._enqueue_specs(specs, prefix, range_indices, axis=2, label="range")
+        self._enqueue_specs(specs, prefix, az_indices,    axis=1, label="azimuth")
 
-        if not tasks:
+        if not specs:
             return out
 
-        worker_args = [(key, p, r) for key, _label, p, r in tasks]
-        n_workers   = min(self.num_workers, len(worker_args))
+        n_workers = min(self.num_workers, len(specs))
+        in_flight = 2 * n_workers
 
         with ProcessPoolExecutor(max_workers=n_workers) as pool:
-            futures = {pool.submit(Metrics._ssim_worker, arg): arg[0] for arg in worker_args}
-            with tqdm(total=len(futures), desc=f"SSIM ({prefix})", unit="slice", leave=False) as pbar:
-                for fut in as_completed(futures):
-                    key, value = fut.result()
+            pending  : deque = deque()
+            submitted        = 0
+
+            with tqdm(total=len(specs), desc=f"SSIM ({prefix})", unit="slice", leave=False) as pbar:
+                for _ in range(len(specs)):
+                    while submitted < len(specs) and len(pending) < in_flight:
+                        key, _label, axis, index = specs[submitted]
+                        pending.append(pool.submit(Metrics._ssim_worker, (key, self._axis_slice(pred, axis, index), self._axis_slice(ref, axis, index))))
+                        submitted += 1
+
+                    key, value = pending.popleft().result()
                     out[key]   = value
                     pbar.update(1)
 
-        labels_seen = {t[1] for t in tasks}
-        for label in labels_seen:
-            vals = [v for (key, lbl, _, _) in tasks if lbl == label and np.isfinite(v := out.get(key, float("nan")))]
+        for label in {spec[1] for spec in specs}:
+            vals = [out[key] for key, lbl, _axis, _index in specs if lbl == label and np.isfinite(out[key])]
             out[f"ssim_{prefix}_{label}_mean"] = float(np.mean(vals)) if vals else float("nan")
 
         return out
 
     @staticmethod
-    def _enqueue_tasks(
-        tasks  : list,
-        pred   : np.ndarray,
-        ref    : np.ndarray,
+    def _enqueue_specs(
+        specs  : list,
         prefix : str,
-        indices: np.ndarray,
+        indices: Optional[np.ndarray],
         axis   : int,
         label  : str,
     ) -> None:
@@ -225,18 +232,23 @@ class Metrics:
             return
 
         for i, idx in enumerate(indices):
-            if axis == 0:
-                p_sl, r_sl = pred[idx, :, :], ref[idx, :, :]
-            elif axis == 1:
-                p_sl, r_sl = pred[:, idx, :], ref[:, idx, :]
-            else:
-                p_sl, r_sl = pred[:, :, idx], ref[:, :, idx]
+            specs.append((f"ssim_{prefix}_{label}_{i}", label, axis, int(idx)))
 
-            tasks.append((f"ssim_{prefix}_{label}_{i}", label, p_sl.astype(np.float64), r_sl.astype(np.float64)))
+    @staticmethod
+    def _axis_slice(cube: np.ndarray, axis: int, index: int) -> np.ndarray:
+        if axis == 0:
+            return cube[index, :, :]
+        if axis == 1:
+            return cube[:, index, :]
+
+        return cube[:, :, index]
 
     @staticmethod
     def _ssim_worker(args: tuple) -> tuple[str, float]:
         key, pred_slice, ref_slice = args
+
+        pred_slice = pred_slice.astype(np.float64)
+        ref_slice  = ref_slice.astype(np.float64)
         data_range = float(ref_slice.max() - ref_slice.min())
         min_side   = min(pred_slice.shape)
         win_size   = min(7, min_side if min_side % 2 == 1 else min_side - 1)
@@ -276,11 +288,23 @@ class Metrics:
             f"elev_ce_{suffix}"   : ce_gt,
         }
 
+    def _param_assignment(self) -> np.ndarray:
+        if self._assignment is None:
+            self._assignment = GaussianMatcher().assignment(self.result.params_pred, self.result.params_gt, self.n_gaussians)
+
+        return self._assignment
+
+    def _aligned_prediction(self) -> np.ndarray:
+        if self._aligned is None:
+            self._aligned = GaussianMatcher().aligned_prediction(self.result.params_pred, self.result.params_gt, self.n_gaussians, assignment=self._param_assignment())
+
+        return self._aligned
+
     def _active_count_stats(self) -> Dict[str, float]:
         pp      = self.result.params_pred
         pg      = self.result.params_gt
         n_K     = self.n_gaussians
-        aligned = GaussianMatcher().aligned_prediction(pp, pg, n_K)
+        aligned = self._aligned_prediction()
         out: Dict[str, float] = {}
 
         H, W       = pg.shape[-2:]
@@ -288,9 +312,9 @@ class Metrics:
         pred_count = np.zeros((H, W), dtype=np.int32)
 
         for k in range(n_K):
-            gt_active      = pg[3 * k]      > ParamMatcher.ACTIVE_AMP_THR
-            pred_active    = pp[3 * k]      > ParamMatcher.ACTIVE_AMP_THR
-            aligned_active = aligned[3 * k] > ParamMatcher.ACTIVE_AMP_THR
+            gt_active      = ParamMatcher.is_active(pg     [3 * k])
+            pred_active    = ParamMatcher.is_active(pp     [3 * k])
+            aligned_active = ParamMatcher.is_active(aligned[3 * k])
 
             out[f"slot_{k}_active_gt_frac"]   = float(gt_active.mean())
             out[f"slot_{k}_active_pred_frac"] = float(aligned_active.mean())
@@ -323,16 +347,15 @@ class Metrics:
         return out
 
     def _param_population_stats(self) -> Dict[str, float]:
-        pp      = self.result.params_pred
         pg      = self.result.params_gt
         n_K     = self.n_gaussians
-        aligned = GaussianMatcher().aligned_prediction(pp, pg, n_K)
+        aligned = self._aligned_prediction()
         out: Dict[str, float] = {}
 
         for k in range(n_K):
             gt_amp   = pg[3 * k].reshape(-1)
             finite   = np.isfinite(gt_amp)
-            active   = finite & (gt_amp > ParamMatcher.ACTIVE_AMP_THR)
+            active   = finite & ParamMatcher.is_active(gt_amp)
             inactive = finite & ~active
             scopes   = (("active", active), ("inactive", inactive), ("global", finite))
 
@@ -340,21 +363,31 @@ class Metrics:
                 ch        = 3 * k + j
                 gt_flat   = pg     [ch].reshape(-1)
                 pred_flat = aligned[ch].reshape(-1)
+                gt_scopes = scopes if param == "amp" else (("active", active),)
+
+                for scope, mask in gt_scopes:
+                    out.update(self._population_moments(f"slot_{k}_{param}_{scope}_gt", gt_flat, mask))
 
                 for scope, mask in scopes:
-                    for source, values in (("gt", gt_flat), ("pred", pred_flat)):
-                        vals = values[mask & np.isfinite(values)]
-                        out[f"slot_{k}_{param}_{scope}_{source}_mean"] = float(vals.mean(dtype=np.float64)) if vals.size else float("nan")
-                        out[f"slot_{k}_{param}_{scope}_{source}_std"]  = float(vals.std(dtype=np.float64))  if vals.size else float("nan")
+                    out.update(self._population_moments(f"slot_{k}_{param}_{scope}_pred", pred_flat, mask))
 
         return out
+
+    @staticmethod
+    def _population_moments(prefix: str, values: np.ndarray, mask: np.ndarray) -> Dict[str, float]:
+        vals = values[mask & np.isfinite(values)]
+
+        return {
+            f"{prefix}_mean" : float(vals.mean(dtype=np.float64)) if vals.size else float("nan"),
+            f"{prefix}_std"  : float(vals.std(dtype=np.float64))  if vals.size else float("nan"),
+        }
 
     def _matched_gaussian_metrics(self, match_tol: float = 5.0) -> Dict[str, float]:
         pp  = self.result.params_pred
         pg  = self.result.params_gt
         n_K = self.n_gaussians
 
-        sel = GaussianMatcher().assignment(pp, pg, n_K)
+        sel = self._param_assignment()
 
         amp_pred = np.stack([pp[3 * k]     for k in range(n_K)], axis=0).reshape(n_K, -1)
         mu_pred  = np.stack([pp[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)
@@ -363,8 +396,8 @@ class Metrics:
         mu_gt    = np.stack([pg[3 * k + 1] for k in range(n_K)], axis=0).reshape(n_K, -1)
         sig_gt   = np.stack([pg[3 * k + 2] for k in range(n_K)], axis=0).reshape(n_K, -1)
 
-        act_pred = amp_pred > ParamMatcher.ACTIVE_AMP_THR
-        act_gt   = amp_gt   > ParamMatcher.ACTIVE_AMP_THR
+        act_pred = ParamMatcher.is_active(amp_pred)
+        act_gt   = ParamMatcher.is_active(amp_gt)
         gt_count = act_gt.sum(axis=0).astype(np.int64)
 
         n_buckets        = n_K + 1
@@ -458,7 +491,7 @@ class Metrics:
         out["slot_mu_rank_diag"] = SlotOrganization.diagonality(rank_counts)
 
         if pg is not None:
-            assign_counts = SlotOrganization.assignment_matrix(pp, pg, n_K)
+            assign_counts = SlotOrganization.assignment_matrix(pp, pg, n_K, assignment=self._param_assignment())
             out["slot_gt_alignment"] = SlotOrganization.diagonality(assign_counts)
 
         return out

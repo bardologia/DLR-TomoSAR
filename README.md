@@ -128,9 +128,10 @@ With real data present, the order is:
    dispatches `generate_interferograms.py` and `generate_tomogram.py` into a second
    conda environment, `--tomogram_env_name`, default `stetools`. That second env is the
    one carrying PyRAT and its GDAL stack; the checkout path itself is
-   `PathConfig.pyrat_directory` in `configuration/sar/processing_config.py`. On the DLR
-   server `stetools` already exists. Anywhere else you have to build it yourself around
-   your own PyRAT checkout.
+   `PathConfig.pyrat_directory` in `configuration/sar/processing_config.py`. It also
+   carries `STEtools`, which `tools/baselines/reading.py` imports to read the DLR
+   reference products. On the DLR server `stetools` already exists. Anywhere else you
+   have to build it yourself around your own PyRAT and STEtools checkouts.
 2. `main/processing/extract_params.py` runs the GPU Gaussian fit over every profile and
    writes `parameters.npy` together with `param_extraction_meta.json` beside it.
    Downstream code reads `k_max` and the preprocessing constants from that meta file and

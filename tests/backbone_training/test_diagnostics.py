@@ -25,11 +25,11 @@ def _phys_params(batch=2, n_gaussians=2, hw=5, seed=0):
 
 
 def test_sampler_inactive_until_begin():
-    sampler = ParamSampler(params_per_gaussian=3, amp_zero_thr=1e-3)
+    sampler = ParamSampler(params_per_gaussian=3)
 
     assert sampler.active is False
 
-    sampler.begin()
+    sampler.begin(1e-3)
     assert sampler.active is True
 
     sampler.end()
@@ -37,8 +37,8 @@ def test_sampler_inactive_until_begin():
 
 
 def test_sampler_collects_active_values_per_param():
-    sampler = ParamSampler(params_per_gaussian=3, amp_zero_thr=1e-3)
-    sampler.begin()
+    sampler = ParamSampler(params_per_gaussian=3)
+    sampler.begin(1e-3)
     sampler.observe(_phys_params())
 
     hists = sampler.histograms()
@@ -49,12 +49,12 @@ def test_sampler_collects_active_values_per_param():
 
 
 def test_sampler_masks_inactive_slots():
-    sampler = ParamSampler(params_per_gaussian=3, amp_zero_thr=1e-3)
+    sampler = ParamSampler(params_per_gaussian=3)
     params  = _phys_params()
 
     params[:, 0:3] = 0.0
 
-    sampler.begin()
+    sampler.begin(1e-3)
     sampler.observe(params)
 
     hists = sampler.histograms()
@@ -63,17 +63,17 @@ def test_sampler_masks_inactive_slots():
 
 
 def test_sampler_empty_when_all_slots_inactive():
-    sampler = ParamSampler(params_per_gaussian=3, amp_zero_thr=1e-3)
+    sampler = ParamSampler(params_per_gaussian=3)
 
-    sampler.begin()
+    sampler.begin(1e-3)
     sampler.observe(torch.zeros(2, 6, 5, 5))
 
     assert sampler.histograms() == {}
 
 
 def test_sampler_subsamples_to_batch_cap():
-    sampler = ParamSampler(params_per_gaussian=3, amp_zero_thr=1e-3)
-    sampler.begin()
+    sampler = ParamSampler(params_per_gaussian=3)
+    sampler.begin(1e-3)
     sampler.observe(_phys_params(batch=4, n_gaussians=2, hw=32))
 
     hists = sampler.histograms()
@@ -82,8 +82,8 @@ def test_sampler_subsamples_to_batch_cap():
 
 
 def test_sampler_stops_at_total_cap():
-    sampler = ParamSampler(params_per_gaussian=3, amp_zero_thr=1e-3)
-    sampler.begin()
+    sampler = ParamSampler(params_per_gaussian=3)
+    sampler.begin(1e-3)
 
     n_batches = ParamSampler.MAX_VALUES_TOTAL // ParamSampler.MAX_VALUES_PER_BATCH + 2
     for i in range(n_batches):
@@ -95,8 +95,8 @@ def test_sampler_stops_at_total_cap():
 
 
 def test_sampler_end_clears_store():
-    sampler = ParamSampler(params_per_gaussian=3, amp_zero_thr=1e-3)
-    sampler.begin()
+    sampler = ParamSampler(params_per_gaussian=3)
+    sampler.begin(1e-3)
     sampler.observe(_phys_params())
     sampler.end()
 
@@ -104,7 +104,7 @@ def test_sampler_end_clears_store():
 
 
 def test_loss_feeds_active_sampler():
-    sampler = ParamSampler(params_per_gaussian=3, amp_zero_thr=1e-3)
+    sampler = ParamSampler(params_per_gaussian=3)
     loss    = build_loss(n_gaussians=2, sampler=sampler)
     pred    = valid_param_tensor(2, 2, 5, 5, seed=1)
     gt      = valid_param_tensor(2, 2, 5, 5, seed=2)
@@ -112,7 +112,7 @@ def test_loss_feeds_active_sampler():
     loss(pred, gt)
     assert sampler.histograms() == {}
 
-    sampler.begin()
+    sampler.begin(1e-3)
     loss(pred, gt)
     assert set(sampler.histograms().keys()) == {"amp", "mu_m", "sigma_m"}
 
@@ -266,7 +266,7 @@ def test_figures_disable_when_no_category_matches():
 
 
 def _vitals(n_k: int = 2) -> "SlotVitals":
-    return SlotVitals(params_per_gaussian=3, amp_zero_thr=1e-3)
+    return SlotVitals(params_per_gaussian=3)
 
 
 def _phys(amps: list[float], H: int = 2, W: int = 2) -> torch.Tensor:
@@ -290,7 +290,7 @@ def test_slot_vitals_inactive_until_begin():
 
 def test_slot_vitals_active_fractions_and_amp_means():
     vitals = _vitals()
-    vitals.begin()
+    vitals.begin(1e-3)
     vitals.observe(_phys([2.0, 0.0]))
 
     scalars = vitals.scalars()
@@ -303,11 +303,11 @@ def test_slot_vitals_active_fractions_and_amp_means():
 
 def test_slot_vitals_entropy_is_low_when_one_slot_dominates():
     balanced = _vitals()
-    balanced.begin()
+    balanced.begin(1e-3)
     balanced.observe(_phys([1.0, 1.0]))
 
     collapsed = _vitals()
-    collapsed.begin()
+    collapsed.begin(1e-3)
     collapsed.observe(_phys([1.0, 0.0]))
 
     assert balanced.scalars()["slot_vitals/usage_entropy"]  == pytest.approx(1.0)
@@ -332,7 +332,7 @@ def test_slot_vitals_accumulates_gradient_norms_per_slot():
 
 def test_slot_vitals_end_resets_validation_state():
     vitals = _vitals()
-    vitals.begin()
+    vitals.begin(1e-3)
     vitals.observe(_phys([1.0, 1.0]))
     vitals.end()
 

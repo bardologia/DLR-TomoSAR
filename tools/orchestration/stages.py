@@ -154,9 +154,6 @@ class QueuedInferenceStage(QueuedStage):
             "GPUs"  : self.config.gpus,
         }
 
-    def _include_item(self, item: str) -> bool:
-        return True
-
     def _training_complete(self, item: str) -> bool:
         return CompletionMarker.is_complete(self.stage_dir / item)
 
@@ -168,7 +165,9 @@ class QueuedInferenceStage(QueuedStage):
         if not inference_dir.is_dir():
             return False
 
-        return any(CompletionMarker.is_complete(candidate) for candidate in inference_dir.iterdir() if candidate.is_dir())
+        completed = [candidate for candidate in inference_dir.iterdir() if candidate.is_dir() and CompletionMarker.is_complete(candidate)]
+
+        return any(CompletionMarker.payload(candidate)["split"] == self.config.inference.split for candidate in completed)
 
     def _purge_unfinished(self, item: str) -> None:
         inference_dir = self.stage_dir / item / "inference"
@@ -208,10 +207,9 @@ class QueuedInferenceStage(QueuedStage):
         self.logger.section("Batch inference")
         self.logger.kv_table(self._config_kv(), title="Configuration")
 
-        eligible = [item for item in self.items if self._include_item(item)]
-        skipped  = [item for item in eligible if not self._training_complete(item)]
-        cached   = [item for item in eligible if item not in skipped and self._has_inference(item)]
-        pending  = [item for item in eligible if item not in skipped and item not in cached]
+        skipped = [item for item in self.items if not self._training_complete(item)]
+        cached  = [item for item in self.items if item not in skipped and self._has_inference(item)]
+        pending = [item for item in self.items if item not in skipped and item not in cached]
 
         for item in skipped:
             self.logger.warning(f"{item}: training incomplete, inference skipped")
@@ -227,7 +225,7 @@ class QueuedInferenceStage(QueuedStage):
             ran = self._run_queue([self._job(item) for item in pending])
 
         results = ran + [self._static_result(item, "DONE") for item in cached] + [self._static_result(item, "SKIPPED") for item in skipped]
-        results = self._order_results(results, eligible)
+        results = self._order_results(results, self.items)
 
         self._write_results(results, self.results_path)
         self._log_summary(results)

@@ -392,12 +392,13 @@ class ReachTrialPlanner:
 
     RESERVED_KEYS = ("label", "backbone")
 
-    def __init__(self, trials, registry_names: tuple, head: str, expected_in_channels: int) -> None:
+    def __init__(self, trials, registry_names: tuple, head: str, expected_in_channels: int, out_channels: int) -> None:
         self.trials               = trials
         self.rungs                = [dict(rung) for rung in trials.rungs if isinstance(rung, dict)]
         self.registry_names       = tuple(registry_names)
         self.head                 = head
         self.expected_in_channels = expected_in_channels
+        self.out_channels         = out_channels
 
         self._validate()
 
@@ -436,12 +437,15 @@ class ReachTrialPlanner:
         if self.trials.in_channels != self.expected_in_channels:
             raise ValueError(f"reach_trials.in_channels={self.trials.in_channels} but the input configuration yields {self.expected_in_channels} channels; training builds every arm at the dataset width, so the capacity check would count the wrong first layer")
 
+        if self.out_channels < 1:
+            raise ValueError(f"reach_trials capacity check needs the resolved output width, got out_channels={self.out_channels}; training builds every arm at the dataset Gaussian count, so the capacity check would count the wrong output stage")
+
     def _overrides(self, rung: dict) -> dict:
         return {key: value for key, value in rung.items() if key not in self.RESERVED_KEYS}
 
     def _parameters(self, rung: dict) -> int:
         sizing   = ModelBuilder.image_size_override(rung["backbone"], self.trials.patch_size)
-        model, _ = get_backbone(rung["backbone"], in_channels=self.trials.in_channels, head=self.head, **sizing, **self._overrides(rung))
+        model, _ = get_backbone(rung["backbone"], in_channels=self.trials.in_channels, out_channels=self.out_channels, head=self.head, **sizing, **self._overrides(rung))
 
         return sum(parameter.numel() for parameter in model.parameters())
 
@@ -451,7 +455,7 @@ class ReachTrialPlanner:
 
         if deviation > self.trials.match_tolerance:
             counts = {label: f"{count:,}" for label, count in self.parameter_counts.items()}
-            raise ValueError(f"reach_trials arms differ by {100 * deviation:.2f} % in parameter count ({counts}) at head '{self.head}', exceeding the {100 * self.trials.match_tolerance:.1f} % match tolerance; the comparison only isolates architecture from capacity when the arms are size matched, so retune the rung widths")
+            raise ValueError(f"reach_trials arms differ by {100 * deviation:.2f} % in parameter count ({counts}) at head '{self.head}' with {self.out_channels} output channels, exceeding the {100 * self.trials.match_tolerance:.1f} % match tolerance; the comparison only isolates architecture from capacity when the arms are size matched, so retune the rung widths")
 
     def _settings(self, rung: dict) -> dict:
         overrides = self._overrides(rung)
@@ -470,6 +474,7 @@ class ReachTrialPlanner:
         return {
             "Rungs"      : [f"{rung['label']}:{rung['backbone']}" for rung in self.rungs],
             "Parameters" : {label: f"{count:,}" for label, count in self.parameter_counts.items()},
+            "Counted at" : f"head '{self.head}', {self.trials.in_channels} in / {self.out_channels} out channels",
             "Patch"      : f"{tuple(self.trials.patch_size)} stride {tuple(self.trials.patch_stride)}",
             "Total runs" : len(self.rungs),
         }

@@ -45,21 +45,25 @@ def main() -> None:
         logger.subsection(f"[Session {index + 1}/{len(config.win_list)}] {dataset_name} queued with filter arguments {filter_arguments}")
 
         tomogram_config = TomogramConfig(
-            fusar_project_path = config.fusar_project_path,
-            base_directory     = config.base_directory,
-            track_selection    = config.track_selection,
-            polarisation       = config.polarisation,
-            beamforming_method = config.beamforming_method,
-            filter_method      = config.filter_method,
-            filter_arguments   = filter_arguments,
-            height_range       = tuple(config.height_range),
+            fusar_project_path     = config.fusar_project_path,
+            base_directory         = config.base_directory,
+            track_selection        = config.track_selection,
+            polarisation           = config.polarisation,
+            beamforming_method     = config.beamforming_method,
+            filter_method          = config.filter_method,
+            filter_arguments       = filter_arguments,
+            height_range           = tuple(config.height_range),
+            max_crop_azimuth_width = config.max_crop_azimuth_width,
+            apply_resampling       = config.apply_resampling,
+            apply_presumming       = config.apply_presumming,
+            max_amplitude_clip     = config.max_amplitude_clip,
         )
 
         processing_config = ProcessingConfig(
             crop            = global_crop,
             tomogram_config = tomogram_config,
 
-            parallel = ParallelConfig(effort=config.effort),
+            parallel = ParallelConfig(effort=config.effort, tomogram_workers=config.tomogram_workers, pyrat_threads=config.pyrat_threads),
 
             paths                = PathConfig(run_subdirectory=dataset_name),
             dataset_type         = config.dataset_type,

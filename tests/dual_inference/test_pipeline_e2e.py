@@ -153,15 +153,13 @@ def test_dual_training_rejects_a_dem_bearing_input_stack(test_data_dir, params_d
     dataset_config                      = _dataset_config(test_data_dir, params_dir)
     dataset_config.input_config.use_dem = True
 
-    pipeline = DualTrainingPipeline(
-        trainer_config = _trainer_config(test_data_dir, params_dir, tmp_path),
-        dataset_config = dataset_config,
-        backbone_name  = "dual_resunet",
-        model_config   = _model_config(),
-        seed           = 0,
-        run_name       = "e2e_dual_dem",
-        overfit_check  = OverfitCheckConfig(enabled=False),
-    )
-
     with pytest.raises(ValueError, match="never uses the DEM"):
-        pipeline._model_overrides(in_channels=6, out_channels=3 * N_GAUSSIANS)
+        DualTrainingPipeline(
+            trainer_config = _trainer_config(test_data_dir, params_dir, tmp_path),
+            dataset_config = dataset_config,
+            backbone_name  = "dual_resunet",
+            model_config   = _model_config(),
+            seed           = 0,
+            run_name       = "e2e_dual_dem",
+            overfit_check  = OverfitCheckConfig(enabled=False),
+        )

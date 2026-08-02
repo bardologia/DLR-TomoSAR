@@ -8,20 +8,38 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from configuration.dataset                      import DatasetConfig, InputConfig, OutputConfig, PatchConfig, SplitRegions
+from configuration.dataset                      import DatasetConfig
 from tools.data.regions                         import CropRegion
 from models                                     import get_backbone
 from pipelines.backbone.dataset.datasets        import PatchDataset
 from pipelines.shared.model.model_builder       import ModelBuilder
 from pipelines.backbone.dataset.normalizer      import Normalizer
 from pipelines.backbone.dataset.stats           import Stats
-from pipelines.backbone.dataset.spatial         import Cropper, GridInfo, Patcher
-from pipelines.shared.dataset.dataset_spatial   import Layout
+from pipelines.backbone.dataset.spatial         import GridInfo
 from pipelines.backbone.inference.model_wrapper import ModelWrapper
 from pipelines.shared.config.config_persistence import BackboneModelConfigIO
-from tools.data.io                              import FileIO
-from tools.monitoring.logger                    import Logger
+from pipelines.shared.inference.run_artifacts   import RunArtifactLoader
 from tools.baselines                            import TrackBaselines, TrackProfiles
+
+
+class AbsentTomogram:
+    def __init__(self, run_directory: Path) -> None:
+        self.run_directory = run_directory
+
+    def _refuse(self, usage: str) -> None:
+        raise ValueError(f"Run '{self.run_directory}' was loaded with load_tomogram=False, so the raw tomogram was never read; {usage} needs it. Reload the run with load_tomogram=True.")
+
+    def __getattr__(self, name: str):
+        if name.startswith("__"):
+            raise AttributeError(name)
+
+        self._refuse(f"attribute '{name}'")
+
+    def __getitem__(self, index):
+        self._refuse("indexing full_curves")
+
+    def __array__(self, dtype=None, copy=None):
+        self._refuse("converting full_curves to an array")
 
 
 @dataclass
@@ -41,62 +59,28 @@ class Run:
     dataset          : PatchDataset
     loader           : DataLoader
     checkpoint_meta  : dict
-    complex_inputs   : np.ndarray | None     = None
-    n_secondaries    : int                   = 0
-    secondary_labels : list | None           = None
-    full_curves      : np.ndarray | None     = None
-    track_baselines  : TrackBaselines | None = None
-    track_profiles   : TrackProfiles  | None = None
+    full_curves      : np.ndarray | AbsentTomogram
+    track_baselines  : TrackBaselines
+    track_profiles   : TrackProfiles
+    complex_inputs   : np.ndarray | None = None
+    n_secondaries    : int               = 0
+    secondary_labels : list | None       = None
 
 
-class RunLoader:
-    def __init__(self, run_directory: Path, logger: Logger) -> None:
-        self.run_directory  = Path(run_directory)
-        self.logger         = logger
-        self.meta_directory = self.run_directory / "meta"
+class RunLoader(RunArtifactLoader):
+    PARAMS_PER_GAUSSIAN = 3
 
-    def _read_json(self, name: str) -> dict:
-        return FileIO.load_json(self.meta_directory / name)
+    def _persisted_n_gaussians(self, run_summary: dict) -> int:
+        if "n_gaussians" not in run_summary:
+            raise KeyError(f"meta/run_summary.json of run '{self.run_directory}' carries no 'n_gaussians'; the Gaussian count is read from that field and is no longer derived from out_channels, so re-train the run or write the extraction K it was trained with into the summary.")
 
-    def _parse_split_payload(self, value):
-        if isinstance(value, list):
-            return [CropRegion(**region) for region in value]
-        return CropRegion(**value)
+        return int(run_summary["n_gaussians"])
 
-    def _build_dataset_config(self, payload: dict, batch_size: Optional[int], num_workers: int) -> DatasetConfig:
-        splits = payload["split_regions"]
+    def _validate_out_channels(self, out_channels: int, n_gaussians: int) -> None:
+        expected = self.PARAMS_PER_GAUSSIAN * n_gaussians
 
-        split_regions = SplitRegions(
-            train = self._parse_split_payload(splits["train"]),
-            val   = self._parse_split_payload(splits["val"]),
-            test  = self._parse_split_payload(splits["test"]),
-        )
-
-        if not isinstance(payload["patch"]["stride"], list):
-            raise ValueError(f"dataset_creation_config.json stores patch stride {payload['patch']['stride']!r} from before per-axis strides; patch it to a [vertical, horizontal] list (e.g. [32, 32]) to run inference on this run.")
-
-        patch = PatchConfig(
-            size                  = tuple(payload["patch"]["size"]),
-            stride                = tuple(payload["patch"]["stride"]),
-            use_symmetric_padding = bool(payload["patch"]["use_symmetric_padding"]),
-        )
-
-        secondary_labels = payload["secondary_labels"]
-
-        return DatasetConfig(
-            preprocessing_run_directory = Path(payload["preprocessing_run_directory"]),
-            parameters_path             = Path(payload["parameters_path"]),
-            split_regions               = split_regions,
-            secondary_labels            = tuple(secondary_labels) if secondary_labels is not None else None,
-            patch                       = patch,
-            input_config                = InputConfig.from_dict(payload["input_config"]),
-            output_config               = OutputConfig.from_dict(payload["output_config"]),
-            batch_size                  = batch_size if batch_size is not None else int(payload["batch_size"]),
-            num_workers                 = int(num_workers),
-            shuffle_train               = False,
-            pin_memory                  = bool(payload["pin_memory"]),
-            n_gaussians                 = int(payload["n_gaussians"]),
-        )
+        if out_channels != expected:
+            raise ValueError(f"Run '{self.run_directory}' persists out_channels={out_channels} but n_gaussians={n_gaussians} requires a {expected}-channel parameter head; the run summary describes a head this loader cannot read.")
 
     def _build_model(self, backbone_name: str, in_channels: int, out_channels: int, patch_size: Tuple[int, int]):
         model_config, _ = BackboneModelConfigIO.load(self.meta_directory)
@@ -109,66 +93,17 @@ class RunLoader:
 
         return model
 
-    def _load_checkpoint(self, ckpt_path: Path, device: str) -> tuple[dict, np.ndarray, dict]:
-        ckpt   = torch.load(str(ckpt_path), map_location=device, weights_only=False)
-        x_axis = np.asarray(ckpt["x_axis"], dtype=np.float32)
-
-        meta = {
-            "epoch"         : int(ckpt["epoch"]),
-            "best_val_loss" : float(ckpt["best_val_loss"]),
-            "best_epoch"    : int(ckpt["best_epoch"]),
-        }
-
-        return ckpt, x_axis, meta
-
     def _wrap_model(self, model, device: str, norm_stats: Stats, x_axis: np.ndarray, amp_max: float | None) -> ModelWrapper:
         return ModelWrapper(
             model               = model,
             device              = device,
-            params_per_gaussian = 3,
+            params_per_gaussian = self.PARAMS_PER_GAUSSIAN,
             normalizer          = Normalizer(norm_stats),
             x_axis              = torch.from_numpy(x_axis),
             amp_max             = amp_max,
         )
 
-    def _build_dataset(self, dataset_config : DatasetConfig, split_name : str, x_axis : np.ndarray, n_gaussians : int, norm_stats : Stats) -> Tuple[PatchDataset, GridInfo, CropRegion, CropRegion, dict]:
-        layout  = Layout(dataset_config.preprocessing_run_directory, logger=self.logger, parameters_path=dataset_config.parameters_path)
-        cropper = Cropper(layout, dataset_config.split_regions, logger=self.logger, secondary_labels=dataset_config.secondary_labels)
-
-        regions = dataset_config.split_regions.regions(split_name)
-        if len(regions) != 1:
-            raise ValueError(f"Inference requires a single contiguous region for split '{split_name}'; found {len(regions)} disjoint regions. Stitching is only defined over one rectangular crop.")
-
-        region = regions[0]
-        arrays = cropper.load_split(region, load_tomogram=True)
-
-        grid = Patcher.build(
-            spatial_size          = (region.azimuth_size, region.range_size),
-            patch_size            = dataset_config.patch.size,
-            stride                = dataset_config.patch.stride,
-            use_symmetric_padding = dataset_config.patch.use_symmetric_padding,
-        )
-
-        inputs        = arrays["inputs"]
-        gt_parameters = arrays["parameters"]
-
-        dataset = PatchDataset(
-            inputs           = inputs,
-            gt_parameters    = gt_parameters,
-            grid             = grid,
-            input_config     = dataset_config.input_config,
-            output_config    = dataset_config.output_config,
-            split_name       = split_name,
-            n_secondaries    = arrays["n_secondaries"],
-            n_interferograms = arrays["n_interferograms"],
-            normalizer       = Normalizer(norm_stats),
-            n_gaussians      = n_gaussians,
-            dem              = arrays["dem"] if dataset_config.input_config.use_dem else None,
-        )
-
-        return dataset, grid, region, layout.global_crop, arrays
-
-    def _load_track_info(self, dataset_config: DatasetConfig) -> Tuple[TrackBaselines | None, TrackProfiles | None]:
+    def _load_track_info(self, dataset_config: DatasetConfig) -> Tuple[TrackBaselines, TrackProfiles]:
         dataset_dir = Path(dataset_config.preprocessing_run_directory)
         labels      = dataset_config.secondary_labels
 
@@ -195,6 +130,7 @@ class RunLoader:
         num_workers     : int,
         device          : str,
         checkpoint_name : str,
+        load_tomogram   : bool = True,
     ) -> Run:
 
         self.logger.section("[Inference: Load Run]")
@@ -208,14 +144,15 @@ class RunLoader:
             num_workers = num_workers,
         )
 
-        backbone_name      = str(run_summary["model_name"])
-        in_channels        = int(run_summary["in_channels"])
-        out_channels_total = int(run_summary["out_channels"])
-        n_gaussians        = out_channels_total // 3
-        out_channels       = 3 * n_gaussians
+        backbone_name = str(run_summary["model_name"])
+        in_channels   = int(run_summary["in_channels"])
+        out_channels  = int(run_summary["out_channels"])
+        n_gaussians   = self._persisted_n_gaussians(run_summary)
+
+        self._validate_out_channels(out_channels, n_gaussians)
 
         ckpt_path = self.run_directory / checkpoint_name
-        model     = self._build_model(backbone_name, in_channels, out_channels_total, dataset_config.patch.size)
+        model     = self._build_model(backbone_name, in_channels, out_channels, dataset_config.patch.size)
         model     = model.to(device)
 
         ckpt, x_axis, ckpt_meta = self._load_checkpoint(ckpt_path, device)
@@ -231,6 +168,7 @@ class RunLoader:
             x_axis         = x_axis,
             n_gaussians    = n_gaussians,
             norm_stats     = norm_stats,
+            load_tomogram  = load_tomogram,
         )
 
         track_baselines, track_profiles = self._load_track_info(dataset_config)
@@ -280,7 +218,7 @@ class RunLoader:
             complex_inputs   = arrays["inputs"],
             n_secondaries    = arrays["n_secondaries"],
             secondary_labels = arrays["secondary_labels"],
-            full_curves      = arrays["tomogram"],
+            full_curves      = arrays["tomogram"] if load_tomogram else AbsentTomogram(self.run_directory),
             track_baselines  = track_baselines,
             track_profiles   = track_profiles,
         )

@@ -35,7 +35,7 @@ class DatasetPipeline:
         config.split_regions.validate_disjoint()
 
         self.layout          = Layout(config.preprocessing_run_directory,  logger=self.logger, parameters_path=config.parameters_path)
-        self.cropper         = Cropper(self.layout, config.split_regions,  logger=self.logger, secondary_labels=config.secondary_labels)
+        self.cropper         = Cropper(self.layout, config.split_regions,  logger=self.logger, secondary_labels=config.secondary_labels, input_config=config.input_config)
         self.metadata_writer = MetadataWriter(self.training_run_directory, logger=self.logger)
         self.geometry_field  = self._load_geometry_field() if build_geometry_field else None
         self.augmenter       = SpatialAugmenter(config.augmentation,       logger=self.logger, seed=self.seed, rot90_inactive=self.geometry_field is not None)
@@ -119,6 +119,7 @@ class DatasetPipeline:
                 split_name       = split_name,
                 n_secondaries    = arrays["n_secondaries"],
                 n_interferograms = arrays["n_interferograms"],
+                n_primary        = arrays["n_primary"],
                 normalizer       = normalizer,
                 n_gaussians      = self.config.n_gaussians,
                 augmenter        = self.augmenter,

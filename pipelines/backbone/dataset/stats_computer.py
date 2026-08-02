@@ -63,13 +63,13 @@ class StatsComputer:
         budget = {g: max(64, max_vals_per_group // (len(channels) * len(parts))) for g, channels in group_channels.items()}
 
         for part in parts:
-            inputs        = part.inputs
-            n_secondaries = part.n_secondaries
+            inputs     = part.inputs
+            ifg_offset = part.n_primary + part.n_secondaries
 
             sections = [
-                (input_config.use_primary,        inputs[0:1],             input_config.primary_representation,        "pass"),
-                (input_config.use_secondaries,    inputs[1:1 + n_secondaries], input_config.secondaries_representation,    "pass"),
-                (input_config.use_interferograms, inputs[1 + n_secondaries:],  input_config.interferograms_representation, "ifg"),
+                (input_config.use_primary,        inputs[:part.n_primary],           input_config.primary_representation,        "pass"),
+                (input_config.use_secondaries,    inputs[part.n_primary:ifg_offset], input_config.secondaries_representation,    "pass"),
+                (input_config.use_interferograms, inputs[ifg_offset:],               input_config.interferograms_representation, "ifg"),
             ]
 
             for enabled, layers, representation, prefix in sections:

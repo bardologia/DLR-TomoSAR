@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from pipelines.backbone.inference.loss_landscape import FilterNormalizedDirection, LandscapeEvaluator
+from pipelines.backbone.inference.loss_landscape import FilterNormalizedDirection, LandscapeEvaluator, LossLandscapePlots
 
 
 class _TinyConv(torch.nn.Module):
@@ -69,3 +69,30 @@ def test_zero_direction_model_raises():
 
     with pytest.raises(ValueError):
         FilterNormalizedDirection.build(model, seed=0)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="needs a CUDA device")
+def test_direction_lives_on_the_parameter_device():
+    model     = _TinyConv().cuda()
+    direction = FilterNormalizedDirection.build(model, seed=0)
+
+    for name, param in model.named_parameters():
+        assert direction[name].device == param.device
+
+
+def test_flat_landscape_contour_raises(tmp_path):
+    alphas = np.linspace(-0.5, 0.5, 5)
+    losses = np.full((alphas.size, alphas.size), 0.37)
+
+    with pytest.raises(ValueError):
+        LossLandscapePlots().contour_2d(alphas, alphas, losses, tmp_path / "contour.png")
+
+
+def test_contour_of_a_varying_landscape_is_written(tmp_path):
+    alphas = np.linspace(-0.5, 0.5, 5)
+    losses = 0.1 + np.abs(alphas)[:, None] + np.abs(alphas)[None, :]
+
+    path = LossLandscapePlots().contour_2d(alphas, alphas, losses, tmp_path / "contour.png")
+
+    assert path.is_file()
+    assert path.stat().st_size > 0

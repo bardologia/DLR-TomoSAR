@@ -52,6 +52,12 @@ class DualTrainingPipeline(TrainingPipeline):
 
     MODEL_CONFIG_IO = DualModelConfigIO
 
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+
+        if self.dataset_config.input_config.use_dem:
+            raise ValueError("The dual model never uses the DEM channel; disable input.use_dem")
+
     def _build_model(self, in_channels: int, out_channels: int):
         model, model_cfg = super()._build_model(in_channels, out_channels)
 
@@ -72,9 +78,6 @@ class DualTrainingPipeline(TrainingPipeline):
     def _model_overrides(self, in_channels: int, out_channels: int) -> dict:
         model_config = self.model_config if self.model_config is not None else DualResUNetConfig()
         input_config = self.dataset_config.input_config
-
-        if input_config.use_dem:
-            raise ValueError("The dual model never uses the DEM channel; disable input.use_dem")
 
         overrides                        = super()._model_overrides(in_channels, out_channels)
         overrides["params_channels"]     = TrunkChannelMap.resolve(input_config, in_channels, model_config.params_input)

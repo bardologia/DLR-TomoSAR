@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from pipelines.backbone.inference.metrics import Metrics, Result
+from tools.loss.param_loss                import ParamMatcher
 
 
 N_GAUSSIANS = 5
@@ -292,16 +293,48 @@ def test_param_population_stats_active_inactive_global_means():
     assert out["slot_0_amp_inactive_gt_mean"] == pytest.approx(0.0)
     assert out["slot_0_amp_global_gt_mean"]   == pytest.approx(1.0)
     assert out["slot_0_mu_active_gt_mean"]    == pytest.approx(10.0)
-    assert out["slot_0_mu_global_gt_mean"]    == pytest.approx(5.0)
     assert out["slot_0_sig_active_gt_std"]    == pytest.approx(0.0)
+
+    assert "slot_0_mu_inactive_gt_mean"  not in out
+    assert "slot_0_mu_global_gt_mean"    not in out
+    assert "slot_0_sig_inactive_gt_mean" not in out
+    assert "slot_0_sig_global_gt_std"    not in out
 
     assert out["slot_0_amp_active_pred_mean"] == pytest.approx(2.5)
     assert out["slot_0_mu_active_pred_mean"]  == pytest.approx(11.0)
     assert np.isnan(out["slot_0_amp_inactive_pred_mean"])
     assert out["slot_0_amp_global_pred_mean"] == pytest.approx(2.5)
+    assert out["slot_0_mu_global_pred_mean"]  == pytest.approx(11.0)
 
     assert np.isnan(out["slot_1_amp_active_gt_mean"])
     assert out["slot_1_amp_global_gt_mean"] == pytest.approx(0.0)
+
+
+def test_param_population_stats_on_nan_masked_ground_truth():
+    H, W = 4, 4
+    gt   = np.zeros((N_GAUSSIANS * 3, H, W), dtype=np.float32)
+
+    gt[0, :, :2] = 2.0
+    gt[1, :, :2] = 10.0
+    gt[2, :, :2] = 4.0
+
+    pred = gt.copy()
+
+    for k in range(N_GAUSSIANS):
+        inactive = ~ParamMatcher.is_active(gt[3 * k])
+        gt[3 * k + 1][inactive] = np.nan
+        gt[3 * k + 2][inactive] = np.nan
+
+    res = _make_result(np.zeros((N_ELEV, H, W), np.float32), np.zeros((N_ELEV, H, W), np.float32), params_pred=pred, params_gt=gt)
+    out = Metrics(res, _x_axis(), N_GAUSSIANS)._param_population_stats()
+
+    assert out["slot_0_mu_active_gt_mean"]  == pytest.approx(10.0)
+    assert out["slot_0_sig_active_gt_mean"] == pytest.approx(4.0)
+
+    assert out["slot_0_amp_inactive_gt_mean"] == pytest.approx(0.0)
+    assert out["slot_0_amp_global_gt_mean"]   == pytest.approx(1.0)
+
+    assert not any(key.endswith("_gt_mean") and np.isnan(value) for key, value in out.items() if key.startswith("slot_0_"))
 
 
 def test_param_population_stats_pred_is_permutation_invariant():

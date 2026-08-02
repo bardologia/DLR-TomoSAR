@@ -95,7 +95,7 @@ class EquationLibrary:
                 {
                     "title" : "Per-pixel parameter vector",
                     "tex"   : r"\theta = [\,a_1, \mu_1, \sigma_1,\; a_2, \mu_2, \sigma_2,\; \dots,\; a_{K}, \mu_{K}, \sigma_{K}\,] \in \mathbb{R}^{3K}",
-                    "note"  : "Interleaved layout used everywhere: the GT array, the model output channels, and the loss (a at 3k, mu at 3k+1, sigma at 3k+2). K is derived from the parameter run's k_max (not a user knob), amplitude is clamped to a floor of 0, and a slot counts as active when its amplitude exceeds amp_zero_thr = 1e-3.",
+                    "note"  : "Interleaved layout used everywhere: the GT array, the model output channels, and the loss (a at 3k, mu at 3k+1, sigma at 3k+2). K is derived from the parameter run's k_max (not a user knob), amplitude is clamped to a floor of 0, and a slot counts as active when its amplitude exceeds amp_zero_thr = 1e-4.",
                     "vars"  : [
                         {"sym": r"\theta",               "desc": "per-pixel parameter vector"},
                         {"sym": r"a_k, \mu_k, \sigma_k", "desc": "amplitude, mean elevation, spread of slot k"},
@@ -483,38 +483,38 @@ class EquationLibrary:
                 },
                 {
                     "title" : "Patch grid",
-                    "tex"   : r"n_v = \left\lceil \frac{H - P_H}{s} \right\rceil + 1, \qquad n_h = \left\lceil \frac{W - P_W}{s} \right\rceil + 1, \qquad N_p = n_v \cdot n_h",
-                    "note"  : "Sliding-window tiling of the split region; a dimension no larger than the patch yields a single row or column.",
+                    "tex"   : r"n_v = \left\lceil \frac{H - P_H}{s_v} \right\rceil + 1, \qquad n_h = \left\lceil \frac{W - P_W}{s_h} \right\rceil + 1, \qquad N_p = n_v \cdot n_h",
+                    "note"  : "Sliding-window tiling of the split region; a dimension no larger than the patch yields a single row or column. Patches and strides are rectangular (azimuth, range) pairs, so the two axes tile independently.",
                     "vars"  : [
                         {"sym": r"n_v, n_h", "desc": "patch rows and columns"},
                         {"sym": r"H, W",     "desc": "spatial height and width of the split (pixels)"},
-                        {"sym": r"P_H, P_W", "desc": "patch size, default (64, 64)"},
-                        {"sym": r"s",        "desc": "stride, default 32"},
+                        {"sym": r"P_H, P_W", "desc": "patch size (azimuth, range), default (64, 32)"},
+                        {"sym": r"s_v, s_h", "desc": "stride (azimuth, range), default (32, 16)"},
                         {"sym": r"N_p",      "desc": "total patch count"},
                     ],
                 },
                 {
                     "title" : "Symmetric grid padding",
-                    "tex"   : r"p_v = P_H + (n_v - 1)\,s - H, \qquad p_h = P_W + (n_h - 1)\,s - W",
+                    "tex"   : r"p_v = P_H + (n_v - 1)\,s_v - H, \qquad p_h = P_W + (n_h - 1)\,s_h - W",
                     "note"  : "The minimal padding that makes the grid tile the domain exactly; boundary patches use symmetric reflection by default.",
                     "vars"  : [
                         {"sym": r"p_v, p_h", "desc": "total vertical and horizontal padding (pixels)"},
                         {"sym": r"P_H, P_W", "desc": "patch height and width"},
                         {"sym": r"n_v, n_h", "desc": "patch rows and columns"},
-                        {"sym": r"s",        "desc": "stride"},
+                        {"sym": r"s_v, s_h", "desc": "vertical and horizontal stride"},
                         {"sym": r"H, W",     "desc": "spatial height and width"},
                     ],
                 },
                 {
                     "title" : "Padding split and patch corners",
-                    "tex"   : r"p_{\mathrm{top}} = \left\lfloor p_v/2 \right\rfloor, \quad p_{\mathrm{bot}} = p_v - p_{\mathrm{top}}, \qquad v_0 = i_v\,s - p_{\mathrm{top}}, \quad h_0 = i_h\,s - p_{\mathrm{left}}",
+                    "tex"   : r"p_{\mathrm{top}} = \left\lfloor p_v/2 \right\rfloor, \quad p_{\mathrm{bot}} = p_v - p_{\mathrm{top}}, \qquad v_0 = i_v\,s_v - p_{\mathrm{top}}, \quad h_0 = i_h\,s_h - p_{\mathrm{left}}",
                     "note"  : "Padding is split evenly per side; each patch corner may be negative, marking a padded region applied in a single np.pad call.",
                     "vars"  : [
                         {"sym": r"p_{\mathrm{top}}, p_{\mathrm{bot}}", "desc": "top and bottom padding (left/right analogous)"},
                         {"sym": r"p_v",                                "desc": "total vertical padding"},
                         {"sym": r"(v_0, h_0)",                         "desc": "patch top-left corner in the padded array"},
                         {"sym": r"(i_v, i_h)",                         "desc": "patch grid indices"},
-                        {"sym": r"s",                                  "desc": "stride"},
+                        {"sym": r"s_v, s_h",                           "desc": "vertical and horizontal stride"},
                     ],
                 },
                 {
@@ -684,7 +684,7 @@ class EquationLibrary:
     def _training_loss(self) -> dict:
         return {
             "group" : "Training · Loss",
-            "blurb" : "The composable multi-term objective, term by term: fourteen switchable components over curve, physics, and parameter space, plus clamping, optimal-assignment matching, slot-presence weighting, and weight calibration.",
+            "blurb" : "The composable multi-term objective, term by term: fifteen switchable components over curve, physics, and parameter space, plus clamping, optimal-assignment matching, slot-presence weighting, and weight calibration.",
             "items" : [
                 {
                     "title" : "Physical parameter bounds",
@@ -858,7 +858,7 @@ class EquationLibrary:
                         {"sym": r"m_{b,k,p}",             "desc": "activity mask for sample b, slot k, parameter p"},
                         {"sym": r"p",                     "desc": "parameter role: a, mu, or sigma"},
                         {"sym": r"a^{\mathrm{GT}}_{b,k}", "desc": "GT amplitude at physical scale"},
-                        {"sym": r"\tau_a",                "desc": "amp_zero_thr = 1e-3"},
+                        {"sym": r"\tau_a",                "desc": "amp_zero_thr = 1e-4"},
                         {"sym": r"w_p",                   "desc": "param_weights, default (1, 1, 1)"},
                         {"sym": r"\rho_{b,k}",            "desc": "slot-presence scale (see below)"},
                         {"sym": r"\phi_{b,k}",            "desc": "amplitude focal scale (see below)"},
@@ -921,6 +921,18 @@ class EquationLibrary:
                         {"sym": r"w_p",                              "desc": "per-parameter weight (a, mu, sigma)"},
                         {"sym": r"m",                                "desc": "activity mask"},
                         {"sym": r"b, k, p, h, w",                    "desc": "batch, slot, parameter, pixel indices"},
+                    ],
+                },
+                {
+                    "title" : "Legacy parameter MSE",
+                    "tex"   : r"\tilde{\theta}_{k,p} = \frac{\theta_{k,p} - l_{k,p}}{u_{k,p} - l_{k,p}}, \qquad \ell_{\mathrm{param\text{-}legacy}} = \operatorname{mean}_{b,k,p,h,w}\left(\hat{\tilde{\theta}} - \tilde{\theta}\right)^2",
+                    "note"  : "Imitation of the pre-Hungarian objective: both prediction and GT are min-max scaled by fixed per-slot physical bounds, then compared with a plain unweighted, unmasked MSE over every slot and parameter. It requires param_matching = sorted_gt (the bounds assume fixed slot identity, Loss._validate_legacy raises otherwise) and exactly two Gaussian slots, and the bound tuples must carry six entries ordered amp1, mu1, sigma1, amp2, mu2, sigma2 with max > min (param_loss.py LegacyParamLoss). The loss-scale probe forces this term off unless it is explicitly enabled.",
+                    "vars"  : [
+                        {"sym": r"\ell_{\mathrm{param\text{-}legacy}}", "desc": "legacy parameter term value"},
+                        {"sym": r"\theta_{k,p}, \hat{\theta}_{k,p}",    "desc": "GT and predicted parameter p of slot k, physical scale"},
+                        {"sym": r"l_{k,p}, u_{k,p}",                    "desc": "legacy_bounds_min and legacy_bounds_max, six entries each"},
+                        {"sym": r"\tilde{\theta}",                      "desc": "parameter mapped into the legacy min-max space"},
+                        {"sym": r"k",                                   "desc": "slot index, exactly two slots"},
                     ],
                 },
                 {
@@ -1257,23 +1269,22 @@ class EquationLibrary:
                 },
                 {
                     "title" : "Hann window",
-                    "tex"   : r"w_v[i] = 0.5 - 0.5\cos\!\left(\frac{2\pi(i + 0.5)}{P}\right)",
-                    "note"  : "The default per-axis profile for the curve stitcher; de-emphasises patch borders in favour of centres, suppressing seams at overlaps.",
+                    "tex"   : r"w_v[i] = 0.5 - 0.5\cos\!\left(\frac{2\pi(i + 0.5)}{P_H}\right)",
+                    "note"  : "The default per-axis profile for the curve stitcher; de-emphasises patch borders in favour of centres, suppressing seams at overlaps. The horizontal profile is the same expression over P_W, since patches are rectangular.",
                     "vars"  : [
                         {"sym": r"w_v[i]", "desc": "vertical window weight at offset i"},
-                        {"sym": r"i",      "desc": "pixel offset within the patch, 0 to P-1"},
-                        {"sym": r"P",      "desc": "patch side length on that axis"},
+                        {"sym": r"i",      "desc": "pixel offset within the patch, 0 to P_H-1"},
+                        {"sym": r"P_H",    "desc": "patch height (the horizontal profile uses P_W)"},
                     ],
                 },
                 {
                     "title" : "Triangular and uniform windows, 2D assembly",
-                    "tex"   : r"w_v[i] = 1 - \left|\frac{2(i + 0.5)}{P} - 1\right|, \qquad w = w_v \otimes w_h, \qquad w_{\mathrm{uniform}} = \mathbf{1}^{P_H \times P_W}",
+                    "tex"   : r"w_v[i] = 1 - \left|\frac{2(i + 0.5)}{P_H} - 1\right|, \qquad w = w_v \otimes w_h, \qquad w_{\mathrm{uniform}} = \mathbf{1}^{P_H \times P_W}",
                     "note"  : "Per-axis factors are floored at 1e-3 before the outer product, guaranteeing strictly positive weights at every covered position.",
                     "vars"  : [
-                        {"sym": r"w_v, w_h", "desc": "vertical and horizontal axis profiles"},
+                        {"sym": r"w_v, w_h", "desc": "vertical and horizontal axis profiles, of length P_H and P_W"},
                         {"sym": r"w",        "desc": "2D patch weighting window"},
                         {"sym": r"\otimes",  "desc": "outer product"},
-                        {"sym": r"P",        "desc": "patch side length per axis"},
                         {"sym": r"P_H, P_W", "desc": "patch height and width"},
                     ],
                 },
@@ -1484,7 +1495,7 @@ class EquationLibrary:
                     "note"  : "Active Gaussians (amplitude strictly above 1e-3) are counted per pixel for prediction and GT; the run reports exact/under/over count fractions, overall and per-slot active fractions (the predicted per-slot fraction uses the GT-aligned assignment), and exact-count accuracy conditioned on the GT active count (count_acc_gt{k}) and also on the predicted count (count_acc_pred{k}) (metrics.py _active_count_stats).",
                     "vars"  : [
                         {"sym": r"c^{s}_{a,r}",                  "desc": "per-pixel active-Gaussian count for source s (pred or GT)"},
-                        {"sym": r"\tau_a",                       "desc": "active-amplitude threshold, ACTIVE_AMP_THR = 1e-3 (strict >)"},
+                        {"sym": r"\tau_a",                       "desc": "active-amplitude threshold, ACTIVE_AMP_THR = 1e-4 (strict >)"},
                         {"sym": r"\mathrm{ExactFrac}",           "desc": "fraction of pixels whose predicted and GT counts match"},
                         {"sym": r"\mathrm{Acc}_{\mathrm{gt}=k}", "desc": "exact-count accuracy among pixels with k active GT slots"},
                     ],

@@ -290,6 +290,7 @@ class LayerProbeConfig:
     samples_per_batch : int   = 512
     ridge_lambda      : float = 1.0
     test_fraction     : float = 0.5
+    seed              : int   = 0
 
     figure_style : str = "report"
 
@@ -381,6 +382,6 @@ class PaperFigurePackConfig:
     report_filename  : str = "report.md"
     figures_subdir   : str = "figures"
 
-    patterns : List[str] = field(default_factory=lambda: ["pixel_maps/*.png", "param_scatter/*.png", "stratified/*.png", "profiles/*.png", "data_consistency/*.png"])
+    patterns : List[str] = field(default_factory=lambda: ["pixel_maps/*", "param_scatter/*", "stratified/*", "profiles/*", "data_consistency/*"])
 
     output_dir : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/publications/neurips2027/figures")

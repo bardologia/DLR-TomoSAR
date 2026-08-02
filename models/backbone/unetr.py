@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 
 from configuration.architectures import UNETRConfig
-from ..blocks                    import ConvBlock, OutputHeadsMixin, PatchEmbedding, TransformerBlock, build_activation, build_norm2d, initialize_weights, match_spatial_size, tokens_to_feature_map
+from ..blocks                    import ConvBlock, OutputHeadsMixin, PatchEmbedding, TransformerBlock, build_activation, build_norm2d, initialize_weights, match_spatial_size, resize_positional_embedding, tokens_to_feature_map
 
 
 class ProgressiveProjectionHead(nn.Module):
@@ -75,7 +75,8 @@ class UNETR(nn.Module, OutputHeadsMixin):
             patch_size    = config.patch_size,
         )
 
-        self.positional_embedding = nn.Parameter(torch.zeros(1, (config.image_size // config.patch_size) ** 2, config.embedding_dim))
+        self.expected_grid_size   = config.image_size // config.patch_size
+        self.positional_embedding = nn.Parameter(torch.zeros(1, self.expected_grid_size ** 2, config.embedding_dim))
         nn.init.trunc_normal_(self.positional_embedding, std=0.02)
 
         drop_path_rates = [x.item() for x in torch.linspace(0, config.stochastic_depth_rate, config.transformer_layers)]
@@ -194,7 +195,7 @@ class UNETR(nn.Module, OutputHeadsMixin):
         original_input = x
 
         tokens, grid_height, grid_width = self.patch_embedding(x)
-        tokens = tokens + self.positional_embedding[:, :tokens.shape[1], :]
+        tokens = tokens + resize_positional_embedding(self.positional_embedding, self.expected_grid_size, grid_height, grid_width)
 
         transformer_skip_maps = []
         for layer_index, transformer_block in enumerate(self.transformer_blocks):

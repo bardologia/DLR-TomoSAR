@@ -110,7 +110,7 @@ class MaxBatchWorker(BenchmarkWorker):
         stage_dir   = self.run_dir / "max_batch"
         result_path = stage_dir / model_name / "max_batch_result.json"
 
-        probe  = MaxBatchProbe(config=self.config, model_name=model_name, overrides=self._size_overrides(model_name))
+        probe  = MaxBatchProbe(config=self.config, model_name=model_name, overrides=self._size_overrides(model_name), work_dir=stage_dir / model_name / "probe")
         result = probe.run()
 
         FileIO.save_json(result, result_path, indent=2)

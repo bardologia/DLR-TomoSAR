@@ -258,3 +258,11 @@ def test_profiledataset_index_changes_with_seed(parameters, tmp_path):
     b = _profile_dataset(parameters, tmp_path, seed=2, pixel_subsample=0.5, keep_empty_frac=0.0)
 
     assert not np.array_equal(a.index, b.index)
+
+
+@pytest.mark.parametrize("pixel_subsample", [0.5, 1.0])
+def test_profiledataset_without_active_pixels_names_the_split_and_threshold(tmp_path, pixel_subsample):
+    empty = np.zeros((15, 8, 8), dtype=np.float32)
+
+    with pytest.raises(ValueError, match="amp_zero_thr"):
+        _profile_dataset(empty, tmp_path, pixel_subsample=pixel_subsample)

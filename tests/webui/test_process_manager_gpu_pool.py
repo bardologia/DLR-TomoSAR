@@ -59,7 +59,7 @@ class StubPaths:
 
     def script_entry(self, key: str) -> dict:
         path = self.main_dir / "analysis" / f"{key}.py"
-        return {"path": path, "rel": f"main/analysis/{key}.py", "args": []}
+        return {"path": path, "rel": f"main/analysis/{key}.py"}
 
 
 class StubDescriber:

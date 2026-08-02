@@ -187,9 +187,7 @@ class LinkNet(nn.Module, OutputHeadsMixin):
             encoder_outputs.append(x)
 
         for stage_index, decoder_stage in enumerate(self.decoder_stages):
-            current_skip  = encoder_outputs[-(stage_index + 1)]
-            decoder_input = current_skip if stage_index == 0 else x
-            decoded       = decoder_stage(decoder_input)
+            decoded = decoder_stage(x)
 
             if stage_index + 1 < len(encoder_outputs):
                 target_skip = encoder_outputs[-(stage_index + 2)]

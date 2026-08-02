@@ -399,21 +399,218 @@ class SeedAxisNote {
 class ExperimentBuilder {
 
   static MODES = [
-    { key: "curriculum", label: "curriculum",  hint: "warmup x complete cross product, one trial each" },
-    { key: "warmup",     label: "single stage", hint: "curriculum disabled, check losses from the catalog and each trains alone as one trial" },
-    { key: "physics",    label: "physics loss", hint: "physics components crossed with weights on top of the base config, one trial per pair plus an optional no-physics baseline" },
-    { key: "pair",       label: "loss pairs",  hint: "one base component plus one candidate second component per weight, curriculum disabled, one trial per pair plus an optional base-only baseline" },
-    { key: "secondary",  label: "secondaries", hint: "one trial per secondary-track selection" },
-    { key: "patch",      label: "patch",       hint: "one trial per patch size, same model end to end" },
-    { key: "presence",   label: "slot presence", hint: "active-normalization x presence-balance matrix (none, A, B, AB), curriculum disabled, one trial per cell" },
-    { key: "input",      label: "input channels", hint: "input-channel ablation, one trial per input variant on its own track scope (all tracks or the reduced selection)" },
-    { key: "context",    label: "context ladder", hint: "one trial per backbone architecture on the shared base config, walking the spatial-context ladder" },
-    { key: "reach",      label: "reach", hint: "size-matched architecture comparison at fixed reach: a 33x33 local CNN against a UNet, same 32x32 patch and same parameter count, one trial per arm" },
-    { key: "head",       label: "head x matching", hint: "one trial per output-head x parameter-matching pair on one fixed backbone" },
-    { key: "augmentation", label: "augmentation", hint: "flips-only augmentation on/off on the shared base config, one trial per state" },
-    { key: "normalization", label: "normalization", hint: "cumulative normalization ladder: pass amp, then ifg phase, then output amp, then output sigma switch from initial to final strategy" },
-    { key: "routing", label: "trunk routing", hint: "one trial per params/existence channel-group assignment, both trunks fixed at the shared parity feature ladders" },
-    { key: "ratio",   label: "arm ratio", hint: "budget-matched params/existence width ladders, one trial per declared split; every model is built and its split verified at launch" },
+    { key: "curriculum", label: "curriculum",  hint: "warmup x complete cross product, one trial each",
+      el        : "columnsEl",
+      available : (b) => Boolean(b.warmupLeaf && b.completeLeaf),
+      summary   : (b, gpus) => {
+        const total = b.variants.warmup.length * b.variants.complete.length;
+        return `${b.variants.warmup.length} warmup x ${b.variants.complete.length} complete = ${total} trials${b._seedsSuffix(total)}${gpus}`;
+      },
+      names     : (b, model) => {
+        const names = [];
+        b.variants.warmup.forEach((w) => b.variants.complete.forEach((c) => names.push(`${model}_w-${w.label}_c-${c.label}`)));
+        return names;
+      } },
+
+    { key: "warmup",     label: "single stage", hint: "curriculum disabled, check losses from the catalog and each trains alone as one trial",
+      el        : "warmupCatalogEl",
+      available : (b) => Boolean(b.warmupLeaf && b.completeLeaf),
+      paint     : (b) => b._paintWarmupCatalog(),
+      summary   : (b, gpus) => {
+        const n = b.variants.warmup.length;
+        return `${n} warmup loss${n === 1 ? "" : "es"} = ${n} trial${n === 1 ? "" : "s"}${b._seedsSuffix(n)}${gpus}`;
+      },
+      names     : (b, model) => b.variants.warmup.map((w) => `${model}_nc-${w.label}`) },
+
+    { key: "physics",    label: "physics loss", hint: "physics components crossed with weights on top of the base config, one trial per pair plus an optional no-physics baseline",
+      at        : 2,
+      el        : "physicsEl",
+      available : (b) => b.physics.size > 0,
+      make      : (b) => b._physicsPanel(),
+      paint     : (b) => b._paintPhysics(),
+      summary   : (b, gpus) => {
+        const nComp    = b._physicsComponents().length;
+        const nWeight  = b._physicsWeights().length;
+        const nCur     = b._physicsCurriculumStates().length;
+        const baseline = b._physicsBaselineOn();
+        const total    = nComp * nWeight * nCur + (baseline ? nCur : 0);
+        return `${nComp} component${nComp === 1 ? "" : "s"} x ${nWeight} weight${nWeight === 1 ? "" : "s"} x ${nCur} curriculum${baseline ? ` + ${nCur} baseline` : ""} = ${total} trial${total === 1 ? "" : "s"}${b._seedsSuffix(total)}${gpus}`;
+      },
+      names     : (b, model) => {
+        const names    = [];
+        const suffixes = b._physicsCurriculumStates().map((state) => state ? "cur" : "nc");
+        if (b._physicsBaselineOn()) suffixes.forEach((suffix) => names.push(`${model}_phys-baseline-${suffix}`));
+        b._physicsComponents().forEach((component) => {
+          b._physicsWeights().forEach((weight) => {
+            suffixes.forEach((suffix) => names.push(`${model}_phys-${component}-w${weight}-${suffix}`));
+          });
+        });
+        return names;
+      } },
+
+    { key: "pair",       label: "loss pairs",  hint: "one base component plus one candidate second component per weight, curriculum disabled, one trial per pair plus an optional base-only baseline",
+      at        : 3,
+      el        : "pairEl",
+      available : (b) => b.pair.size > 0,
+      make      : (b) => b._pairPanel(),
+      paint     : (b) => b._paintPair(),
+      summary   : (b, gpus) => {
+        const nCand    = b._pairCandidates().length;
+        const nWeight  = b._pairWeights().length;
+        const baseline = b._pairBaselineOn();
+        const total    = nCand * nWeight + (baseline ? 1 : 0);
+        return `${b._pairBase()} + ${nCand} candidate${nCand === 1 ? "" : "s"} x ${nWeight} weight${nWeight === 1 ? "" : "s"}${baseline ? " + baseline" : ""} = ${total} trial${total === 1 ? "" : "s"}${b._seedsSuffix(total)}${gpus}`;
+      },
+      names     : (b, model) => {
+        const names = [];
+        if (b._pairBaselineOn()) names.push(`${model}_pair-baseline`);
+        b._pairCandidates().forEach((component) => {
+          b._pairWeights().forEach((weight) => names.push(`${model}_pair-${component}-w${weight}`));
+        });
+        return names;
+      } },
+
+    { key: "secondary",  label: "secondaries", hint: "one trial per secondary-track selection",
+      at        : 0,
+      el        : "secondaryEl",
+      available : (b) => b.secondary.size > 0,
+      make      : (b) => b._secondaryPanel(),
+      paint     : (b) => b._paintSecondary(),
+      summary   : (b, gpus) => {
+        const strategy = b._strategy();
+        const sampled  = strategy === "uniform" || strategy === "gaussian";
+        const count    = sampled ? `${b._secondaryEffective("n_trials")} trials` : "trial count set by the stack";
+        return `${strategy}, ${b._secondaryEffective("n_secondaries")} secondaries, ${count}${b._seedsSuffix(null)}${gpus}`;
+      },
+      pattern   : (b, model) => ({ text: `${model}_sec-${b._strategy()}-tNN_<labels>`, note: "one per selection, labels resolved from the dataset stack" }) },
+
+    { key: "patch",      label: "patch",       hint: "one trial per patch size, same model end to end",
+      at        : 1,
+      el        : "patchEl",
+      available : (b) => b.patch.size > 0,
+      make      : (b) => b._patchPanel(),
+      paint     : (b) => b._paintPatch(),
+      summary   : (b, gpus) => {
+        const n = b._patchSizes().length;
+        return `${n} patch size${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${b._seedsSuffix(n)}${gpus}`;
+      },
+      names     : (b, model) => b._patchSizes().map((size) => `${model}_p-${size}`) },
+
+    { key: "presence",   label: "slot presence", hint: "active-normalization x presence-balance matrix (none, A, B, AB), curriculum disabled, one trial per cell",
+      at        : 4,
+      el        : "presenceEl",
+      available : (b) => Boolean(b.presenceTrialsLeaf),
+      make      : (b) => b._presencePanel(),
+      paint     : (b) => b._paintPresence(),
+      summary   : (b, gpus) => {
+        const n = b._presenceCells().length;
+        return `${n} presence cell${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${b._seedsSuffix(n)}${gpus}`;
+      },
+      names     : (b, model) => b._presenceCells().map((cell) => `${model}_pr-${cell}`) },
+
+    { key: "input",      label: "input channels", hint: "input-channel ablation, one trial per input variant on its own track scope (all tracks or the reduced selection)",
+      at        : 5,
+      el        : "inputEl",
+      available : (b) => Boolean(b.inputTrialsLeaf),
+      make      : (b) => b._inputPanel(),
+      paint     : (b) => b._paintInput(),
+      summary   : (b, gpus) => {
+        const trials = b._inputTrials();
+        const n      = Object.keys(trials).length;
+        const nAll   = Object.values(trials).filter((spec) => spec && spec.tracks === "all").length;
+        return `${n} input variant${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"} (${nAll} all tracks, ${n - nAll} reduced)${b._seedsSuffix(n)}${gpus}`;
+      },
+      names     : (b, model) => b._inputCells().map((cell) => `${model}_in-${cell}`) },
+
+    { key: "context",    label: "context ladder", hint: "one trial per backbone architecture on the shared base config, walking the spatial-context ladder",
+      at        : 6,
+      el        : "contextEl",
+      available : (b) => Boolean(b.contextTrialsLeaf),
+      make      : (b) => b._contextPanel(),
+      paint     : (b) => b._paintContext(),
+      summary   : (b, gpus) => {
+        const n = b._contextTrials().length;
+        return `${n} backbone${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${b._seedsSuffix(n)}${gpus}`;
+      },
+      names     : (b) => b._contextTrials().map((rung) => `${rung.backbone}_ctx-${rung.label}`) },
+
+    { key: "reach",      label: "reach", hint: "size-matched architecture comparison at fixed reach: a 33x33 local CNN against a UNet, same 32x32 patch and same parameter count, one trial per arm",
+      at        : 7,
+      el        : "reachEl",
+      available : (b) => b.reach.size > 0,
+      make      : (b) => b._reachPanel(),
+      paint     : (b) => b._paintReach(),
+      summary   : (b, gpus) => {
+        const n = b._reachRungs().length;
+        return `${n} size-matched arm${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"} on a shared ${b._reachPatch()} patch${b._seedsSuffix(n)}${gpus}`;
+      },
+      names     : (b) => b._reachRungs().map((rung) => `${rung.backbone}_reach-${rung.label}`) },
+
+    { key: "head",       label: "head x matching", hint: "one trial per output-head x parameter-matching pair on one fixed backbone",
+      at        : 8,
+      el        : "headEl",
+      available : (b) => b.headTrials.size > 0,
+      make      : (b) => b._headPanel(),
+      paint     : (b) => b._paintHead(),
+      summary   : (b, gpus) => {
+        const nHeads     = b._headList("heads").length;
+        const nMatchings = b._headList("matchings").length;
+        const total      = nHeads * nMatchings;
+        return `${nHeads} head${nHeads === 1 ? "" : "s"} x ${nMatchings} matching${nMatchings === 1 ? "" : "s"} = ${total} trial${total === 1 ? "" : "s"} on ${b._headBackbone()}${b._seedsSuffix(total)}${gpus}`;
+      },
+      names     : (b) => {
+        const names    = [];
+        const backbone = b._headBackbone();
+        b._headList("heads").forEach((headKey) => {
+          b._headList("matchings").forEach((matching) => names.push(`${backbone}_hm-${headKey}-${matching}`));
+        });
+        return names;
+      } },
+
+    { key: "augmentation", label: "augmentation", hint: "flips-only augmentation on/off on the shared base config, one trial per state",
+      at        : 9,
+      el        : "augEl",
+      available : (b) => Boolean(b.augTrialsLeaf),
+      make      : (b) => b._augmentationPanel(),
+      paint     : (b) => b._paintAugmentation(),
+      summary   : (b, gpus) => {
+        const n = b._augCells().length;
+        return `${n} augmentation state${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${b._seedsSuffix(n)}${gpus}`;
+      },
+      names     : (b, model) => b._augCells().map((cell) => `${model}_aug-${cell}`) },
+
+    { key: "normalization", label: "normalization", hint: "cumulative normalization ladder: pass amp, then ifg phase, then output amp, then output sigma switch from initial to final strategy",
+      at        : 10,
+      el        : "normEl",
+      available : (b) => b.normTrials.size > 0,
+      make      : (b) => b._normalizationPanel(),
+      paint     : (b) => b._paintNormalization(),
+      summary   : (b, gpus) => `baseline + 4 ladder rungs = 5 trials${b._seedsSuffix(5)}${gpus}`,
+      names     : (b, model) => ["nrm-0-initial", "nrm-1-pass_mag", "nrm-2-ifg_phase", "nrm-3-out_amp", "nrm-4-out_sigma"].map((rung) => `${model}_${rung}`) },
+
+    { key: "routing", label: "trunk routing", hint: "one trial per params/existence channel-group assignment, both trunks fixed at the shared parity feature ladders",
+      at        : 11,
+      el        : "routingEl",
+      available : (b) => b.routingTrials.size > 0,
+      make      : (b) => b._routingPanel(),
+      paint     : (b) => b._paintRouting(),
+      summary   : (b, gpus) => {
+        const n = Object.keys(b._routingTrialsDict()).length;
+        return `${n} routing assignment${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${b._seedsSuffix(n)}${gpus}`;
+      },
+      names     : (b, model) => Object.keys(b._routingTrialsDict()).map((label) => `${model}_di-${label}`) },
+
+    { key: "ratio",   label: "arm ratio", hint: "budget-matched params/existence width ladders, one trial per declared split; every model is built and its split verified at launch",
+      at        : 12,
+      el        : "ratioEl",
+      available : (b) => b.ratioTrials.size > 0,
+      make      : (b) => b._ratioPanel(),
+      paint     : (b) => b._paintRatio(),
+      summary   : (b, gpus) => {
+        const n = Object.keys(b._ratioTrialsDict()).length;
+        return `${n} arm split${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${b._seedsSuffix(n)}${gpus}`;
+      },
+      names     : (b, model) => Object.keys(b._ratioTrialsDict()).map((label) => `${model}_dr-${label}`) },
   ];
 
   static NORM_PRESETS = ["min_max", "min_max_log1p", "robust_iqr", "robust_iqr_log1p", "fixed_div_pi", "zscore", "zscore_log1p"];
@@ -607,20 +804,10 @@ class ExperimentBuilder {
     this.columnEls.complete = columns.appendChild(this._column("complete", "complete losses"));
     body.appendChild(columns);
 
-    if (this.modeLeaf) body.appendChild(this._warmupCatalogPanel());
-    if (this.modeLeaf && this.secondary.size)     body.appendChild(this._secondaryPanel());
-    if (this.modeLeaf && this.patch.size)         body.appendChild(this._patchPanel());
-    if (this.modeLeaf && this.physics.size)       body.appendChild(this._physicsPanel());
-    if (this.modeLeaf && this.pair.size)          body.appendChild(this._pairPanel());
-    if (this.modeLeaf && this.presenceTrialsLeaf) body.appendChild(this._presencePanel());
-    if (this.modeLeaf && this.inputTrialsLeaf)    body.appendChild(this._inputPanel());
-    if (this.modeLeaf && this.contextTrialsLeaf)  body.appendChild(this._contextPanel());
-    if (this.modeLeaf && this.reach.size)         body.appendChild(this._reachPanel());
-    if (this.modeLeaf && this.headTrials.size)    body.appendChild(this._headPanel());
-    if (this.modeLeaf && this.augTrialsLeaf)      body.appendChild(this._augmentationPanel());
-    if (this.modeLeaf && this.normTrials.size)    body.appendChild(this._normalizationPanel());
-    if (this.modeLeaf && this.routingTrials.size) body.appendChild(this._routingPanel());
-    if (this.modeLeaf && this.ratioTrials.size)   body.appendChild(this._ratioPanel());
+    if (this.modeLeaf) {
+      body.appendChild(this._warmupCatalogPanel());
+      this._panelModes().forEach((mode) => body.appendChild(mode.make(this)));
+    }
 
     const preview     = document.createElement("div");
     preview.className = "exp-builder__preview";
@@ -646,43 +833,21 @@ class ExperimentBuilder {
     if (!this.summaryEl) return;
     if (this._paintSwitch) this._paintSwitch();
     this._paintMode();
-    this._paintSecondary();
-    this._paintPatch();
-    this._paintPhysics();
-    this._paintPair();
-    this._paintPresence();
-    this._paintInput();
-    this._paintContext();
-    this._paintReach();
-    this._paintHead();
-    this._paintAugmentation();
-    this._paintNormalization();
-    this._paintRouting();
-    this._paintRatio();
-    this._paintWarmupCatalog();
+    ExperimentBuilder.MODES.forEach((mode) => { if (mode.paint) mode.paint(this); });
     this._paintSummary();
     this._paintNames();
   }
 
-  _modeAvailable(key) {
-    if (key === "secondary")     return this.secondary.size > 0;
-    if (key === "patch")         return this.patch.size > 0;
-    if (key === "physics")       return this.physics.size > 0;
-    if (key === "pair")          return this.pair.size > 0;
-    if (key === "presence")      return Boolean(this.presenceTrialsLeaf);
-    if (key === "input")         return Boolean(this.inputTrialsLeaf);
-    if (key === "context")       return Boolean(this.contextTrialsLeaf);
-    if (key === "reach")         return this.reach.size > 0;
-    if (key === "head")          return this.headTrials.size > 0;
-    if (key === "augmentation")  return Boolean(this.augTrialsLeaf);
-    if (key === "normalization") return this.normTrials.size > 0;
-    if (key === "routing")       return this.routingTrials.size > 0;
-    if (key === "ratio")         return this.ratioTrials.size > 0;
-    return Boolean(this.warmupLeaf && this.completeLeaf);
+  _modeEntry(key) {
+    return ExperimentBuilder.MODES.find((mode) => mode.key === key);
   }
 
   _modes() {
-    return ExperimentBuilder.MODES.filter((mode) => this._modeAvailable(mode.key));
+    return ExperimentBuilder.MODES.filter((mode) => mode.available(this));
+  }
+
+  _panelModes() {
+    return this._modes().filter((mode) => mode.make).sort((a, b) => a.at - b.at);
   }
 
   _mode() {
@@ -1035,31 +1200,11 @@ class ExperimentBuilder {
   }
 
   _physicsComponents() {
-    const leaf = this.physics.get("components");
-    if (!leaf) return [];
-
-    let raw = null;
-    try {
-      raw = PythonLiteral.parse(this.view._effective(leaf));
-    } catch (e) {
-      raw = null;
-    }
-    return Array.isArray(raw) ? raw.filter((value) => typeof value === "string") : [];
+    return this._listOf(this.physics.get("components"), (value) => typeof value === "string");
   }
 
   _physicsWeights() {
-    const leaf = this.physics.get("weights");
-    if (!leaf) return [];
-
-    let raw = null;
-    try {
-      raw = PythonLiteral.parse(this.view._effective(leaf));
-    } catch (e) {
-      raw = null;
-    }
-    if (!Array.isArray(raw)) return [];
-
-    return raw.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+    return this._numbersOf(this.physics.get("weights"));
   }
 
   _physicsBaselineOn() {
@@ -1068,16 +1213,7 @@ class ExperimentBuilder {
   }
 
   _physicsCurriculumStates() {
-    const leaf = this.physics.get("curriculum_states");
-    if (!leaf) return [];
-
-    let raw = null;
-    try {
-      raw = PythonLiteral.parse(this.view._effective(leaf));
-    } catch (e) {
-      raw = null;
-    }
-    return Array.isArray(raw) ? raw.filter((value) => typeof value === "boolean") : [];
+    return this._listOf(this.physics.get("curriculum_states"), (value) => typeof value === "boolean");
   }
 
   _emitPhysicsCurriculum(states) {
@@ -1089,15 +1225,8 @@ class ExperimentBuilder {
   }
 
   _togglePhysicsCurriculum(key) {
-    const current = this._physicsCurriculumStates();
-
-    if (current.includes(key)) {
-      if (current.length <= 1) return;
-      this._emitPhysicsCurriculum(current.filter((value) => value !== key));
-    } else {
-      const order = ExperimentBuilder.PHYSICS_CURRICULUM.map((entry) => entry.key);
-      this._emitPhysicsCurriculum(order.filter((value) => current.includes(value) || value === key));
-    }
+    const order = ExperimentBuilder.PHYSICS_CURRICULUM.map((entry) => entry.key);
+    this._toggleInCatalog(order, this._physicsCurriculumStates(), key, (states) => this._emitPhysicsCurriculum(states));
   }
 
   _emitPhysicsComponents(components) {
@@ -1118,46 +1247,8 @@ class ExperimentBuilder {
   }
 
   _togglePhysicsComponent(key) {
-    const current = this._physicsComponents();
-
-    if (current.includes(key)) {
-      if (current.length <= 1) return;
-      this._emitPhysicsComponents(current.filter((value) => value !== key));
-    } else {
-      const order = ExperimentBuilder.PHYSICS_COMPONENTS.map((entry) => entry.key);
-      this._emitPhysicsComponents(order.filter((value) => current.includes(value) || value === key));
-    }
-  }
-
-  _physicsWeightChip(weight, index, weights) {
-    const chip     = document.createElement("div");
-    chip.className = "exp-patch__chip";
-
-    const input      = document.createElement("input");
-    input.className  = "cfg-edit__input exp-patch__size";
-    input.type       = "number";
-    input.step       = "any";
-    input.min        = "0";
-    input.spellcheck = false;
-    input.value      = String(weight);
-    input.title      = "physics loss weight applied to the tested component";
-    input.addEventListener("change", () => {
-      const next  = weights.slice();
-      next[index] = Number(input.value);
-      this._emitPhysicsWeights(next);
-    });
-
-    const remove = LaunchWidgetDom.mini("×", () => {
-      const next = weights.slice();
-      next.splice(index, 1);
-      this._emitPhysicsWeights(next);
-    });
-    remove.classList.add("exp-patch__remove");
-    remove.title = "Remove weight";
-
-    chip.appendChild(input);
-    chip.appendChild(remove);
-    return chip;
+    const order = ExperimentBuilder.PHYSICS_COMPONENTS.map((entry) => entry.key);
+    this._toggleInCatalog(order, this._physicsComponents(), key, (components) => this._emitPhysicsComponents(components));
   }
 
   _paintPhysics() {
@@ -1167,13 +1258,7 @@ class ExperimentBuilder {
       this.physicsComponentsEl.innerHTML = "";
       const active = this._physicsComponents();
       ExperimentBuilder.PHYSICS_COMPONENTS.forEach(({ key, label }) => {
-        const on   = active.includes(key);
-        const chip = document.createElement("button");
-        chip.type        = "button";
-        chip.className   = "exp-name exp-presence__toggle" + (on ? " is-on" : "");
-        chip.textContent = label;
-        chip.title       = on ? "Click to drop this component from the sweep" : "Click to sweep this component";
-        chip.addEventListener("click", () => this._togglePhysicsComponent(key));
+        const chip = this._toggleChip(label, active.includes(key), "Click to drop this component from the sweep", "Click to sweep this component", () => this._togglePhysicsComponent(key));
         this.physicsComponentsEl.appendChild(chip);
       });
     }
@@ -1181,20 +1266,14 @@ class ExperimentBuilder {
     if (this.physicsWeightsEl) {
       const weights = this._physicsWeights();
       this.physicsWeightsEl.innerHTML = "";
-      weights.forEach((weight, index) => this.physicsWeightsEl.appendChild(this._physicsWeightChip(weight, index, weights)));
+      weights.forEach((weight, index) => this.physicsWeightsEl.appendChild(this._weightChip(weight, index, weights, "physics loss weight applied to the tested component", (next) => this._emitPhysicsWeights(next))));
     }
 
     if (this.physicsCurriculumEl) {
       this.physicsCurriculumEl.innerHTML = "";
       const states = this._physicsCurriculumStates();
       ExperimentBuilder.PHYSICS_CURRICULUM.forEach(({ key, label }) => {
-        const on   = states.includes(key);
-        const chip = document.createElement("button");
-        chip.type        = "button";
-        chip.className   = "exp-name exp-presence__toggle" + (on ? " is-on" : "");
-        chip.textContent = label;
-        chip.title       = on ? "Click to drop this curriculum state from the sweep" : "Click to sweep this curriculum state";
-        chip.addEventListener("click", () => this._togglePhysicsCurriculum(key));
+        const chip = this._toggleChip(label, states.includes(key), "Click to drop this curriculum state from the sweep", "Click to sweep this curriculum state", () => this._togglePhysicsCurriculum(key));
         this.physicsCurriculumEl.appendChild(chip);
       });
     }
@@ -1319,31 +1398,11 @@ class ExperimentBuilder {
   }
 
   _pairCandidates() {
-    const leaf = this.pair.get("components");
-    if (!leaf) return [];
-
-    let raw = null;
-    try {
-      raw = PythonLiteral.parse(this.view._effective(leaf));
-    } catch (e) {
-      raw = null;
-    }
-    return Array.isArray(raw) ? raw.filter((value) => typeof value === "string") : [];
+    return this._listOf(this.pair.get("components"), (value) => typeof value === "string");
   }
 
   _pairWeights() {
-    const leaf = this.pair.get("weights");
-    if (!leaf) return [];
-
-    let raw = null;
-    try {
-      raw = PythonLiteral.parse(this.view._effective(leaf));
-    } catch (e) {
-      raw = null;
-    }
-    if (!Array.isArray(raw)) return [];
-
-    return raw.map((value) => Number(value)).filter((value) => Number.isFinite(value));
+    return this._numbersOf(this.pair.get("weights"));
   }
 
   _pairBaselineOn() {
@@ -1381,45 +1440,7 @@ class ExperimentBuilder {
 
   _togglePairCandidate(name) {
     if (name === this._pairBase()) return;
-
-    const current = this._pairCandidates();
-    if (current.includes(name)) {
-      if (current.length <= 1) return;
-      this._emitPairCandidates(current.filter((value) => value !== name));
-    } else {
-      this._emitPairCandidates(ExperimentBuilder.PAIR_COMPONENTS.filter((value) => current.includes(value) || value === name));
-    }
-  }
-
-  _pairWeightChip(weight, index, weights) {
-    const chip     = document.createElement("div");
-    chip.className = "exp-patch__chip";
-
-    const input      = document.createElement("input");
-    input.className  = "cfg-edit__input exp-patch__size";
-    input.type       = "number";
-    input.step       = "any";
-    input.min        = "0";
-    input.spellcheck = false;
-    input.value      = String(weight);
-    input.title      = "weight of the second component";
-    input.addEventListener("change", () => {
-      const next  = weights.slice();
-      next[index] = Number(input.value);
-      this._emitPairWeights(next);
-    });
-
-    const remove = LaunchWidgetDom.mini("×", () => {
-      const next = weights.slice();
-      next.splice(index, 1);
-      this._emitPairWeights(next);
-    });
-    remove.classList.add("exp-patch__remove");
-    remove.title = "Remove weight";
-
-    chip.appendChild(input);
-    chip.appendChild(remove);
-    return chip;
+    this._toggleInCatalog(ExperimentBuilder.PAIR_COMPONENTS, this._pairCandidates(), name, (candidates) => this._emitPairCandidates(candidates));
   }
 
   _paintPair() {
@@ -1433,13 +1454,7 @@ class ExperimentBuilder {
       const active = this._pairCandidates();
       ExperimentBuilder.PAIR_COMPONENTS.forEach((name) => {
         if (name === base) return;
-        const on   = active.includes(name);
-        const chip = document.createElement("button");
-        chip.type        = "button";
-        chip.className   = "exp-name exp-presence__toggle" + (on ? " is-on" : "");
-        chip.textContent = name;
-        chip.title       = on ? "Click to drop this component from the sweep" : "Click to test this component as the second term";
-        chip.addEventListener("click", () => this._togglePairCandidate(name));
+        const chip = this._toggleChip(name, active.includes(name), "Click to drop this component from the sweep", "Click to test this component as the second term", () => this._togglePairCandidate(name));
         this.pairCandidatesEl.appendChild(chip);
       });
     }
@@ -1447,7 +1462,7 @@ class ExperimentBuilder {
     if (this.pairWeightsEl) {
       const weights = this._pairWeights();
       this.pairWeightsEl.innerHTML = "";
-      weights.forEach((weight, index) => this.pairWeightsEl.appendChild(this._pairWeightChip(weight, index, weights)));
+      weights.forEach((weight, index) => this.pairWeightsEl.appendChild(this._weightChip(weight, index, weights, "weight of the second component", (next) => this._emitPairWeights(next))));
     }
 
     this.patchFlagPaints.forEach((paint) => paint());
@@ -1460,23 +1475,11 @@ class ExperimentBuilder {
   }
 
   _presenceDefaults() {
-    if (!this.presenceTrialsLeaf) return {};
-    try {
-      const raw = PythonLiteral.parse(this.presenceTrialsLeaf.value);
-      return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-    } catch (e) {
-      return {};
-    }
+    return this._defaultsDict(this.presenceTrialsLeaf);
   }
 
   _presenceTrials() {
-    if (!this.presenceTrialsLeaf) return {};
-    try {
-      const raw = PythonLiteral.parse(this.view._effective(this.presenceTrialsLeaf));
-      return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-    } catch (e) {
-      return {};
-    }
+    return this._trialsDict(this.presenceTrialsLeaf);
   }
 
   _presenceCells() {
@@ -1527,49 +1530,17 @@ class ExperimentBuilder {
 
   _paintPresence() {
     if (!this.presenceCellsEl) return;
-    this.presenceCellsEl.innerHTML = "";
-
-    const active = this._presenceTrials();
-    const cells  = { ...this._presenceDefaults() };
-    Object.entries(active).forEach(([cell, spec]) => { if (!(cell in cells)) cells[cell] = spec; });
-
-    Object.entries(cells).forEach(([cell, spec]) => {
-      const on   = Object.prototype.hasOwnProperty.call(active, cell);
-      const chip = document.createElement("button");
-      chip.type        = "button";
-      chip.className   = "exp-name exp-presence__toggle" + (on ? " is-on" : "");
-      chip.textContent = this._presenceChipText(cell, spec);
-      chip.title       = on ? "Click to drop this cell" : "Click to add this cell";
-      chip.addEventListener("click", () => this._togglePresenceCell(cell));
-      this.presenceCellsEl.appendChild(chip);
-    });
-  }
-
-  _emitPresence(leaf, value) {
-    this.view._setValue(leaf, PythonLiteral.render(value));
-    this._paintPresence();
-    this._paintSummary();
-    this._paintNames();
+    this._paintDictCells(this.presenceCellsEl, this._presenceTrials(), this._presenceDefaults(), (cell, spec) => this._presenceChipText(cell, spec), "Click to drop this cell", "Click to add this cell", (cell) => this._togglePresenceCell(cell));
   }
 
   _togglePresenceCell(cell) {
     if (!this.presenceTrialsLeaf) return;
-    const trials   = this._presenceTrials();
-    const defaults = this._presenceDefaults();
 
-    if (Object.prototype.hasOwnProperty.call(trials, cell)) {
-      if (Object.keys(trials).length <= 1) return;
-      delete trials[cell];
-    } else {
-      if (!Object.prototype.hasOwnProperty.call(defaults, cell)) return;
-      trials[cell] = defaults[cell];
-    }
+    const ordered = this._toggleDictCell(this._presenceTrials(), this._presenceDefaults(), cell);
+    if (!ordered) return;
 
-    const ordered = {};
-    Object.keys(defaults).forEach((key) => { if (Object.prototype.hasOwnProperty.call(trials, key)) ordered[key] = trials[key]; });
-    Object.keys(trials).forEach((key) => { if (!Object.prototype.hasOwnProperty.call(ordered, key)) ordered[key] = trials[key]; });
-
-    this._emitPresence(this.presenceTrialsLeaf, ordered);
+    this.view._setValue(this.presenceTrialsLeaf, PythonLiteral.render(ordered));
+    this._repaintPresence();
   }
 
   _resetPresence() {
@@ -1584,13 +1555,7 @@ class ExperimentBuilder {
   }
 
   _inputTrials() {
-    if (!this.inputTrialsLeaf) return {};
-    try {
-      const raw = PythonLiteral.parse(this.view._effective(this.inputTrialsLeaf));
-      return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-    } catch (e) {
-      return {};
-    }
+    return this._trialsDict(this.inputTrialsLeaf);
   }
 
   _inputCells() {
@@ -1654,19 +1619,8 @@ class ExperimentBuilder {
   }
 
   _inputCellChip(cell, spec) {
-    const chip     = document.createElement("span");
-    chip.className = "exp-name exp-presence__cell";
-    chip.title     = this._inputSpecText(spec);
-
-    const label       = document.createElement("span");
-    label.textContent = `${cell} · ${this._inputSpecText(spec)}`;
-    chip.appendChild(label);
-
-    const remove = LaunchWidgetDom.mini("×", () => this._removeInputCell(cell));
-    remove.classList.add("exp-presence__remove");
-    remove.title = "Remove variant";
-    chip.appendChild(remove);
-    return chip;
+    const text = this._inputSpecText(spec);
+    return this._cellChip(`${cell} · ${text}`, text, "Remove variant", () => this._removeInputCell(cell));
   }
 
   _removeInputCell(cell) {
@@ -1695,24 +1649,11 @@ class ExperimentBuilder {
   }
 
   _contextTrials() {
-    if (!this.contextTrialsLeaf) return [];
-    try {
-      const raw = PythonLiteral.parse(this.view._effective(this.contextTrialsLeaf));
-      return Array.isArray(raw) ? raw : [];
-    } catch (e) {
-      return [];
-    }
+    return this._listOf(this.contextTrialsLeaf, () => true);
   }
 
   _reachRungs() {
-    const leaf = this.reach.get("rungs");
-    if (!leaf) return [];
-    try {
-      const raw = PythonLiteral.parse(this.view._effective(leaf));
-      return Array.isArray(raw) ? raw.filter((rung) => rung && rung.label && rung.backbone) : [];
-    } catch (e) {
-      return [];
-    }
+    return this._listOf(this.reach.get("rungs"), (rung) => rung && rung.label && rung.backbone);
   }
 
   _reachPatch() {
@@ -1768,18 +1709,7 @@ class ExperimentBuilder {
   }
 
   _contextChip(rung) {
-    const chip     = document.createElement("span");
-    chip.className = "exp-name exp-presence__cell";
-
-    const label       = document.createElement("span");
-    label.textContent = `${rung.label} · ${rung.backbone}`;
-    chip.appendChild(label);
-
-    const remove = LaunchWidgetDom.mini("×", () => this._removeContextCell(rung.label));
-    remove.classList.add("exp-presence__remove");
-    remove.title = "Remove rung";
-    chip.appendChild(remove);
-    return chip;
+    return this._cellChip(`${rung.label} · ${rung.backbone}`, null, "Remove rung", () => this._removeContextCell(rung.label));
   }
 
   _removeContextCell(label) {
@@ -1884,18 +1814,7 @@ class ExperimentBuilder {
   }
 
   _reachChip(rung) {
-    const chip     = document.createElement("span");
-    chip.className = "exp-name exp-presence__cell";
-
-    const label       = document.createElement("span");
-    label.textContent = `${rung.label} · ${rung.backbone}`;
-    chip.appendChild(label);
-
-    const remove = LaunchWidgetDom.mini("×", () => this._removeReachCell(rung.label));
-    remove.classList.add("exp-presence__remove");
-    remove.title = "Remove arm";
-    chip.appendChild(remove);
-    return chip;
+    return this._cellChip(`${rung.label} · ${rung.backbone}`, null, "Remove arm", () => this._removeReachCell(rung.label));
   }
 
   _removeReachCell(label) {
@@ -1920,23 +1839,11 @@ class ExperimentBuilder {
   }
 
   _augDefaults() {
-    if (!this.augTrialsLeaf) return {};
-    try {
-      const raw = PythonLiteral.parse(this.augTrialsLeaf.value);
-      return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-    } catch (e) {
-      return {};
-    }
+    return this._defaultsDict(this.augTrialsLeaf);
   }
 
   _augTrials() {
-    if (!this.augTrialsLeaf) return {};
-    try {
-      const raw = PythonLiteral.parse(this.view._effective(this.augTrialsLeaf));
-      return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-    } catch (e) {
-      return {};
-    }
+    return this._trialsDict(this.augTrialsLeaf);
   }
 
   _augCells() {
@@ -1984,40 +1891,14 @@ class ExperimentBuilder {
 
   _paintAugmentation() {
     if (!this.augCellsEl) return;
-    this.augCellsEl.innerHTML = "";
-
-    const active = this._augTrials();
-    const cells  = { ...this._augDefaults() };
-    Object.entries(active).forEach(([cell, enabled]) => { if (!(cell in cells)) cells[cell] = enabled; });
-
-    Object.entries(cells).forEach(([cell, enabled]) => {
-      const on   = Object.prototype.hasOwnProperty.call(active, cell);
-      const chip = document.createElement("button");
-      chip.type        = "button";
-      chip.className   = "exp-name exp-presence__toggle" + (on ? " is-on" : "");
-      chip.textContent = this._augChipText(cell, enabled);
-      chip.title       = on ? "Click to drop this state" : "Click to add this state";
-      chip.addEventListener("click", () => this._toggleAugCell(cell));
-      this.augCellsEl.appendChild(chip);
-    });
+    this._paintDictCells(this.augCellsEl, this._augTrials(), this._augDefaults(), (cell, enabled) => this._augChipText(cell, enabled), "Click to drop this state", "Click to add this state", (cell) => this._toggleAugCell(cell));
   }
 
   _toggleAugCell(cell) {
     if (!this.augTrialsLeaf) return;
-    const trials   = this._augTrials();
-    const defaults = this._augDefaults();
 
-    if (Object.prototype.hasOwnProperty.call(trials, cell)) {
-      if (Object.keys(trials).length <= 1) return;
-      delete trials[cell];
-    } else {
-      if (!Object.prototype.hasOwnProperty.call(defaults, cell)) return;
-      trials[cell] = defaults[cell];
-    }
-
-    const ordered = {};
-    Object.keys(defaults).forEach((key) => { if (Object.prototype.hasOwnProperty.call(trials, key)) ordered[key] = trials[key]; });
-    Object.keys(trials).forEach((key) => { if (!Object.prototype.hasOwnProperty.call(ordered, key)) ordered[key] = trials[key]; });
+    const ordered = this._toggleDictCell(this._augTrials(), this._augDefaults(), cell);
+    if (!ordered) return;
 
     this.view._setValue(this.augTrialsLeaf, PythonLiteral.render(ordered));
     this._repaintAugmentation();
@@ -2129,16 +2010,7 @@ class ExperimentBuilder {
   }
 
   _headList(key) {
-    const leaf = this.headTrials.get(key);
-    if (!leaf) return [];
-
-    let raw = null;
-    try {
-      raw = PythonLiteral.parse(this.view._effective(leaf));
-    } catch (e) {
-      raw = null;
-    }
-    return Array.isArray(raw) ? raw.filter((value) => typeof value === "string") : [];
+    return this._listOf(this.headTrials.get(key), (value) => typeof value === "string");
   }
 
   _headBackbone() {
@@ -2155,15 +2027,8 @@ class ExperimentBuilder {
   }
 
   _toggleHeadOption(key, option, catalog) {
-    const current = this._headList(key);
-
-    if (current.includes(option)) {
-      if (current.length <= 1) return;
-      this._emitHeadList(key, current.filter((value) => value !== option));
-    } else {
-      const order = catalog.map((entry) => entry.key);
-      this._emitHeadList(key, order.filter((value) => current.includes(value) || value === option));
-    }
+    const order = catalog.map((entry) => entry.key);
+    this._toggleInCatalog(order, this._headList(key), option, (values) => this._emitHeadList(key, values));
   }
 
   _headPanel() {
@@ -2236,13 +2101,7 @@ class ExperimentBuilder {
       el.innerHTML = "";
       const active = this._headList(key);
       catalog.forEach(({ key: option, label }) => {
-        const on   = active.includes(option);
-        const chip = document.createElement("button");
-        chip.type        = "button";
-        chip.className   = "exp-name exp-presence__toggle" + (on ? " is-on" : "");
-        chip.textContent = label;
-        chip.title       = on ? "Click to drop this option from the grid" : "Click to add this option to the grid";
-        chip.addEventListener("click", () => this._toggleHeadOption(key, option, catalog));
+        const chip = this._toggleChip(label, active.includes(option), "Click to drop this option from the grid", "Click to add this option to the grid", () => this._toggleHeadOption(key, option, catalog));
         el.appendChild(chip);
       });
     };
@@ -2271,13 +2130,11 @@ class ExperimentBuilder {
   }
 
   _trialsDict(leaf) {
-    if (!leaf) return {};
-    try {
-      const raw = PythonLiteral.parse(this.view._effective(leaf));
-      return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
-    } catch (e) {
-      return {};
-    }
+    return leaf ? this._dictFrom(this.view._effective(leaf)) : {};
+  }
+
+  _defaultsDict(leaf) {
+    return leaf ? this._dictFrom(leaf.value) : {};
   }
 
   _routingSpecText(spec) {
@@ -2407,19 +2264,127 @@ class ExperimentBuilder {
   }
 
   _trialChip(label, text, remove) {
+    return this._cellChip(`${label} · ${text}`, text, "Remove trial", remove);
+  }
+
+  _listOf(leaf, keep) {
+    if (!leaf) return [];
+
+    let raw = null;
+    try {
+      raw = PythonLiteral.parse(this.view._effective(leaf));
+    } catch (e) {
+      raw = null;
+    }
+    return Array.isArray(raw) ? raw.filter(keep) : [];
+  }
+
+  _numbersOf(leaf) {
+    return this._listOf(leaf, () => true).map((value) => Number(value)).filter((value) => Number.isFinite(value));
+  }
+
+  _dictFrom(text) {
+    try {
+      const raw = PythonLiteral.parse(text);
+      return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
+    } catch (e) {
+      return {};
+    }
+  }
+
+  _toggleChip(label, on, onTitle, offTitle, onClick) {
+    const chip       = document.createElement("button");
+    chip.type        = "button";
+    chip.className   = "exp-name exp-presence__toggle" + (on ? " is-on" : "");
+    chip.textContent = label;
+    chip.title       = on ? onTitle : offTitle;
+    chip.addEventListener("click", onClick);
+    return chip;
+  }
+
+  _cellChip(text, title, removeTitle, remove) {
     const chip     = document.createElement("span");
     chip.className = "exp-name exp-presence__cell";
-    chip.title     = text;
+    if (title != null) chip.title = title;
 
     const body       = document.createElement("span");
-    body.textContent = `${label} · ${text}`;
+    body.textContent = text;
     chip.appendChild(body);
 
     const drop = LaunchWidgetDom.mini("×", remove);
     drop.classList.add("exp-presence__remove");
-    drop.title = "Remove trial";
+    drop.title = removeTitle;
     chip.appendChild(drop);
     return chip;
+  }
+
+  _weightChip(weight, index, weights, title, emit) {
+    const chip     = document.createElement("div");
+    chip.className = "exp-patch__chip";
+
+    const input      = document.createElement("input");
+    input.className  = "cfg-edit__input exp-patch__size";
+    input.type       = "number";
+    input.step       = "any";
+    input.min        = "0";
+    input.spellcheck = false;
+    input.value      = String(weight);
+    input.title      = title;
+    input.addEventListener("change", () => {
+      const next  = weights.slice();
+      next[index] = Number(input.value);
+      emit(next);
+    });
+
+    const remove = LaunchWidgetDom.mini("×", () => {
+      const next = weights.slice();
+      next.splice(index, 1);
+      emit(next);
+    });
+    remove.classList.add("exp-patch__remove");
+    remove.title = "Remove weight";
+
+    chip.appendChild(input);
+    chip.appendChild(remove);
+    return chip;
+  }
+
+  _toggleInCatalog(order, current, key, emit) {
+    if (current.includes(key)) {
+      if (current.length <= 1) return;
+      emit(current.filter((value) => value !== key));
+      return;
+    }
+    emit(order.filter((value) => current.includes(value) || value === key));
+  }
+
+  _paintDictCells(el, trials, defaults, text, onTitle, offTitle, toggle) {
+    el.innerHTML = "";
+
+    const cells = { ...defaults };
+    Object.entries(trials).forEach(([cell, spec]) => { if (!(cell in cells)) cells[cell] = spec; });
+
+    Object.entries(cells).forEach(([cell, spec]) => {
+      const on = Object.prototype.hasOwnProperty.call(trials, cell);
+      el.appendChild(this._toggleChip(text(cell, spec), on, onTitle, offTitle, () => toggle(cell)));
+    });
+  }
+
+  _toggleDictCell(trials, defaults, cell) {
+    const has = (dict, key) => Object.prototype.hasOwnProperty.call(dict, key);
+
+    if (has(trials, cell)) {
+      if (Object.keys(trials).length <= 1) return null;
+      delete trials[cell];
+    } else {
+      if (!has(defaults, cell)) return null;
+      trials[cell] = defaults[cell];
+    }
+
+    const ordered = {};
+    Object.keys(defaults).forEach((key) => { if (has(trials, key)) ordered[key] = trials[key]; });
+    Object.keys(trials).forEach((key) => { if (!has(ordered, key)) ordered[key] = trials[key]; });
+    return ordered;
   }
 
   _removeTrialKey(leaf, label, repaint) {
@@ -2483,24 +2448,13 @@ class ExperimentBuilder {
 
     this.modeButtons.forEach((btn, key) => btn.classList.toggle("is-on", key === mode));
     if (this.modeEl) this.modeEl.classList.toggle("is-dirty", this.view.dirty[this.modeLeaf.path] !== undefined);
-    if (this.hintEl) this.hintEl.textContent = ExperimentBuilder.MODES.find((entry) => entry.key === mode).hint;
+    if (this.hintEl) this.hintEl.textContent = this._modeEntry(mode).hint;
 
-    if (this.columnsEl)          this.columnsEl.hidden          = mode !== "curriculum";
     if (this.columnEls.complete) this.columnEls.complete.hidden = mode !== "curriculum";
-    if (this.warmupCatalogEl)    this.warmupCatalogEl.hidden    = mode !== "warmup";
-    if (this.secondaryEl)        this.secondaryEl.hidden        = mode !== "secondary";
-    if (this.patchEl)            this.patchEl.hidden            = mode !== "patch";
-    if (this.physicsEl)          this.physicsEl.hidden          = mode !== "physics";
-    if (this.pairEl)             this.pairEl.hidden             = mode !== "pair";
-    if (this.presenceEl)         this.presenceEl.hidden         = mode !== "presence";
-    if (this.inputEl)            this.inputEl.hidden            = mode !== "input";
-    if (this.contextEl)          this.contextEl.hidden          = mode !== "context";
-    if (this.reachEl)            this.reachEl.hidden            = mode !== "reach";
-    if (this.headEl)             this.headEl.hidden             = mode !== "head";
-    if (this.augEl)              this.augEl.hidden              = mode !== "augmentation";
-    if (this.normEl)             this.normEl.hidden             = mode !== "normalization";
-    if (this.routingEl)          this.routingEl.hidden          = mode !== "routing";
-    if (this.ratioEl)            this.ratioEl.hidden            = mode !== "ratio";
+    ExperimentBuilder.MODES.forEach((entry) => {
+      const el = this[entry.el];
+      if (el) el.hidden = mode !== entry.key;
+    });
   }
 
   _paintSecondary() {
@@ -2659,10 +2613,7 @@ class ExperimentBuilder {
     this.variants.complete = this._variantsFrom(this.completeLeaf);
     if (this._paintSwitch) this._paintSwitch();
     this._paintMode();
-    this._paintSecondary();
-    this._paintPatch();
-    this._paintPhysics();
-    this._paintPair();
+    ExperimentBuilder.MODES.forEach((mode) => { if (mode.paint) mode.paint(this); });
     this._paintAll();
   }
 
@@ -2964,10 +2915,6 @@ class ExperimentBuilder {
   }
 
   _paintSummary() {
-    const nWarm = this.variants.warmup.length;
-    const nComp = this.variants.complete.length;
-    const mode  = this._mode();
-
     let gpus = "";
     if (this.gpusLeaf) {
       try {
@@ -2978,171 +2925,32 @@ class ExperimentBuilder {
       }
     }
 
-    if (mode === "warmup") {
-      this.summaryEl.textContent = `${nWarm} warmup loss${nWarm === 1 ? "" : "es"} = ${nWarm} trial${nWarm === 1 ? "" : "s"}${this._seedsSuffix(nWarm)}${gpus}`;
-      return;
-    }
-
-    if (mode === "secondary") {
-      const strategy = this._strategy();
-      const sampled  = strategy === "uniform" || strategy === "gaussian";
-      const count    = sampled ? `${this._secondaryEffective("n_trials")} trials` : "trial count set by the stack";
-      this.summaryEl.textContent = `${strategy}, ${this._secondaryEffective("n_secondaries")} secondaries, ${count}${this._seedsSuffix(null)}${gpus}`;
-      return;
-    }
-
-    if (mode === "patch") {
-      const n = this._patchSizes().length;
-      this.summaryEl.textContent = `${n} patch size${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${this._seedsSuffix(n)}${gpus}`;
-      return;
-    }
-
-    if (mode === "physics") {
-      const nComp    = this._physicsComponents().length;
-      const nWeight  = this._physicsWeights().length;
-      const nCur     = this._physicsCurriculumStates().length;
-      const baseline = this._physicsBaselineOn();
-      const total    = nComp * nWeight * nCur + (baseline ? nCur : 0);
-      this.summaryEl.textContent = `${nComp} component${nComp === 1 ? "" : "s"} x ${nWeight} weight${nWeight === 1 ? "" : "s"} x ${nCur} curriculum${baseline ? ` + ${nCur} baseline` : ""} = ${total} trial${total === 1 ? "" : "s"}${this._seedsSuffix(total)}${gpus}`;
-      return;
-    }
-
-    if (mode === "pair") {
-      const nCand    = this._pairCandidates().length;
-      const nWeight  = this._pairWeights().length;
-      const baseline = this._pairBaselineOn();
-      const total    = nCand * nWeight + (baseline ? 1 : 0);
-      this.summaryEl.textContent = `${this._pairBase()} + ${nCand} candidate${nCand === 1 ? "" : "s"} x ${nWeight} weight${nWeight === 1 ? "" : "s"}${baseline ? " + baseline" : ""} = ${total} trial${total === 1 ? "" : "s"}${this._seedsSuffix(total)}${gpus}`;
-      return;
-    }
-
-    if (mode === "presence") {
-      const cells = this._presenceCells().length;
-      this.summaryEl.textContent = `${cells} presence cell${cells === 1 ? "" : "s"} = ${cells} trial${cells === 1 ? "" : "s"}${this._seedsSuffix(cells)}${gpus}`;
-      return;
-    }
-
-    if (mode === "input") {
-      const trials = this._inputTrials();
-      const n      = Object.keys(trials).length;
-      const nAll   = Object.values(trials).filter((spec) => spec && spec.tracks === "all").length;
-      this.summaryEl.textContent = `${n} input variant${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"} (${nAll} all tracks, ${n - nAll} reduced)${this._seedsSuffix(n)}${gpus}`;
-      return;
-    }
-
-    if (mode === "context") {
-      const n = this._contextTrials().length;
-      this.summaryEl.textContent = `${n} backbone${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${this._seedsSuffix(n)}${gpus}`;
-      return;
-    }
-
-    if (mode === "reach") {
-      const rungs = this._reachRungs();
-      const n     = rungs.length;
-      const patch = this._reachPatch();
-      this.summaryEl.textContent = `${n} size-matched arm${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"} on a shared ${patch} patch${this._seedsSuffix(n)}${gpus}`;
-      return;
-    }
-
-    if (mode === "head") {
-      const nHeads     = this._headList("heads").length;
-      const nMatchings = this._headList("matchings").length;
-      const total      = nHeads * nMatchings;
-      this.summaryEl.textContent = `${nHeads} head${nHeads === 1 ? "" : "s"} x ${nMatchings} matching${nMatchings === 1 ? "" : "s"} = ${total} trial${total === 1 ? "" : "s"} on ${this._headBackbone()}${this._seedsSuffix(total)}${gpus}`;
-      return;
-    }
-
-    if (mode === "augmentation") {
-      const n = this._augCells().length;
-      this.summaryEl.textContent = `${n} augmentation state${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${this._seedsSuffix(n)}${gpus}`;
-      return;
-    }
-
-    if (mode === "normalization") {
-      this.summaryEl.textContent = `baseline + 4 ladder rungs = 5 trials${this._seedsSuffix(5)}${gpus}`;
-      return;
-    }
-
-    if (mode === "routing") {
-      const n = Object.keys(this._routingTrialsDict()).length;
-      this.summaryEl.textContent = `${n} routing assignment${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${this._seedsSuffix(n)}${gpus}`;
-      return;
-    }
-
-    if (mode === "ratio") {
-      const n = Object.keys(this._ratioTrialsDict()).length;
-      this.summaryEl.textContent = `${n} arm split${n === 1 ? "" : "s"} = ${n} trial${n === 1 ? "" : "s"}${this._seedsSuffix(n)}${gpus}`;
-      return;
-    }
-
-    this.summaryEl.textContent = `${nWarm} warmup x ${nComp} complete = ${nWarm * nComp} trials${this._seedsSuffix(nWarm * nComp)}${gpus}`;
+    this.summaryEl.textContent = this._modeEntry(this._mode()).summary(this, gpus);
   }
 
   _paintNames() {
     this.namesEl.innerHTML = "";
     const model = this.modelLeaf ? this.view._effective(this.modelLeaf) : "model";
-    const mode  = this._mode();
+    const entry = this._modeEntry(this._mode());
 
-    if (mode === "secondary") {
+    if (entry.pattern) {
+      const spec = entry.pattern(this, model);
+
       const pattern       = document.createElement("span");
       pattern.className   = "exp-name";
-      pattern.textContent = `${model}_sec-${this._strategy()}-tNN_<labels>`;
+      pattern.textContent = spec.text;
       this.namesEl.appendChild(pattern);
 
       const more       = document.createElement("span");
       more.className   = "exp-name exp-name--more";
-      more.textContent = "one per selection, labels resolved from the dataset stack";
+      more.textContent = spec.note;
       this.namesEl.appendChild(more);
 
       SeedAxisNote.append(this.namesEl, this.view, this.seedsLeaf);
       return;
     }
 
-    const names = [];
-    if (mode === "patch") {
-      this._patchSizes().forEach((size) => names.push(`${model}_p-${size}`));
-    } else if (mode === "physics") {
-      const suffixes = this._physicsCurriculumStates().map((state) => state ? "cur" : "nc");
-      if (this._physicsBaselineOn()) suffixes.forEach((suffix) => names.push(`${model}_phys-baseline-${suffix}`));
-      this._physicsComponents().forEach((component) => {
-        this._physicsWeights().forEach((weight) => {
-          suffixes.forEach((suffix) => names.push(`${model}_phys-${component}-w${weight}-${suffix}`));
-        });
-      });
-    } else if (mode === "pair") {
-      if (this._pairBaselineOn()) names.push(`${model}_pair-baseline`);
-      this._pairCandidates().forEach((component) => {
-        this._pairWeights().forEach((weight) => names.push(`${model}_pair-${component}-w${weight}`));
-      });
-    } else if (mode === "presence") {
-      this._presenceCells().forEach((cell) => names.push(`${model}_pr-${cell}`));
-    } else if (mode === "input") {
-      this._inputCells().forEach((cell) => names.push(`${model}_in-${cell}`));
-    } else if (mode === "context") {
-      this._contextTrials().forEach((rung) => names.push(`${rung.backbone}_ctx-${rung.label}`));
-    } else if (mode === "reach") {
-      this._reachRungs().forEach((rung) => names.push(`${rung.backbone}_reach-${rung.label}`));
-    } else if (mode === "head") {
-      const backbone = this._headBackbone();
-      this._headList("heads").forEach((headKey) => {
-        this._headList("matchings").forEach((matching) => names.push(`${backbone}_hm-${headKey}-${matching}`));
-      });
-    } else if (mode === "augmentation") {
-      this._augCells().forEach((cell) => names.push(`${model}_aug-${cell}`));
-    } else if (mode === "routing") {
-      Object.keys(this._routingTrialsDict()).forEach((label) => names.push(`${model}_di-${label}`));
-    } else if (mode === "ratio") {
-      Object.keys(this._ratioTrialsDict()).forEach((label) => names.push(`${model}_dr-${label}`));
-    } else if (mode === "normalization") {
-      ["nrm-0-initial", "nrm-1-pass_mag", "nrm-2-ifg_phase", "nrm-3-out_amp", "nrm-4-out_sigma"].forEach((rung) => names.push(`${model}_${rung}`));
-    } else if (mode === "warmup") {
-      this.variants.warmup.forEach((w) => names.push(`${model}_nc-${w.label}`));
-    } else {
-      this.variants.warmup.forEach((w) => {
-        this.variants.complete.forEach((c) => names.push(`${model}_w-${w.label}_c-${c.label}`));
-      });
-    }
-
+    const names = entry.names(this, model);
     const limit = 12;
     names.slice(0, limit).forEach((name) => {
       const chip       = document.createElement("span");
@@ -3930,10 +3738,7 @@ class NumberField {
     this.default = Number.isFinite(Number(leaf.value)) ? Number(leaf.value) : 0;
     this.log     = false;
     this.range   = this._resolve(spec);
-    this.logMin  = 0;
-    this.logMax  = 0;
     this.input   = null;
-    this.slider  = null;
     this.chips   = new Map();
     this.reset   = () => this._paint();
   }
@@ -3952,16 +3757,9 @@ class NumberField {
     input.spellcheck = false;
     this.input       = input;
 
-    const slider     = document.createElement("input");
-    slider.className = "numfield__slider";
-    slider.type      = "range";
-    this.slider      = slider;
-    this._configureSlider();
-
     input.addEventListener("input", () => {
       const raw = input.value;
       const v   = Number(raw);
-      if (raw !== "" && Number.isFinite(v)) slider.value = String(this._toSlider(v));
       const out = raw === "" ? "" : (v === this.default ? this.leaf.value : raw);
       this.view._setValue(this.leaf, out);
       this._mark();
@@ -4020,48 +3818,10 @@ class NumberField {
     return [...seen.values()].sort((a, b) => a - b).slice(0, 8);
   }
 
-  _configureSlider() {
-    if (this.range.log) {
-      this.logMin = this.range.min > 0 ? this.range.min : this.range.max / 1e6;
-      this.logMax = this.range.max;
-      this.slider.min  = "0";
-      this.slider.max  = "1000";
-      this.slider.step = "1";
-      return;
-    }
-    this.slider.min  = String(this.range.min);
-    this.slider.max  = String(this.range.max);
-    this.slider.step = String(this.range.step);
-  }
-
-  _toSlider(v) {
-    if (this.range.log) {
-      if (v <= 0) return 0;
-      const lo = Math.log(this.logMin);
-      const hi = Math.log(this.logMax);
-      const t  = 1000 * (Math.log(this._clamp(v, this.logMin, this.logMax)) - lo) / (hi - lo);
-      return Math.round(this._clamp(t, 0, 1000));
-    }
-    return this._clamp(v, this.range.min, this.range.max);
-  }
-
-  _fromSlider() {
-    if (this.range.log) {
-      const lo = Math.log(this.logMin);
-      const hi = Math.log(this.logMax);
-      return Math.exp(lo + (Number(this.slider.value) / 1000) * (hi - lo));
-    }
-    return Number(this.slider.value);
-  }
-
   _fmt(v) {
     if (this.integer) return String(Math.round(v));
     if (v === 0) return "0";
     return String(Number(v.toPrecision(this.log ? 2 : 6)));
-  }
-
-  _clamp(x, a, b) {
-    return Math.min(b, Math.max(a, x));
   }
 
   _chip(value) {
@@ -4071,8 +3831,7 @@ class NumberField {
     chip.textContent = this._fmt(value);
     chip.title       = `set ${this.short} = ${this._fmt(value)}`;
     chip.addEventListener("click", () => {
-      this.input.value  = this._fmt(value);
-      this.slider.value = String(this._toSlider(value));
+      this.input.value = this._fmt(value);
       const out = value === this.default ? this.leaf.value : this._fmt(value);
       this.view._setValue(this.leaf, out);
       this._mark();
@@ -4093,9 +3852,7 @@ class NumberField {
 
   _paint() {
     const eff = this.view._effective(this.leaf);
-    const v   = Number(eff);
     this.input.value = eff === "None" ? "" : eff;
-    if (Number.isFinite(v)) this.slider.value = String(this._toSlider(v));
     this._mark();
   }
 }

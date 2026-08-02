@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import gc
 from dataclasses import dataclass
-from pathlib     import Path
 from typing      import Callable, Optional
 
 import torch
@@ -26,13 +25,12 @@ class PretrainContext:
 
 
 class PretrainOrchestrator:
-    def __init__(self, pretrain_config, training_config, build_context: Callable[[], PretrainContext], logger: Logger, label: Optional[str] = None, result_dir: Optional[Path] = None) -> None:
-        self.pretrain   = pretrain_config
-        self.training   = training_config
-        self.build      = build_context
-        self.logger     = logger
-        self.label      = label
-        self.result_dir = Path(result_dir) if result_dir is not None else None
+    def __init__(self, pretrain_config, training_config, build_context: Callable[[], PretrainContext], logger: Logger, label: Optional[str] = None) -> None:
+        self.pretrain = pretrain_config
+        self.training = training_config
+        self.build    = build_context
+        self.logger   = logger
+        self.label    = label
 
     def _enabled(self) -> bool:
         return bool(self.pretrain.find_batch_size or self.pretrain.tune_loader)

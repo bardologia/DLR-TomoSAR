@@ -10,6 +10,7 @@ from models.image_autoencoder               import IMAGE_AE_CONFIG_REGISTRY
 from models.profile_autoencoder             import PROFILE_AE_CONFIG_REGISTRY
 from pipelines.shared.config.config_factory import ConfigFactory
 from pipelines.shared.model.model_builder   import ModelBuilder
+from pipelines.tuning.storage               import TuningStorage
 from pipelines.tuning.trial                 import TrialImageAePipeline, TrialProfileAePipeline
 from pipelines.tuning.tuners                import AeTuner, JepaTuner, Tuner
 from tools.monitoring.logger                import Logger
@@ -159,7 +160,7 @@ class TuningWorker:
             seed             = tune_cfg.base_seed + gpu_id,
         )
 
-        study = optuna.load_study(study_name=study_name, storage=storage_url, sampler=sampler, pruner=pruner)
+        study = optuna.load_study(study_name=study_name, storage=TuningStorage.open(storage_url), sampler=sampler, pruner=pruner)
         tuner.run(study, n_trials)
 
         logger.info(f"[GPU {gpu_id}] — {model_name}  DONE")

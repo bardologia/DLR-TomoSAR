@@ -6,8 +6,9 @@ import pytest
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from configuration.training                 import LossScaleProbeConfig
+from configuration.training                 import BackboneEntryConfig, LossScaleProbeConfig
 from configuration.training.general.loss    import LossConfig
+from pipelines.backbone.training.launcher   import SingleTrainRunner
 from pipelines.backbone.training.loss_probe import LossScaleProbe
 
 from tests.backbone_training._helpers import gaussian_config, geometry_config, identity_normalizer, tiny_model, x_axis_tensor
@@ -39,6 +40,17 @@ def test_probe_forces_all_terms_on_with_unit_weight():
     assert probe.loss_cfg.use_mse_curve        is True
     assert probe.loss_cfg.weight_mse_curve     == 1.0
     assert probe.loss_cfg.use_covariance_match is True
+
+
+def test_entry_config_forwards_the_per_term_probe_overrides():
+    config                      = BackboneEntryConfig()
+    config.probe_enabled        = True
+    config.probe_enabled_losses = {"use_param_legacy": True}
+
+    probe_cfg = SingleTrainRunner(config)._probe_config()
+
+    assert probe_cfg.enabled        is True
+    assert probe_cfg.enabled_losses == {"use_param_legacy": True}
 
 
 def test_probe_respects_enabled_losses_override():

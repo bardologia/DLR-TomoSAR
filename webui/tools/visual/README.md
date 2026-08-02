@@ -31,8 +31,9 @@ node snap_ui.js --port 8765 --out /tmp/tomosar-ui [--settle 1800] [--width 1600]
 It loads the SPA once, then per route sets the hash, waits for the route's page
 section to become active, `document.fonts.ready`, and a settle delay (for GSAP
 entrances, route API fetches, and KaTeX typesetting), and takes a `fullPage`
-screenshot. Network-idle waits are deliberately avoided: the status board polls
-`/api/system` every 250 ms from app boot, so the network never idles.
+screenshot. Network-idle waits are deliberately avoided: the status board keeps polling
+`/api/system`, `/api/jobs` and the guard history from app boot, so the network idles only
+intermittently and never predictably. `snap_repomap.js` navigates the same way.
 
 ## Repo-map diagram harness
 
@@ -66,7 +67,7 @@ Renders the pipeline process animations (`webui/static/js/process_anim.js`) head
 npm install
 ```
 
-Requires a Playwright Chromium under `~/.cache/ms-playwright` (any `chromium*` build). Override the executable with `PW_CHROMIUM=/path/to/chrome`.
+Requires a Playwright Chromium under `~/.cache/ms-playwright` (any `chromium*` build). Override the executable with `PW_CHROMIUM=/path/to/chrome`. All four scripts locate it through the shared `chromium.js` module.
 
 ## Usage
 

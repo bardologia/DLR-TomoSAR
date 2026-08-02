@@ -22,18 +22,22 @@ class MetricsBarPlotter(PlotBase):
         self.fig_dpi     = fig_dpi
         self.save_dpi    = save_dpi
 
-    def _plot_global_metrics_summary(self, summary : dict, out_dir : Path) -> Dict[str, Path]:
-        qs    = [10, 25, 50, 75, 90]
-        pvals = [summary[f"r2_p{q}"] for q in qs]
+    def _plot_r2_percentiles(self, summary : dict, out_dir : Path) -> Dict[str, Path]:
+        qs      = [10, 25, 50, 75, 90]
+        pvals   = [summary[f"r2_p{q}"] for q in qs]
+        finite  = [value for value in pvals if np.isfinite(value)]
         pcolors = ["#9467bd", "#1f77b4", "#2ca02c", "#ff7f0e", "#d62728"]
-        saved   : Dict[str, Path] = {}
+
+        if not finite:
+            self.logger.warning("R² percentile plot skipped: no finite values")
+            return {}
 
         fig, ax = plt.subplots(figsize=(6.4, 5))
         bars    = ax.bar(range(len(qs)), pvals, color=pcolors, alpha=0.80, edgecolor="white", lw=0.5)
         ax.set_xticks(range(len(qs)))
         ax.set_xticklabels([f"$p_{{{q}}}$" for q in qs])
         ax.set_ylabel(r"$R^2$")
-        ax.set_ylim(bottom=min(0.0, min(v for v in pvals if np.isfinite(v))) - 0.05)
+        ax.set_ylim(bottom=min(0.0, min(finite)) - 0.05)
         ax.set_title(r"$R^2$ percentiles across all pixels")
         r2_mean = summary["r2_mean"]
 
@@ -48,14 +52,16 @@ class MetricsBarPlotter(PlotBase):
                 ax.text(bar.get_x() + bar.get_width() / 2, val + 0.01, f"{val:.3f}", ha="center", va="bottom", fontsize=8)
 
         fig.tight_layout()
-        saved["r2_percentiles"] = self._save(fig, out_dir / "r2_percentiles.png")
 
+        return {"r2_percentiles": self._save(fig, out_dir / "r2_percentiles.png")}
+
+    def _plot_active_count_distribution(self, summary : dict, out_dir : Path) -> Dict[str, Path]:
         fig, ax = plt.subplots(figsize=(6.4, 5))
-        n_K    = self.n_gaussians
-        k_vals = list(range(1, n_K + 1))
-        fracs  = [summary[f"frac_{k}_fitted"] for k in k_vals]
-        cols   = [cm.tab10((k - 1) % 10) for k in k_vals]
-        bars   = ax.bar(k_vals, fracs, color=cols, alpha=0.80, edgecolor="white", lw=0.5)
+        n_K     = self.n_gaussians
+        k_vals  = list(range(1, n_K + 1))
+        fracs   = [summary[f"frac_{k}_fitted"] for k in k_vals]
+        cols    = [cm.tab10((k - 1) % 10) for k in k_vals]
+        bars    = ax.bar(k_vals, fracs, color=cols, alpha=0.80, edgecolor="white", lw=0.5)
 
         frac_unfitted = summary["frac_0_active"]
         n_fitted      = summary["n_fitted"]
@@ -78,7 +84,14 @@ class MetricsBarPlotter(PlotBase):
             ax.text(0.98, 0.98, note, transform=ax.transAxes, fontsize=8, va="top", ha="right", bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="0.5", alpha=0.88))
 
         fig.tight_layout()
-        saved["active_count_distribution"] = self._save(fig, out_dir / "active_count_distribution.png")
+
+        return {"active_count_distribution": self._save(fig, out_dir / "active_count_distribution.png")}
+
+    def _plot_global_metrics_summary(self, summary : dict, out_dir : Path) -> Dict[str, Path]:
+        saved : Dict[str, Path] = {}
+
+        saved.update(self._plot_r2_percentiles(summary, out_dir))
+        saved.update(self._plot_active_count_distribution(summary, out_dir))
 
         return saved
 
@@ -105,7 +118,7 @@ class MetricsBarPlotter(PlotBase):
         pty_means = [per_k_summary[f"k{k}_penalty_mean"]   for k in k_vals]
         tot_means = [per_k_summary[f"k{k}_penalised_mean"] for k in k_vals]
         ax.bar(k_vals, mse_means,                   color="#1f77b4", alpha=0.78, edgecolor="white", lw=0.5, label="mean MSE (peak-normalised profile)")
-        ax.bar(k_vals, pty_means, bottom=mse_means, color="#d62728", alpha=0.78, edgecolor="white", lw=0.5, label=r"mean penalty $\lambda_K K \bar{A}_{\mathrm{norm}}$")
+        ax.bar(k_vals, pty_means, bottom=mse_means, color="#d62728", alpha=0.78, edgecolor="white", lw=0.5, label=r"mean penalty $\lambda_K K$")
         ax.plot(k_vals, tot_means, color="black", lw=1.3, ls="--", marker="o", ms=4, label="mean penalised score")
         ax.set_xticks(k_vals)
         ax.set_xticklabels([f"$K={k}$" for k in k_vals])
@@ -138,9 +151,14 @@ class MetricsBarPlotter(PlotBase):
 
         return saved
 
-    def _plot_snr_vs_r2(self, snr_db_map: np.ndarray, r2_map: np.ndarray, out_dir: Path) -> Path:
+    def _plot_snr_vs_r2(self, snr_db_map: np.ndarray, r2_map: np.ndarray, out_dir: Path) -> Dict[str, Path]:
+        s, r = self._paired_subsample([snr_db_map, np.maximum(r2_map, -1.0)], 400_000)
+
+        if s.size == 0:
+            self.logger.warning("Contrast-vs-R² plot skipped: no pixel has both a finite contrast and a finite R²")
+            return {}
+
         fig, ax = plt.subplots(figsize=(6.4, 4.8))
-        s, r    = self._paired_subsample([snr_db_map, np.maximum(r2_map, -1.0)], 400_000)
         hb      = ax.hexbin(s, r, gridsize=70, bins="log", cmap="magma", mincnt=1)
         fig.colorbar(hb, ax=ax, fraction=0.04, pad=0.02).set_label("pixel count")
 
@@ -156,9 +174,10 @@ class MetricsBarPlotter(PlotBase):
         ax.text(0.98, 0.12, f"Pearson $r$ = {pearson:.3f}\nSpearman $\\rho$ = {spearman:.3f}\n(on plotted, $-1$-floored $R^2$)", transform=ax.transAxes, fontsize=9, va="bottom", ha="right", bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="0.5", alpha=0.88))
 
         fig.tight_layout()
-        return self._save(fig, out_dir / "snr_vs_r2.png")
 
-    def _plot_snr_by_k(self, snr_db_map: np.ndarray, best_k_map: np.ndarray, out_dir: Path) -> Path:
+        return {"snr_vs_r2": self._save(fig, out_dir / "snr_vs_r2.png")}
+
+    def _plot_snr_by_k(self, snr_db_map: np.ndarray, best_k_map: np.ndarray, out_dir: Path) -> Dict[str, Path]:
         fig, ax = plt.subplots(figsize=(6.4, 4.8))
         k_vals  = list(range(1, self.n_gaussians + 1))
         palette = [cm.tab10((k - 1) % 10) for k in k_vals]
@@ -174,11 +193,16 @@ class MetricsBarPlotter(PlotBase):
         ax.grid(True, axis="y", which="major", lw=0.3, alpha=0.40)
         fig.tight_layout()
 
-        return self._save(fig, out_dir / "snr_by_selected_k.png")
+        return {"snr_by_selected_k": self._save(fig, out_dir / "snr_by_selected_k.png")}
 
-    def _plot_snr_vs_ambiguity(self, snr_db_map: np.ndarray, rel_margin_map: np.ndarray, out_dir: Path) -> Path:
-        fig, ax  = plt.subplots(figsize=(6.4, 4.8))
+    def _plot_snr_vs_ambiguity(self, snr_db_map: np.ndarray, rel_margin_map: np.ndarray, out_dir: Path) -> Dict[str, Path]:
         s_m, rel = self._paired_subsample([snr_db_map, rel_margin_map], 400_000)
+
+        if s_m.size == 0:
+            self.logger.warning("Contrast-vs-ambiguity plot skipped: no pixel has both a finite contrast and a finite selection margin")
+            return {}
+
+        fig, ax = plt.subplots(figsize=(6.4, 4.8))
         log_rel = np.log10(np.maximum(rel, 1e-9))
         hb      = ax.hexbin(s_m, log_rel, gridsize=70, bins="log", cmap="magma", mincnt=1)
         fig.colorbar(hb, ax=ax, fraction=0.04, pad=0.02).set_label("pixel count")
@@ -191,7 +215,7 @@ class MetricsBarPlotter(PlotBase):
         ax.legend(loc="lower right", framealpha=0.90)
         fig.tight_layout()
 
-        return self._save(fig, out_dir / "snr_vs_k_ambiguity.png")
+        return {"snr_vs_k_ambiguity": self._save(fig, out_dir / "snr_vs_k_ambiguity.png")}
 
     def _plot_snr_vs_fit_quality(
         self,
@@ -204,12 +228,12 @@ class MetricsBarPlotter(PlotBase):
     ) -> Dict[str, Path]:
         saved : Dict[str, Path] = {}
 
-        saved["snr_vs_r2"] = self._plot_snr_vs_r2(snr_db_map, r2_map, out_dir)
+        saved.update(self._plot_snr_vs_r2(snr_db_map, r2_map, out_dir))
 
         if best_k_map is not None:
-            saved["snr_by_selected_k"] = self._plot_snr_by_k(snr_db_map, best_k_map, out_dir)
+            saved.update(self._plot_snr_by_k(snr_db_map, best_k_map, out_dir))
 
         if rel_margin_map is not None:
-            saved["snr_vs_k_ambiguity"] = self._plot_snr_vs_ambiguity(snr_db_map, rel_margin_map, out_dir)
+            saved.update(self._plot_snr_vs_ambiguity(snr_db_map, rel_margin_map, out_dir))
 
         return saved

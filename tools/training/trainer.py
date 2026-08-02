@@ -16,7 +16,7 @@ from tools.training.aggregation      import MetricAggregator
 from tools.training.scheduling       import Scheduler, Warmup
 from tools.training.stopping         import EarlyStopping
 from tools.training.gradients        import GradientClipper
-from tools.training.checkpoint       import Checkpoint, TrainerState, WeightEma
+from tools.training.checkpoint       import Checkpoint, TorchIO, TrainerState, WeightEma
 from tools.training.vram_reservation import VramReservation
 from tools.runtime.completion        import CompletionMarker
 
@@ -111,7 +111,6 @@ class BaseTrainer:
             "Debug logging"            : training.log_debug,
             "LR scale (batch-size rule)": f"x{self.config.optimizer.lr_scale:.4f} (from the micro-batch, ignores accumulation)",
             "Optimizer"                : f"AdamW (default betas={tuple(self.config.optimizer.betas)}, eps={self.config.optimizer.eps:g}, weight_decay={self.config.optimizer.weight_decay:g}; per-group values below take precedence)",
-            "Cache clearing"           : f"every_n_steps={memory.clear_cache_every_n_steps}, after_eval={memory.clear_cache_after_eval}, after_epoch={memory.clear_cache_after_epoch}",
             "VRAM reservation"         : f"{memory.reserve_vram} (keep free {memory.vram_keep_free_gb:g} GB)",
             "cudnn"                    : f"deterministic={torch.backends.cudnn.deterministic}, benchmark={torch.backends.cudnn.benchmark}",
         })
@@ -222,7 +221,6 @@ class BaseTrainer:
         loss_sum, n = 0.0, 0
         aggregator  = MetricAggregator()
         n_batches   = len(loader)
-        clear_n     = self.config.memory.clear_cache_every_n_steps
 
         window_has_grads = False
         nonfinite_count  = 0
@@ -277,9 +275,6 @@ class BaseTrainer:
                 self.global_step += 1
                 self.tracker.set_step(self.global_step)
 
-                if clear_n > 0 and self.global_step % clear_n == 0:
-                    self._clear_cuda_cache()
-
                 _prog.update(_task, advance=1)
                 fetch_start = time.perf_counter()
 
@@ -309,33 +304,29 @@ class BaseTrainer:
         loss_sum, n = 0.0, 0
         aggregator  = MetricAggregator()
 
-        try:
-            with self.logger.track(transient=True) as _prog:
-                _task = _prog.add_task(f"[section]Eval {stage}[/section] - epoch {epoch + 1}/{self.epochs}", total=len(loader))
+        with self.logger.track(transient=True) as _prog:
+            _task = _prog.add_task(f"[section]Eval {stage}[/section] - epoch {epoch + 1}/{self.epochs}", total=len(loader))
 
-                for batch in loader:
-                    with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
-                        loss_dict = self._eval_step(batch, aggregator)
-                    loss = loss_dict["total_loss"]
+            for batch in loader:
+                with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16, enabled=self.use_amp):
+                    loss_dict = self._eval_step(batch, aggregator)
+                loss = loss_dict["total_loss"]
 
-                    if torch.isfinite(loss):
-                        loss_sum += loss.item()
-                        n += 1
-                        aggregator.add(loss_dict)
+                if torch.isfinite(loss):
+                    loss_sum += loss.item()
+                    n += 1
+                    aggregator.add(loss_dict)
 
-                    elif self.abort_on_nonfinite_loss:
-                        raise FloatingPointError(f"{self.stage_name} {stage} loss is non-finite at epoch {epoch + 1}")
+                elif self.abort_on_nonfinite_loss:
+                    raise FloatingPointError(f"{self.stage_name} {stage} loss is non-finite at epoch {epoch + 1}")
 
-                    else:
-                        self.logger.warning(f"{self.stage_name} {stage} loss is non-finite at epoch {epoch + 1}; skipping batch (abort_on_nonfinite_loss disabled).")
+                else:
+                    self.logger.warning(f"{self.stage_name} {stage} loss is non-finite at epoch {epoch + 1}; skipping batch (abort_on_nonfinite_loss disabled).")
 
-                    _prog.advance(_task)
+                _prog.advance(_task)
 
-            avg = loss_sum / n if n > 0 else float("nan")
-            self._log_epoch_metrics(stage, aggregator, epoch)
-        finally:
-            if self.config.memory.clear_cache_after_eval:
-                self._clear_cuda_cache()
+        avg = loss_sum / n if n > 0 else float("nan")
+        self._log_epoch_metrics(stage, aggregator, epoch)
 
         return {"avg_loss": avg, "num_batches": n}
 
@@ -366,10 +357,9 @@ class BaseTrainer:
             return
 
         path = Path(self.run_dir) / "checkpoints" / f"epoch_{epoch + 1:04d}.pt"
-        path.parent.mkdir(parents=True, exist_ok=True)
 
         with self.ema.applied(self.model):
-            torch.save({"epoch": epoch, "params": self.model.state_dict()}, path)
+            TorchIO.save_atomic({"epoch": epoch, "params": self.model.state_dict()}, path)
 
         self.logger.subsection(f"Epoch snapshot -> {path}")
 
@@ -456,9 +446,6 @@ class BaseTrainer:
 
                         self.train_losses.append(train_loss)
                         self.val_losses.append(val_loss)
-
-                        if self.config.memory.clear_cache_after_epoch:
-                            self._clear_cuda_cache()
 
                         effective_lrs = self.lr_scheduler.effective_lrs()
                         self._update_optimizer(effective_lrs)

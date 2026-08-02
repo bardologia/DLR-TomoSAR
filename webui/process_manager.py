@@ -61,6 +61,8 @@ class ProcessManager:
     DETACHED_PID     = re.compile(r"detached .* as pid (\d+)")
     ORPHAN_MIN_AGE_S = 15.0
     ORPHAN_RESCAN_S  = 3.0
+    HISTORY_LIMIT    = 50
+    ENDED_STATES     = ("finished", "failed", "cancelled")
     POOL_SCRIPTS     = ("train_backbone", "train_dual", "train_jepa", "train_image_autoencoder", "train_profile_autoencoder", "train_unrolled", "sweep_patches", "benchmark", "cross_validate", "tune", "infer_backbone", "infer_profile_autoencoder", "infer_image_autoencoder", "infer_unrolled", "infer_dual")
     POOL_FIELD       = "gpus_file"
 
@@ -187,7 +189,7 @@ class ProcessManager:
 
     def _start(self, record: dict, stream: JobStream) -> str | None:
         entry = self.paths.script_entry(record["script"])
-        argv  = [record["interpreter"], "-u", str(entry["path"]), *entry["args"]]
+        argv  = [record["interpreter"], "-u", str(entry["path"])]
         for path, value in record["overrides"].items():
             argv += [f"--{path}", value]
         if record.get("detach"):
@@ -303,7 +305,7 @@ class ProcessManager:
 
     def _render_command(self, interpreter: str, key: str, overrides: dict, detach: bool = False) -> str:
         entry = self.paths.script_entry(key)
-        parts = [interpreter, "-u", entry["rel"], *entry["args"]]
+        parts = [interpreter, "-u", entry["rel"]]
         for path, value in overrides.items():
             parts += [f"--{path}", shlex.quote(value)]
         if detach:
@@ -363,6 +365,7 @@ class ProcessManager:
             self.notifier.job_finished(snapshot)
 
         self._advance_queue()
+        self._prune_history()
 
     def _parse_detached_pid(self, text: str) -> int | None:
         match = self.DETACHED_PID.search(text)
@@ -408,10 +411,22 @@ class ProcessManager:
         self.notifier.job_finished(snapshot)
 
         self._advance_queue()
+        self._prune_history()
 
     def _final_progress(self, job_id: str) -> dict | None:
         info = self.progress(job_id)
         return info["progress"] if info.get("ok") and "progress" in info else None
+
+    def _prune_history(self) -> None:
+        with self.lock:
+            ended   = sorted((record for record in self.jobs.values() if record["status"] in self.ENDED_STATES), key=lambda r: r["started"])
+            dropped = ended[: max(0, len(ended) - self.HISTORY_LIMIT)]
+            for record in dropped:
+                self.jobs.pop(record["job_id"], None)
+                self.streams.pop(record["job_id"], None)
+
+        if dropped:
+            self.logger.muted(f"dropped {len(dropped)} ended job(s) and their output from the console, keeping the {self.HISTORY_LIMIT} most recent")
 
     def adopt_orphans(self) -> int:
         now = time.monotonic()
@@ -525,7 +540,7 @@ class ProcessManager:
             "job_id"           : uuid.uuid4().hex[:12],
             "script"           : info["script"],
             "command"          : info["cmd"],
-            "description"      : self.describer.describe(info["script"], info["interpreter"], overrides),
+            "description"      : "",
             "interpreter"      : info["interpreter"],
             "overrides"        : overrides,
             "detach"           : False,
@@ -548,9 +563,19 @@ class ProcessManager:
 
         self.logger.warning(f"adopted untracked process {info['script']} (pid {pid}) into the console")
 
+        threading.Thread(target=self._describe_adopted, args=(record["job_id"], info, overrides), daemon=True).start()
+
         token   = self._pid_start_token(pid)
         watcher = threading.Thread(target=self._watch_detached, args=(record["job_id"], pid, token, stream), daemon=True)
         watcher.start()
+
+    def _describe_adopted(self, job_id: str, info: dict, overrides: dict) -> None:
+        description = self.describer.describe(info["script"], info["interpreter"], overrides)
+
+        with self.lock:
+            record = self.jobs.get(job_id)
+            if record is not None:
+                record["description"] = description
 
     def _pid_alive(self, pid: int) -> bool:
         try:

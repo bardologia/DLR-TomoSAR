@@ -105,7 +105,7 @@ class SeedComparisonReport:
         return out
 
     def _report_keys(self, means: dict) -> list[str]:
-        return [key for key in means if not Report._is_per_slice_ssim(key) and "_raw" not in key and key not in Report._METRIC_SKIP_KEYS]
+        return [key for key in means if not Report._is_per_slice_ssim(key) and key not in Report._METRIC_SKIP_KEYS]
 
     def _grouped_keys(self, keys: list[str]) -> list[tuple[str, list[str]]]:
         groups: dict[str, list[str]] = {title: [] for title, _match in Report._METRIC_TAXONOMY}

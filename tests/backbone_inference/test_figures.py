@@ -15,6 +15,7 @@ from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
 from pipelines.backbone.inference.metrics            import Metrics, Result
 from pipelines.backbone.inference.figures            import Animator, FigureComposer
 from pipelines.backbone.inference.plots              import Plotter
+from tools.baselines                                 import TrackBaselines, TrackProfiles
 
 
 N_GAUSSIANS = 2
@@ -94,14 +95,34 @@ def _result_and_metrics():
     return res, gm, indices, x_axis
 
 
+def _track_baselines():
+    return TrackBaselines(
+        labels         = ["PS02", "PS04", "PS06"],
+        vertical       = [0.0, 4.0, 8.0],
+        horizontal     = [0.0, 1.0, 2.0],
+        vertical_std   = [0.0, 0.2, 0.3],
+        horizontal_std = [0.0, 0.1, 0.2],
+    )
+
+
+def _track_profiles():
+    along = np.linspace(0.0, 1.0, H, dtype=np.float32)
+    return TrackProfiles(
+        labels        = ["PS02", "PS04", "PS06"],
+        horizontal    = np.stack([along * k       for k in range(3)]).astype(np.float32),
+        vertical      = np.stack([along * k + 4.0 * k for k in range(3)]).astype(np.float32),
+        azimuth_start = 0,
+    )
+
+
 def _run_stub():
     region = CropRegion(azimuth_start=0, azimuth_end=H, range_start=0, range_end=W)
     return types.SimpleNamespace(
         n_gaussians      = N_GAUSSIANS,
         split_region     = region,
-        full_curves      = None,
-        track_baselines  = None,
-        track_profiles   = None,
+        full_curves      = _curves(_params(), _x_axis()),
+        track_baselines  = _track_baselines(),
+        track_profiles   = _track_profiles(),
         complex_inputs   = None,
         n_secondaries    = 0,
         secondary_labels = None,

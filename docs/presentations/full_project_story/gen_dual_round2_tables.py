@@ -2,10 +2,10 @@ import re
 import sys
 from pathlib import Path
 
-_vault = next(p for p in Path(__file__).resolve().parents if (p / "code" / "tools" / "logger.py").exists())
-sys.path.insert(0, str(_vault / "code"))
+_repo = next(p for p in Path(__file__).resolve().parents if (p / "tools" / "monitoring" / "logger.py").exists())
+sys.path.insert(0, str(_repo))
 
-from tools.logger import Logger
+from tools.monitoring.logger import Logger
 
 
 class ReportParser:
@@ -364,4 +364,4 @@ class DualRound2Tables:
 
 
 if __name__ == "__main__":
-    DualRound2Tables(_vault / "code" / "DLR-TomoSAR").run()
+    DualRound2Tables(_repo).run()

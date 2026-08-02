@@ -38,6 +38,7 @@ class StubProcesses:
         self.jobs   = []
         self.pools  = {}
         self.writes = []
+        self.refuse = False
 
     def list_jobs(self) -> list[dict]:
         return list(self.jobs)
@@ -46,6 +47,9 @@ class StubProcesses:
         return self.pools.get(job_id, {"ok": True, "supported": False, "live": False})
 
     def set_gpus(self, job_id: str, gpus) -> dict:
+        if self.refuse:
+            return {"ok": False, "error": "job is not running"}
+
         self.writes.append((job_id, list(gpus)))
         self.pools[job_id]["gpus"] = list(gpus)
         return {"ok": True, "gpus": list(gpus), "parked": False}
@@ -258,6 +262,51 @@ def test_a_pool_held_entirely_by_others_leaves_the_job_untouched(schedule):
 
     assert processes.writes                      == []
     assert scheduler.applied["job1"]["withheld"] == [0, 1, 2, 3]
+
+
+def test_a_blocked_shrink_stays_pending_until_the_weekday_pool_frees(schedule):
+    scheduler, processes, system = schedule
+    processes.add_running_fan_out("job1")
+    processes.pools["job1"]["gpus"] = [0, 1, 2, 3]
+
+    scheduler.tick(SATURDAY)
+    for index in (2, 3):
+        system.occupy(index, "colleague")
+
+    scheduler.tick(MONDAY_WORKDAY)
+
+    assert processes.writes                      == []
+    assert scheduler.applied["job1"]["phase"]    == "weekend"
+    assert scheduler.applied["job1"]["withheld"] == [2, 3]
+
+    scheduler.sweep(MONDAY_WORKDAY)
+    assert processes.writes == []
+
+    system.release(2)
+    system.release(3)
+    scheduler.tick(MONDAY_WORKDAY)
+
+    assert processes.writes                      == [("job1", [2, 3])]
+    assert scheduler.applied["job1"]["phase"]    == "weekday"
+    assert scheduler.applied["job1"]["withheld"] == []
+
+
+def test_a_refused_pool_write_leaves_the_transition_pending(schedule):
+    scheduler, processes, _system = schedule
+    processes.add_running_fan_out("job1")
+
+    scheduler.tick(WEDNESDAY)
+    processes.refuse = True
+    scheduler.tick(WEDNESDAY_NIGHT)
+
+    assert processes.writes                   == []
+    assert scheduler.applied["job1"]["phase"] == "weekday"
+
+    processes.refuse = False
+    scheduler.tick(WEDNESDAY_NIGHT)
+
+    assert processes.writes                   == [("job1", [0, 1, 2, 3])]
+    assert scheduler.applied["job1"]["phase"] == "night"
 
 
 def test_greedy_picks_up_a_withheld_gpu_once_it_frees(schedule):

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import inspect
-
 import numpy as np
 import pytest
 import torch
@@ -78,15 +76,29 @@ def test_synthetic_dataset_is_deterministic_per_index():
 
 
 def test_feed_losses_are_mse_surrogates_not_trainer_loss():
-    reconstruction_src = inspect.getsource(FeedLosses.reconstruction)
-    supervised_src     = inspect.getsource(FeedLosses.supervised)
+    class _Exploding:
+        def __call__(self, *args, **kwargs):
+            raise AssertionError("the dataloader feed must stay a cheap MSE surrogate, never the trainer loss")
 
-    assert "mse_loss" in reconstruction_src
-    assert "mse_loss" in supervised_src
-    assert "criterion" not in reconstruction_src
-    assert "criterion" not in supervised_src
-    assert "_compute_loss" not in reconstruction_src
-    assert "_compute_loss" not in supervised_src
+    class _Offset(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.criterion = _Exploding()
+
+        def reconstruct(self, x):
+            return x + 2.0, None
+
+        def forward(self, x):
+            return x + 3.0
+
+        def _compute_loss(self, *args, **kwargs):
+            raise AssertionError("the dataloader feed must stay a cheap MSE surrogate, never the trainer loss")
+
+    model  = _Offset()
+    inputs = torch.arange(6, dtype=torch.float32).reshape(2, 3)
+
+    assert float(FeedLosses.reconstruction(model, inputs)) == pytest.approx(4.0)
+    assert float(FeedLosses.supervised(model, inputs))     == pytest.approx(float(((inputs + 3.0) ** 2).mean()))
 
 
 def test_reconstruction_loss_is_zero_for_perfect_model():

@@ -151,7 +151,14 @@ class PreProcessEntryConfig:
     height_range       : tuple = (-20.0, 80.0)
     win_list           : list  = field(default_factory=lambda: [[20, 10]])
 
-    effort : str = "high"
+    max_crop_azimuth_width : int   = 1000
+    apply_resampling       : bool  = False
+    apply_presumming       : bool  = False
+    max_amplitude_clip     : float = 1.25
+
+    effort           : str           = "high"
+    tomogram_workers : Optional[int] = None
+    pyrat_threads    : Optional[int] = None
 
     dataset_name         : Optional[str] = None
     dataset_type         : str           = "FSAR"

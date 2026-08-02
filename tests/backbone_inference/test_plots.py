@@ -10,6 +10,7 @@ import pytest
 from pipelines.backbone.inference.plots          import Plotter, PlotTools, SlicePlotter, ParamPlotter, SlotPlotter, TrackPlotter
 from pipelines.backbone.inference.plots.plotter  import Plotter as PloterClass
 from tools.baselines.containers                  import TrackBaselines, TrackProfiles
+from tools.metrics.gaussian_matching             import GaussianMatcher
 
 
 N_GAUSSIANS = 2
@@ -123,6 +124,38 @@ def test_param_plotter_error_hists(tmp_path):
     )
     _assert_files(paths)
     assert len(paths) == N_GAUSSIANS * 3
+
+
+def test_param_plotter_matches_slots_once_per_cube(tmp_path, monkeypatch):
+    params  = _params()
+    pred    = params + 0.01
+    other   = params + 0.5
+    plotter = ParamPlotter()
+    calls   = []
+
+    original = GaussianMatcher.aligned_prediction
+
+    def counted(self, params_pred, params_gt, n_K):
+        calls.append(n_K)
+        return original(self, params_pred, params_gt, n_K)
+
+    monkeypatch.setattr(GaussianMatcher, "aligned_prediction", counted)
+
+    plotter.plot_param_scatter(
+        params_pred=pred[: N_GAUSSIANS * 3], params_gt=params[: N_GAUSSIANS * 3], n_gaussians=N_GAUSSIANS, out_dir=tmp_path / "scatter",
+    )
+    plotter.plot_param_error_hists(
+        params_pred=pred[: N_GAUSSIANS * 3], params_gt=params[: N_GAUSSIANS * 3], n_gaussians=N_GAUSSIANS, out_dir=tmp_path / "hists",
+    )
+
+    assert len(calls) == 1
+
+    plotter.plot_param_error_maps(
+        params_pred=other[: N_GAUSSIANS * 3], params_gt=params[: N_GAUSSIANS * 3], n_gaussians=N_GAUSSIANS,
+        out_dir=tmp_path / "maps", az_offset=0, rg_offset=0,
+    )
+
+    assert len(calls) == 2
 
 
 def test_param_scatter_r2_value_exact():

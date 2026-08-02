@@ -106,7 +106,13 @@
         "filter_method": "Covariance-estimation spatial filter name, e.g. Boxcar, forwarded into each session's TomogramConfig",
         "height_range": "Vertical focusing extent in meters as (min, max), forwarded into each session's TomogramConfig",
         "win_list": "List of [azimuth, range] filter window sizes to sweep, one sequential session launched per entry",
+        "max_crop_azimuth_width": "Maximum azimuth pixels per PyRAT subsection, forwarded into each session's TomogramConfig; wider crops split into multiple parallel-worker jobs",
+        "apply_resampling": "Whether pyrat resamples the stack geometry before focusing, forwarded into each session's TomogramConfig",
+        "apply_presumming": "Whether pyrat presums (averages) acquisitions before focusing, forwarded into each session's TomogramConfig",
+        "max_amplitude_clip": "Upper amplitude clip applied to the focused tomogram, forwarded into each session's TomogramConfig",
         "effort": "Parallelism intensity level: low, medium, or high, forwarded to each session's ParallelConfig",
+        "tomogram_workers": "Fixed number of parallel PyRAT tomogram worker processes; None lets ParallelConfig.resolve_plan derive it from the core budget",
+        "pyrat_threads": "Fixed thread count per PyRAT job; None derives it from the core budget",
         "dataset_name": "Explicit output dataset/run-subdirectory name; None auto-derives one from the project source filename, crop, window size, polarisation, stack identifier, and run timestamp",
         "dataset_type": "Sensor/dataset family tag forwarded to each session; only FSAR is implemented downstream",
         "stack_identifier": "Identifier distinguishing the acquisition stack, forwarded into each session's ProcessingConfig",
@@ -138,9 +144,8 @@
       }
     },
     "param_extraction::FitSettings": {
-      "summary": "Optimizer iteration cap and Gaussian-fit hyperparameters for one profile-fitting run",
+      "summary": "Gaussian-fit hyperparameters for one profile-fitting run",
       "fields": {
-        "max_fit_iterations": "nominal iteration cap for the profile fit; not read by the Adam extractor, which uses adam_steps instead",
         "fit_config": "FitConfig sub-config with k_max, lambda_k, sigma_init_divisor, thresholds, and the fit_sigma/fit_amplitude/fit_mean free-parameter toggles"
       }
     },
@@ -952,7 +957,8 @@
       "fields": {
         "normalization": "fixed at layernorm for this variant: ChannelLayerNorm before each downsampling stage and the LayerNorm inside every ConvNeXtBlock are hardcoded, and the model rejects any other value loudly at construction",
         "downsample_factor": "spatial downsampling ratio before the bottleneck (power of two, stage count = log2); defaults to 2 here (one strided downsampling stage) and is tuned over {2,4,8} when architecture search is enabled",
-        "upsample_mode": "decoder upsampling operator: convtranspose (learned) or bilinear (fixed interpolation)"
+        "upsample_mode": "decoder upsampling operator: convtranspose (learned) or bilinear (fixed interpolation)",
+        "stochastic_depth_rate": "drop-path probability applied to every ConvNeXt block's residual branch, tuned over 0.0-0.3; this variant has no dropout layers, so it rejects a non-zero dropout loudly at construction"
       }
     },
     "architectures/image_autoencoder::DilatedConv2dImageAutoencoderConfig": {
@@ -1173,6 +1179,7 @@
         "probe_n_batches": "Number of training batches the loss-scale probe averages over before reporting suggested weights",
         "probe_reference": "Loss-term name used as the reference scale in the probe's suggested-weight table; None normalizes each term independently to 1.0",
         "probe_exit_after": "Exit the run after the probe report instead of continuing into full training",
+        "probe_enabled_losses": "Per-term use_* flag overrides for the probe, as a dict such as {'use_param_legacy': True}; terms left out keep the probe default (every term on except use_param_legacy)",
         "overfit_check": "OverfitCheckConfig sanity gate that memorizes a few examples before full training and aborts if the model cannot overfit them",
         "infer_after": "Run the InferencePipeline automatically on the trained checkpoint once training completes",
         "infer_at_end": "Hold all inference until every training job of the fan-out has finished, then run one inference job per completed run through the same GPU queue; keeps the GPUs saturated with training first, mutually exclusive with infer_after",
@@ -1384,6 +1391,7 @@
         "clip_adaptive_mean_std_k": "std-dev multiplier k in mean + k*std used as the clip bound when clip_mode is adaptive_mean_std",
         "patch_size": "height and width in pixels of training patches cropped from the SAR stack, (H, W) may be rectangular for fully-convolutional backbones",
         "patch_stride": "per-axis (vertical, horizontal) pixel stride between overlapping extracted patches",
+        "use_symmetric_padding": "pad scene borders with symmetric (mirror) padding instead of zero (constant) padding so edge patches stay fully covered",
         "train_azimuth": "azimuth line range (start, end) assigned to the training split, paired with the dataset's full range extent",
         "val_azimuth": "azimuth line range (start, end) assigned to the validation split, paired with the dataset's full range extent",
         "test_azimuth": "azimuth line range (start, end) assigned to the test split, paired with the dataset's full range extent",
@@ -1424,12 +1432,9 @@
       }
     },
     "training/general/runtime::MemoryConfig": {
-      "summary": "CUDA cache-clearing cadence and pre-training VRAM reservation to protect other GPU users",
+      "summary": "Pre-training VRAM reservation to protect other GPU users",
       "fields": {
-        "clear_cache_every_n_steps": "Call torch.cuda.empty_cache every this many training steps; 0 disables periodic clearing",
-        "clear_cache_after_eval": "Free the CUDA cache immediately after each validation pass",
-        "clear_cache_after_epoch": "Free the CUDA cache at the end of each training epoch",
-        "reserve_vram": "Before training starts, and again after every CUDA cache clear, greedily allocate spare GPU memory down to vram_keep_free_gb via VramReservation to block other users from claiming it",
+        "reserve_vram": "Before training starts, greedily allocate spare GPU memory down to vram_keep_free_gb via VramReservation to block other users from claiming it",
         "vram_keep_free_gb": "Gigabytes of free VRAM left unclaimed on the device when reserve_vram is enabled"
       }
     },
@@ -2247,7 +2252,8 @@
     "training/unrolled::UnrolledEntryConfig": {
       "summary": "Entry configuration for main/training/train_unrolled.py: trains the unrolled physics network on per-pixel coherence measurements synthesised from the ground-truth Gaussian profiles through the exact kz steering operator, isolated from the backbone training stack",
       "fields": {
-        "run_name": "Optional run directory name; defaults to <model_name>_<timestamp> under logdir",
+        "run_name": "Optional run directory name; defaults to run_<model_name>_<timestamp> under logdir",
+        "resume": "Reuse this run directory when it already holds a completed run (complete.json marker stamped only at successful completion); an unfinished run directory is deleted and restarted from scratch. Lets an interrupted seed sweep continue without retraining the seeds that finished. Unrolled training has no mid-run continuation, so a partially trained run always restarts",
         "model_name": "Key into the unrolled model registry (gamma_net)",
         "gpu": "CUDA device index pinned before torch import",
         "gpus": "GPU pool across which the seeds of a multi-seed run are fanned out, one training job per seed launched in parallel",
@@ -2291,6 +2297,7 @@
         "lr_reference_batch_size": "Baseline batch size the learning-rate scaling ratio is computed against",
         "patch_size": "Spatial patch size (height, width) tiled from the scene, the two dimensions may differ",
         "patch_stride": "Per-axis (vertical, horizontal) stride between neighbouring patches during tiling",
+        "use_symmetric_padding": "pad scene borders with symmetric (mirror) padding instead of zero (constant) padding so edge patches stay fully covered",
         "train_azimuth": "Azimuth pixel range of the training split",
         "val_azimuth": "Azimuth pixel range of the validation split",
         "test_azimuth": "Azimuth pixel range of the test split"
@@ -2325,6 +2332,7 @@
         "probe_n_batches": "Number of training batches the loss-scale probe averages over before reporting suggested weights",
         "probe_reference": "Loss-term name used as the reference scale in the probe's suggested-weight table; None normalizes each term independently to 1.0",
         "probe_exit_after": "Exit the run after the probe report instead of continuing into full training",
+        "probe_enabled_losses": "Per-term use_* flag overrides for the probe, as a dict such as {'use_param_legacy': True}; terms left out keep the probe default (every term on except use_param_legacy)",
         "overfit_check": "OverfitCheckConfig sanity gate that memorizes a few examples before full training and aborts if the model cannot overfit them",
         "infer_after": "Run the shared inference pipeline with the dual components automatically on the trained checkpoint once training completes",
         "infer_at_end": "Hold all inference until every training job of the fan-out has finished, then run one inference job per completed run through the same GPU queue; keeps the GPUs saturated with training first, mutually exclusive with infer_after",
@@ -2488,6 +2496,7 @@
         "samples_per_batch": "Number of pixels sampled per batch as probe examples; features are read at each pixel's location scaled into every layer's spatial grid",
         "ridge_lambda": "Ridge regularization strength of the linear probes",
         "test_fraction": "Fraction of probe samples held out for the reported R²",
+        "seed": "Seed of the sampled probe pixels and of the held-out probe split; vary it to check how sensitive the reported R² is to the sample",
         "figure_style": "PlotBase figure style the decodability curves are rendered with (report or paper)"
       }
     },

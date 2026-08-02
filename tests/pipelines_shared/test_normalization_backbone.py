@@ -188,7 +188,7 @@ def test_output_denormalization_torch_and_numpy_agree():
 
 @pytest.mark.real_data
 @pytest.mark.slow
-def test_fit_real_window_stats_finite_and_roundtrip(data_dir, interferograms, parameters):
+def test_fit_real_window_stats_finite_and_roundtrip(data_dir, interferograms, parameters, tmp_path):
     ifg     = np.ascontiguousarray(np.asarray(interferograms[:4, :24, :24]))
     primary = ifg[:1]
     inputs  = np.concatenate([primary, ifg], axis=0)
@@ -206,11 +206,12 @@ def test_fit_real_window_stats_finite_and_roundtrip(data_dir, interferograms, pa
         n_secondaries=0, n_interferograms=4, n_gaussians=5,
     )
 
-    logger = Logger(log_dir="logs", name="norm_real", level="ERROR")
+    logger = Logger(log_dir=str(tmp_path / "logs"), name="norm_real", level="ERROR")
     stats  = StatsComputer.compute(
         dataset=ds, logger=logger, input_config=ic, output_config=oc,
         n_secondaries=0, n_interferograms=4, n_gaussians=5,
     )
+    logger.close()
 
     assert np.all(np.isfinite(stats.input_stats.loc))
     assert np.all(np.isfinite(stats.input_stats.scale))

@@ -70,6 +70,19 @@ def test_run_inference_is_repeatable_under_noise(tmp_path):
     assert np.array_equal(first.peak_error_map, second.peak_error_map)
 
 
+def test_profile_pair_reuses_the_chunk_it_already_predicted(tmp_path):
+    predictor = _predictor(tmp_path, noise_std=0.0)
+    calls     = []
+
+    original = predictor._predict_rows
+    predictor._predict_rows = lambda start, end: (calls.append((start, end)), original(start, end))[1]
+
+    for range_index in range(WIDTH):
+        predictor.profile_pair(0, range_index)
+
+    assert calls == [(0, 4)]
+
+
 def test_noise_free_profile_pair_matches_error_maps(tmp_path):
     predictor  = _predictor(tmp_path, noise_std=0.0)
     prediction = predictor.run_inference()

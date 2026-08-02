@@ -53,5 +53,5 @@ class TomoGeometry:
             "Look angle"       : f"{self.cfg.look_angle_deg} deg",
             "Axis convention"  : self.cfg.height_axis_convention,
             "kz source"        : self._kz_source(),
-            "Baselines origin" : getattr(self.cfg, "baselines_origin", "config"),
+            "Baselines origin" : self.cfg.baselines_origin,
         }

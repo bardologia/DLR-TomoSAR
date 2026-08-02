@@ -6,30 +6,7 @@ import torch.nn.functional as functional
 
 from configuration.architectures import DeepLabV3PlusConfig
 from ..blocks                    import build_activation, build_norm2d, initialize_weights
-from ..blocks                    import OutputHeadsMixin, ResidualConvBlock
-
-
-class ConvNormAct(nn.Module):
-    def __init__(
-        self,
-        input_channels:  int,
-        output_channels: int,
-        kernel_size:     int = 3,
-        dilation:        int = 1,
-        activation:      str = "relu",
-        normalization:   str = "batch",
-        bias:            bool = False,
-    ):
-        super().__init__()
-        padding = dilation * (kernel_size - 1) // 2
-        self.layers = nn.Sequential(
-            nn.Conv2d(input_channels, output_channels, kernel_size=kernel_size, padding=padding, dilation=dilation, bias=bias),
-            build_norm2d(normalization, output_channels),
-            build_activation(activation),
-        )
-
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.layers(x)
+from ..blocks                    import ConvNormAct, OutputHeadsMixin, ResidualConvBlock
 
 
 class ASPP(nn.Module):

@@ -149,13 +149,6 @@ def test_script_imports_in_launcher_subprocess(script, tmp_path):
     assert result.returncode == 0, result.stderr
 
 
-@pytest.mark.parametrize("name", DEFER_HEAVY_IMPORTS)
-def test_module_guards_execution_behind_name_main(name, main_on_path, frozen_env):
-    source = _script_path(name).read_text()
-
-    assert 'if __name__ == "__main__":' in source
-
-
 def test_import_does_not_set_cuda_visible_devices(main_on_path, frozen_env, monkeypatch):
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
 
@@ -166,31 +159,48 @@ def test_import_does_not_set_cuda_visible_devices(main_on_path, frozen_env, monk
 
 
 @pytest.mark.parametrize("name", ("train_jepa", "train_profile_autoencoder", "train_image_autoencoder"))
-def test_seed_sweep_entries_hand_their_script_to_the_fanout(name, main_on_path, frozen_env):
-    source = _script_path(name).read_text()
+def test_seed_sweep_entries_hand_their_script_to_the_fanout(name, main_on_path, frozen_env, monkeypatch):
+    import pipelines.shared.training.training_launcher as training_launcher
 
-    assert "entry_script=pathlib.Path(__file__).resolve()" in source
+    captured = {}
+
+    class _RecordingLauncher:
+        def __init__(self, *args, **kwargs):
+            captured.update(kwargs)
+
+        def run(self):
+            captured["ran"] = True
+
+    module = _import_main(name)
+
+    monkeypatch.setattr(training_launcher, "SeedSweepLauncher", _RecordingLauncher)
+    monkeypatch.setattr(module.EnvironmentPinner, "gpu", lambda *args, **kwargs: None)
+    monkeypatch.setattr(sys, "argv", [f"{name}.py"])
+
+    module.main()
+
+    assert captured["ran"]          is True
+    assert captured["entry_script"] == _script_path(name)
 
 
 @pytest.mark.parametrize("name", ("train_backbone", "train_jepa", "train_profile_autoencoder", "train_image_autoencoder", "train_unrolled", "train_dual"))
-def test_train_main_defers_heavy_imports(name, main_on_path, frozen_env):
-    source = _script_path(name).read_text()
+def test_train_main_defers_heavy_imports(name, tmp_path):
+    script = _script_path(name)
+    code   = f"import sys; sys.path.insert(0, {str(script.parent)!r}); import {name}; print(sorted(module for module in sys.modules if module.split('.')[0] in {{'pipelines', 'models', 'torch'}}))"
+    result = subprocess.run([sys.executable, "-u", "-c", code], cwd=str(tmp_path), capture_output=True, text=True, timeout=120)
 
-    assert "from pipelines" not in source.split("def main")[0]
-    assert "from pipelines" in source.split("def main", 1)[1]
+    assert result.returncode     == 0, result.stderr
+    assert result.stdout.strip() == "[]"
 
 
 @pytest.mark.parametrize("name", DEFER_HEAVY_IMPORTS)
-def test_compare_runs_is_the_only_module_pinning_threads_at_import(name, main_on_path, frozen_env, monkeypatch):
+def test_import_does_not_pin_threads(name, main_on_path, frozen_env, monkeypatch):
     for key in THREAD_KEYS:
         monkeypatch.delenv(key, raising=False)
 
     _import_main(name)
 
-    pinned = all(os.environ.get(key) == "4" for key in THREAD_KEYS)
-    if name == "compare_runs":
-        return
-    assert not pinned or name in {"compare_runs"}
+    assert all(key not in os.environ for key in THREAD_KEYS)
 
 
 def test_compare_runs_has_no_module_level_side_effects(main_on_path, monkeypatch):

@@ -54,7 +54,7 @@ def _loaded(base: Path) -> tuple[CubeExplorer, str, str]:
     stamp_a = _make_run(base, preproc, "run_a", seed=1)
     stamp_b = _make_run(base, preproc, "run_b", seed=2)
 
-    explorer = CubeExplorer(paths=None, logger=WebLogger())
+    explorer = CubeExplorer(WebLogger())
     listing  = explorer.list_cubes(str(base))
     assert listing["ok"] and len(listing["cubes"]) == 2
 
@@ -129,7 +129,7 @@ def test_attach_rejects_mismatched_axis(tmp_path):
     stamp_a = _make_run(tmp_path, preproc, "run_a", seed=1)
     stamp_c = _make_run(tmp_path, preproc, "run_c", seed=3, x_min=-99.0)
 
-    explorer = CubeExplorer(paths=None, logger=WebLogger())
+    explorer = CubeExplorer(WebLogger())
     explorer.list_cubes(str(tmp_path))
     explorer.start_load(str(stamp_a))
 

@@ -17,7 +17,7 @@ def main() -> None:
     parser.add_argument("--resume",      action="store_true")
     parser.add_argument("--model",       type=str,  default=None, help="(scheduler) tune only this model; (worker) model being tuned")
     parser.add_argument("--gpu",         type=int,  default=0)
-    parser.add_argument("--n-trials",    type=int,  default=8)
+    parser.add_argument("--n-trials",    type=int,  default=None)
     parser.add_argument("--study-name",  type=str,  default=None)
     parser.add_argument("--storage-url", type=str,  default=None)
     parser.add_argument("--run-tag",     type=str,  default=None)
@@ -42,13 +42,14 @@ def main() -> None:
             sys.exit("ERROR: --worker requires --model")
         if args.study_name is None or args.storage_url is None:
             sys.exit("ERROR: --worker requires --study-name and --storage-url")
+        if args.n_trials is None:
+            sys.exit("ERROR: --worker requires --n-trials")
+        if args.run_tag is None or args.run_dir is None:
+            sys.exit("ERROR: --worker requires --run-tag and --run-dir")
 
-        tag    = args.run_tag or RunTag.now()
-        config = TuningEntryConfig()
-        if args.run_dir:
-            config = ConfigCli.load_resolved(config, Path(args.run_dir) / "resolved_config.json")
+        config = ConfigCli.load_resolved(TuningEntryConfig(), Path(args.run_dir) / "resolved_config.json")
 
-        worker = TuningWorker(tag=tag, config=config)
+        worker = TuningWorker(tag=args.run_tag, config=config)
         worker.run_worker(
             model_name  = args.model,
             gpu_id      = args.gpu,

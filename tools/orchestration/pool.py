@@ -14,7 +14,7 @@ class ProcessPoolRunner:
 
     def run(self, jobs: Iterable[Any], worker_fn: Callable[[Any], Any]) -> list[tuple[Any, Any]]:
         job_list = list(jobs)
-        workers  = max(1, min(self.max_workers, len(job_list))) if self.max_workers is not None else len(job_list)
+        workers  = max(1, min(self.max_workers, len(job_list)) if self.max_workers is not None else len(job_list))
         results  : list[tuple[Any, Any]] = []
 
         with ProcessPoolExecutor(max_workers=workers, mp_context=mp.get_context("spawn")) as executor:

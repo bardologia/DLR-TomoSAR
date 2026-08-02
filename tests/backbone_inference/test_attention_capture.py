@@ -1,13 +1,22 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
+
 import numpy as np
 import pytest
 import torch
 
+from configuration.diagnostics                      import AttentionCaptureConfig
 from models.backbone                                import get_backbone
-from pipelines.backbone.inference.attention_capture import AttentionCapture, AttentionSummary
+from models.blocks                                  import AttentionTap
+from pipelines.backbone.inference.attention_capture import AttentionCapture, AttentionCaptureRun, AttentionSummary
 
 from tests.models_backbone._helpers import SMALL_OVERRIDES, WINDOW
+
+
+class _SilentLogger:
+    def __getattr__(self, name):
+        return lambda *args, **kwargs: None
 
 
 def _capture(name: str, in_channels: int = 3, out_channels: int = 6):
@@ -17,10 +26,12 @@ def _capture(name: str, in_channels: int = 3, out_channels: int = 6):
     capture = AttentionCapture(model)
     capture.attach()
 
-    with torch.no_grad():
-        model(torch.randn(1, in_channels, WINDOW, WINDOW))
+    try:
+        with torch.no_grad():
+            model(torch.randn(1, in_channels, WINDOW, WINDOW))
+    finally:
+        capture.detach()
 
-    capture.detach()
     return capture.records()
 
 
@@ -68,6 +79,39 @@ def test_capture_detach_restores_the_model():
     for name, module in model.named_modules():
         if isinstance(module, torch.nn.MultiheadAttention):
             assert module.forward == mha_forwards[name]
+            assert "forward" not in module.__dict__
+
+
+def test_detach_disables_the_process_wide_tap():
+    model, _ = get_backbone("swin_unet", in_channels=3, out_channels=6, **SMALL_OVERRIDES["swin_unet"])
+
+    capture = AttentionCapture(model.eval())
+    capture.attach()
+
+    assert AttentionTap._sink is not None
+
+    capture.detach()
+
+    assert AttentionTap._sink is None
+
+
+def test_capture_releases_the_tap_when_the_forward_fails(tmp_path):
+    model, _ = get_backbone("swin_unet", in_channels=3, out_channels=6, **SMALL_OVERRIDES["swin_unet"])
+
+    class _FailingModel:
+        def __init__(self, module) -> None:
+            self.module = module
+
+        def __call__(self, images):
+            raise RuntimeError("the forward failed")
+
+    run = SimpleNamespace(model=_FailingModel(model.eval()), loader=[(torch.randn(1, 3, WINDOW, WINDOW),)])
+
+    with pytest.raises(RuntimeError):
+        AttentionCaptureRun(tmp_path, AttentionCaptureConfig(), _SilentLogger())._capture(run)
+
+    assert AttentionTap._sink is None
+    assert all("forward" not in module.__dict__ for module in run.model.module.modules())
 
 
 def test_model_without_attention_raises():

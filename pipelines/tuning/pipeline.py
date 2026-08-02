@@ -10,6 +10,7 @@ from configuration.tuning                 import TuningConfig
 from models                               import BACKBONE_HEADS, config_registry
 from pipelines.shared.model.model_builder import ModelBuilder
 from pipelines.tuning.plots               import StudyPlotter
+from pipelines.tuning.storage             import TuningStorage
 from pipelines.tuning.tuners              import BestConfigWriter
 from tools                                import FileIO
 from tools                                import GpuJob
@@ -98,18 +99,16 @@ class TuningScheduler:
     def _load_or_create_study(self, model_name: str) -> optuna.Study:
         return optuna.create_study(
             study_name     = self._study_name(model_name),
-            storage        = self.storage_url,
+            storage        = TuningStorage.open(self.storage_url),
             direction      = "minimize",
             load_if_exists = True,
         )
 
     def _fail_stale_trials(self, study: optuna.Study) -> int:
-        stale = study.get_trials(deepcopy=False, states=(TrialState.RUNNING,))
+        before = self._count_state(study, TrialState.FAIL)
+        optuna.storages.fail_stale_trials(study)
 
-        for trial in stale:
-            study._storage.set_trial_state_values(trial._trial_id, state=TrialState.FAIL)
-
-        return len(stale)
+        return self._count_state(study, TrialState.FAIL) - before
 
     def _count_done(self, study: optuna.Study) -> int:
         return len(study.get_trials(deepcopy=False, states=(TrialState.COMPLETE, TrialState.PRUNED)))
@@ -166,7 +165,7 @@ class TuningScheduler:
             self._save_results()
             return
 
-        self.logger.subsection(f"Best — trial {payload['trial']}  best validation loss (normalized param L1) = {payload['val_loss']:.6f}")
+        self.logger.subsection(f"Best — trial {payload['trial']}  best validation loss under the {self.config.training_type} objective = {payload['val_loss']:.6f}")
         self.logger.kv_table(payload["params"], title="Best Params")
 
         if tune_cfg.emit_study_plots:

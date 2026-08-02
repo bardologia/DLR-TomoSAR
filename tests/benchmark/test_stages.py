@@ -132,6 +132,14 @@ def test_sizematch_run_emits_reference_and_matched(monkeypatch, logger_stub, tes
     assert stage.records_path.exists()
 
 
+def test_sizematch_rejects_a_reference_that_is_not_swept(config, logger_stub):
+    config.size_match.reference_model = "unet"
+    stage = SizeMatchStage(config=config, run_tag="t", models=["unet-set_pred", "resunet-set_pred"], logger=logger_stub)
+
+    with pytest.raises(SystemExit, match="reference_model"):
+        stage.run()
+
+
 def test_sizematch_load_cached_requires_all_models(config, logger_stub):
     config.resume = True
     stage = SizeMatchStage(config=config, run_tag="t", models=["unet", "resunet"], logger=logger_stub)

@@ -57,7 +57,7 @@ class ProfileAeInferencePipeline:
         return path
 
     def _evaluate_metrics(self, result, run, meta: ProfileAeInferenceMetadata, logger: Logger):
-        metrics_obj = ProfileAeMetrics(result, run.x_axis, run.normalizer, run.amp_zero_thr)
+        metrics_obj = ProfileAeMetrics(result, run.x_axis, run.amp_zero_thr)
         metrics     = metrics_obj.compute()
 
         metrics["split"]         = run.split_name

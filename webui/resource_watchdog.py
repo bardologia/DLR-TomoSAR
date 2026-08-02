@@ -6,6 +6,7 @@ import time
 from collections import deque
 from datetime    import datetime
 
+from proc_stats      import CpuCounters, MemInfo
 from process_manager import ProcessManager
 from web_logger      import WebLogger
 
@@ -117,33 +118,13 @@ class ResourceWatchdog:
             self.logger.muted(f"alert cleared: {kind}")
 
     def _cpu_percent(self) -> float | None:
-        try:
-            parts = open("/proc/stat").readline().split()
-        except OSError:
-            return None
-
-        vals  = [int(v) for v in parts[1:9]]
-        busy  = sum(vals) - vals[3] - vals[4]
-        whole = sum(vals)
-
+        current       = CpuCounters.read().get("cpu")
         prev          = self.prev_cpu
-        self.prev_cpu = (busy, whole)
+        self.prev_cpu = current
 
-        if prev is None or whole <= prev[1]:
+        if current is None or prev is None or current[1] <= prev[1]:
             return None
-        return 100.0 * (busy - prev[0]) / (whole - prev[1])
+        return 100.0 * (current[0] - prev[0]) / (current[1] - prev[1])
 
     def _ram_percent(self) -> float | None:
-        info = {}
-        try:
-            for line in open("/proc/meminfo").read().splitlines():
-                key, _, rest = line.partition(":")
-                info[key]    = int(rest.split()[0])
-        except (OSError, ValueError, IndexError):
-            return None
-
-        total     = info.get("MemTotal", 0)
-        available = info.get("MemAvailable", 0)
-        if total <= 0:
-            return None
-        return 100.0 * (total - available) / total
+        return MemInfo.used_percent()

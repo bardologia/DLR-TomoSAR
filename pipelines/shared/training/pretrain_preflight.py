@@ -60,7 +60,6 @@ class PretrainPreflight:
             build_context   = lambda: self._build_context(logger, device),
             logger          = logger,
             label           = self.label,
-            result_dir      = result_dir,
         )
 
         try:

@@ -30,16 +30,17 @@ class ImageAutoencoderBaseConfig:
     @classmethod
     def tunable_lr_params(cls) -> dict:
         return {
-            "encoder_lr"    : {"type": "float",       "low": 1e-5, "high": 1e-2, "log": True},
-            "decoder_lr"    : {"type": "float",       "low": 1e-5, "high": 1e-2, "log": True},
-            "encoder_wd"    : {"type": "float",       "low": 1e-6, "high": 1e-1, "log": True},
-            "decoder_wd"    : {"type": "float",       "low": 1e-6, "high": 1e-1, "log": True},
-            "embedding_dim" : {"type": "categorical", "choices": [16, 24, 32, 48]},
+            "encoder_lr" : {"type": "float", "low": 1e-5, "high": 1e-2, "log": True},
+            "decoder_lr" : {"type": "float", "low": 1e-5, "high": 1e-2, "log": True},
+            "encoder_wd" : {"type": "float", "low": 1e-6, "high": 1e-1, "log": True},
+            "decoder_wd" : {"type": "float", "low": 1e-6, "high": 1e-1, "log": True},
         }
 
     @classmethod
     def tunable_arch_params(cls) -> dict:
-        return {}
+        return {
+            "embedding_dim" : {"type": "categorical", "choices": [16, 24, 32, 48]},
+        }
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:
         groups = [
@@ -56,6 +57,7 @@ class Conv2dImageAutoencoderConfig(ImageAutoencoderBaseConfig):
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
+            **super().tunable_arch_params(),
             "base_channels"     : {"type": "categorical", "choices": [16, 32, 64]},
             "depth"             : {"type": "categorical", "choices": [1, 2, 3]},
             "downsample_factor" : {"type": "categorical", "choices": [1, 2, 4]},
@@ -73,6 +75,7 @@ class ResNet2dImageAutoencoderConfig(ImageAutoencoderBaseConfig):
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
+            **super().tunable_arch_params(),
             "base_channels"     : {"type": "categorical", "choices": [16, 32, 64]},
             "depth"             : {"type": "categorical", "choices": [1, 2, 3]},
             "downsample_factor" : {"type": "categorical", "choices": [2, 4, 8]},
@@ -86,17 +89,19 @@ class ResNet2dImageAutoencoderConfig(ImageAutoencoderBaseConfig):
 class ConvNeXt2dImageAutoencoderConfig(ImageAutoencoderBaseConfig):
     normalization: str = "layernorm"
 
-    downsample_factor : int = 2
-    upsample_mode     : str = "convtranspose"
+    downsample_factor     : int   = 2
+    upsample_mode         : str   = "convtranspose"
+    stochastic_depth_rate : float = 0.0
 
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
-            "base_channels"     : {"type": "categorical", "choices": [16, 32, 64]},
-            "depth"             : {"type": "categorical", "choices": [1, 2, 3]},
-            "downsample_factor" : {"type": "categorical", "choices": [2, 4, 8]},
-            "activation"        : {"type": "categorical", "choices": ["gelu", "silu"]},
-            "dropout"           : {"type": "float",       "low": 0.0, "high": 0.3},
+            **super().tunable_arch_params(),
+            "base_channels"         : {"type": "categorical", "choices": [16, 32, 64]},
+            "depth"                 : {"type": "categorical", "choices": [1, 2, 3]},
+            "downsample_factor"     : {"type": "categorical", "choices": [2, 4, 8]},
+            "activation"            : {"type": "categorical", "choices": ["gelu", "silu"]},
+            "stochastic_depth_rate" : {"type": "float",       "low": 0.0, "high": 0.3},
         }
 
 
@@ -108,6 +113,7 @@ class DilatedConv2dImageAutoencoderConfig(ImageAutoencoderBaseConfig):
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
+            **super().tunable_arch_params(),
             "base_channels"  : {"type": "categorical", "choices": [16, 32, 64]},
             "dilation_depth" : {"type": "categorical", "choices": [2, 3, 4]},
             "activation"     : {"type": "categorical", "choices": ["relu", "gelu", "silu"]},
@@ -130,6 +136,7 @@ class ViTImageAutoencoderConfig(ImageAutoencoderBaseConfig):
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
+            **super().tunable_arch_params(),
             "patch_size" : {"type": "categorical", "choices": [4, 8, 16]},
             "hidden_dim" : {"type": "categorical", "choices": [96, 192, 384]},
             "depth"      : {"type": "categorical", "choices": [2, 4, 6]},

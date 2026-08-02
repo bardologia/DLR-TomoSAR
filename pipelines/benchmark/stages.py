@@ -194,6 +194,10 @@ class SizeMatchStage(ExperimentStage):
         self.records_path = self.run_dir / "pipeline" / "size_match.json"
         self.report_path  = self.run_dir / "pipeline" / "size_match_report.md"
 
+    def _validate_reference(self, reference: str) -> None:
+        if reference not in self.models:
+            raise SystemExit(f"size_match.reference_model '{reference}' is not one of the swept model keys {self.models}; give the full key including the head (e.g. 'unet-set_pred') so the reference is capacity-matched against its own architecture and not bisected against a different head")
+
     def _load_cached(self) -> dict | None:
         if not self.config.resume or not self.records_path.exists():
             return None
@@ -239,6 +243,8 @@ class SizeMatchStage(ExperimentStage):
         self.logger.info(f"Report written to: {self.report_path}")
 
     def run(self) -> dict:
+        self._validate_reference(self.config.size_match.reference_model)
+
         matcher = SizeMatcher(config=self.config, logger=self.logger)
 
         self.logger.section("Capacity matching")

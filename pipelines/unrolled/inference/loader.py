@@ -11,10 +11,10 @@ from configuration.sar.gaussian_config          import GaussianConfig
 from configuration.training                     import UnrolledEntryConfig
 from models.unrolled                            import get_unrolled
 from pipelines.backbone.dataset.normalizer      import Normalizer
-from pipelines.backbone.dataset.spatial         import Cropper
 from pipelines.backbone.dataset.stats           import Stats
-from pipelines.backbone.inference.loader        import RunLoader
+from pipelines.profile_autoencoder.dataset      import ParameterCropper
 from pipelines.shared.config.config_persistence import UnrolledModelConfigIO
+from pipelines.shared.inference.run_artifacts   import RunArtifactLoader
 from pipelines.shared.dataset.dataset_spatial   import Layout
 from tools.data.gaussians                       import GaussianAxis
 from tools.data.io                              import FileIO
@@ -28,7 +28,6 @@ class UnrolledRun:
     model            : object
     model_name       : str
     model_config     : object
-    entry_config     : UnrolledEntryConfig
     gt_parameters    : np.ndarray
     kz_field         : np.ndarray
     x_axis           : np.ndarray
@@ -43,7 +42,7 @@ class UnrolledRun:
     training_summary : dict
 
 
-class UnrolledRunLoader(RunLoader):
+class UnrolledRunLoader(RunArtifactLoader):
     def _load_entry_config(self) -> UnrolledEntryConfig:
         path = self.run_directory / "docs" / "resolved_entry_config.json"
 
@@ -75,20 +74,19 @@ class UnrolledRunLoader(RunLoader):
 
     def _region_ground_truth(self, dataset_config, split: str, normalizer: Normalizer):
         layout  = Layout(dataset_config.preprocessing_run_directory, logger=self.logger, parameters_path=dataset_config.parameters_path)
-        cropper = Cropper(layout, dataset_config.split_regions, logger=self.logger, secondary_labels=dataset_config.secondary_labels)
+        cropper = ParameterCropper(layout, dataset_config.split_regions, logger=self.logger)
 
         regions = dataset_config.split_regions.regions(split)
         if len(regions) != 1:
             raise ValueError(f"Unrolled inference requires a single contiguous region for split '{split}'; found {len(regions)} disjoint regions.")
 
-        region  = regions[0]
-        arrays  = cropper.load_split(region)
-        indices = dataset_config.output_config.selected_indices(n_gaussians=dataset_config.n_gaussians)
+        parameters = cropper.load_split(split)[0]
+        indices    = dataset_config.output_config.selected_indices(n_gaussians=dataset_config.n_gaussians)
 
-        raw      = np.ascontiguousarray(arrays["parameters"][indices], dtype=np.float32)
+        raw      = np.ascontiguousarray(parameters[indices], dtype=np.float32)
         physical = normalizer.denormalize_output(normalizer.normalize_output(raw))
 
-        return np.ascontiguousarray(physical, dtype=np.float32), region, layout
+        return np.ascontiguousarray(physical, dtype=np.float32), regions[0], layout
 
     def _region_kz(self, dataset_config, layout: Layout, region: CropRegion, height_axis_convention: str) -> np.ndarray:
         path = Path(dataset_config.preprocessing_run_directory) / "meta" / GeometryField.FILENAME
@@ -145,7 +143,6 @@ class UnrolledRunLoader(RunLoader):
             model            = model,
             model_name       = model_name,
             model_config     = model_config,
-            entry_config     = entry,
             gt_parameters    = gt_parameters,
             kz_field         = kz_field,
             x_axis           = x_axis,

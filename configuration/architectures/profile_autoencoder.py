@@ -24,16 +24,17 @@ class ProfileAutoencoderBaseConfig:
     @classmethod
     def tunable_lr_params(cls) -> dict:
         return {
-            "encoder_lr"    : {"type": "float",       "low": 1e-5, "high": 1e-2, "log": True},
-            "decoder_lr"    : {"type": "float",       "low": 1e-5, "high": 1e-2, "log": True},
-            "encoder_wd"    : {"type": "float",       "low": 1e-6, "high": 1e-1, "log": True},
-            "decoder_wd"    : {"type": "float",       "low": 1e-6, "high": 1e-1, "log": True},
-            "embedding_dim" : {"type": "categorical", "choices": [16, 24, 32, 48]},
+            "encoder_lr" : {"type": "float", "low": 1e-5, "high": 1e-2, "log": True},
+            "decoder_lr" : {"type": "float", "low": 1e-5, "high": 1e-2, "log": True},
+            "encoder_wd" : {"type": "float", "low": 1e-6, "high": 1e-1, "log": True},
+            "decoder_wd" : {"type": "float", "low": 1e-6, "high": 1e-1, "log": True},
         }
 
     @classmethod
     def tunable_arch_params(cls) -> dict:
-        return {}
+        return {
+            "embedding_dim" : {"type": "categorical", "choices": [16, 24, 32, 48]},
+        }
 
     def get_param_groups(self, model: nn.Module) -> list[dict]:
         groups = [
@@ -52,6 +53,7 @@ class MlpAutoencoderConfig(ProfileAutoencoderBaseConfig):
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
+            **super().tunable_arch_params(),
             "hidden_dim" : {"type": "categorical", "choices": [256, 512, 768, 1024]},
             "depth"      : {"type": "categorical", "choices": [3, 4, 6, 8]},
             "activation" : {"type": "categorical", "choices": ["relu", "gelu", "silu"]},
@@ -67,6 +69,7 @@ class Conv1dAutoencoderConfig(ProfileAutoencoderBaseConfig):
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
+            **super().tunable_arch_params(),
             "seq_channels"    : {"type": "categorical", "choices": [128, 192, 256]},
             "seq_kernel_size" : {"type": "categorical", "choices": [3, 5, 7]},
             "activation"      : {"type": "categorical", "choices": ["relu", "gelu", "silu"]},
@@ -83,6 +86,7 @@ class Transformer1dAutoencoderConfig(ProfileAutoencoderBaseConfig):
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
+            **super().tunable_arch_params(),
             "hidden_dim" : {"type": "categorical", "choices": [128, 192, 256]},
             "depth"      : {"type": "categorical", "choices": [2, 3, 4]},
             "num_heads"  : {"type": "categorical", "choices": [2, 4, 8]},
@@ -100,6 +104,7 @@ class ResMlpAutoencoderConfig(ProfileAutoencoderBaseConfig):
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
+            **super().tunable_arch_params(),
             "hidden_dim" : {"type": "categorical", "choices": [256, 384, 512]},
             "depth"      : {"type": "categorical", "choices": [2, 3, 4, 6]},
             "activation" : {"type": "categorical", "choices": ["relu", "gelu", "silu"]},
@@ -117,6 +122,7 @@ class TcnAutoencoderConfig(ProfileAutoencoderBaseConfig):
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
+            **super().tunable_arch_params(),
             "seq_channels"    : {"type": "categorical", "choices": [64, 96, 128]},
             "seq_kernel_size" : {"type": "categorical", "choices": [3, 5, 7]},
             "depth"           : {"type": "categorical", "choices": [3, 4, 5]},
@@ -135,6 +141,7 @@ class GruAutoencoderConfig(ProfileAutoencoderBaseConfig):
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
+            **super().tunable_arch_params(),
             "hidden_dim"    : {"type": "categorical", "choices": [128, 224, 320]},
             "depth"         : {"type": "categorical", "choices": [1, 2, 3]},
             "bidirectional" : {"type": "categorical", "choices": [True, False]},
@@ -155,6 +162,7 @@ class CnnAttnAutoencoderConfig(ProfileAutoencoderBaseConfig):
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
+            **super().tunable_arch_params(),
             "seq_channels"    : {"type": "categorical", "choices": [16, 32, 64]},
             "seq_kernel_size" : {"type": "categorical", "choices": [3, 5, 7]},
             "patch_size"      : {"type": "categorical", "choices": [4, 8, 16]},

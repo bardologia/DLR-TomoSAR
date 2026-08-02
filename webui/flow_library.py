@@ -696,7 +696,7 @@ class FlowLibrary:
             },
             {
                 "id": "pae_select", "title": "Active-pixel gate and subsample", "phase": "A - Curve genesis",
-                "note": "A pixel is active when any component amplitude exceeds amp_zero_thr = 1e-3; active pixels are kept at fraction pixel_subsample (default 1.0) and empty pixels at keep_empty_frac = 0.05, then the union is seed-shuffled.",
+                "note": "A pixel is active when any component amplitude exceeds amp_zero_thr = 1e-4; active pixels are kept at fraction pixel_subsample (default 1.0) and empty pixels at keep_empty_frac = 0.05, then the union is seed-shuffled.",
                 "inputs": ["gp"], "outputs": ["active", "idx"],
                 "lines": [
                     [{"id": "active", "tex": r"\mathbb{1}_{\mathrm{act},p}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\bigvee_{k}\big["}, {"id": "gp", "tex": r"a_{p,k}", "role": "intermediate"}, {"tex": r" > \tau_a\big],\qquad \tau_a = 10^{-3}"}],

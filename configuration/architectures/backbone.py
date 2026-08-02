@@ -458,7 +458,7 @@ class SwinUNetConfig:
     @classmethod
     def tunable_arch_params(cls) -> dict:
         return {
-            "embedding_dim"         : {"type": "categorical", "choices": [48, 80, 96, 128]},
+            "embedding_dim"         : {"type": "categorical", "choices": [40, 80, 120, 160]},
             "attention_dropout"     : {"type": "float",       "low": 0.0,  "high": 0.3},
             "stochastic_depth_rate" : {"type": "float",       "low": 0.0,  "high": 0.3},
             "ffn_activation"        : {"type": "categorical", "choices": ["gelu", "relu", "silu"]},
@@ -723,7 +723,7 @@ class DeepLabV3PlusConfig:
     def tunable_arch_params(cls) -> dict:
         return {
             "features"      : {"type": "indexed_categorical", "choices": [[32, 64, 128, 256], [64, 128, 256, 512], [48, 96, 192, 384]]},
-            "atrous_rates"  : {"type": "categorical",         "choices": [(1, 2, 4), (2, 4, 8), (1, 2, 4, 8)]},
+            "atrous_rates"  : {"type": "indexed_categorical", "choices": [(1, 2, 4), (2, 4, 8), (1, 2, 4, 8)]},
             "activation"    : {"type": "categorical",         "choices": ["relu", "leaky_relu", "gelu", "silu"]},
             "normalization" : {"type": "categorical",         "choices": ["batch", "instance", "group"]},
         }
@@ -1178,7 +1178,7 @@ class U2NetLiteConfig:
     def tunable_arch_params(cls) -> dict:
         return {
             "features"      : {"type": "indexed_categorical", "choices": [[32, 64, 128, 256], [64, 128, 256, 512], [48, 96, 192, 384]]},
-            "rsu_heights"   : {"type": "categorical",         "choices": [(4, 3, 2), (5, 4, 3), (6, 5, 4)]},
+            "rsu_heights"   : {"type": "indexed_categorical", "choices": [(4, 3, 2), (5, 4, 3), (6, 5, 4)]},
             "activation"    : {"type": "categorical",         "choices": ["relu", "leaky_relu", "gelu", "silu"]},
             "normalization" : {"type": "categorical",         "choices": ["batch", "instance", "group"]},
         }

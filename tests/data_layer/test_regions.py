@@ -148,15 +148,6 @@ def test_region_rows_list_region_indexes():
     assert train_labels == ["train[0]", "train[1]"]
 
 
-def test_bounding_global_crop_encloses_all():
-    a      = CropRegion(100, 200, 50, 100)
-    b      = CropRegion(150, 400, 20, 80)
-    splits = SplitRegions(train=a, val=b, test=a)
-    bound  = splits.bounding_global_crop()
-
-    assert bound.as_tuple() == (100, 400, 20, 100)
-
-
 @pytest.mark.real_data
 def test_crop_region_matches_real_config(config_state_json):
     crop   = config_state_json["crop"]

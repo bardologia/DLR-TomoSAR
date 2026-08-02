@@ -46,13 +46,15 @@ class PaperFigurePack:
 
         entries = []
         for pattern in self.config.patterns:
-            for figure in sorted(figures_dir.glob(pattern)):
+            figures = [path for path in sorted(figures_dir.glob(pattern)) if path.is_file()]
+
+            if not figures:
+                raise FileNotFoundError(f"No figure under {figures_dir} matches '{pattern}'; that stage rendered nothing for this run, so adjust patterns or re-run inference with save_plots")
+
+            for figure in figures:
                 target = self.output_dir / self._stable_name(run_dir, figures_dir, figure)
                 shutil.copy2(figure, target)
                 entries.append({"run": self._run_label(run_dir), "source": str(figure), "target": target.name})
-
-        if not entries:
-            raise FileNotFoundError(f"No figure under {figures_dir} matches {self.config.patterns}; adjust patterns or re-run inference with save_plots")
 
         return entries
 
@@ -71,7 +73,7 @@ class PaperFigurePack:
         payload = {
             "output_dir" : str(self.output_dir),
             "patterns"   : list(self.config.patterns),
-            "note"       : "Figures are copied as rendered by each run's inference; re-run inference with figure_style=paper for publication styling before packing.",
+            "note"       : "Figures are copied as rendered by each run's inference, whatever the extension: the paper style writes line and scatter figures as .pdf and keeps raster maps as .png. Re-run inference with figure_style=paper for publication styling before packing.",
             "figures"    : manifest,
         }
         FileIO.save_json(payload, self.output_dir / self.MANIFEST)

@@ -11,7 +11,8 @@ from pipelines.benchmark.results                   import BenchmarkSeedCollector
 from pipelines.shared.comparison.comparison_report import ComparisonReport
 from pipelines.shared.comparison.trial_collection  import TrialCollector, TrialRecord
 
-from tools.data.io import FileIO
+from tools.data.io             import FileIO
+from tools.runtime.completion  import CompletionMarker
 
 
 class _SilentLogger:
@@ -82,21 +83,36 @@ def test_collector_reads_checkpoint_with_weights_only_false(tmp_path, logger_stu
     trial_dir.mkdir(parents=True)
 
     checkpoint = {
+        "epoch"         : 9,
+        "params"        : {},
+        "x_axis"        : np.zeros(4, dtype=np.float32),
         "best_val_loss" : 0.123,
         "best_epoch"    : 7,
-        "epoch"         : 9,
-        "global_step"   : 900,
-        "train_losses"  : [1.0, 0.5, 0.123],
-        "val_losses"    : [1.1, 0.6],
     }
     torch.save(checkpoint, trial_dir / "best_model.pt")
+    _write_json(trial_dir / CompletionMarker.FILENAME, {"stage": "training", "epochs_completed": 10, "epochs_total": 20})
 
     records = TrialCollector(run_dir=tmp_path, logger=logger_stub).collect()
 
     assert records[0].checkpoint["best_val_loss"]  == pytest.approx(0.123)
     assert records[0].checkpoint["best_epoch"]     == 7
-    assert records[0].checkpoint["n_train_epochs"] == 3
-    assert records[0].checkpoint["n_val_epochs"]   == 2
+    assert records[0].checkpoint["epoch"]          == 9
+    assert records[0].checkpoint["n_train_epochs"] == 10
+
+
+def test_collector_omits_epoch_count_without_completion_marker(tmp_path, logger_stub):
+    (tmp_path / "pipeline").mkdir(parents=True)
+    _write_json(tmp_path / "pipeline" / "size_match.json", {})
+    _write_json(tmp_path / "pipeline" / "training_results.json", [])
+
+    trial_dir = tmp_path / "training" / "unet"
+    trial_dir.mkdir(parents=True)
+
+    torch.save({"epoch": 4, "params": {}, "best_val_loss": 0.5, "best_epoch": 2}, trial_dir / "best_model.pt")
+
+    records = TrialCollector(run_dir=tmp_path, logger=logger_stub).collect()
+
+    assert "n_train_epochs" not in records[0].checkpoint
 
 
 def test_collector_attaches_inference_metrics_and_media(tmp_path, logger_stub):

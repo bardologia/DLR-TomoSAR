@@ -33,6 +33,10 @@ class ConfigIO:
         raise NotImplementedError
 
     @classmethod
+    def _expected_fields(cls, config) -> set:
+        return {f.name for f in fields(config)}
+
+    @classmethod
     def exists(cls, meta_directory: Path) -> bool:
         return (Path(meta_directory) / cls.FILENAME).is_file()
 
@@ -62,6 +66,10 @@ class ConfigIO:
 
         config = registry[name]()
 
+        missing = cls._expected_fields(config) - payload["config"].keys()
+        if missing:
+            raise ValueError(f"Persisted {cls.FILENAME} under {meta_directory} lacks fields {sorted(missing)} of {type(config).__name__}; the architecture definition gained fields since this checkpoint was trained and current defaults cannot be assumed. Retrain to regenerate it.")
+
         for key, value in payload["config"].items():
             if not hasattr(config, key):
                 raise ValueError(f"Persisted field '{key}' is not an attribute of {type(config).__name__}; the architecture definition changed since this checkpoint was trained")
@@ -75,19 +83,26 @@ class ConfigIO:
         return config, raw_name
 
 
-class BackboneModelConfigIO(ConfigIO):
-    FILENAME     = RunArtifacts.BACKBONE_CONFIG
-    MISSING_NOUN = "backbone"
-    UNKNOWN_NOUN = "architecture"
-    EXCLUDED     = {"shape_logger_types"}
-
-    @classmethod
-    def _registry(cls) -> dict:
-        return BACKBONE_CONFIG_REGISTRY
+class ModelConfigIO(ConfigIO):
+    EXCLUDED = {"shape_logger_types"}
 
     @classmethod
     def _serialize(cls, config) -> dict:
         return {f.name: getattr(config, f.name) for f in fields(config) if f.name not in cls.EXCLUDED}
+
+    @classmethod
+    def _expected_fields(cls, config) -> set:
+        return super()._expected_fields(config) - cls.EXCLUDED
+
+
+class BackboneModelConfigIO(ModelConfigIO):
+    FILENAME     = RunArtifacts.BACKBONE_CONFIG
+    MISSING_NOUN = "backbone"
+    UNKNOWN_NOUN = "architecture"
+
+    @classmethod
+    def _registry(cls) -> dict:
+        return BACKBONE_CONFIG_REGISTRY
 
 
 class ProfileAutoencoderConfigIO(ConfigIO):
@@ -118,34 +133,24 @@ class ImageAutoencoderConfigIO(ConfigIO):
         return asdict(config)
 
 
-class UnrolledModelConfigIO(ConfigIO):
+class UnrolledModelConfigIO(ModelConfigIO):
     FILENAME     = RunArtifacts.UNROLLED_CONFIG
     MISSING_NOUN = "unrolled"
     UNKNOWN_NOUN = "unrolled model"
-    EXCLUDED     = {"shape_logger_types"}
 
     @classmethod
     def _registry(cls) -> dict:
         return UNROLLED_CONFIG_REGISTRY
 
-    @classmethod
-    def _serialize(cls, config) -> dict:
-        return {f.name: getattr(config, f.name) for f in fields(config) if f.name not in cls.EXCLUDED}
 
-
-class DualModelConfigIO(ConfigIO):
+class DualModelConfigIO(ModelConfigIO):
     FILENAME     = RunArtifacts.DUAL_CONFIG
     MISSING_NOUN = "dual-input"
     UNKNOWN_NOUN = "dual-input model"
-    EXCLUDED     = {"shape_logger_types"}
 
     @classmethod
     def _registry(cls) -> dict:
         return DUAL_CONFIG_REGISTRY
-
-    @classmethod
-    def _serialize(cls, config) -> dict:
-        return {f.name: getattr(config, f.name) for f in fields(config) if f.name not in cls.EXCLUDED}
 
 
 class ProfileDatasetConfigIO:

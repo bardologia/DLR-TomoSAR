@@ -152,19 +152,13 @@ class Loss:
 
         gt_gaussians = gt_gauss.shape[1] // ppg
 
+        if gt_gaussians != num_gaussians:
+            raise ValueError(f"The model predicts {num_gaussians} Gaussians but the ground truth carries {gt_gaussians}; both sides must describe the same slot count for the loss to pair them.")
+
         gt      = gt_gauss[     :, : gt_gaussians * ppg].reshape(batch_size, gt_gaussians, ppg, height, width)
         gt_phys = gt_phys_gauss[:, : gt_gaussians * ppg].reshape(batch_size, gt_gaussians, ppg, height, width)
 
-        pred, pred_phys, gt, gt_phys = ParamMatcher.match(pred, pred_phys, gt, gt_phys, method=self.loss_cfg.param_matching.value, active_thr=self.loss_cfg.amp_zero_thr)
-
-        effective_gaussians = min(num_gaussians, gt_gaussians)
-
-        pred      = pred[:,      :effective_gaussians]
-        pred_phys = pred_phys[:, :effective_gaussians]
-        gt        = gt[:,        :effective_gaussians]
-        gt_phys   = gt_phys[:,   :effective_gaussians]
-
-        return pred, pred_phys, gt, gt_phys
+        return ParamMatcher.match(pred, pred_phys, gt, gt_phys, method=self.loss_cfg.param_matching.value, active_thr=self.loss_cfg.amp_zero_thr)
 
     def _prepare(self, pred_params, gt_params):
         clamp_cfg   = self.norm_stats.stats.clamp

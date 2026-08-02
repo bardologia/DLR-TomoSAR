@@ -11,15 +11,15 @@ import torch.nn as nn
 from pipelines.backbone.dataset.spatial                  import GridInfo
 from pipelines.backbone.inference.loader                 import RunLoader
 from pipelines.backbone.inference.model_wrapper          import ModelWrapper
-from configuration.architectures                         import Conv2dImageAutoencoderConfig, UNetConfig
+from configuration.architectures                         import Conv2dImageAutoencoderConfig, MlpAutoencoderConfig, UNetConfig
 from pipelines.jepa.inference.loader                     import JepaInferenceModel, JepaParamRunLoader, JepaRunLoader
-from pipelines.shared.config.config_persistence          import BackboneModelConfigIO, ImageAutoencoderConfigIO
+from pipelines.shared.config.config_persistence          import BackboneModelConfigIO, ImageAutoencoderConfigIO, ProfileAutoencoderConfigIO
 from pipelines.jepa.inference.pipeline                   import JEPA_INFERENCE_COMPONENTS, JEPA_PARAM_INFERENCE_COMPONENTS
 from pipelines.jepa.inference.predictor                  import JepaCurvePredictor
 from pipelines.jepa.training.trainer                     import JepaModule
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 
-from tests.jepa.conftest  import EMBEDDING_DIM, PROFILE_LENGTH, SPATIAL, make_autoencoder
+from tests.jepa.conftest  import DEPTH, EMBEDDING_DIM, HIDDEN_DIM, N_GAUSSIANS, PROFILE_LENGTH, SPATIAL, make_autoencoder
 from tools.data.gaussians import GaussianReconstructor
 
 
@@ -83,6 +83,53 @@ def test_jepa_param_run_loader_builds_image_frontend_module(tmp_path):
         out = module(torch.randn(2, 2, 8, 8))
 
     assert out.shape == (2, 6, 8, 8)
+
+
+def _profile_ae_meta(tmp_path, embedding_dim: int):
+    meta_dir = tmp_path / "meta"
+    meta_dir.mkdir()
+
+    ae_cfg = MlpAutoencoderConfig(profile_length=PROFILE_LENGTH, embedding_dim=embedding_dim, hidden_dim=HIDDEN_DIM, depth=DEPTH)
+    ProfileAutoencoderConfigIO.save(ae_cfg, "mlp_ae", meta_dir)
+
+    return meta_dir
+
+
+def test_jepa_run_loader_reads_persisted_n_gaussians(tmp_path):
+    _profile_ae_meta(tmp_path, embedding_dim=EMBEDDING_DIM)
+
+    loader = JepaRunLoader(tmp_path, logger=FakeLogger())
+
+    assert loader._persisted_n_gaussians({"n_gaussians": N_GAUSSIANS}) == N_GAUSSIANS
+
+    loader._validate_out_channels(EMBEDDING_DIM, N_GAUSSIANS)
+
+
+def test_jepa_run_loader_rejects_summary_without_n_gaussians(tmp_path):
+    _profile_ae_meta(tmp_path, embedding_dim=EMBEDDING_DIM)
+
+    loader = JepaRunLoader(tmp_path, logger=FakeLogger())
+
+    with pytest.raises(KeyError, match="n_gaussians"):
+        loader._persisted_n_gaussians({"out_channels": EMBEDDING_DIM})
+
+
+def test_jepa_run_loader_rejects_out_channels_that_are_not_the_embedding_width(tmp_path):
+    _profile_ae_meta(tmp_path, embedding_dim=EMBEDDING_DIM)
+
+    loader = JepaRunLoader(tmp_path, logger=FakeLogger())
+
+    with pytest.raises(ValueError, match="profile autoencoder embeds"):
+        loader._validate_out_channels(3 * N_GAUSSIANS, N_GAUSSIANS)
+
+
+def test_param_run_loader_requires_a_parameter_head_width(tmp_path):
+    loader = JepaParamRunLoader(tmp_path, logger=FakeLogger())
+
+    loader._validate_out_channels(3 * N_GAUSSIANS, N_GAUSSIANS)
+
+    with pytest.raises(ValueError, match="parameter head"):
+        loader._validate_out_channels(EMBEDDING_DIM, N_GAUSSIANS)
 
 
 def test_wrap_model_returns_model_wrapper_with_curve_output():

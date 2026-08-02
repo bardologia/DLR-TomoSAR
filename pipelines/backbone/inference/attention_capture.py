@@ -61,7 +61,7 @@ class AttentionCapture:
             return out, weights
 
         module.forward = wrapped
-        self._patched.append((module, original))
+        self._patched.append(module)
 
     def attach(self) -> None:
         gates, taps, mhas = self._find_modules()
@@ -87,8 +87,8 @@ class AttentionCapture:
             handle.remove()
         self._handles = []
 
-        for module, original in self._patched:
-            module.forward = original
+        for module in self._patched:
+            del module.forward
         self._patched = []
 
     def records(self) -> dict:
@@ -186,10 +186,12 @@ class AttentionCaptureRun:
         capture = AttentionCapture(run.model.module)
         capture.attach()
 
-        with torch.no_grad():
-            run.model(next(iter(run.loader))[0])
+        try:
+            with torch.no_grad():
+                run.model(next(iter(run.loader))[0])
+        finally:
+            capture.detach()
 
-        capture.detach()
         return capture.records()
 
     def _summarize(self, records: dict) -> dict:

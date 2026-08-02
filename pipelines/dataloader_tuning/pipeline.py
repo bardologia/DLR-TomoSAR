@@ -67,10 +67,12 @@ class DataLoaderTuningPipeline:
         return kept or [min(self.config.worker_counts) if self.config.worker_counts else 0]
 
     def _main_specs(self) -> list[LoaderSpec]:
+        worker_counts = self._worker_counts()
+
         return [
             LoaderSpec(batch_size=batch_size, num_workers=workers, prefetch_factor=self.config.reference_prefetch, pin_memory=True, persistent_workers=True)
             for batch_size in self.config.batch_sizes
-            for workers in self._worker_counts()
+            for workers in worker_counts
         ]
 
     def _run_sweep(self, benchmark, specs, phase: str) -> list[dict]:
@@ -117,9 +119,7 @@ class DataLoaderTuningPipeline:
 
         return final
 
-    def _write(self, target, device, main_results, refine_results, recommendation, final) -> Path:
-        report = SweepReport(main_results, wait_threshold=self.config.data_wait_target)
-
+    def _write(self, target, device, main_results, refine_results, recommendation, final, report) -> Path:
         if self.config.save_figures and not report.ok_frame.empty:
             report.save_all(self.figure_dir)
 
@@ -146,6 +146,7 @@ class DataLoaderTuningPipeline:
         benchmark, device = self._build_benchmark(target)
 
         parameter_count = sum(parameter.numel() for parameter in target.model.parameters())
+        main_specs      = self._main_specs()
 
         self.events.emit("meta", {
             "mode"        : self.config.mode,
@@ -155,11 +156,11 @@ class DataLoaderTuningPipeline:
             "sample"      : target.sample_text,
             "item_source" : target.item_source,
             "config_hint" : target.config_hint,
-            "n_specs"     : len(self._main_specs()),
+            "n_specs"     : len(main_specs),
             "wait_target" : self.config.data_wait_target,
         })
 
-        main_results = self._run_sweep(benchmark, self._main_specs(), phase="main")
+        main_results = self._run_sweep(benchmark, main_specs, phase="main")
 
         report         = SweepReport(main_results, wait_threshold=self.config.data_wait_target)
         recommendation = report.recommendation
@@ -180,7 +181,7 @@ class DataLoaderTuningPipeline:
 
         self.events.emit("recommendation", {"recommendation": recommendation, "final": final})
 
-        results_path = self._write(target, device, main_results, refine_results, recommendation, final)
+        results_path = self._write(target, device, main_results, refine_results, recommendation, final, report)
 
         self.logger.section("[Recommended configuration]")
         self.logger.kv_table({**final, "results": str(results_path)})

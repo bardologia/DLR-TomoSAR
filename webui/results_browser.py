@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import json
 import re
 from pathlib      import Path
 from urllib.parse import quote
 
-from web_logger import WebLogger
+from catalog_roots import CatalogRoots
+from web_logger    import WebLogger
 
 
 class ResultsBrowser:
@@ -32,18 +32,13 @@ class ResultsBrowser:
 
     def __init__(self, logger: WebLogger) -> None:
         self.logger = logger
-        self.roots  = set()
+        self.roots  = CatalogRoots()
 
     def tree(self, raw_path: str) -> dict:
-        root = Path(raw_path).expanduser()
-        if not raw_path.strip() or not root.is_absolute():
-            return {"ok": False, "error": "an absolute path is required"}
+        root, error = self.roots.open(raw_path, "an absolute path is required")
+        if error:
+            return {"ok": False, "error": error}
 
-        root = root.resolve()
-        if not root.is_dir():
-            return {"ok": False, "error": f"not a directory: {root}"}
-
-        self.roots.add(str(root))
         self.logger.info(f"results: opened {root}")
 
         return {
@@ -55,7 +50,7 @@ class ResultsBrowser:
         }
 
     def folder(self, raw_root: str, rel: str) -> dict:
-        if raw_root not in self.roots:
+        if not self.roots.known(raw_root):
             return {"ok": False, "error": "path not opened"}
 
         folder = (Path(raw_root) / rel).resolve() if rel else Path(raw_root)
@@ -104,7 +99,7 @@ class ResultsBrowser:
         }
 
     def gallery(self, raw_root: str) -> dict:
-        if raw_root not in self.roots:
+        if not self.roots.known(raw_root):
             return {"ok": False, "error": "path not opened"}
 
         root   = Path(raw_root)
@@ -116,14 +111,14 @@ class ResultsBrowser:
 
     def file_path(self, raw_path: str) -> Path | None:
         target = Path(raw_path).resolve()
-        if not any(target.is_relative_to(root) for root in self.roots):
+        if not self.roots.contains(target):
             return None
         if not target.is_file():
             return None
         return target
 
     def _catalog_datasets(self, raw: str) -> dict:
-        root, error = self._catalog_root(raw)
+        root, error = self.roots.resolve(raw, "not set")
         if error:
             return {"error": error, "items": []}
 
@@ -138,7 +133,7 @@ class ResultsBrowser:
         return {"error": "", "items": items}
 
     def _catalog_runs(self, raw: str) -> dict:
-        root, error = self._catalog_root(raw)
+        root, error = self.roots.resolve(raw, "not set")
         if error:
             return {"error": error, "items": []}
 
@@ -146,21 +141,6 @@ class ResultsBrowser:
         dirs.sort(key=lambda d: d.stat().st_mtime, reverse=True)
 
         return {"error": "", "items": [{"name": d.name, "path": str(d), "stage": self._stage(d)} for d in dirs]}
-
-    def _catalog_root(self, raw: str) -> tuple[Path | None, str]:
-        raw = raw.strip()
-        if not raw:
-            return None, "not set"
-
-        root = Path(raw).expanduser()
-        if not root.is_absolute():
-            return None, "an absolute path is required"
-
-        root = root.resolve()
-        if not root.is_dir():
-            return None, f"not a directory: {root}"
-
-        return root, ""
 
     def _subdirs(self, directory: Path) -> list:
         try:

@@ -197,8 +197,3 @@ def test_dataframe_exposes_all_rows():
     report = SweepReport(results)
     assert len(report.dataframe) == 2
     assert len(report.ok_frame)  == 1
-
-
-@pytest.mark.skip(reason="real multiprocessing dataloader timing requires hardware and is not deterministic")
-def test_real_benchmark_timing_skipped():
-    pass

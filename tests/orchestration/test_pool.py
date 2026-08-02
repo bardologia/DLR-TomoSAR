@@ -98,6 +98,13 @@ def test_unbounded_workers_when_none(logger):
     assert results == {2: 4, 3: 9}
 
 
+def test_empty_jobs_with_unbounded_workers_returns_empty(logger):
+    runner  = ProcessPoolRunner(logger=logger, max_workers=None)
+    results = runner.run([], _square)
+
+    assert results == []
+
+
 def test_iterable_input_is_consumed(logger):
     runner  = ProcessPoolRunner(logger=logger, max_workers=2)
     results = dict(runner.run(iter([1, 2, 3]), _const))

@@ -16,6 +16,8 @@ if str(WEBUI_ROOT) not in sys.path:
 from cube_explorer import CubeExplorer
 from web_logger    import WebLogger
 
+from tools.loss.param_loss import ParamMatcher
+
 
 N_ELEV, N_AZ, N_RG, N_SLOTS = 5, 8, 6, 2
 
@@ -69,7 +71,7 @@ def _make_cube_run(base: Path, with_params: tuple = ("pred", "gt"), with_spacing
 
 def _loaded_explorer(base: Path, with_params: tuple = ("pred", "gt"), with_spacing: bool = False, with_reduced: bool = False) -> tuple[CubeExplorer, str]:
     _make_cube_run(base, with_params, with_spacing, with_reduced)
-    explorer = CubeExplorer(paths=None, logger=WebLogger())
+    explorer = CubeExplorer(WebLogger())
 
     listing = explorer.list_cubes(str(base))
     assert listing["ok"] and len(listing["cubes"]) == 1
@@ -94,7 +96,7 @@ def test_meta_reports_param_block(tmp_path):
     assert meta["sources"] == ["pred", "gt"]
     assert meta["n_slots"] == N_SLOTS
     assert meta["error"] is True
-    assert meta["threshold"] == 1e-3
+    assert meta["threshold"] == ParamMatcher.ACTIVE_AMP_THR
     assert meta["ranges"]["mu"] == [-10.0, 30.0]
     assert meta["ranges"]["count"] == [0.0, float(N_SLOTS)]
     assert meta["ranges"]["error_count"] == [-float(N_SLOTS), float(N_SLOTS)]
@@ -276,7 +278,7 @@ def test_dem_grid_with_artifact(tmp_path):
     layout["artifacts"]["dem_full"] = "dem.npy"
     (preproc / "data" / "dataset.json").write_text(json.dumps(layout))
 
-    explorer = CubeExplorer(paths=None, logger=WebLogger())
+    explorer = CubeExplorer(WebLogger())
     cube_id  = explorer.list_cubes(str(tmp_path))["cubes"][0]["id"]
     explorer.start_load(cube_id)
 
@@ -305,7 +307,7 @@ def test_params_with_nan_survive_load_and_lookup(tmp_path):
     pred[4]       = np.nan
     np.save(stamp / "cubes" / "params_pred.npy", pred)
 
-    explorer = CubeExplorer(paths=None, logger=WebLogger())
+    explorer = CubeExplorer(WebLogger())
     listing  = explorer.list_cubes(str(tmp_path))
     cube_id  = listing["cubes"][0]["id"]
     assert explorer.start_load(cube_id)["ok"]

@@ -110,9 +110,10 @@ def test_max_batch_worker_invokes_real_probe(config, monkeypatch):
     calls = {}
 
     class FakeProbe:
-        def __init__(self, config, model_name, overrides):
+        def __init__(self, config, model_name, overrides, work_dir):
             calls["model_name"] = model_name
             calls["overrides"]  = overrides
+            calls["work_dir"]   = work_dir
         def run(self):
             return {"model": "unet", "status": "PASS", "batch_size": 64, "peak_gb": 12.0}
 
@@ -121,6 +122,7 @@ def test_max_batch_worker_invokes_real_probe(config, monkeypatch):
     worker.run("unet")
 
     assert calls["model_name"] == "unet"
+    assert calls["work_dir"]   == worker.run_dir / "max_batch" / "unet" / "probe"
     result_path = worker.run_dir / "max_batch" / "unet" / "max_batch_result.json"
     assert result_path.exists()
     assert FileIO.load_json(result_path)["batch_size"] == 64

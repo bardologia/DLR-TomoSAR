@@ -111,16 +111,6 @@ class SplitRegions:
                     label = name if len(regions) == 1 else f"{name}[{index}]"
                     raise ValueError(f"Split region '{label}' {region.as_tuple()} is not contained in the preprocessing global crop {global_crop.as_tuple()}; out-of-crop coordinates would silently wrap or truncate when sliced, loading pixels from the wrong area.")
 
-    def bounding_global_crop(self) -> CropRegion:
-        regions = [region for _, region_list in self.region_lists() for region in region_list]
-
-        return CropRegion(
-            azimuth_start = min(r.azimuth_start for r in regions),
-            azimuth_end   = max(r.azimuth_end   for r in regions),
-            range_start   = min(r.range_start   for r in regions),
-            range_end     = max(r.range_end     for r in regions),
-        )
-
     @classmethod
     def from_ratios(cls, global_crop: CropRegion, train_ratio: float = 0.70, val_ratio: float = 0.15) -> "SplitRegions":
         total_az  = global_crop.azimuth_end - global_crop.azimuth_start

@@ -13,10 +13,11 @@ from pipelines.shared.dataset.dataset_spatial import Layout
 
 
 class Cropper:
-    def __init__(self, layout: Layout, split_regions: SplitRegions, logger: Logger, secondary_labels=None) -> None:
+    def __init__(self, layout: Layout, split_regions: SplitRegions, logger: Logger, secondary_labels=None, input_config=None) -> None:
         self.layout            = layout
         self.split_regions     = split_regions
         self.logger            = logger
+        self.input_config      = input_config
         self.secondary_indices = layout.secondary_indices(secondary_labels)
         self.secondary_labels  = self._resolve_labels(secondary_labels)
 
@@ -50,27 +51,44 @@ class Cropper:
 
         return np.stack([array[index, az_slice, rg_slice] for index in self.secondary_indices])
 
-    def _stack_inputs(self, az_slice: slice, rg_slice: slice) -> Tuple[np.ndarray, int, int]:
-        primary        = np.load(str(self.layout.artifact_path("primary")),        mmap_mode="r", allow_pickle=False)
-        secondaries    = np.load(str(self.layout.artifact_path("secondaries")),    mmap_mode="r", allow_pickle=False)
-        interferograms = np.load(str(self.layout.artifact_path("interferograms")), mmap_mode="r", allow_pickle=False)
+    def _group_enabled(self, flag: str) -> bool:
+        return getattr(self.input_config, flag) if self.input_config is not None else True
 
-        primary_view        = primary[..., az_slice, rg_slice]
-        secondaries_view    = self._select_channels(secondaries,    az_slice, rg_slice)
-        interferograms_view = self._select_channels(interferograms, az_slice, rg_slice)
+    def _group_view(self, artifact: str, flag: str, az_slice: slice, rg_slice: slice) -> Optional[np.ndarray]:
+        if not self._group_enabled(flag):
+            return None
 
-        n_secondaries    = secondaries_view.shape[0]
-        n_interferograms = interferograms_view.shape[0]
-        n_passes         = 1 + n_secondaries + n_interferograms
-        az_size          = primary_view.shape[-2]
-        rg_size          = primary_view.shape[-1]
+        array = np.load(str(self.layout.artifact_path(artifact)), mmap_mode="r", allow_pickle=False)
 
-        inputs_split                      = np.empty((n_passes, az_size, rg_size), dtype=primary.dtype)
-        inputs_split[0]                   = primary_view
-        inputs_split[1:1 + n_secondaries] = secondaries_view
-        inputs_split[1 + n_secondaries:]  = interferograms_view
+        return self._select_channels(array, az_slice, rg_slice)
 
-        return inputs_split, n_secondaries, n_interferograms
+    def _stack_inputs(self, az_slice: slice, rg_slice: slice) -> Tuple[np.ndarray, int, int, int]:
+        primary      = np.load(str(self.layout.artifact_path("primary")), mmap_mode="r", allow_pickle=False)
+        primary_view = primary[..., az_slice, rg_slice]
+
+        secondaries_view    = self._group_view("secondaries",    "use_secondaries",    az_slice, rg_slice)
+        interferograms_view = self._group_view("interferograms", "use_interferograms", az_slice, rg_slice)
+
+        n_primary        = 1 if self._group_enabled("use_primary") else 0
+        n_secondaries    = secondaries_view.shape[0]    if secondaries_view    is not None else 0
+        n_interferograms = interferograms_view.shape[0] if interferograms_view is not None else 0
+
+        n_passes = n_primary + n_secondaries + n_interferograms
+        az_size  = primary_view.shape[-2]
+        rg_size  = primary_view.shape[-1]
+
+        inputs_split = np.empty((n_passes, az_size, rg_size), dtype=primary.dtype)
+
+        if n_primary:
+            inputs_split[0] = primary_view
+
+        if secondaries_view is not None:
+            inputs_split[n_primary:n_primary + n_secondaries] = secondaries_view
+
+        if interferograms_view is not None:
+            inputs_split[n_primary + n_secondaries:] = interferograms_view
+
+        return inputs_split, n_primary, n_secondaries, n_interferograms
 
     def _load_targets(self, az_slice: slice, rg_slice: slice) -> Tuple[np.ndarray, np.ndarray]:
         parameters = np.load(str(self.layout.artifact_path("parameters")), mmap_mode="r", allow_pickle=False)
@@ -85,14 +103,14 @@ class Cropper:
         tomogram = np.load(str(self.layout.artifact_path("tomogram_full")), mmap_mode="r", allow_pickle=False)
         return np.ascontiguousarray(np.abs(tomogram[:, az_slice, rg_slice]).astype(np.float32))
 
-    def _log_crop(self, inputs_split: np.ndarray, dem_split: np.ndarray, parameters_split: np.ndarray, tomogram_split: Optional[np.ndarray], n_secondaries: int, n_interferograms: int) -> None:
+    def _log_crop(self, inputs_split: np.ndarray, dem_split: np.ndarray, parameters_split: np.ndarray, tomogram_split: Optional[np.ndarray], n_primary: int, n_secondaries: int, n_interferograms: int) -> None:
         self.logger.section("[Crop Loaded]")
         self.logger.kv_table({
-            "Primary"          : inputs_split[0].shape,
-            "Secondaries"      : inputs_split[1:1 + n_secondaries].shape,
-            "Interferograms"   : inputs_split[1 + n_secondaries:].shape,
+            "Primary"          : inputs_split[:n_primary].shape,
+            "Secondaries"      : inputs_split[n_primary:n_primary + n_secondaries].shape,
+            "Interferograms"   : inputs_split[n_primary + n_secondaries:].shape,
             "Selection"        : ", ".join(self.secondary_labels) if self.secondary_labels else "all passes",
-            "Inputs (stacked)" : f"{inputs_split.shape}  ({inputs_split.nbytes/1e9:.2f} GB)  [1 primary + {n_secondaries} secondaries + {n_interferograms} interferograms]",
+            "Inputs (stacked)" : f"{inputs_split.shape}  ({inputs_split.nbytes/1e9:.2f} GB)  [{n_primary} primary + {n_secondaries} secondaries + {n_interferograms} interferograms]",
             "DEM"              : f"{dem_split.shape}  ({dem_split.nbytes/1e6:.2f} MB)",
             "Parameters"       : f"{parameters_split.shape}  ({parameters_split.nbytes/1e9:.2f} GB)",
             "Full tomogram"    : f"{tomogram_split.shape}  ({tomogram_split.nbytes/1e9:.2f} GB)" if tomogram_split is not None else "not loaded",
@@ -101,17 +119,18 @@ class Cropper:
     def load_split(self, region: CropRegion, load_tomogram: bool = False) -> dict[str, np.ndarray]:
         az_slice, rg_slice = self._to_local_slices(region)
 
-        inputs_split, n_secondaries, n_interferograms = self._stack_inputs(az_slice, rg_slice)
-        parameters_split, dem_split                   = self._load_targets(az_slice, rg_slice)
-        tomogram_split                                = self._load_tomogram(az_slice, rg_slice) if load_tomogram else None
+        inputs_split, n_primary, n_secondaries, n_interferograms = self._stack_inputs(az_slice, rg_slice)
+        parameters_split, dem_split                              = self._load_targets(az_slice, rg_slice)
+        tomogram_split                                           = self._load_tomogram(az_slice, rg_slice) if load_tomogram else None
 
-        self._log_crop(inputs_split, dem_split, parameters_split, tomogram_split, n_secondaries, n_interferograms)
+        self._log_crop(inputs_split, dem_split, parameters_split, tomogram_split, n_primary, n_secondaries, n_interferograms)
 
         return {
             "inputs"           : inputs_split,
             "dem"              : dem_split,
             "parameters"       : parameters_split,
             "tomogram"         : tomogram_split,
+            "n_primary"        : n_primary,
             "n_secondaries"    : n_secondaries,
             "n_interferograms" : n_interferograms,
             "secondary_labels" : self.secondary_labels,

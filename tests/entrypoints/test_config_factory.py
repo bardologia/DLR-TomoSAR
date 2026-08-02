@@ -94,6 +94,15 @@ def test_training_dataset_config_propagates_loader_settings(factory):
     assert dataset_config.pin_memory      is True
 
 
+@pytest.mark.real_data
+def test_training_dataset_config_propagates_patch_padding(factory):
+    factory.config.training.use_symmetric_padding = False
+
+    dataset_config = factory.training_dataset_config()
+
+    assert dataset_config.patch.use_symmetric_padding is False
+
+
 def test_inference_config_propagates_run_directory(bare_factory, tmp_path):
     run_directory = tmp_path / "run"
 
@@ -152,6 +161,15 @@ def test_training_trainer_config_abort_flag_propagates(factory, tmp_path):
     trainer_config = factory.training_trainer_config(tmp_path / "logdir")
 
     assert trainer_config.training.abort_on_nonfinite_loss is False
+
+
+@pytest.mark.real_data
+def test_training_trainer_config_snapshot_cadence_propagates(factory, tmp_path):
+    factory.config.training.snapshot_every_n_epochs = 5
+
+    trainer_config = factory.training_trainer_config(tmp_path / "logdir")
+
+    assert trainer_config.training.snapshot_every_n_epochs == 5
 
 
 @pytest.mark.real_data

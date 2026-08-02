@@ -53,7 +53,7 @@ def _make_cube_run(base: Path) -> Path:
 
 def _loaded_explorer(base: Path) -> tuple[CubeExplorer, str]:
     _make_cube_run(base)
-    explorer = CubeExplorer(paths=None, logger=WebLogger())
+    explorer = CubeExplorer(WebLogger())
 
     listing = explorer.list_cubes(str(base))
     cube_id = listing["cubes"][0]["id"]

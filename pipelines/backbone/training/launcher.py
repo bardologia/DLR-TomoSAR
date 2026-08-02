@@ -20,6 +20,7 @@ from pipelines.shared.model.model_builder      import ModelBuilder
 from pipelines.shared.training.run_naming      import RunNaming
 from pipelines.shared.training.seed_sweep      import SeedFanoutScheduler, SeedSet, SeedSweepRunner
 from pipelines.shared.training.training_runner import SingleTrainRunner as BaseSingleTrainRunner
+from tools.data.gaussians                      import GaussianHead
 from tools.orchestration                       import ExperimentStage, GpuJob
 from tools.monitoring.logger                   import Logger
 from tools.runtime.config_cli                  import ConfigCli
@@ -82,7 +83,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
             n_batches      = self.config.probe_n_batches,
             reference      = self.config.probe_reference,
             exit_after     = self.config.probe_exit_after,
-            enabled_losses = {},
+            enabled_losses = dict(self.config.probe_enabled_losses),
         )
 
     def _inference_components(self):
@@ -107,7 +108,7 @@ class SingleTrainRunner(BaseSingleTrainRunner):
             pipeline = self._pipeline(self.config.logdir)
             results  = pipeline.run(probe_config=self._probe_config(), resolved_entry_config=self.config)
 
-        if (self.config.infer_after or self.config.infer_at_end) and not self.unit_resume.skip_inference():
+        if (self.config.infer_after or self.config.infer_at_end) and not self.unit_resume.skip_inference(self.config.inference.split):
             self._run_inference(self.run_directory)
 
         return results
@@ -151,6 +152,11 @@ class TrainScheduler:
         self.logger = Logger(log_dir=str(self.log_dir), name="train_scheduler")
         self.stage  = ExperimentStage(config=config, run_tag="batch_train", logger=self.logger, entry_script=self.entry_script, run_dir=self.runs_root)
 
+    def _out_channels(self) -> int:
+        gaussian = ConfigFactory(self.config).gaussian_config()
+
+        return GaussianHead.total_channels(gaussian.params_per_gaussian, gaussian.n_default_gaussians)
+
     def planner(self):
         mode = self.config.trials_mode
         if mode == "curriculum":
@@ -173,7 +179,7 @@ class TrainScheduler:
             return ContextTrialPlanner(self.config.context_trials, tuple(BACKBONE_CONFIG_REGISTRY))
         if mode == "reach":
             n_secondaries = len(self.config.paths.secondary_labels)
-            return ReachTrialPlanner(self.config.reach_trials, tuple(BACKBONE_CONFIG_REGISTRY), self.config.backbone_head, self.config.input.total_channels(n_secondaries, n_secondaries))
+            return ReachTrialPlanner(self.config.reach_trials, tuple(BACKBONE_CONFIG_REGISTRY), self.config.backbone_head, self.config.input.total_channels(n_secondaries, n_secondaries), self._out_channels())
         if mode == "head":
             return HeadMatchingTrialPlanner(self.config.head_trials, tuple(BACKBONE_CONFIG_REGISTRY), BACKBONE_HEADS, tuple(matching.value for matching in ParamMatching))
         if mode == "augmentation":

@@ -181,10 +181,10 @@ class SigmaFittingExtractor:
 
         r_end = min(r_start + self.range_batch_size, R)
         r_c   = r_end - r_start
-        raw   = np.abs(np.array(tomogram_mmap[:, :, r_start:r_end])).astype(np.float32)
+        raw   = np.abs(tomogram_mmap[:, :, r_start:r_end]).astype(np.float32, copy=False)
         raw   = ProfilePreprocessor.apply(raw, self.threshold_factor, self.truncation_index)
 
-        pf     = raw.transpose(2, 1, 0).reshape(r_c * Az, H).copy()
+        pf     = raw.transpose(2, 1, 0).reshape(r_c * Az, H)
         active = pf.max(axis=1) > self.activity_threshold
         pmax   = pf.max(axis=1, keepdims=True)
         scale  = np.where(active[:, None], pmax, 1.0).astype(np.float32)

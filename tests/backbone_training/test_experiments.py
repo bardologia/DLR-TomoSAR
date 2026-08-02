@@ -370,7 +370,7 @@ def _reach_config(**overrides) -> ReachTrialsConfig:
 
 
 def test_reach_planner_pins_every_arm_to_the_same_patch():
-    planner = ReachTrialPlanner(_reach_config(), REGISTRY_NAMES, "conv", 9)
+    planner = ReachTrialPlanner(_reach_config(), REGISTRY_NAMES, "conv", 9, 6)
 
     plans = planner.plan()
 
@@ -384,7 +384,7 @@ def test_reach_default_arms_are_size_matched_and_reach_the_whole_patch():
     from models import BACKBONE_CONFIG_REGISTRY
 
     trials  = ReachTrialsConfig()
-    planner = ReachTrialPlanner(trials, tuple(BACKBONE_CONFIG_REGISTRY), "conv", 9)
+    planner = ReachTrialPlanner(trials, tuple(BACKBONE_CONFIG_REGISTRY), "conv", 9, 6)
 
     counts    = planner.parameter_counts
     deviation = (max(counts.values()) - min(counts.values())) / min(counts.values())
@@ -399,6 +399,18 @@ def test_reach_default_arms_are_size_matched_and_reach_the_whole_patch():
     assert all(field >= size for size in trials.patch_size)
 
 
+def test_reach_planner_counts_the_arms_at_the_configured_gaussian_count():
+    rungs = [
+        {"label" : "a", "backbone" : "local_cnn", "features" : [8] * 2},
+        {"label" : "b", "backbone" : "local_cnn", "features" : [8] * 2},
+    ]
+
+    two_slots  = ReachTrialPlanner(_reach_config(rungs=rungs), REGISTRY_NAMES, "set_pred", 9, 6)
+    five_slots = ReachTrialPlanner(_reach_config(rungs=rungs), REGISTRY_NAMES, "set_pred", 9, 15)
+
+    assert five_slots.parameter_counts["a"] > two_slots.parameter_counts["a"]
+
+
 def test_reach_planner_rejects_arms_that_are_not_size_matched():
     rungs = [
         {"label" : "narrow", "backbone" : "local_cnn", "features" : [8]  * 2},
@@ -406,33 +418,33 @@ def test_reach_planner_rejects_arms_that_are_not_size_matched():
     ]
 
     with pytest.raises(ValueError, match="in parameter count"):
-        ReachTrialPlanner(_reach_config(rungs=rungs), REGISTRY_NAMES, "conv", 9)
+        ReachTrialPlanner(_reach_config(rungs=rungs), REGISTRY_NAMES, "conv", 9, 6)
 
 
 def test_reach_planner_rejects_a_lone_arm_and_unknown_backbones():
     with pytest.raises(ValueError, match="at least two architectures"):
-        ReachTrialPlanner(_reach_config(rungs=[{"label": "a", "backbone": "unet"}]), REGISTRY_NAMES, "conv", 9)
+        ReachTrialPlanner(_reach_config(rungs=[{"label": "a", "backbone": "unet"}]), REGISTRY_NAMES, "conv", 9, 6)
 
     rungs = [{"label": "a", "backbone": "voxel_gnn"}, {"label": "b", "backbone": "unet"}]
     with pytest.raises(ValueError, match="Unknown reach_trials backbones"):
-        ReachTrialPlanner(_reach_config(rungs=rungs), REGISTRY_NAMES, "conv", 9)
+        ReachTrialPlanner(_reach_config(rungs=rungs), REGISTRY_NAMES, "conv", 9, 6)
 
 
 def test_reach_planner_rejects_duplicate_labels():
     rungs = [{"label": "a", "backbone": "unet"}, {"label": "a", "backbone": "local_cnn"}]
 
     with pytest.raises(ValueError, match="labels must be unique"):
-        ReachTrialPlanner(_reach_config(rungs=rungs), REGISTRY_NAMES, "conv", 9)
+        ReachTrialPlanner(_reach_config(rungs=rungs), REGISTRY_NAMES, "conv", 9, 6)
 
 
 def test_reach_planner_rejects_an_input_stack_mismatch():
     with pytest.raises(ValueError, match="count the wrong first layer"):
-        ReachTrialPlanner(_reach_config(), REGISTRY_NAMES, "conv", 61)
+        ReachTrialPlanner(_reach_config(), REGISTRY_NAMES, "conv", 61, 6)
 
 
 def test_reach_and_context_planners_reject_bare_string_rungs():
     with pytest.raises(ValueError, match="must be dicts"):
-        ReachTrialPlanner(_reach_config(rungs=["local_cnn", "unet"]), REGISTRY_NAMES, "conv", 9)
+        ReachTrialPlanner(_reach_config(rungs=["local_cnn", "unet"]), REGISTRY_NAMES, "conv", 9, 6)
 
     with pytest.raises(ValueError, match="pre-rung format"):
         ContextTrialPlanner(["pixel_mlp", "local_cnn", "unet"], REGISTRY_NAMES)

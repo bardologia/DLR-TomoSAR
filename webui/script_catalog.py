@@ -307,7 +307,7 @@ class ScriptCatalog:
         meta    = self.META.get(key, {"title": key, "category": "Other", "purpose": ""})
         source  = spec["path"].read_text(encoding="utf-8")
         entry   = self.resolver.entry_config(key)
-        command = " ".join(["python", spec["rel"], *spec["args"]])
+        command = f"python {spec['rel']}"
 
         group_key, group, label = self._group_of(key)
 
@@ -317,7 +317,6 @@ class ScriptCatalog:
             "title"        : meta["title"],
             "category"     : meta["category"],
             "purpose"      : meta["purpose"],
-            "essentials"   : meta.get("essentials", []),
             "source"       : source,
             "language"     : "python",
             "config_class" : entry["class"] if entry else None,

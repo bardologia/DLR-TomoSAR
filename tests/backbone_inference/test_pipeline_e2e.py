@@ -100,7 +100,7 @@ def _build_run_directory(tmp_path, test_data_dir, params_dir):
     in_channels    = dataset_config.input_config.total_channels(0, len(SECONDARY_LABELS))
 
     MetadataWriter(run_dir, logger=_SilentLogger()).save_dataset_configuration(dataset_config)
-    FileIO.save_json({"model_name": "unet", "in_channels": in_channels, "out_channels": 3 * N_GAUSSIANS}, meta_dir / "run_summary.json")
+    FileIO.save_json({"model_name": "unet", "in_channels": in_channels, "out_channels": 3 * N_GAUSSIANS, "n_gaussians": N_GAUSSIANS}, meta_dir / "run_summary.json")
     FileIO.save_json({"geometry": {"height_axis_convention": "height"}}, run_dir / "docs" / "trainer_config.json")
 
     _persist_stats(meta_dir, in_channels)
@@ -160,3 +160,13 @@ def test_inference_pipeline_end_to_end(tmp_path, test_data_dir, params_dir):
     report = report_path.read_text()
     assert "Interferometric data consistency" in report
     assert "unet" in report
+
+
+def test_equal_indices_are_unique_and_inside_the_axis():
+    for n_total in (7, 10, 64, 150):
+        for n_slices in (1, 3, 5, n_total):
+            indices = InferencePipeline._equal_indices(n_total, n_slices)
+
+            assert indices.size == np.unique(indices).size
+            assert indices.min() >= 0
+            assert indices.max() < n_total

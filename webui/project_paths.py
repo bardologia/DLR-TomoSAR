@@ -6,7 +6,7 @@ from pathlib import Path
 
 class ProjectPaths:
 
-    PRIORITY        = ["conda:dlr-cu12", "conda:Dune", "conda:nazaria"]
+    PRIORITY        = ["conda:Dune"]
     SCRIPT_PRIORITY = {
         "generate_tomogram"       : ["conda:stetools"],
         "generate_interferograms" : ["conda:stetools"],
@@ -58,12 +58,10 @@ class ProjectPaths:
             "config_class"  : "DualInferenceEntryConfig",
         },
         "cross_validate": {
-            "file"          : "cross_validate",
             "config_module" : "configuration.cross_validation.general",
             "config_class"  : "CrossValidationConfig",
         },
         "sweep_patches": {
-            "file"          : "sweep_patches",
             "config_module" : "configuration.patch_sweep.general",
             "config_class"  : "PatchSweepConfig",
         },
@@ -137,7 +135,6 @@ class ProjectPaths:
         return {
             "path"          : self.main_dir / subdir / f"{file_stem}.py",
             "rel"           : rel,
-            "args"          : list(override.get("args", [])),
             "config_module" : override.get("config_module"),
             "config_class"  : override.get("config_class"),
         }
