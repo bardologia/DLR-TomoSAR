@@ -202,6 +202,11 @@ class JobDescriber:
             ("runs", "run_filter", "list", "all runs"),
             ("root", "runs_dir",   "opt_tail"),
         ],
+        "map_loss_landscape": [
+            ("runs", "run_filter", "list", "all runs"),
+            ("root", "runs_dir",   "opt_tail"),
+            ("span", "span",       "text"),
+        ],
         "export_tensorboard_plots": [
             ("runs", "run_filter", "list", "all runs"),
             ("root", "runs_dir",   "opt_tail"),

@@ -311,3 +311,23 @@ class CkaConfig:
     sample_seed       : int = 0
 
     figure_style : str = "report"
+
+
+@dataclass
+class LossLandscapeConfig:
+    runs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
+    run_filter : List[str] = field(default_factory=list)
+
+    split           : str = "test"
+    device          : str = "cpu"
+    checkpoint_name : str = "best_model.pt"
+    output_subdir   : str = "loss_landscape"
+
+    batch_size     : int   = 4
+    max_batches    : int   = 2
+    span           : float = 0.5
+    n_points_1d    : int   = 21
+    n_points_2d    : int   = 11
+    direction_seed : int   = 0
+
+    figure_style : str = "report"

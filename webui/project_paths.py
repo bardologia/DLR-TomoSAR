@@ -117,6 +117,7 @@ class ProjectPaths:
         "capture_attention"               : "analysis",
         "probe_layers"                    : "analysis",
         "compare_representations"         : "analysis",
+        "map_loss_landscape"              : "analysis",
         "export_tensorboard_plots"        : "analysis",
         "collect_reports"                 : "analysis",
     }

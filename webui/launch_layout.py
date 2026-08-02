@@ -1278,6 +1278,31 @@ class LaunchLayout:
                 ]},
             ],
         },
+        "map_loss_landscape": {
+            "sections": [
+                {"key": "config", "title": "Configuration", "panels": [
+                    {"kind": "fields", "groups": [
+                        {"title": "Runs", "fields": [
+                            "runs_dir",
+                            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir", "checkpointOnly": True}},
+                            "checkpoint_name",
+                            "output_subdir",
+                        ]},
+                        {"title": "Landscape", "fields": [
+                            "split",
+                            "device",
+                            {"path": "batch_size",  "widget": {"kind": "number", "min": 1, "max": 64, "step": 1}},
+                            {"path": "max_batches", "widget": {"kind": "number", "min": 1, "max": 16, "step": 1}},
+                            "span",
+                            {"path": "n_points_1d", "widget": {"kind": "number", "min": 5, "max": 101, "step": 2}},
+                            {"path": "n_points_2d", "widget": {"kind": "number", "min": 5, "max": 41, "step": 2}},
+                            {"path": "direction_seed", "widget": NUM_SEED},
+                        ]},
+                        {"title": "Figures", "fields": ["figure_style"]},
+                    ]},
+                ]},
+            ],
+        },
         "compare_representations": {
             "sections": [
                 {"key": "config", "title": "Configuration", "panels": [

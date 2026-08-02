@@ -2505,6 +2505,24 @@
         "sample_seed": "Seed of the shared pixel-sampling coordinates",
         "figure_style": "PlotBase figure style the heatmaps are rendered with (report or paper)"
       }
+    },
+    "diagnostics::LossLandscapeConfig": {
+      "summary": "Entry config that maps the curve-MSE landscape around the trained weights of one or more backbone runs along two filter-normalized random directions, with 1D cuts, a 2D contour and sharpness scalars per run",
+      "fields": {
+        "runs_dir": "Root directory scanned recursively for run directories holding the configured checkpoint file; each selected run is mapped in sequence",
+        "run_filter": "Run directory names (or names of parent directories whose nested runs are expanded) to map; empty selects interactively on a TTY and every discovered run otherwise",
+        "split": "Dataset split the fixed evaluation batches are drawn from",
+        "device": "Torch device the perturbed model evaluations run on",
+        "checkpoint_name": "Checkpoint filename loaded from each run directory and used as the run-discovery marker",
+        "output_subdir": "Name of the output directory created inside each run directory for the JSON, figures and markdown report",
+        "batch_size": "Batch size of the fixed evaluation batches",
+        "max_batches": "Number of batches the curve MSE is averaged over at every grid point; total cost scales with n_points squared times batches",
+        "span": "Half-width of the sampled step range along each filter-normalized direction",
+        "n_points_1d": "Number of grid points of each 1D cut",
+        "n_points_2d": "Number of grid points per axis of the 2D contour; the grid costs n_points_2d squared evaluations",
+        "direction_seed": "Seed of the two random directions (seed and seed+1); fixed seeds make landscapes comparable across runs",
+        "figure_style": "PlotBase figure style the cuts and contour are rendered with (report or paper)"
+      }
     }
   }
 }

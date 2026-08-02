@@ -172,6 +172,11 @@ class ScriptCatalog:
             "category"  : "Analysis",
             "purpose"   : "Compare the internal representations of two or more trained backbone runs with linear CKA on identical sampled pixels. Per-pair cross-layer heatmaps expose which depths learn matching features, and a run-by-run alignment matrix shows whether different architectures or seeds converge to similar representations. Requires runs sharing the split region and patch grid.",
         },
+        "map_loss_landscape": {
+            "title"     : "Loss Landscape",
+            "category"  : "Analysis",
+            "purpose"   : "Map the curve-MSE landscape around the trained weights of backbone runs along two filter-normalized random directions (Li et al. 2018). Writes 1D cuts, a 2D log-scale contour, and a sharpness scalar per direction into each run directory. The physical curve objective keeps runs trained under different losses comparable, replacing the synthetic shift/scale landscape.",
+        },
         "export_tensorboard_plots": {
             "title"     : "Export TensorBoard Plots",
             "category"  : "Analysis",
