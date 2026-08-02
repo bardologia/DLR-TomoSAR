@@ -404,11 +404,19 @@ class LeaderboardView {
         svg += `<line x1="${e0}" y1="${mid - 4}" x2="${e0}" y2="${mid + 4}" class="lb-chart__err" />`;
         svg += `<line x1="${e1}" y1="${mid - 4}" x2="${e1}" y2="${mid + 4}" class="lb-chart__err" />`;
       }
-      svg += `<text x="${xAt(hi) + 8}" y="${mid + 4}" class="lb-chart__value">${this._fmt(row.agg.mean)} ± ${this._fmt(row.agg.std)} (n=${row.agg.n})</text>`;
+      const sig = this._sigText(row.agg);
+      svg += `<text x="${xAt(hi) + 8}" y="${mid + 4}" class="lb-chart__value">${this._fmt(row.agg.mean)} ± ${this._fmt(row.agg.std)} (n=${row.agg.n})${sig}</text>`;
     });
 
     svg += `</svg>`;
     return `<div class="lb-chart__wrap">${svg}</div>`;
+  }
+
+  _sigText(agg) {
+    if (!agg || agg.is_best) return "";
+    if (agg.p_vs_best === null || agg.p_vs_best === undefined) return "";
+    const star = agg.p_vs_best < 0.05 ? "*" : "";
+    return `, p=${agg.p_vs_best.toPrecision(2)}${star}`;
   }
 
   _trialsTableHtml(experiment, columns, index) {
@@ -423,7 +431,7 @@ class LeaderboardView {
       html += `<tr><td class="lb-key">${this._esc(unit.unit)}</td><td>${unit.seeds.join(", ")}</td>`;
       present.forEach((col) => {
         const agg = unit.metrics[col.key];
-        html += `<td>${agg ? `${this._fmt(agg.mean)} ± ${this._fmt(agg.std)}` : "&ndash;"}</td>`;
+        html += `<td>${agg ? `${this._fmt(agg.mean)} ± ${this._fmt(agg.std)}${this._sigText(agg)}` : "&ndash;"}</td>`;
       });
       html += `</tr>`;
     });

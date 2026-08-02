@@ -75,6 +75,7 @@ class SeedRunAggregator:
             "n_seeds"           : len(runs),
             "best_val_loss_std" : ckpt_std.get("best_val_loss"),
             "metrics"           : metric_std,
+            "seed_metrics"      : {run.name.rsplit("/", 1)[-1]: run.metrics for run in runs},
         }
 
         return record, dispersion

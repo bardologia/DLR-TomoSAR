@@ -6,8 +6,9 @@ import re
 import statistics
 from pathlib import Path
 
-from tools.reporting.reporting import MetricSectionGrouper
-from web_logger                import WebLogger
+from tools.metrics.significance import SignificanceVsLeader
+from tools.reporting.reporting  import MetricSectionGrouper
+from web_logger                 import WebLogger
 
 
 class RunAxes:
@@ -180,6 +181,28 @@ class RunLeaderboard:
             node = node.parent
         return None
 
+    def _annotate_significance(self, units_list: list[dict]) -> None:
+        for column in self.COLUMNS:
+            key        = column["key"]
+            candidates = [unit for unit in units_list if key in unit["metrics"] and unit["metrics"][key]["n"] >= 2]
+
+            if len(candidates) < 2:
+                continue
+
+            best     = min(candidates, key=lambda unit: unit["metrics"][key]["mean"] * -column["direction"])
+            per_seed = {unit["unit"]: {seed: values.get(key) for seed, values in unit["seed_rows"].items()} for unit in candidates}
+
+            results = SignificanceVsLeader().compute(per_seed, best["unit"])
+
+            for unit in candidates:
+                if unit is best:
+                    unit["metrics"][key]["p_vs_best"] = None
+                    unit["metrics"][key]["is_best"]   = True
+                else:
+                    entry = results.get(unit["unit"], {})
+                    unit["metrics"][key]["p_vs_best"] = entry.get("p_adjusted")
+                    unit["metrics"][key]["is_best"]   = False
+
     def trials(self, base: str) -> dict:
         root, error = self._catalog_root(base)
         if error:
@@ -229,11 +252,19 @@ class RunLeaderboard:
                 }
 
             experiments.setdefault(experiment, []).append({
-                "unit"    : unit_path.name,
-                "path"    : unit_dir,
-                "seeds"   : sorted(seed for seed, _ in seed_rows),
-                "metrics" : aggregated,
+                "unit"       : unit_path.name,
+                "path"       : unit_dir,
+                "seeds"      : sorted(seed for seed, _ in seed_rows),
+                "metrics"    : aggregated,
+                "seed_rows"  : {str(seed): values for seed, values in seed_rows},
             })
+
+        for units_list in experiments.values():
+            self._annotate_significance(units_list)
+
+        for units_list in experiments.values():
+            for unit in units_list:
+                unit.pop("seed_rows")
 
         payload = [{"key": name, "units": units_list} for name, units_list in sorted(experiments.items())]
         self.logger.info(f"leaderboard trials: {sum(len(e['units']) for e in payload)} units in {len(payload)} experiments under {root}")

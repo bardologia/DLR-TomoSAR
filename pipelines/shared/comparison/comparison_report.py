@@ -8,6 +8,7 @@ from pipelines.shared.comparison.trial_collection import TrialRecord
 from tools.data.io                                import FileIO
 from tools.metrics.ranking                        import RankingComputer, RankingResult
 from tools.metrics.scoring                        import FiniteScalar, MetricOrientation
+from tools.metrics.significance                   import SignificanceVsLeader
 from tools.monitoring.logger                      import Logger
 from tools.reporting.markdown                     import MarkdownTable, ScalarFormatter
 from tools.reporting.reporting                    import MetricSectionGrouper, ReportAssets
@@ -49,6 +50,28 @@ class ComparisonReportBase:
         trials = [(r.name, r.metrics) for r in scored]
         return RankingComputer(metrics, trials).compute()
 
+    def _significance_vs_leader(self, metric_key: str, order: list[str]) -> dict[str, dict] | None:
+        per_seed = {}
+        for name in order:
+            entry = self.seed_dispersion.get(name, {})
+            if "seed_metrics" in entry:
+                per_seed[name] = {seed: metrics.get(metric_key) for seed, metrics in entry["seed_metrics"].items()}
+
+        leader = order[0]
+        if leader not in per_seed or len(per_seed) < 2:
+            return None
+
+        return SignificanceVsLeader().compute(per_seed, leader)
+
+    @staticmethod
+    def _significance_cell(entry: dict | None) -> str:
+        if entry is None or entry.get("p_adjusted") is None:
+            return "n/a"
+
+        p    = entry["p_adjusted"]
+        mark = "*" if p < 0.05 else ""
+        return f"{p:.3g}{mark}"
+
     def _rank_section(self, entity: str, title: str, intro: str, metrics: list[tuple[str, str]], scored: list[TrialRecord]) -> list[str]:
         if not metrics:
             return [f"## {title}\n", "_No applicable metrics available._\n"]
@@ -58,9 +81,16 @@ class ComparisonReportBase:
 
         lines = [f"## {title}\n", f"{intro}\n"]
 
-        table = MarkdownTable(["#", entity, "Score", "Mean rank", "Wins", "Δ", *[label for _, label in metrics]])
+        order        = list(result.order())
+        significance = self._significance_vs_leader(metrics[0][0], order)
 
-        for position, name in enumerate(result.order(), start=1):
+        header = ["#", entity, "Score", "Mean rank", "Wins", "Δ", *[label for _, label in metrics]]
+        if significance is not None:
+            header.append(f"p vs #1 ({metrics[0][1]})")
+
+        table = MarkdownTable(header)
+
+        for position, name in enumerate(order, start=1):
             cells = []
             for key, _ in metrics:
                 cell = RankingResult.format_rank(result.metric_rank(name, key))
@@ -69,6 +99,9 @@ class ComparisonReportBase:
                 cells.append(cell)
 
             delta = result.composite[name] - leader
+
+            if significance is not None:
+                cells.append("—" if position == 1 else self._significance_cell(significance.get(name)))
 
             table.add_row(
                 position,
@@ -82,6 +115,10 @@ class ComparisonReportBase:
 
         lines += table.render()
         lines.append("")
+
+        if significance is not None:
+            lines.append(f"> p vs #1: two-sided paired permutation test on per-seed {metrics[0][1]} against the composite leader, Holm-adjusted across rows; * marks p < 0.05.\n")
+
         return lines
 
     def _grouped_section(self, entity: str, title: str, intro: str, groups: list[tuple[str, list[str]]], scored: list[TrialRecord]) -> list[str]:
