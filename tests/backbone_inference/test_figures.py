@@ -17,16 +17,12 @@ from pipelines.backbone.inference.figures            import Animator, FigureComp
 from pipelines.backbone.inference.plots              import Plotter
 from tools.baselines                                 import TrackBaselines, TrackProfiles
 
+from tests.conftest import SilentLogger
+
 
 N_GAUSSIANS = 2
 N_ELEV      = 12
 H = W       = 8
-
-
-class _SilentLogger:
-    def section(self, *a, **k):    pass
-    def subsection(self, *a, **k): pass
-    def kv_table(self, *a, **k):   pass
 
 
 def _x_axis():
@@ -134,11 +130,11 @@ def _composer(tmp_path):
     meta = InferenceMetadata(cfg)
     meta.create_dirs()
     plotter = Plotter(normalize=False)
-    return FigureComposer(plotter=plotter, meta=meta, logger=_SilentLogger(), cfg=cfg), meta
+    return FigureComposer(plotter=plotter, meta=meta, logger=SilentLogger(), cfg=cfg), meta
 
 
 def test_animator_build_axis_bad_axis():
-    animator = Animator(_SilentLogger())
+    animator = Animator(SilentLogger())
     cubes    = (np.zeros((N_ELEV, H, W), np.float32), np.zeros((N_ELEV, H, W), np.float32))
     with pytest.raises(ValueError, match="axis must be"):
         animator._build_axis("bogus", cubes, _x_axis(), 0, 0)
@@ -146,7 +142,7 @@ def test_animator_build_axis_bad_axis():
 
 def test_animator_rejects_non_positive_max_frames():
     with pytest.raises(ValueError, match="max_frames"):
-        Animator(_SilentLogger(), max_frames=0)
+        Animator(SilentLogger(), max_frames=0)
 
 
 @pytest.mark.slow
@@ -156,7 +152,7 @@ def test_animator_walk_gif(tmp_path):
     gt     = _curves(params, x_axis)
     pred   = gt + 0.05
 
-    animator = Animator(_SilentLogger(), max_frames=4, num_workers=1)
+    animator = Animator(SilentLogger(), max_frames=4, num_workers=1)
     out      = animator.walk_gif(
         pred_cube=pred, gt_cube=gt, axis="elevation",
         out_path=tmp_path / "walk.gif", x_axis=x_axis, az_offset=0, rg_offset=0,

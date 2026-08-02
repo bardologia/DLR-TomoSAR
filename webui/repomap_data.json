@@ -3750,7 +3750,7 @@
               "label": "UnrolledEntryConfig",
               "module": "configuration/training/unrolled.py",
               "role": "config",
-              "fn": "Slim entry dataclass: paths, UnrolledTrainingConfig (schedule, warmup, EMA, VRAM reservation), geometry, normalization, augmentation, curve loss and measurement-noise knobs.",
+              "fn": "Slim entry dataclass (paths, UnrolledTrainingConfig, geometry, normalization, augmentation, curve loss and measurement-noise knobs) plus UnrolledTrainerConfig, the resolved component bundle BaseTrainer consumes.",
               "col": 0,
               "reads": [],
               "writes": [],
@@ -3838,7 +3838,7 @@
               "label": "UnrolledTrainer",
               "module": "pipelines/unrolled/training/trainer.py",
               "role": "orchestrator",
-              "fn": "Synthesises normalised coherence measurements from GT profiles, optimises the masked curve loss with AdamW, and validates, checkpoints and tests under the EMA weights when enabled.",
+              "fn": "BaseTrainer subclass: synthesises normalised coherence measurements from GT profiles per batch, feeds gamma_net, and delegates epochs, early stopping, EMA, clipping, checkpointing and resume to the shared loop.",
               "col": 3,
               "reads": [],
               "writes": [],
@@ -3961,29 +3961,29 @@
           ],
           "artifacts": [
             {
-              "name": "best.pt",
+              "name": "best_model.pt",
               "producer": "UnrolledTrainer",
               "consumers": [
                 "UnrolledTrainer"
               ],
               "fmt": "PyTorch state dict",
-              "desc": "Best-validation weights (the EMA shadow when use_ema is on); reloaded before the final test pass.",
+              "desc": "Best-validation checkpoint written by the shared Checkpoint (params, x-axis, best epoch and loss); the EMA shadow when use_ema is on, reloaded before the final test pass.",
               "scope": "within"
             },
             {
               "name": "last.pt",
               "producer": "UnrolledTrainer",
               "consumers": [],
-              "fmt": "PyTorch state dict",
-              "desc": "Final-epoch weights saved after training completes.",
+              "fmt": "PyTorch checkpoint",
+              "desc": "Resumable TrainerState written every epoch: model, optimizer, EMA, schedules, early stopping, clipper and RNG.",
               "scope": "within"
             },
             {
               "name": "training_summary.json",
-              "producer": "UnrolledTrainer",
+              "producer": "UnrolledTrainingPipeline",
               "consumers": [],
               "fmt": "JSON",
-              "desc": "Per-epoch train/val loss and peak-MAE history plus final test metrics.",
+              "desc": "Per-epoch train/val loss history, best validation loss and epoch, and the final test metrics (loss, batches, peak MAE).",
               "scope": "within"
             },
             {

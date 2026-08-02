@@ -1,20 +1,14 @@
 from __future__ import annotations
 
 import json
-import sys
 from datetime import datetime
-from pathlib  import Path
 
 import pytest
 
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
-
 from gpu_schedule import GpuSchedule, NightWindow, WeekWindow
 from web_logger   import WebLogger
+
+from tests.webui.conftest import StubPaths
 
 FRIDAY_MORNING   = datetime(2026, 7, 17, 9, 0)
 FRIDAY_EVENING   = datetime(2026, 7, 17, 18, 30)
@@ -26,11 +20,6 @@ WEDNESDAY        = datetime(2026, 7, 22, 15, 0)
 WEDNESDAY_NIGHT  = datetime(2026, 7, 22, 21, 0)
 THURSDAY_EARLY   = datetime(2026, 7, 23, 2, 0)
 THURSDAY_WORKDAY = datetime(2026, 7, 23, 9, 0)
-
-
-class StubPaths:
-    def __init__(self, root: Path) -> None:
-        self.logs_dir = root / "logs"
 
 
 class StubProcesses:

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import contextlib
 import types
 
 import numpy as np
@@ -19,6 +18,7 @@ from pipelines.jepa.inference.predictor                  import JepaCurvePredict
 from pipelines.jepa.training.trainer                     import JepaModule
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
 
+from tests.conftest       import SilentLogger
 from tests.jepa.conftest  import DEPTH, EMBEDDING_DIM, HIDDEN_DIM, N_GAUSSIANS, PROFILE_LENGTH, SPATIAL, make_autoencoder
 from tools.data.gaussians import GaussianReconstructor
 
@@ -71,7 +71,7 @@ def test_jepa_param_run_loader_builds_image_frontend_module(tmp_path):
     backbone_cfg = UNetConfig(in_channels=4, out_channels=6, features=(8, 16))
     BackboneModelConfigIO.save(backbone_cfg, "unet", meta_dir)
 
-    loader = JepaParamRunLoader(tmp_path, logger=FakeLogger())
+    loader = JepaParamRunLoader(tmp_path, logger=SilentLogger())
     module = loader._build_model("unet", in_channels=2, out_channels=6, patch_size=(8, 8))
     module.eval()
 
@@ -98,7 +98,7 @@ def _profile_ae_meta(tmp_path, embedding_dim: int):
 def test_jepa_run_loader_reads_persisted_n_gaussians(tmp_path):
     _profile_ae_meta(tmp_path, embedding_dim=EMBEDDING_DIM)
 
-    loader = JepaRunLoader(tmp_path, logger=FakeLogger())
+    loader = JepaRunLoader(tmp_path, logger=SilentLogger())
 
     assert loader._persisted_n_gaussians({"n_gaussians": N_GAUSSIANS}) == N_GAUSSIANS
 
@@ -108,7 +108,7 @@ def test_jepa_run_loader_reads_persisted_n_gaussians(tmp_path):
 def test_jepa_run_loader_rejects_summary_without_n_gaussians(tmp_path):
     _profile_ae_meta(tmp_path, embedding_dim=EMBEDDING_DIM)
 
-    loader = JepaRunLoader(tmp_path, logger=FakeLogger())
+    loader = JepaRunLoader(tmp_path, logger=SilentLogger())
 
     with pytest.raises(KeyError, match="n_gaussians"):
         loader._persisted_n_gaussians({"out_channels": EMBEDDING_DIM})
@@ -117,14 +117,14 @@ def test_jepa_run_loader_rejects_summary_without_n_gaussians(tmp_path):
 def test_jepa_run_loader_rejects_out_channels_that_are_not_the_embedding_width(tmp_path):
     _profile_ae_meta(tmp_path, embedding_dim=EMBEDDING_DIM)
 
-    loader = JepaRunLoader(tmp_path, logger=FakeLogger())
+    loader = JepaRunLoader(tmp_path, logger=SilentLogger())
 
     with pytest.raises(ValueError, match="profile autoencoder embeds"):
         loader._validate_out_channels(3 * N_GAUSSIANS, N_GAUSSIANS)
 
 
 def test_param_run_loader_requires_a_parameter_head_width(tmp_path):
-    loader = JepaParamRunLoader(tmp_path, logger=FakeLogger())
+    loader = JepaParamRunLoader(tmp_path, logger=SilentLogger())
 
     loader._validate_out_channels(3 * N_GAUSSIANS, N_GAUSSIANS)
 
@@ -195,31 +195,6 @@ def test_load_checkpoint_accepts_tensor_x_axis(tmp_path):
     assert np.allclose(axis, x_axis.numpy())
 
 
-class FakeProgress:
-    def add_task(self, *args, **kwargs):
-        return 0
-
-    def advance(self, *args, **kwargs):
-        pass
-
-
-class FakeLogger:
-    def __init__(self):
-        self._cm = contextlib.contextmanager(self._track)
-
-    def _track(self, transient=False):
-        yield FakeProgress()
-
-    def track(self, transient=False):
-        return self._cm(transient)
-
-    def section(self, *args, **kwargs):
-        pass
-
-    def kv_table(self, *args, **kwargs):
-        pass
-
-
 def build_fake_run(model_fn, n_gaussians, n_elev, spatial):
     grid = GridInfo(
         n_v          = 1,
@@ -270,7 +245,7 @@ def test_jepa_curve_predictor_produces_curve_cubes(tmp_path):
 
     predictor = JepaCurvePredictor(
         run,
-        FakeLogger(),
+        SilentLogger(),
         window_kind = "uniform",
         cube_dtype  = "float32",
         save_cubes  = False,
@@ -328,7 +303,7 @@ def test_jepa_curve_predictor_zero_error_on_identical_output(tmp_path):
 
     predictor = JepaCurvePredictor(
         fake_run,
-        FakeLogger(),
+        SilentLogger(),
         window_kind = "uniform",
         cube_dtype  = "float32",
         save_cubes  = False,

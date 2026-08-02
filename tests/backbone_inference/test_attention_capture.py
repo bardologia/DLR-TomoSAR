@@ -11,12 +11,8 @@ from models.backbone                                import get_backbone
 from models.blocks                                  import AttentionTap
 from pipelines.backbone.inference.attention_capture import AttentionCapture, AttentionCaptureRun, AttentionSummary
 
+from tests.conftest                 import SilentLogger
 from tests.models_backbone._helpers import SMALL_OVERRIDES, WINDOW
-
-
-class _SilentLogger:
-    def __getattr__(self, name):
-        return lambda *args, **kwargs: None
 
 
 def _capture(name: str, in_channels: int = 3, out_channels: int = 6):
@@ -108,7 +104,7 @@ def test_capture_releases_the_tap_when_the_forward_fails(tmp_path):
     run = SimpleNamespace(model=_FailingModel(model.eval()), loader=[(torch.randn(1, 3, WINDOW, WINDOW),)])
 
     with pytest.raises(RuntimeError):
-        AttentionCaptureRun(tmp_path, AttentionCaptureConfig(), _SilentLogger())._capture(run)
+        AttentionCaptureRun(tmp_path, AttentionCaptureConfig(), SilentLogger())._capture(run)
 
     assert AttentionTap._sink is None
     assert all("forward" not in module.__dict__ for module in run.model.module.modules())

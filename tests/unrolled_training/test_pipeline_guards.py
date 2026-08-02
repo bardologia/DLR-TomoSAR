@@ -5,9 +5,10 @@ import json
 import pytest
 import torch
 
-from configuration.training               import UnrolledEntryConfig
-from models.unrolled                      import get_unrolled
-from pipelines.unrolled.training.pipeline import UnrolledOverfitGate, UnrolledSingleTrainRunner, UnrolledTrainingPipeline
+from configuration.training                import UnrolledEntryConfig
+from models.unrolled                       import get_unrolled
+from pipelines.shared.config.config_factory import ConfigFactory
+from pipelines.unrolled.training.pipeline   import UnrolledOverfitGate, UnrolledSingleTrainRunner, UnrolledTrainingPipeline
 
 from tests.backbone_training._helpers import identity_normalizer, x_axis_numpy
 
@@ -17,11 +18,6 @@ from tools.runtime.completion import CompletionMarker
 
 HW     = 8
 TRACKS = 3
-
-
-@pytest.fixture
-def force_cpu(monkeypatch):
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
 
 
 class _StubDataset:
@@ -82,10 +78,13 @@ def _entry_config(**overrides) -> UnrolledEntryConfig:
 
 
 def _run_gate(tmp_path, config: UnrolledEntryConfig, dataset: _StubDataset) -> None:
-    logger    = Logger(log_dir=str(tmp_path / "logs"), name="overfit_gate", level="ERROR")
-    model_cfg = get_unrolled("gamma_net", n_iterations=2, prox_hidden=4)[1]
+    logger         = Logger(log_dir=str(tmp_path / "logs"), name="overfit_gate", level="ERROR")
+    model_cfg      = get_unrolled("gamma_net", n_iterations=2, prox_hidden=4)[1]
+    trainer_config = ConfigFactory(config).unrolled_trainer_config(tmp_path, params_per_gaussian=3)
 
-    UnrolledOverfitGate(config, tmp_path, logger).run(model_cfg, x_axis_numpy(), 3, identity_normalizer(6), dataset)
+    trainer_config.resources.enabled = False
+
+    UnrolledOverfitGate(config, tmp_path, logger).run(model_cfg, x_axis_numpy(), trainer_config, identity_normalizer(6), dataset)
 
 
 def test_disabled_gate_is_a_no_op(tmp_path, force_cpu):
@@ -105,8 +104,11 @@ def test_passing_gate_writes_report_and_cleans_workdir(tmp_path, force_cpu):
     assert report["passed"] is True
     assert len(report["epoch_losses"]) == 2
     assert report["sanitized_overrides"]["training.use_ema"] is False
-    assert report["sanitized_overrides"]["training.warmup_enabled"] is False
+    assert report["sanitized_overrides"]["training.resume"] is False
+    assert report["sanitized_overrides"]["warmup.warmup_enabled"] is False
+    assert report["sanitized_overrides"]["scheduler.type"] == "constant"
     assert report["sanitized_overrides"]["measurement_noise_std"] == 0.0
+    assert report["sanitized_overrides"]["memory.reserve_vram"] is False
     assert report["sanitized_overrides"]["model.steps_wd"] == 0.0
     assert report["sanitized_overrides"]["augmentation"] == "disabled"
     assert not (tmp_path / "overfit_check").exists()
@@ -162,11 +164,11 @@ def test_unfinished_run_directory_is_deleted_before_retraining(tmp_path, force_c
     config.run_name = "unit"
 
     run_directory = tmp_path / "unit"
-    (run_directory / "checkpoints").mkdir(parents=True)
-    (run_directory / "checkpoints" / "last.pt").write_bytes(b"")
+    run_directory.mkdir(parents=True)
+    (run_directory / "last.pt").write_bytes(b"")
 
     runner = UnrolledSingleTrainRunner(config)
     runner._resolve_run_directory()
 
     assert runner._build_unit_resume().skip_training() is False
-    assert not (run_directory / "checkpoints").exists()
+    assert not (run_directory / "last.pt").exists()

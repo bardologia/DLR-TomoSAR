@@ -1,91 +1,21 @@
 from __future__ import annotations
 
 import json
-import sys
-import time
 from pathlib import Path
 
 import numpy as np
 
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
-
 from cube_explorer import CubeExplorer
-from web_logger    import WebLogger
 
 from tools.loss.param_loss import ParamMatcher
 
+from tests.webui.conftest import N_AZ, N_ELEV, N_RG, N_SLOTS, load_cube, loaded_cube, make_cube_run, open_explorer
 
-N_ELEV, N_AZ, N_RG, N_SLOTS = 5, 8, 6, 2
-
-
-def _make_cube_run(base: Path, with_params: tuple = ("pred", "gt"), with_spacing: bool = False, with_reduced: bool = False) -> Path:
-    rng     = np.random.default_rng(0)
-    preproc = base / "preproc"
-    (preproc / "data").mkdir(parents=True)
-
-    primary = rng.normal(size=(N_AZ, N_RG)) + 1j * rng.normal(size=(N_AZ, N_RG))
-    np.save(preproc / "data" / "primary.npy", primary)
-
-    layout = {"global_crop": [0, N_AZ, 0, N_RG], "artifacts": {"primary": "primary.npy"}}
-    (preproc / "data" / "dataset.json").write_text(json.dumps(layout))
-
-    if with_spacing:
-        payload = {
-            "labels"      : ["T01", "T02"],
-            "reference"   : "T01",
-            "shared"      : {"ps_rg": 0.6},
-            "per_track"   : {"T01": {"ps_az": 0.4}, "T02": {"ps_az": 0.41}},
-            "track_files" : [],
-        }
-        (preproc / "meta").mkdir()
-        (preproc / "meta" / "track_parameters.json").write_text(json.dumps(payload))
-
-    run   = base / "group" / "run_a"
-    stamp = run / "inference" / "stamp_1"
-    (stamp / "cubes").mkdir(parents=True)
-    (run / "meta").mkdir(parents=True)
-
-    (run / "meta" / "dataset_creation_config.json").write_text(json.dumps({"preprocessing_run_directory": str(preproc)}))
-    (stamp / "metrics.json").write_text(json.dumps({"x_axis_min": -10.0, "x_axis_max": 30.0, "split_region": [0, N_AZ, 0, N_RG]}))
-
-    for source in ("pred", "gt"):
-        np.save(stamp / "cubes" / f"{source}_curves.npy", rng.random((N_ELEV, N_AZ, N_RG)).astype(np.float32))
-
-    if with_reduced:
-        reduced          = np.zeros((N_ELEV, N_AZ, N_RG), dtype=np.float32)
-        reduced[2, 3, 4] = 2.0
-        reduced[4, 5, 1] = 1.0
-        np.save(stamp / "cubes" / "reduced_curves.npy", reduced)
-
-    for source in with_params:
-        block = rng.random((3 * N_SLOTS, N_AZ, N_RG)).astype(np.float32)
-        block[3] = 0.0
-        np.save(stamp / "cubes" / f"params_{source}.npy", block)
-
-    return stamp
+PARAM_SOURCES = ("pred", "gt")
 
 
-def _loaded_explorer(base: Path, with_params: tuple = ("pred", "gt"), with_spacing: bool = False, with_reduced: bool = False) -> tuple[CubeExplorer, str]:
-    _make_cube_run(base, with_params, with_spacing, with_reduced)
-    explorer = CubeExplorer(WebLogger())
-
-    listing = explorer.list_cubes(str(base))
-    assert listing["ok"] and len(listing["cubes"]) == 1
-
-    cube_id = listing["cubes"][0]["id"]
-    assert explorer.start_load(cube_id)["ok"]
-
-    deadline = time.time() + 30.0
-    while explorer.load_status()["state"] == "loading" and time.time() < deadline:
-        time.sleep(0.05)
-
-    status = explorer.load_status()
-    assert status["state"] == "ready", status
-    return explorer, cube_id
+def _loaded_explorer(base: Path, with_params: tuple = PARAM_SOURCES, with_spacing: bool = False, with_reduced: bool = False) -> tuple[CubeExplorer, str]:
+    return loaded_cube(base, with_params=with_params, with_spacing=with_spacing, with_reduced=with_reduced)
 
 
 def test_meta_reports_param_block(tmp_path):
@@ -268,7 +198,8 @@ def test_dem_grid_absent_without_artifact(tmp_path):
 
 
 def test_dem_grid_with_artifact(tmp_path):
-    stamp   = _make_cube_run(tmp_path)
+    make_cube_run(tmp_path, with_params=PARAM_SOURCES)
+
     preproc = tmp_path / "preproc"
     layout  = json.loads((preproc / "data" / "dataset.json").read_text())
 
@@ -278,15 +209,10 @@ def test_dem_grid_with_artifact(tmp_path):
     layout["artifacts"]["dem_full"] = "dem.npy"
     (preproc / "data" / "dataset.json").write_text(json.dumps(layout))
 
-    explorer = CubeExplorer(WebLogger())
-    cube_id  = explorer.list_cubes(str(tmp_path))["cubes"][0]["id"]
-    explorer.start_load(cube_id)
+    explorer, cube_ids = open_explorer(tmp_path, expected=1)
+    cube_id            = cube_ids[0]
 
-    deadline = time.time() + 30.0
-    while explorer.load_status()["state"] == "loading" and time.time() < deadline:
-        time.sleep(0.05)
-    assert explorer.load_status()["state"] == "ready"
-    assert explorer.load_status()["cube"]["dem"] is True
+    assert load_cube(explorer, cube_id)["cube"]["dem"] is True
 
     raw    = np.frombuffer(explorer.dem_grid_bin(cube_id), dtype=np.float32)
     header = raw[:4]
@@ -301,23 +227,16 @@ def test_dem_grid_with_artifact(tmp_path):
 
 
 def test_params_with_nan_survive_load_and_lookup(tmp_path):
-    stamp = _make_cube_run(tmp_path)
+    stamp = make_cube_run(tmp_path, with_params=PARAM_SOURCES)
     pred  = np.load(stamp / "cubes" / "params_pred.npy")
     pred[1, 0, 0] = np.nan
     pred[4]       = np.nan
     np.save(stamp / "cubes" / "params_pred.npy", pred)
 
-    explorer = CubeExplorer(WebLogger())
-    listing  = explorer.list_cubes(str(tmp_path))
-    cube_id  = listing["cubes"][0]["id"]
-    assert explorer.start_load(cube_id)["ok"]
+    explorer, cube_ids = open_explorer(tmp_path, expected=1)
+    cube_id            = cube_ids[0]
 
-    deadline = time.time() + 30.0
-    while explorer.load_status()["state"] == "loading" and time.time() < deadline:
-        time.sleep(0.05)
-    assert explorer.load_status()["state"] == "ready"
-
-    meta = explorer.load_status()["cube"]["params"]
+    meta = load_cube(explorer, cube_id)["cube"]["params"]
     assert all(np.isfinite(v) for bounds in meta["ranges"].values() for v in bounds)
 
     result = explorer.params_at(cube_id, az=0, rg=0)

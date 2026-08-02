@@ -11,11 +11,7 @@ from pipelines.backbone.inference.data_consistency import DataConsistencyEvaluat
 from tools.data.regions                            import CropRegion
 from tools.sar                                     import GeometryField
 
-
-class _SilentLogger:
-    def section(self, *a, **k):    pass
-    def subsection(self, *a, **k): pass
-    def kv_table(self, *a, **k):   pass
+from tests.conftest import SilentLogger
 
 
 def _geometry_field(n_tracks: int, H: int, W: int) -> GeometryField:
@@ -101,7 +97,7 @@ def _build_case(tmp_path, sign: float = 1.0, convention: str = "height"):
 def test_identical_curves_have_zero_physics_error(tmp_path):
     run, cfg, curves, x_axis = _build_case(tmp_path)
 
-    consistency = DataConsistencyEvaluator(run, cfg, _SilentLogger()).run(curves, curves, x_axis)
+    consistency = DataConsistencyEvaluator(run, cfg, SilentLogger()).run(curves, curves, x_axis)
 
     assert consistency.metrics["physics_coherence_error_mean"]  == pytest.approx(0.0, abs=1e-9)
     assert consistency.metrics["physics_covariance_error_mean"] == pytest.approx(0.0, abs=1e-9)
@@ -112,7 +108,7 @@ def test_identical_curves_have_zero_physics_error(tmp_path):
 def test_phase_agreement_detects_correct_sign(tmp_path):
     run, cfg, curves, x_axis = _build_case(tmp_path, sign=1.0)
 
-    consistency = DataConsistencyEvaluator(run, cfg, _SilentLogger()).run(curves, curves, x_axis)
+    consistency = DataConsistencyEvaluator(run, cfg, SilentLogger()).run(curves, curves, x_axis)
 
     assert consistency.metrics["phase_agreement_gt_mean"] == pytest.approx(1.0, abs=1e-4)
     assert consistency.metrics["phase_agreement_gt_mean"] > consistency.metrics["phase_agreement_gt_flipped_mean"] + 0.05
@@ -121,7 +117,7 @@ def test_phase_agreement_detects_correct_sign(tmp_path):
 def test_phase_agreement_detects_flipped_sign(tmp_path):
     run, cfg, curves, x_axis = _build_case(tmp_path, sign=-1.0)
 
-    consistency = DataConsistencyEvaluator(run, cfg, _SilentLogger()).run(curves, curves, x_axis)
+    consistency = DataConsistencyEvaluator(run, cfg, SilentLogger()).run(curves, curves, x_axis)
 
     assert consistency.metrics["phase_agreement_gt_flipped_mean"] > consistency.metrics["phase_agreement_gt_mean"] + 0.05
 
@@ -131,7 +127,7 @@ def test_wrong_prediction_scores_worse_than_gt(tmp_path):
 
     shifted = np.roll(curves, 6, axis=0)
 
-    consistency = DataConsistencyEvaluator(run, cfg, _SilentLogger()).run(shifted, curves, x_axis)
+    consistency = DataConsistencyEvaluator(run, cfg, SilentLogger()).run(shifted, curves, x_axis)
 
     assert consistency.metrics["physics_coherence_error_mean"] > 1e-3
     assert consistency.metrics["phase_agreement_gt_mean"] > consistency.metrics["phase_agreement_pred_mean"]
@@ -142,7 +138,7 @@ def test_missing_geometry_field_raises(tmp_path):
     (tmp_path / "meta" / GeometryField.FILENAME).unlink()
 
     with pytest.raises(FileNotFoundError, match="geometry field"):
-        DataConsistencyEvaluator(run, cfg, _SilentLogger()).run(curves, curves, x_axis)
+        DataConsistencyEvaluator(run, cfg, SilentLogger()).run(curves, curves, x_axis)
 
 
 def test_missing_trainer_config_raises(tmp_path):
@@ -150,13 +146,13 @@ def test_missing_trainer_config_raises(tmp_path):
     (tmp_path / "docs" / "trainer_config.json").unlink()
 
     with pytest.raises(FileNotFoundError, match="trainer_config"):
-        DataConsistencyEvaluator(run, cfg, _SilentLogger()).run(curves, curves, x_axis)
+        DataConsistencyEvaluator(run, cfg, SilentLogger()).run(curves, curves, x_axis)
 
 
 def test_height_convention_read_from_training_run(tmp_path):
     run, cfg, curves, x_axis = _build_case(tmp_path, convention="slant")
 
-    consistency = DataConsistencyEvaluator(run, cfg, _SilentLogger()).run(curves, curves, x_axis)
+    consistency = DataConsistencyEvaluator(run, cfg, SilentLogger()).run(curves, curves, x_axis)
 
     assert consistency.metrics["physics_coherence_error_mean"] == pytest.approx(0.0, abs=1e-9)
     assert consistency.metrics["phase_agreement_gt_mean"]      == pytest.approx(1.0, abs=1e-4)
@@ -165,7 +161,7 @@ def test_height_convention_read_from_training_run(tmp_path):
 def test_per_track_metrics_present_and_labelled(tmp_path):
     run, cfg, curves, x_axis = _build_case(tmp_path)
 
-    consistency = DataConsistencyEvaluator(run, cfg, _SilentLogger()).run(curves, curves, x_axis)
+    consistency = DataConsistencyEvaluator(run, cfg, SilentLogger()).run(curves, curves, x_axis)
 
     assert consistency.track_labels == ["REF", "S1", "S2"]
     for label in ("REF", "S1", "S2"):

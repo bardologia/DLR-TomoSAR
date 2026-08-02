@@ -4,7 +4,6 @@ import json
 
 import numpy as np
 import pytest
-import torch
 
 from configuration.dataset                     import DatasetConfig, InputConfig, PatchConfig, Representation, SplitRegions
 from configuration.inference                   import InferenceConfig
@@ -21,15 +20,10 @@ from tools.data.regions                        import CropRegion
 from tests.backbone_training._helpers import geometry_config
 
 
-pytestmark = [pytest.mark.real_data, pytest.mark.slow]
+pytestmark = [pytest.mark.real_data, pytest.mark.slow, pytest.mark.usefixtures("force_cpu")]
 
 N_GAUSSIANS      = 5
 SECONDARY_LABELS = ("FL01_PS04", "FL01_PS06")
-
-
-@pytest.fixture(autouse=True)
-def _force_cpu(monkeypatch):
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
 
 
 def _dataset_config(test_data_dir, params_dir) -> DatasetConfig:

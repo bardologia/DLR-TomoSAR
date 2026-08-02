@@ -1816,7 +1816,7 @@
         "seed": "Random seed applied before prediction so the optional synthetic measurement-noise draw is reproducible",
         "log_level": "Logging verbosity threshold, e.g. INFO or DEBUG",
         "split": "Dataset split region to run inference on: train, val, or test",
-        "checkpoint_name": "Filename under the run's checkpoints directory to load, best.pt or last.pt",
+        "checkpoint_name": "Checkpoint filename in the run directory to load; best_model.pt is the best-validation checkpoint written by the shared trainer",
         "measurement_noise_std": "Complex noise standard deviation added to the synthesised coherences, None reuses the value the run was trained with",
         "chunk_cells": "Upper bound on elevation bins times pixels processed per prediction chunk, bounding peak memory during region inference",
         "save_plots": "Whether to write error maps, the error histogram, peak-height maps, and profile-overlay figures to disk",
@@ -2276,14 +2276,18 @@
       }
     },
     "training/unrolled::UnrolledTrainingConfig": {
-      "summary": "Training-loop knobs for the unrolled physics pipeline; slimmer than the shared TrainingQueueConfig, containing exactly the fields the unrolled trainer supports (schedule, warmup, EMA, VRAM reservation, clipping, batching, splits)",
+      "summary": "Training-loop knobs for the unrolled physics pipeline; slimmer than the shared TrainingQueueConfig, exposing exactly the fields the unrolled trainer reads (schedule, warmup, EMA, VRAM reservation, clipping, batching, splits); AMP, the cosine schedule type and the linear warmup mode are fixed for this family and are therefore not exposed",
       "fields": {
         "epochs": "Number of training epochs",
         "scheduler_epochs": "Cosine schedule horizon in epochs; null uses the full epoch count",
+        "validation_frequency": "Run validation, checkpointing and early stopping every N epochs; the final epoch always validates",
         "eta_min": "Final learning rate of the cosine annealing schedule",
         "early_stop_patience": "Epochs without validation improvement before training stops",
         "early_stop_min_delta": "Minimum validation-loss decrease that counts as an improvement",
         "max_grad_norm": "Fixed gradient-norm clipping threshold",
+        "resume": "Resume the trainer from last.pt in the run directory (model, optimizer, EMA, schedules, RNG); the run fails loudly when no state file exists",
+        "snapshot_every_n_epochs": "Save a weights-only epoch snapshot to checkpoints/epoch_<N>.pt every N epochs (EMA weights when EMA is on); 0 disables",
+        "log_debug": "Emit per-step debug telemetry (gradient NaN scans and extra tracker scalars)",
         "warmup_enabled": "Whether linear LR warmup runs at the start of training, scaling all group learning rates up from 10% of base over warmup_steps optimizer steps",
         "warmup_steps": "Number of optimizer steps the linear warmup spans",
         "use_ema": "Whether an exponential moving average of the weights is maintained; validation, checkpointing, and the final test run use the averaged weights",
@@ -2293,6 +2297,8 @@
         "batch_size": "Patches per training batch",
         "num_workers": "Dataloader worker processes",
         "prefetch_factor": "Batches prefetched per dataloader worker",
+        "gradient_accumulation_steps": "Batches accumulated before each optimizer step; the effective batch is batch_size times this factor",
+        "abort_on_nonfinite_loss": "Raise on the first non-finite loss instead of skipping the batch and continuing",
         "scale_lr_with_batch": "Scale all param-group learning rates linearly by batch_size / lr_reference_batch_size, else keep them at the model-config base values",
         "lr_reference_batch_size": "Baseline batch size the learning-rate scaling ratio is computed against",
         "patch_size": "Spatial patch size (height, width) tiled from the scene, the two dimensions may differ",
@@ -2301,6 +2307,24 @@
         "train_azimuth": "Azimuth pixel range of the training split",
         "val_azimuth": "Azimuth pixel range of the validation split",
         "test_azimuth": "Azimuth pixel range of the test split"
+      }
+    },
+    "training/unrolled::UnrolledTrainerConfig": {
+      "summary": "Aggregates the resolved component configs the UnrolledTrainer consumes for one unrolled physics run, built from the slim entry config by ConfigFactory",
+      "fields": {
+        "params_per_gaussian": "Number of parameters per Gaussian component in the ground-truth parameter stack, read from the dataset extraction metadata",
+        "curve_loss": "Per-pixel elevation-profile loss used to compare the unrolled reconstruction against the synthesised target ('l1' or 'mse')",
+        "measurement_noise_std": "Standard deviation of the complex Gaussian noise added to the synthesised coherence measurements, resampled every epoch",
+        "power_floor": "Minimum integrated profile power for a pixel to enter the loss; pixels below it are masked out",
+        "early_stopping": "EarlyStoppingConfig sub-config setting patience, min-delta, and best-checkpoint restore for training",
+        "warmup": "WarmupConfig sub-config for the initial learning-rate warmup (steps, start factor, mode, poly power)",
+        "scheduler": "SchedulerConfig sub-config selecting the LR schedule type and its parameters (epochs, eta_min, step size, gamma, power)",
+        "io": "IOConfig sub-config holding the run logdir; the TensorBoard writer stays None because unrolled runs write no event files",
+        "optimizer": "OptimizerConfig sub-config for the AdamW-style optimizer (lr, betas, eps, weight decay, lr scale)",
+        "training": "TrainingLoopConfig sub-config for the training loop: epochs, validation frequency, AMP, gradient accumulation, EMA, resume, epoch snapshots",
+        "resources": "ResourceConfig sub-config controlling the system-resource monitor (poll interval, TensorBoard logging, RAM/VRAM/swap/shm warn thresholds)",
+        "memory": "MemoryConfig sub-config governing CUDA cache clearing cadence and VRAM reservation to protect other GPU users",
+        "gradient_clipper": "GradientClipperConfig sub-config selecting the gradient-clip mode (disabled, fixed, adaptive_percentile, or adaptive_mean_std) and its thresholds"
       }
     },
     "training/dual::DualEntryConfig": {

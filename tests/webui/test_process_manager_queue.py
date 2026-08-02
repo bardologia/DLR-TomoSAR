@@ -1,77 +1,28 @@
 from __future__ import annotations
 
 import sys
-import time
-from pathlib import Path
 
 import pytest
 
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
+from process_manager import JobStream
 
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
-
-from notifier        import JobNotifier
-from process_manager import JobStream, ProcessManager
-from web_logger      import WebLogger
+from tests.webui.conftest import ARGS_DUMP, SLEEP_LONG, job_record, wait_for_status
 
 SLEEP_OK   = "import time\ntime.sleep(0.6)\n"
 SLEEP_FAIL = "import sys, time\ntime.sleep(0.6)\nsys.exit(3)\n"
-SLEEP_LONG = "import time\ntime.sleep(30)\n"
 WRITER     = "import pathlib, sys\npathlib.Path('order.txt').open('a').write(pathlib.Path(__file__).stem + '\\n')\n"
-ARGS_DUMP  = "import pathlib, sys\npathlib.Path('argv.txt').write_text(' '.join(sys.argv[1:]))\n"
-
-
-class StubPaths:
-
-    def __init__(self, root: Path) -> None:
-        self.repo_root = root
-        self.main_dir  = root / "main"
-        self.logs_dir  = root / "logs"
-
-    def has_script(self, key: str) -> bool:
-        return (self.main_dir / "analysis" / f"{key}.py").exists()
-
-    def script_entry(self, key: str) -> dict:
-        path = self.main_dir / "analysis" / f"{key}.py"
-        return {"path": path, "rel": f"main/analysis/{key}.py"}
-
-
-class StubDescriber:
-
-    def describe(self, key: str, interpreter: str, overrides: dict | None) -> str:
-        return f"stub description for {key}"
 
 
 @pytest.fixture
-def manager(tmp_path):
-    scripts = tmp_path / "main" / "analysis"
-    scripts.mkdir(parents=True)
-    (scripts / "sleep_ok.py").write_text(SLEEP_OK)
-    (scripts / "sleep_fail.py").write_text(SLEEP_FAIL)
-    (scripts / "sleep_long.py").write_text(SLEEP_LONG)
-    (scripts / "writer_a.py").write_text(WRITER)
-    (scripts / "writer_b.py").write_text(WRITER)
-    (scripts / "args_dump.py").write_text(ARGS_DUMP)
-
-    paths  = StubPaths(tmp_path)
-    logger = WebLogger()
-    yield ProcessManager(paths, logger, JobNotifier(paths, logger), StubDescriber())
-
-
-def _record(manager: ProcessManager, job_id: str) -> dict:
-    with manager.lock:
-        return dict(manager.jobs[job_id])
-
-
-def _wait_status(manager: ProcessManager, job_id: str, status: str, timeout: float = 10.0) -> bool:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        if _record(manager, job_id)["status"] == status:
-            return True
-        time.sleep(0.05)
-    return False
+def manager(make_manager):
+    return make_manager({
+        "sleep_ok"   : SLEEP_OK,
+        "sleep_fail" : SLEEP_FAIL,
+        "sleep_long" : SLEEP_LONG,
+        "writer_a"   : WRITER,
+        "writer_b"   : WRITER,
+        "args_dump"  : ARGS_DUMP,
+    })
 
 
 def test_enqueue_idle_starts_immediately(manager):
@@ -79,7 +30,7 @@ def test_enqueue_idle_starts_immediately(manager):
 
     assert result["ok"]
     assert result["queued"] is False
-    assert _wait_status(manager, result["job_id"], "finished")
+    assert wait_for_status(manager, result["job_id"], "finished")
 
 
 def test_enqueue_waits_for_running_job(manager):
@@ -88,18 +39,18 @@ def test_enqueue_waits_for_running_job(manager):
 
     assert queued["ok"]
     assert queued["queued"] is True
-    assert _record(manager, queued["job_id"])["status"] == "queued"
+    assert job_record(manager, queued["job_id"])["status"] == "queued"
 
-    assert _wait_status(manager, queued["job_id"], "finished")
-    assert _record(manager, running["job_id"])["status"] == "finished"
+    assert wait_for_status(manager, queued["job_id"], "finished")
+    assert job_record(manager, running["job_id"])["status"] == "finished"
 
 
 def test_queued_job_starts_after_predecessor_fails(manager):
     failing = manager.launch("sleep_fail", sys.executable)
     queued  = manager.enqueue("sleep_ok", sys.executable)
 
-    assert _wait_status(manager, queued["job_id"], "finished")
-    assert _record(manager, failing["job_id"])["status"] == "failed"
+    assert wait_for_status(manager, queued["job_id"], "finished")
+    assert job_record(manager, failing["job_id"])["status"] == "failed"
 
 
 def test_queued_jobs_run_in_order(manager, tmp_path):
@@ -107,8 +58,8 @@ def test_queued_jobs_run_in_order(manager, tmp_path):
     first  = manager.enqueue("writer_a", sys.executable)
     second = manager.enqueue("writer_b", sys.executable)
 
-    assert _wait_status(manager, first["job_id"], "finished")
-    assert _wait_status(manager, second["job_id"], "finished")
+    assert wait_for_status(manager, first["job_id"], "finished")
+    assert wait_for_status(manager, second["job_id"], "finished")
     assert (tmp_path / "order.txt").read_text().splitlines() == ["writer_a", "writer_b"]
 
 
@@ -116,7 +67,7 @@ def test_queued_launch_keeps_overrides(manager, tmp_path):
     manager.launch("sleep_ok", sys.executable)
     queued = manager.enqueue("args_dump", sys.executable, {"training.seed": "7"})
 
-    assert _wait_status(manager, queued["job_id"], "finished")
+    assert wait_for_status(manager, queued["job_id"], "finished")
     assert (tmp_path / "argv.txt").read_text() == "--training.seed 7"
 
 
@@ -126,10 +77,10 @@ def test_cancelled_queued_job_is_skipped(manager, tmp_path):
     second = manager.enqueue("writer_b", sys.executable)
 
     assert manager.stop(first["job_id"])["ok"]
-    assert _record(manager, first["job_id"])["status"] == "cancelled"
+    assert job_record(manager, first["job_id"])["status"] == "cancelled"
 
-    assert _wait_status(manager, second["job_id"], "finished")
-    assert _record(manager, first["job_id"])["status"] == "cancelled"
+    assert wait_for_status(manager, second["job_id"], "finished")
+    assert job_record(manager, first["job_id"])["status"] == "cancelled"
     assert (tmp_path / "order.txt").read_text().splitlines() == ["writer_b"]
 
 
@@ -138,11 +89,11 @@ def test_stop_all_purges_queue(manager):
     queued  = manager.enqueue("sleep_ok", sys.executable)
 
     assert manager.stop_all() == 1
-    assert _record(manager, queued["job_id"])["status"] == "cancelled"
-    assert _record(manager, queued["job_id"])["pid"] is None
+    assert job_record(manager, queued["job_id"])["status"] == "cancelled"
+    assert job_record(manager, queued["job_id"])["pid"] is None
 
-    assert _wait_status(manager, running["job_id"], "failed")
-    assert _record(manager, queued["job_id"])["status"] == "cancelled"
+    assert wait_for_status(manager, running["job_id"], "failed")
+    assert job_record(manager, queued["job_id"])["status"] == "cancelled"
 
 
 def test_queue_respects_follow_up_chain(manager, tmp_path):
@@ -150,11 +101,11 @@ def test_queue_respects_follow_up_chain(manager, tmp_path):
     parent = manager.enqueue("writer_a", sys.executable, follow_up="args_dump")
     last   = manager.enqueue("writer_b", sys.executable)
 
-    assert _wait_status(manager, last["job_id"], "finished")
+    assert wait_for_status(manager, last["job_id"], "finished")
 
-    follow_id = _record(manager, parent["job_id"])["follow_up"]
+    follow_id = job_record(manager, parent["job_id"])["follow_up"]
     assert follow_id is not None
-    assert _record(manager, follow_id)["status"] == "finished"
+    assert job_record(manager, follow_id)["status"] == "finished"
 
     order = (tmp_path / "order.txt").read_text().splitlines()
     assert order == ["writer_a", "writer_b"]
@@ -174,7 +125,7 @@ def test_notifications_fire_on_start_and_finish_for_direct_and_queued(manager):
     manager.launch("sleep_ok", sys.executable)
     queued = manager.enqueue("writer_a", sys.executable)
 
-    assert _wait_status(manager, queued["job_id"], "finished")
+    assert wait_for_status(manager, queued["job_id"], "finished")
     assert events == [("started", "sleep_ok"), ("finished", "sleep_ok"), ("started", "writer_a"), ("finished", "writer_a")]
 
 

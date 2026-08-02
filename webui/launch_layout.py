@@ -256,9 +256,13 @@ class LaunchLayout:
             {"title": "Schedule", "fields": [
                 {"path": "epochs", "widget": NUM_EPOCHS},
                 "scheduler_epochs",
+                {"path": "validation_frequency", "widget": NUM_FREQ},
                 {"path": "eta_min", "widget": NUM_ETA_MIN},
                 {"path": "early_stop_patience", "widget": NUM_PATIENCE},
                 "early_stop_min_delta",
+                "resume",
+                "snapshot_every_n_epochs",
+                "log_debug",
             ]},
             {"title": "LR warmup", "fields": [
                 {"gate": "warmup_enabled", "fields": [{"path": "warmup_steps", "widget": NUM_STEPS}]},
@@ -273,6 +277,8 @@ class LaunchLayout:
                 {"path": "batch_size", "widget": NUM_BATCH},
                 {"path": "num_workers", "widget": NUM_WORKERS},
                 {"path": "prefetch_factor", "widget": NUM_PREFETCH},
+                {"path": "gradient_accumulation_steps", "widget": NUM_ACCUM},
+                "abort_on_nonfinite_loss",
                 "scale_lr_with_batch",
                 {"path": "lr_reference_batch_size", "widget": NUM_BATCH},
             ]},

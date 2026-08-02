@@ -10,7 +10,8 @@ from tools.training.gradients  import GradientClipper
 from tools.training.scheduling import Scheduler, Warmup
 from tools.training.stopping   import EarlyStopping
 
-from tests.training_runtime.conftest import NullLogger, RecordingTracker, TinyModel
+from tests.conftest                  import SilentLogger
+from tests.training_runtime.conftest import RecordingTracker, TinyModel
 
 
 def _warmup_config(steps: int = 5) -> SimpleNamespace:
@@ -32,7 +33,7 @@ def _clipper_config(window: int = 4) -> SimpleNamespace:
 def _trainer(tmp_path, seed: int = 0) -> SimpleNamespace:
     torch.manual_seed(seed)
 
-    logger  = NullLogger()
+    logger  = SilentLogger()
     tracker = RecordingTracker()
 
     model     = TinyModel()

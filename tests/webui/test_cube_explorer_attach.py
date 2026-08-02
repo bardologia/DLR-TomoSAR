@@ -1,70 +1,27 @@
 from __future__ import annotations
 
-import json
-import sys
-import time
 from pathlib import Path
 
 import numpy as np
 
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
-
 from cube_explorer import CubeExplorer
-from web_logger    import WebLogger
+
+from tests.webui.conftest import N_AZ, N_ELEV, N_RG, load_cube, make_preproc, make_stamp, open_explorer
 
 
-N_ELEV, N_AZ, N_RG = 5, 8, 6
-
-
-def _make_preproc(base: Path) -> Path:
-    rng     = np.random.default_rng(0)
-    preproc = base / "preproc"
-    (preproc / "data").mkdir(parents=True)
-
-    primary = rng.normal(size=(N_AZ, N_RG)) + 1j * rng.normal(size=(N_AZ, N_RG))
-    np.save(preproc / "data" / "primary.npy", primary)
-
-    layout = {"global_crop": [0, N_AZ, 0, N_RG], "artifacts": {"primary": "primary.npy"}}
-    (preproc / "data" / "dataset.json").write_text(json.dumps(layout))
-    return preproc
-
-
-def _make_run(base: Path, preproc: Path, name: str, seed: int, x_min: float = -10.0, shape: tuple = (N_ELEV, N_AZ, N_RG)) -> Path:
-    rng   = np.random.default_rng(seed)
-    run   = base / name
-    stamp = run / "inference" / "stamp_1"
-    (stamp / "cubes").mkdir(parents=True)
-    (run / "meta").mkdir(parents=True)
-
-    (run / "meta" / "dataset_creation_config.json").write_text(json.dumps({"preprocessing_run_directory": str(preproc)}))
-    (stamp / "metrics.json").write_text(json.dumps({"x_axis_min": x_min, "x_axis_max": 30.0, "split_region": [0, N_AZ, 0, N_RG]}))
-
-    for source in ("pred", "gt"):
-        np.save(stamp / "cubes" / f"{source}_curves.npy", rng.random(shape).astype(np.float32))
-
-    return stamp
+def _make_run(base: Path, preproc: Path, name: str, seed: int, x_min: float = -10.0) -> Path:
+    return make_stamp(base / name, preproc, np.random.default_rng(seed), x_min=x_min)
 
 
 def _loaded(base: Path) -> tuple[CubeExplorer, str, str]:
-    preproc = _make_preproc(base)
+    preproc = make_preproc(base)
     stamp_a = _make_run(base, preproc, "run_a", seed=1)
     stamp_b = _make_run(base, preproc, "run_b", seed=2)
 
-    explorer = CubeExplorer(WebLogger())
-    listing  = explorer.list_cubes(str(base))
-    assert listing["ok"] and len(listing["cubes"]) == 2
+    explorer, _ = open_explorer(base, expected=2)
+    cube_a      = str(stamp_a)
 
-    cube_a = str(stamp_a)
-    assert explorer.start_load(cube_a)["ok"]
-
-    deadline = time.time() + 30.0
-    while explorer.load_status()["state"] == "loading" and time.time() < deadline:
-        time.sleep(0.05)
-    assert explorer.load_status()["state"] == "ready"
+    load_cube(explorer, cube_a)
 
     return explorer, cube_a, str(stamp_b)
 
@@ -125,17 +82,12 @@ def test_attach_rejects_self_and_unknown(tmp_path):
 
 
 def test_attach_rejects_mismatched_axis(tmp_path):
-    preproc = _make_preproc(tmp_path)
+    preproc = make_preproc(tmp_path)
     stamp_a = _make_run(tmp_path, preproc, "run_a", seed=1)
     stamp_c = _make_run(tmp_path, preproc, "run_c", seed=3, x_min=-99.0)
 
-    explorer = CubeExplorer(WebLogger())
-    explorer.list_cubes(str(tmp_path))
-    explorer.start_load(str(stamp_a))
-
-    deadline = time.time() + 30.0
-    while explorer.load_status()["state"] == "loading" and time.time() < deadline:
-        time.sleep(0.05)
+    explorer, _ = open_explorer(tmp_path, expected=2)
+    load_cube(explorer, str(stamp_a))
 
     result = explorer.attach_second(str(stamp_a), str(stamp_c))
     assert not result["ok"] and "elevation axis" in result["error"]

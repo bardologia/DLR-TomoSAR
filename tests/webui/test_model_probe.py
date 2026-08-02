@@ -1,31 +1,20 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
 from types   import SimpleNamespace
 
 import numpy as np
 import pytest
 import torch
 
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
-
 from model_probe import ModelProbe
 from web_logger  import WebLogger
 
 from pipelines.backbone.inference.probes import PredictionCurves
 
+from tests.conftest import SilentLogger
+
 
 N_AZ, N_RG, PH, PW, N_ELEV = 20, 16, 8, 8, 12
-
-
-class _SilentLogger:
-    def __getattr__(self, name):
-        return lambda *args, **kwargs: None
 
 
 class _BareModel(torch.nn.Module):
@@ -50,7 +39,7 @@ class _Wrapper:
 
 
 def _probe() -> ModelProbe:
-    probe = ModelProbe(_SilentLogger())
+    probe = ModelProbe(SilentLogger())
 
     rng            = np.random.default_rng(0)
     complex_inputs = (rng.uniform(0.5, 1.0, size=(2, N_AZ, N_RG)) + 1j * rng.uniform(0.0, 0.2, size=(2, N_AZ, N_RG))).astype(np.complex64)
@@ -110,7 +99,7 @@ def test_predict_outside_region_fails():
 
 
 def test_predict_without_loaded_model_fails():
-    probe = ModelProbe(_SilentLogger())
+    probe = ModelProbe(SilentLogger())
 
     assert probe.predict({"az": 0, "rg": 0})["ok"] is False
 
@@ -150,7 +139,7 @@ def test_whatif_unknown_perturbation_fails():
 
 
 def test_layers_and_map_need_a_loaded_model():
-    probe = ModelProbe(_SilentLogger())
+    probe = ModelProbe(SilentLogger())
 
     assert probe.layers()["ok"] is False
     assert probe.map_png() is None

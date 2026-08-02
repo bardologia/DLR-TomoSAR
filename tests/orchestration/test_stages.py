@@ -9,19 +9,12 @@ import pytest
 from tools.orchestration.stages import QueuedInferenceStage, QueuedTrainingStage
 from tools.runtime.completion   import CompletionMarker
 
-
-class NullLogger:
-    def section(self, *a, **k):    pass
-    def subsection(self, *a, **k): pass
-    def info(self, *a, **k):       pass
-    def warning(self, *a, **k):    pass
-    def error(self, *a, **k):      pass
-    def kv_table(self, *a, **k):   pass
+from tests.conftest import SilentLogger
 
 
 @pytest.fixture
 def logger():
-    return NullLogger()
+    return SilentLogger()
 
 
 def _config(tmp_path: Path, resume: bool = False) -> SimpleNamespace:

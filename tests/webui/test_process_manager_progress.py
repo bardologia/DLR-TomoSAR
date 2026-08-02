@@ -2,78 +2,20 @@ from __future__ import annotations
 
 import json
 import sys
-import time
 from pathlib import Path
 
 import pytest
 
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
-
-from notifier        import JobNotifier
 from process_manager import ProcessManager
-from web_logger      import WebLogger
 
 from tools.orchestration.gpu_queue import GpuProgressFile
 
-SLEEP_LONG = "import time\ntime.sleep(30)\n"
-
-
-class StubPaths:
-
-    def __init__(self, root: Path) -> None:
-        self.repo_root     = root
-        self.main_dir      = root / "main"
-        self.logs_dir      = root / "logs"
-        self.gpu_pools_dir = root / "logs" / "gpu_pools"
-
-    def has_script(self, key: str) -> bool:
-        return (self.main_dir / "analysis" / f"{key}.py").exists()
-
-    def script_entry(self, key: str) -> dict:
-        path = self.main_dir / "analysis" / f"{key}.py"
-        return {"path": path, "rel": f"main/analysis/{key}.py"}
-
-
-class StubDescriber:
-
-    def describe(self, key: str, interpreter: str, overrides: dict | None) -> str:
-        return f"stub description for {key}"
+from tests.webui.conftest import SLEEP_LONG, wait_for_status, wait_until_finished
 
 
 @pytest.fixture
-def manager(tmp_path):
-    scripts = tmp_path / "main" / "analysis"
-    scripts.mkdir(parents=True)
-    (scripts / "train_backbone.py").write_text(SLEEP_LONG)
-    (scripts / "tune_dataloader.py").write_text(SLEEP_LONG)
-
-    paths  = StubPaths(tmp_path)
-    logger = WebLogger()
-    yield ProcessManager(paths, logger, JobNotifier(paths, logger), StubDescriber())
-
-
-def _wait_running(manager: ProcessManager, job_id: str, timeout: float = 10.0) -> bool:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        with manager.lock:
-            if manager.jobs[job_id]["status"] == "running":
-                return True
-        time.sleep(0.05)
-    return False
-
-
-def _wait_done(manager: ProcessManager, job_id: str, timeout: float = 10.0) -> bool:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        with manager.lock:
-            if manager.jobs[job_id]["status"] != "running":
-                return True
-        time.sleep(0.05)
-    return False
+def manager(make_manager):
+    return make_manager({name: SLEEP_LONG for name in ("train_backbone", "tune_dataloader")})
 
 
 def _progress_path(manager: ProcessManager, job_id: str) -> Path:
@@ -112,7 +54,7 @@ def test_progress_before_the_file_exists_is_not_live(manager):
     result = manager.launch("train_backbone", sys.executable)
     job_id = result["job_id"]
 
-    assert _wait_running(manager, job_id)
+    assert wait_for_status(manager, job_id, "running")
 
     info = manager.progress(job_id)
 
@@ -129,7 +71,7 @@ def test_progress_reads_the_live_snapshot(manager):
     result = manager.launch("train_backbone", sys.executable)
     job_id = result["job_id"]
 
-    assert _wait_running(manager, job_id)
+    assert wait_for_status(manager, job_id, "running")
 
     path = _progress_path(manager, job_id)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -148,7 +90,7 @@ def test_list_jobs_embeds_the_progress_of_running_fan_outs(manager):
     result = manager.launch("train_backbone", sys.executable)
     job_id = result["job_id"]
 
-    assert _wait_running(manager, job_id)
+    assert wait_for_status(manager, job_id, "running")
 
     path = _progress_path(manager, job_id)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -165,7 +107,7 @@ def test_list_jobs_leaves_other_jobs_without_progress(manager):
     result = manager.launch("tune_dataloader", sys.executable)
     job_id = result["job_id"]
 
-    assert _wait_running(manager, job_id)
+    assert wait_for_status(manager, job_id, "running")
 
     record = next(r for r in manager.list_jobs() if r["job_id"] == job_id)
 
@@ -178,14 +120,14 @@ def test_progress_of_a_finished_job_keeps_the_snapshot_but_is_not_live(manager):
     result = manager.launch("train_backbone", sys.executable)
     job_id = result["job_id"]
 
-    assert _wait_running(manager, job_id)
+    assert wait_for_status(manager, job_id, "running")
 
     path = _progress_path(manager, job_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(_snapshot(done=30, failed=0)))
 
     manager.stop(job_id)
-    assert _wait_done(manager, job_id)
+    assert wait_until_finished(manager, job_id)
 
     info = manager.progress(job_id)
 
@@ -200,7 +142,7 @@ def test_progress_rejects_an_unreadable_file(manager):
     result = manager.launch("train_backbone", sys.executable)
     job_id = result["job_id"]
 
-    assert _wait_running(manager, job_id)
+    assert wait_for_status(manager, job_id, "running")
 
     path = _progress_path(manager, job_id)
     path.parent.mkdir(parents=True, exist_ok=True)

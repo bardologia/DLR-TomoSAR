@@ -1,16 +1,9 @@
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from types   import SimpleNamespace
 
 import numpy as np
-
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
 
 from triage_board import TriageBoard, TriageStore
 from web_logger   import WebLogger

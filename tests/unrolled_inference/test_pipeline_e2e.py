@@ -4,7 +4,6 @@ import json
 
 import numpy as np
 import pytest
-import torch
 
 from configuration.inference.unrolled          import UnrolledInferenceConfig
 from configuration.training                    import UnrolledEntryConfig
@@ -13,12 +12,7 @@ from pipelines.unrolled.inference.pipeline     import UnrolledInferencePipeline
 from pipelines.unrolled.training.pipeline      import UnrolledTrainingPipeline
 
 
-pytestmark = [pytest.mark.real_data, pytest.mark.slow]
-
-
-@pytest.fixture(autouse=True)
-def _force_cpu(monkeypatch):
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+pytestmark = [pytest.mark.real_data, pytest.mark.slow, pytest.mark.usefixtures("force_cpu")]
 
 
 def _entry_config(test_data_dir, params_dir, tmp_path) -> UnrolledEntryConfig:
@@ -49,7 +43,9 @@ def test_unrolled_train_then_infer_end_to_end(test_data_dir, params_dir, tmp_pat
     run_directory = tmp_path / "e2e_unrolled"
 
     assert np.isfinite(results["test"]["loss"])
-    assert (run_directory / "checkpoints" / "best.pt").is_file()
+    assert np.isfinite(results["test"]["peak_mae_m"])
+    assert (run_directory / "best_model.pt").is_file()
+    assert (run_directory / "training_summary.json").is_file()
     assert (run_directory / "meta" / "unrolled_model_config.json").is_file()
     assert (run_directory / "meta" / "dataset_creation_config.json").is_file()
     assert RunClassifier.classify(run_directory) == RunType.UNROLLED

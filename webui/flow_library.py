@@ -1122,7 +1122,7 @@ class FlowLibrary:
             },
             {
                 "id": "unr_ckpt", "title": "Checkpointing, early stop and test", "phase": "D - Optimise",
-                "note": "The best validation loss checkpoints best.pt (the EMA weights when enabled); training stops after early_stop_patience epochs without improvement; the best weights are reloaded for the test pass, and history plus test metrics (loss, peak MAE in metres) land in training_summary.json.",
+                "note": "The unrolled family runs the shared BaseTrainer loop: the best validation loss checkpoints best_model.pt (the EMA weights when enabled), a resumable trainer state is written to last.pt every epoch, training stops after early_stop_patience validation rounds without improvement, the best weights are reloaded for the test pass, and the loss history plus test metrics (loss, peak MAE in metres) land in training_summary.json. No TensorBoard events are written because the run carries no writer.",
                 "inputs": ["ema", "loss"], "outputs": ["best"],
                 "lines": [
                     [{"id": "best", "tex": r"\theta^{\star}", "role": "final"}, {"tex": "="}, {"tex": r"\arg\min_{e}\ \mathcal{L}^{\mathrm{val}}_{e},\qquad \mathrm{stop\ after}\ p\ \mathrm{epochs\ without\ improvement}"}],

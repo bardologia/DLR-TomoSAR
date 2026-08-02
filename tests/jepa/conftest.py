@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import contextlib
-
 import pytest
 import torch
 import torch.nn as nn
@@ -10,6 +8,8 @@ from configuration.architectures                         import MlpAutoencoderCo
 from configuration.training.jepa                         import EmbeddingLossConfig
 from models.profile_autoencoder                          import get_profile_autoencoder
 from pipelines.profile_autoencoder.dataset.normalization import ProfileNormalizer, ProfileStats
+
+from tests.conftest import SilentLogger
 
 
 PROFILE_LENGTH = 8
@@ -23,32 +23,6 @@ N_GAUSSIANS    = 2
 class IdentityNormStats:
     def denormalize_output(self, params):
         return params
-
-
-class FakeProgress:
-    def add_task(self, *args, **kwargs):
-        return 0
-
-    def advance(self, *args, **kwargs):
-        pass
-
-    def update(self, *args, **kwargs):
-        pass
-
-
-class FakeLogger:
-    @contextlib.contextmanager
-    def track(self, transient=False):
-        yield FakeProgress()
-
-    def section(self, *args, **kwargs):
-        pass
-
-    def subsection(self, *args, **kwargs):
-        pass
-
-    def kv_table(self, *args, **kwargs):
-        pass
 
 
 def make_autoencoder(embedding_norm: str = "none"):
@@ -90,7 +64,7 @@ def embedding_loss_cfg():
 
 @pytest.fixture
 def fake_logger():
-    return FakeLogger()
+    return SilentLogger()
 
 
 @pytest.fixture

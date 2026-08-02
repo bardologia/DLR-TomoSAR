@@ -18,12 +18,7 @@ from pipelines.shared.config.config_persistence import BackboneModelConfigIO
 from tools.data.io                              import FileIO
 from tools.data.regions                         import CropRegion
 
-
-class _SilentLogger:
-    def section(self, *a, **k):       pass
-    def subsection(self, *a, **k):    pass
-    def kv_table(self, *a, **k):      pass
-    def metrics_table(self, *a, **k): pass
+from tests.conftest import SilentLogger
 
 
 N_GAUSSIANS      = 5
@@ -99,7 +94,7 @@ def _build_run_directory(tmp_path, test_data_dir, params_dir):
     dataset_config = _dataset_config(test_data_dir, params_dir)
     in_channels    = dataset_config.input_config.total_channels(0, len(SECONDARY_LABELS))
 
-    MetadataWriter(run_dir, logger=_SilentLogger()).save_dataset_configuration(dataset_config)
+    MetadataWriter(run_dir, logger=SilentLogger()).save_dataset_configuration(dataset_config)
     FileIO.save_json({"model_name": "unet", "in_channels": in_channels, "out_channels": 3 * N_GAUSSIANS, "n_gaussians": N_GAUSSIANS}, meta_dir / "run_summary.json")
     FileIO.save_json({"geometry": {"height_axis_convention": "height"}}, run_dir / "docs" / "trainer_config.json")
 

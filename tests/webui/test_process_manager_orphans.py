@@ -7,40 +7,13 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
-
-from notifier        import JobNotifier
-from process_manager import ProcessManager
-from web_logger      import WebLogger
-
 SLEEPER = "import time\ntime.sleep(120)\n"
 SPAWNER = "import os, subprocess, sys, time\nsubprocess.Popen([sys.executable, os.path.join(os.path.dirname(__file__), 'fake_sleep.py')])\ntime.sleep(120)\n"
 
 
-class StubPaths:
-
-    def __init__(self, root: Path) -> None:
-        self.repo_root = root
-        self.main_dir  = root / "main"
-        self.logs_dir  = root / "logs"
-
-
-class StubDescriber:
-
-    def describe(self, key: str, interpreter: str, overrides: dict | None) -> str:
-        return ""
-
-
 @pytest.fixture
-def manager(tmp_path):
-    (tmp_path / "main" / "analysis").mkdir(parents=True)
-    paths                     = StubPaths(tmp_path)
-    logger                    = WebLogger()
-    instance                  = ProcessManager(paths, logger, JobNotifier(paths, logger), StubDescriber())
+def manager(make_manager):
+    instance                  = make_manager({})
     instance.ORPHAN_MIN_AGE_S = 0.0
     instance.ORPHAN_RESCAN_S  = 0.0
     return instance

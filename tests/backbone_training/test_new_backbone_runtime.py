@@ -21,11 +21,6 @@ NEW_BACKBONES = {
 }
 
 
-@pytest.fixture
-def force_cpu(monkeypatch):
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
-
-
 def _loader(n: int = 6, hw: int = 16) -> DataLoader:
     gen  = torch.Generator().manual_seed(0)
     imgs = torch.randn(n, 2, hw, hw, generator=gen)

@@ -2,26 +2,17 @@ from __future__ import annotations
 
 import json
 import sys
-import time
 from pathlib import Path
 
 import pytest
 
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
-
-from notifier        import JobNotifier
-from process_manager import ProcessManager
 from saved_run_store import SavedRunStore
 from web_logger      import WebLogger
 
-ARGS_DUMP = "import pathlib, sys\npathlib.Path('argv.txt').write_text(' '.join(sys.argv[1:]))\n"
+from tests.webui.conftest import ARGS_DUMP, wait_for_status
 
 
-class StubPaths:
+class SavedRunPaths:
 
     def __init__(self, root: Path) -> None:
         self.saved_runs_dir = root / "logs" / "saved_runs"
@@ -30,31 +21,9 @@ class StubPaths:
         return key in ("train_backbone", "infer_backbone")
 
 
-class RunnerPaths:
-
-    def __init__(self, root: Path) -> None:
-        self.repo_root      = root
-        self.main_dir       = root / "main"
-        self.logs_dir       = root / "logs"
-        self.saved_runs_dir = root / "logs" / "saved_runs"
-
-    def has_script(self, key: str) -> bool:
-        return (self.main_dir / "analysis" / f"{key}.py").exists()
-
-    def script_entry(self, key: str) -> dict:
-        path = self.main_dir / "analysis" / f"{key}.py"
-        return {"path": path, "rel": f"main/analysis/{key}.py"}
-
-
-class StubDescriber:
-
-    def describe(self, key: str, interpreter: str, overrides: dict | None) -> str:
-        return f"stub description for {key}"
-
-
 @pytest.fixture
 def store(tmp_path):
-    return SavedRunStore(StubPaths(tmp_path), WebLogger())
+    return SavedRunStore(SavedRunPaths(tmp_path), WebLogger())
 
 
 def _payload(**extra) -> dict:
@@ -107,7 +76,7 @@ def test_blank_name_falls_back_to_title(store):
 def test_list_persists_across_instances(store, tmp_path):
     saved = store.save(_payload())["entry"]
 
-    fresh = SavedRunStore(StubPaths(tmp_path), WebLogger())
+    fresh = SavedRunStore(SavedRunPaths(tmp_path), WebLogger())
     assert fresh.list()["saved"] == [saved]
 
 
@@ -146,28 +115,13 @@ def test_delete_rejects_unknown_and_malformed_ids(store):
     assert store.delete("../escape")    == {"ok": False, "error": "saved run not found"}
 
 
-def test_saved_entry_launches_through_process_manager(tmp_path):
-    scripts = tmp_path / "main" / "analysis"
-    scripts.mkdir(parents=True)
-    (scripts / "args_dump.py").write_text(ARGS_DUMP)
-
-    paths   = RunnerPaths(tmp_path)
-    logger  = WebLogger()
-    store   = SavedRunStore(paths, logger)
-    manager = ProcessManager(paths, logger, JobNotifier(paths, logger), StubDescriber())
+def test_saved_entry_launches_through_process_manager(make_manager, tmp_path):
+    manager = make_manager({"args_dump": ARGS_DUMP})
+    store   = SavedRunStore(manager.paths, WebLogger())
 
     entry  = store.save({"script_key": "args_dump", "title": "Args dump", "name": "", "interpreter": sys.executable, "overrides": {"training.seed": "7"}, "follow_up": None, "detach": False})["entry"]
     result = manager.launch(entry["script"], entry["interpreter"], entry["overrides"], entry["follow_up"], entry["detach"])
 
     assert result["ok"]
-
-    deadline = time.monotonic() + 10.0
-    while time.monotonic() < deadline:
-        with manager.lock:
-            status = manager.jobs[result["job_id"]]["status"]
-        if status == "finished":
-            break
-        time.sleep(0.05)
-
-    assert status == "finished"
+    assert wait_for_status(manager, result["job_id"], "finished")
     assert (tmp_path / "argv.txt").read_text() == "--training.seed 7"

@@ -15,27 +15,13 @@ from pipelines.backbone.inference.predictor          import CubeStitcher, Predic
 from tools.data.regions                              import CropRegion
 from configuration.inference                         import InferenceConfig
 
+from tests.conftest import SilentLogger
+
 
 N_GAUSSIANS = 5
 OUT_CH      = N_GAUSSIANS * 3
 N_ELEV      = 16
 PATCH       = 16
-
-
-class _SilentLogger:
-    def section(self, *a, **k):    pass
-    def subsection(self, *a, **k): pass
-    def kv_table(self, *a, **k):   pass
-
-    def track(self, *a, **k):
-        return _NullProgress()
-
-
-class _NullProgress:
-    def __enter__(self):         return self
-    def __exit__(self, *a):      return False
-    def add_task(self, *a, **k): return 0
-    def advance(self, *a, **k):  pass
 
 
 class _IdentityNormalizer:
@@ -91,7 +77,7 @@ def _make_predictor(tmp_path, run) -> Predictor:
 
     return Predictor(
         run         = run,
-        logger      = _SilentLogger(),
+        logger      = SilentLogger(),
         window_kind = "hann",
         cube_dtype  = "float32",
         save_cubes  = False,

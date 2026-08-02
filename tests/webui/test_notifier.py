@@ -1,28 +1,16 @@
 from __future__ import annotations
 
-import sys
 import threading
 import time
 from datetime    import datetime, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib     import Path
 
 import pytest
-
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
 
 from notifier   import ExperimentProgressWatcher, JobNotifier
 from web_logger import WebLogger
 
-
-class StubPaths:
-
-    def __init__(self, root: Path) -> None:
-        self.logs_dir = root / "logs"
+from tests.webui.conftest import StubPaths
 
 
 class CaptureHandler(BaseHTTPRequestHandler):

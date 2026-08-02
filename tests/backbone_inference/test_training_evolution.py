@@ -10,10 +10,7 @@ import torch
 from pipelines.backbone.inference.training_evolution import EvolutionFrames, TrainingEvolutionRun
 from configuration.diagnostics                       import TrainingEvolutionConfig
 
-
-class _SilentLogger:
-    def __getattr__(self, name):
-        return lambda *args, **kwargs: None
+from tests.conftest import SilentLogger
 
 
 def test_evolution_frame_renders_an_image():
@@ -31,7 +28,7 @@ def test_evolution_frame_renders_an_image():
 def test_missing_snapshots_raise(tmp_path):
     (tmp_path / "checkpoints").mkdir()
 
-    run = TrainingEvolutionRun(tmp_path, TrainingEvolutionConfig(), _SilentLogger())
+    run = TrainingEvolutionRun(tmp_path, TrainingEvolutionConfig(), SilentLogger())
 
     with pytest.raises(FileNotFoundError):
         run._snapshots()
@@ -44,7 +41,7 @@ def test_snapshots_are_discovered_in_epoch_order(tmp_path):
     for epoch in (10, 2, 30):
         torch.save({"epoch": epoch - 1, "params": {}}, ckpt_dir / f"epoch_{epoch:04d}.pt")
 
-    run       = TrainingEvolutionRun(tmp_path, TrainingEvolutionConfig(), _SilentLogger())
+    run       = TrainingEvolutionRun(tmp_path, TrainingEvolutionConfig(), SilentLogger())
     snapshots = run._snapshots()
 
     assert [path.name for path in snapshots] == ["epoch_0002.pt", "epoch_0010.pt", "epoch_0030.pt"]

@@ -5,7 +5,6 @@ from types import SimpleNamespace
 
 import numpy as np
 import pytest
-import torch
 
 from configuration.inference.image_autoencoder        import ImageAeInferenceConfig
 from configuration.inference.profile_autoencoder      import ProfileAeInferenceConfig
@@ -18,12 +17,7 @@ from pipelines.profile_autoencoder.inference.pipeline import ProfileAeInferenceP
 from pipelines.profile_autoencoder.training.pipeline  import TrainingPipeline as ProfileTrainingPipeline
 
 
-pytestmark = [pytest.mark.real_data, pytest.mark.slow]
-
-
-@pytest.fixture(autouse=True)
-def _force_cpu(monkeypatch):
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+pytestmark = [pytest.mark.real_data, pytest.mark.slow, pytest.mark.usefixtures("force_cpu")]
 
 
 def _entry_config(test_data_dir, params_dir, tmp_path) -> ImageAeEntryConfig:

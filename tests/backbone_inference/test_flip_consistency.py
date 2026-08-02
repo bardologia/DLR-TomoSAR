@@ -8,29 +8,10 @@ import torch
 from pipelines.backbone.dataset.spatial            import Patcher
 from pipelines.backbone.inference.flip_consistency import FlipConsistencyEvaluator
 
+from tests.conftest import SilentLogger
+
 
 H, W, N_ELEV = 8, 6, 10
-
-
-class _SilentLogger:
-    def __getattr__(self, name):
-        if name == "track":
-            return lambda transient=False: _SilentProgress()
-        return lambda *args, **kwargs: None
-
-
-class _SilentProgress:
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *args):
-        return False
-
-    def add_task(self, *args, **kwargs):
-        return 0
-
-    def advance(self, task):
-        pass
 
 
 def _equivariant_model(images: torch.Tensor) -> np.ndarray:
@@ -71,7 +52,7 @@ def _run(model) -> SimpleNamespace:
 
 
 def test_equivariant_model_has_zero_disagreement():
-    evaluator = FlipConsistencyEvaluator(_run(_equivariant_model), _SilentLogger(), window_kind="uniform")
+    evaluator = FlipConsistencyEvaluator(_run(_equivariant_model), SilentLogger(), window_kind="uniform")
 
     flip_map = evaluator.run()
 
@@ -80,7 +61,7 @@ def test_equivariant_model_has_zero_disagreement():
 
 
 def test_position_dependent_model_disagrees():
-    evaluator = FlipConsistencyEvaluator(_run(_position_model), _SilentLogger(), window_kind="uniform")
+    evaluator = FlipConsistencyEvaluator(_run(_position_model), SilentLogger(), window_kind="uniform")
 
     flip_map = evaluator.run()
 

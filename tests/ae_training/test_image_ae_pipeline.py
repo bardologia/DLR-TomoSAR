@@ -17,17 +17,12 @@ from pipelines.image_autoencoder.training          import pipeline as image_pipe
 from pipelines.shared.config.run_metadata          import TrainingRunMetadata
 
 
-pytestmark = pytest.mark.slow
+pytestmark = [pytest.mark.slow, pytest.mark.usefixtures("force_cpu")]
 
 
 IN_CHANNELS   = 2
 EMBEDDING_DIM = 8
 PATCH         = 16
-
-
-@pytest.fixture(autouse=True)
-def _force_cpu(monkeypatch):
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
 
 
 def _trainer_config(cfg):

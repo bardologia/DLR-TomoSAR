@@ -4,14 +4,7 @@ import pytest
 
 from tools.orchestration.pool import ProcessPoolRunner
 
-
-class NullLogger:
-    def section(self, *a, **k):    pass
-    def subsection(self, *a, **k): pass
-    def info(self, *a, **k):       pass
-    def warning(self, *a, **k):    pass
-    def error(self, *a, **k):      pass
-    def kv_table(self, *a, **k):   pass
+from tests.conftest import SilentLogger
 
 
 def _square(x):
@@ -34,7 +27,7 @@ def _const(_x):
 
 @pytest.fixture
 def logger():
-    return NullLogger()
+    return SilentLogger()
 
 
 def test_empty_jobs_returns_empty(logger):

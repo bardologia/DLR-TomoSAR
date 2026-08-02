@@ -1,25 +1,13 @@
 from __future__ import annotations
 
-import sys
 import time
-from pathlib import Path
 
 import pytest
-
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
 
 from contention_monitor import ContentionMonitor
 from web_logger         import WebLogger
 
-
-class StubPaths:
-
-    def __init__(self, root: Path) -> None:
-        self.repo_root = root
+from tests.webui.conftest import StubPaths
 
 
 class StubNuke:

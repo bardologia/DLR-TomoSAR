@@ -1,14 +1,13 @@
 from __future__ import annotations
 
-import json
-
 import pytest
 import torch
 from torch.utils.data import DataLoader, TensorDataset
 
-from configuration.training              import UnrolledEntryConfig
-from models.unrolled                     import get_unrolled
-from pipelines.unrolled.training.trainer import UnrolledTrainer
+from configuration.training                 import UnrolledEntryConfig, UnrolledTrainerConfig
+from models.unrolled                        import get_unrolled
+from pipelines.shared.config.config_factory import ConfigFactory
+from pipelines.unrolled.training.trainer    import UnrolledTrainer
 
 from tests.backbone_training._helpers import identity_normalizer, x_axis_numpy
 
@@ -18,11 +17,6 @@ from tools.monitoring.logger import Logger
 HW      = 8
 TRACKS  = 3
 N_BATCH = 3
-
-
-@pytest.fixture
-def force_cpu(monkeypatch):
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
 
 
 def _loader(n: int = 2 * N_BATCH) -> DataLoader:
@@ -52,19 +46,25 @@ def _entry_config(epochs: int = 2, warmup_steps: int = 4, use_ema: bool = True, 
     return config
 
 
+def _trainer_config(tmp_path, entry_config: UnrolledEntryConfig) -> UnrolledTrainerConfig:
+    config                   = ConfigFactory(entry_config).unrolled_trainer_config(tmp_path, params_per_gaussian=3)
+    config.resources.enabled = False
+
+    return config
+
+
 def _build_trainer(tmp_path, entry_config: UnrolledEntryConfig) -> UnrolledTrainer:
     model, model_cfg = get_unrolled("gamma_net", n_iterations=2, prox_hidden=4)
     logger           = Logger(log_dir=str(tmp_path / "logs"), name="unrolled_trainer", level="ERROR")
 
     return UnrolledTrainer(
-        model        = model,
-        model_cfg    = model_cfg,
-        x_axis       = x_axis_numpy(),
-        entry_config = entry_config,
-        ppg          = 3,
-        run_dir      = tmp_path,
-        logger       = logger,
-        norm_stats   = identity_normalizer(6),
+        model      = model,
+        model_cfg  = model_cfg,
+        x_axis     = x_axis_numpy(),
+        config     = _trainer_config(tmp_path, entry_config),
+        run_dir    = tmp_path,
+        logger     = logger,
+        norm_stats = identity_normalizer(6),
     )
 
 
@@ -72,12 +72,14 @@ def test_fit_engages_warmup_and_finishes(tmp_path, force_cpu):
     trainer = _build_trainer(tmp_path, _entry_config(epochs=2, warmup_steps=4))
     loader  = _loader()
 
-    results = trainer.train(loader, loader, loader)
+    train_losses, val_losses, best_val_loss = trainer.train(loader, loader, loader)
 
-    assert len(results["history"]) == 2
+    assert len(train_losses) == 2
+    assert len(val_losses)   == 2
     assert trainer.warmup.current_step == trainer.warmup.warmup_steps
     assert trainer.warmup.is_finished()
-    assert torch.isfinite(torch.tensor(results["test"]["loss"])).item()
+    assert torch.isfinite(torch.tensor(best_val_loss)).item()
+    assert torch.isfinite(torch.tensor(trainer.test_metrics["avg_loss"])).item()
 
 
 def test_active_warmup_scales_learning_rates_below_base(tmp_path, force_cpu):
@@ -100,11 +102,8 @@ def test_fit_updates_ema_shadow_and_checkpoints(tmp_path, force_cpu):
 
     assert trainer.ema.enabled
     assert any(not torch.equal(trainer.ema.shadow[key], initial[key]) for key in initial)
-    assert (tmp_path / "checkpoints" / "best.pt").exists()
-    assert (tmp_path / "checkpoints" / "last.pt").exists()
-
-    summary = json.loads((tmp_path / "training_summary.json").read_text())
-    assert len(summary["history"]) == 2
+    assert (tmp_path / "best_model.pt").exists()
+    assert (tmp_path / "last.pt").exists()
 
 
 def test_best_checkpoint_holds_ema_weights(tmp_path, force_cpu):
@@ -113,9 +112,32 @@ def test_best_checkpoint_holds_ema_weights(tmp_path, force_cpu):
 
     trainer.train(loader, loader, loader)
 
-    saved = torch.load(tmp_path / "checkpoints" / "best.pt", map_location="cpu", weights_only=True)
+    saved = torch.load(tmp_path / "best_model.pt", map_location="cpu", weights_only=False)["params"]
 
     assert all(torch.equal(saved[key], trainer.ema.shadow[key]) for key in trainer.ema.shadow)
+
+
+def test_peak_error_is_tracked_for_every_stage(tmp_path, force_cpu):
+    trainer = _build_trainer(tmp_path, _entry_config(epochs=1))
+    loader  = _loader()
+
+    trainer.train(loader, loader, loader)
+
+    assert set(trainer.peak_error_m) == {"train", "val", "test"}
+    assert all(value >= 0.0 for value in trainer.peak_error_m.values())
+
+
+def test_resume_restores_the_saved_trainer_state(tmp_path, force_cpu):
+    loader = _loader()
+    _build_trainer(tmp_path, _entry_config(epochs=1)).train(loader, loader, loader)
+
+    resumed_entry                 = _entry_config(epochs=2)
+    resumed_entry.training.resume = True
+
+    trainer = _build_trainer(tmp_path, resumed_entry)
+    trainer.train(loader, loader, loader)
+
+    assert len(trainer.train_losses) == 2
 
 
 def test_batch_without_kz_field_fails_loudly(tmp_path, force_cpu):
@@ -154,9 +176,18 @@ def test_compute_loss_satisfies_the_probe_contract(tmp_path, force_cpu):
     assert trainer.use_amp is False
     assert loss.requires_grad
     assert torch.isfinite(loss).item()
+    assert set(losses) == {"total_loss", "components", "monitor", "occupancy", "physical"}
 
     loss.backward()
     trainer.optimizer.step()
+
+
+def test_unknown_curve_loss_fails_loudly(tmp_path, force_cpu):
+    entry            = _entry_config(epochs=1)
+    entry.curve_loss = "huber"
+
+    with pytest.raises(ValueError):
+        _build_trainer(tmp_path, entry)
 
 
 @pytest.mark.skipif(not torch.cuda.is_available(), reason="VRAM reservation requires CUDA")
@@ -164,9 +195,9 @@ def test_fit_with_vram_reservation_on_gpu(tmp_path):
     trainer = _build_trainer(tmp_path, _entry_config(epochs=1, reserve_vram=True))
     loader  = _loader()
 
-    results = trainer.train(loader, loader, loader)
+    trainer.train(loader, loader, loader)
 
     assert trainer.device.type == "cuda"
     assert trainer.vram_reservation.enabled
     assert trainer.vram_reservation.filled
-    assert torch.isfinite(torch.tensor(results["test"]["loss"])).item()
+    assert torch.isfinite(torch.tensor(trainer.test_metrics["avg_loss"])).item()

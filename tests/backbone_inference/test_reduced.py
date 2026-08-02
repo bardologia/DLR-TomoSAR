@@ -8,6 +8,8 @@ import pytest
 from tools.data.regions                   import CropRegion
 from pipelines.backbone.inference.reduced import ReducedTomogramSynthesizer
 
+from tests.conftest import SilentLogger
+
 
 def _make_synth(x_axis_length: int, region: CropRegion, secondary_labels=None) -> ReducedTomogramSynthesizer:
     synth        = ReducedTomogramSynthesizer.__new__(ReducedTomogramSynthesizer)
@@ -16,14 +18,8 @@ def _make_synth(x_axis_length: int, region: CropRegion, secondary_labels=None) -
         split_region     = region,
         secondary_labels = secondary_labels,
     )
-    synth.logger = _SilentLogger()
+    synth.logger = SilentLogger()
     return synth
-
-
-class _SilentLogger:
-    def section(self, *a, **k):    pass
-    def subsection(self, *a, **k): pass
-    def kv_table(self, *a, **k):   pass
 
 
 def test_validate_alignment_match():

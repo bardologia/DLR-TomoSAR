@@ -10,13 +10,8 @@ from pipelines.jepa.inference.embedding import JepaEmbeddingEvaluator
 from pipelines.jepa.inference.pipeline  import JEPA_INFERENCE_COMPONENTS
 from tools.data.gaussians               import GaussianReconstructor
 
+from tests.conftest      import SilentLogger
 from tests.jepa.conftest import PROFILE_LENGTH, make_autoencoder
-
-
-class _SilentLogger:
-    def section(self, *a, **k):    pass
-    def subsection(self, *a, **k): pass
-    def kv_table(self, *a, **k):   pass
 
 
 class _FakeProfileAe:
@@ -136,7 +131,7 @@ def test_components_carry_embedding_evaluator():
 def test_perfect_prediction_scores_zero_embedding_error():
     run, gt_curves, autoencoder = _build_case()
 
-    metrics = JepaEmbeddingEvaluator(run, _SilentLogger()).run()
+    metrics = JepaEmbeddingEvaluator(run, SilentLogger()).run()
 
     assert metrics["jepa_embedding_mse"]    == pytest.approx(0.0, abs=1e-10)
     assert metrics["jepa_embedding_cosine"] == pytest.approx(1.0, abs=1e-6)
@@ -146,7 +141,7 @@ def test_perfect_prediction_scores_zero_embedding_error():
 def test_decoder_floor_matches_reconstruction_tail():
     run, gt_curves, autoencoder = _build_case()
 
-    metrics = JepaEmbeddingEvaluator(run, _SilentLogger()).run()
+    metrics = JepaEmbeddingEvaluator(run, SilentLogger()).run()
 
     tail     = gt_curves[:, autoencoder.embedding_dim:]
     expected = float((tail ** 2).sum()) / gt_curves.numel()
@@ -157,7 +152,7 @@ def test_decoder_floor_matches_reconstruction_tail():
 def test_flipped_prediction_scores_negative_cosine():
     run, _, _ = _build_case(flip=True)
 
-    metrics = JepaEmbeddingEvaluator(run, _SilentLogger()).run()
+    metrics = JepaEmbeddingEvaluator(run, SilentLogger()).run()
 
     assert metrics["jepa_embedding_cosine"] == pytest.approx(-1.0, abs=1e-6)
     assert metrics["jepa_embedding_mse"] > 0.0
@@ -167,7 +162,7 @@ def test_flipped_prediction_scores_negative_cosine():
 def test_offset_prediction_separates_chain_from_decoder_error():
     run, _, _ = _build_case(z_offset=0.5)
 
-    metrics = JepaEmbeddingEvaluator(run, _SilentLogger()).run()
+    metrics = JepaEmbeddingEvaluator(run, SilentLogger()).run()
 
     assert metrics["jepa_embedding_mse"] == pytest.approx(0.25, rel=1e-5)
     assert metrics["jepa_chain_mse_norm"] > metrics["jepa_decode_mse_norm"]
@@ -176,7 +171,7 @@ def test_offset_prediction_separates_chain_from_decoder_error():
 def test_layernorm_target_is_normalized_exactly_once():
     run = _build_layernorm_case()
 
-    metrics = JepaEmbeddingEvaluator(run, _SilentLogger()).run()
+    metrics = JepaEmbeddingEvaluator(run, SilentLogger()).run()
 
     assert metrics["jepa_embedding_mse"]    == pytest.approx(0.0, abs=1e-10)
     assert metrics["jepa_embedding_cosine"] == pytest.approx(1.0, abs=1e-6)
@@ -187,4 +182,4 @@ def test_empty_loader_raises():
     run.loader = []
 
     with pytest.raises(ValueError, match="no samples"):
-        JepaEmbeddingEvaluator(run, _SilentLogger()).run()
+        JepaEmbeddingEvaluator(run, SilentLogger()).run()

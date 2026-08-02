@@ -44,6 +44,7 @@ from configuration.training.profile_autoencoder import (
 )
 from configuration.training.unrolled import (
     UnrolledEntryConfig,
+    UnrolledTrainerConfig,
     UnrolledTrainingConfig,
 )
 from configuration.training.dual import (

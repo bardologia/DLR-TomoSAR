@@ -1,22 +1,14 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import numpy as np
 
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
-
-from cube_explorer import CubeExplorer, SliceCollector
+from cube_explorer import SliceCollector
 from web_logger    import WebLogger
 
-
-N_ELEV, N_AZ, N_RG = 5, 8, 6
+from tests.webui.conftest import N_AZ, N_ELEV, N_RG, open_explorer
 
 
 def _make_run(base: Path, group: str, name: str, stamp: str = "stamp_1", sources: tuple = ("pred", "gt", "reduced"), seed: int = 0) -> Path:
@@ -33,12 +25,9 @@ def _make_run(base: Path, group: str, name: str, stamp: str = "stamp_1", sources
 
 
 def _collector(base: Path) -> tuple[SliceCollector, list]:
-    cubes   = CubeExplorer(WebLogger())
-    listing = cubes.list_cubes(str(base))
-    assert listing["ok"], listing
+    cubes, cube_ids = open_explorer(base)
 
-    collector = SliceCollector(cubes, WebLogger())
-    return collector, [c["id"] for c in listing["cubes"]]
+    return SliceCollector(cubes, WebLogger()), cube_ids
 
 
 def test_info_reports_dims_sources_and_intensity(tmp_path):

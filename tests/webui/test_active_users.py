@@ -1,35 +1,11 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
+import os
 
 import pytest
 
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
-
-import os
-
 from proc_stats     import ProcStats
-from system_monitor import ActiveUsers, SystemHistory, SystemMonitor
-from web_logger     import WebLogger
-
-
-class StubPaths:
-
-    def __init__(self, root: Path) -> None:
-        self.repo_root = root
-
-
-@pytest.fixture
-def monitor(tmp_path, monkeypatch):
-    monkeypatch.setattr(SystemMonitor, "_du_loop", lambda self: None)
-    monkeypatch.setattr(SystemHistory, "sample_loop", lambda self: None)
-    monkeypatch.setattr(ActiveUsers, "sample_loop", lambda self: None)
-    return SystemMonitor(StubPaths(tmp_path), WebLogger())
+from system_monitor import ActiveUsers
 
 
 @pytest.fixture

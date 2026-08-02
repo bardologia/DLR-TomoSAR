@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import copy
 import shutil
 
 from pathlib import Path
@@ -8,7 +7,7 @@ from pathlib import Path
 import numpy as np
 
 from configuration.sar.gaussian_config            import GaussianConfig
-from configuration.training                       import UnrolledEntryConfig
+from configuration.training                       import UnrolledEntryConfig, UnrolledTrainerConfig
 from models.unrolled                              import UNROLLED_MODEL_REGISTRY, get_unrolled
 from pipelines.backbone.dataset.pipeline          import DatasetPipeline
 from pipelines.shared.config.config_factory       import ConfigFactory
@@ -17,23 +16,12 @@ from pipelines.shared.config.run_metadata         import TrainingRunMetadata
 from pipelines.shared.training.overfit_check      import OverfitCheck
 from pipelines.shared.training.seed_sweep         import SeedFanoutScheduler, SeedSet, SeedSweepRunner
 from pipelines.shared.training.training_runner    import EntryConfigTrainRunner
-from pipelines.shared.training.unit_resume        import UnitResume
 from pipelines.unrolled.training.trainer          import UnrolledTrainer
 from tools.data.gaussians                         import GaussianAxis
+from tools.data.io                                import FileIO
 from tools.monitoring.logger                      import Logger
 from tools.runtime.config_cli                     import ConfigCli
 from tools.runtime.reproducibility                import Reproducibility
-
-
-class OverfitGateTrainer:
-    def __init__(self, trainer: UnrolledTrainer) -> None:
-        self.trainer = trainer
-
-    def train(self, train_loader, val_loader, test_loader) -> tuple:
-        results = self.trainer.train(train_loader, val_loader, test_loader)
-        losses  = [entry["train"]["loss"] for entry in results["history"]]
-
-        return losses, None, None
 
 
 class UnrolledOverfitGate:
@@ -42,41 +30,31 @@ class UnrolledOverfitGate:
         self.logger = logger
         self.check  = OverfitCheck(entry_config.overfit_check, run_directory, logger)
 
-    def _sanitized_entry_config(self) -> UnrolledEntryConfig:
-        gate = copy.deepcopy(self.entry)
+    def _sanitized_trainer_config(self, trainer_config: UnrolledTrainerConfig) -> UnrolledTrainerConfig:
+        gate = self.check.sanitized_trainer_config(trainer_config)
 
-        gate.training.epochs              = self.check.planned_epochs
-        gate.training.scheduler_epochs    = 1_000_000
-        gate.training.early_stop_patience = self.check.planned_epochs
-        gate.training.warmup_enabled      = False
-        gate.training.use_ema             = False
-        gate.training.reserve_vram        = False
-        gate.measurement_noise_std        = 0.0
+        gate.measurement_noise_std = 0.0
+        gate.memory.reserve_vram   = False
 
-        self.check.record("training.epochs",              self.check.planned_epochs)
-        self.check.record("training.scheduler_epochs",    1_000_000)
-        self.check.record("training.early_stop_patience", self.check.planned_epochs)
-        self.check.record("training.warmup_enabled",      False)
-        self.check.record("training.use_ema",             False)
-        self.check.record("training.reserve_vram",        False)
-        self.check.record("measurement_noise_std",        0.0)
+        self.check.record("measurement_noise_std", 0.0)
+        self.check.record("memory.reserve_vram",   False)
 
         return gate
 
-    def run(self, model_cfg, x_axis, ppg: int, norm_stats, train_dataset) -> None:
+    def run(self, model_cfg, x_axis, trainer_config: UnrolledTrainerConfig, norm_stats, train_dataset) -> None:
         if not self.check.enabled:
             return
 
         self.check.announce()
 
-        gate_entry     = self._sanitized_entry_config()
-        gate_model_cfg = self.check.sanitized_model_config(model_cfg)
-        gate_model     = UNROLLED_MODEL_REGISTRY[self.entry.model_name](gate_model_cfg)
+        gate_trainer_config = self._sanitized_trainer_config(trainer_config)
+        gate_model_cfg      = self.check.sanitized_model_config(model_cfg)
+        gate_model          = UNROLLED_MODEL_REGISTRY[self.entry.model_name](gate_model_cfg)
 
-        gate_trainer = UnrolledTrainer(gate_model, gate_model_cfg, x_axis, gate_entry, ppg, self.check.work_directory, self.logger, norm_stats)
+        gate_trainer = UnrolledTrainer(gate_model, gate_model_cfg, x_axis, gate_trainer_config, self.check.work_directory, self.logger, norm_stats)
 
         try:
-            self.check.run(OverfitGateTrainer(gate_trainer), train_dataset)
+            self.check.run(gate_trainer, train_dataset)
         finally:
             shutil.rmtree(self.check.work_directory, ignore_errors=True)
 
@@ -136,6 +114,28 @@ class UnrolledTrainingPipeline:
 
         return model, model_cfg
 
+    def _trainer_config(self, run_directory: Path, gaussian_cfg) -> UnrolledTrainerConfig:
+        return self.factory.unrolled_trainer_config(run_directory, gaussian_cfg.params_per_gaussian)
+
+    def _save_training_summary(self, run_directory: Path, trainer: UnrolledTrainer, results: tuple) -> dict:
+        train_losses, val_losses, best_val_loss = results
+
+        summary = {
+            "train_losses"  : [float(loss) for loss in train_losses],
+            "val_losses"    : [float(loss) for loss in val_losses],
+            "best_val_loss" : float(best_val_loss),
+            "best_epoch"    : int(trainer.checkpoint.best_epoch) + 1,
+            "test"          : {
+                "loss"        : float(trainer.test_metrics["avg_loss"]),
+                "num_batches" : int(trainer.test_metrics["num_batches"]),
+                "peak_mae_m"  : float(trainer.peak_error_m["test"]),
+            },
+        }
+
+        FileIO.save_json(summary, run_directory / "training_summary.json")
+
+        return summary
+
     def build_pretrain_trainer(self, work_dir: Path, logger) -> tuple:
         work_dir     = Path(work_dir)
         gaussian_cfg = GaussianConfig.from_dataset(self.config.paths.dataset_path, self.config.paths.parameters_path)
@@ -148,7 +148,7 @@ class UnrolledTrainingPipeline:
 
         model, model_cfg = self._build_model(logger)
 
-        trainer = UnrolledTrainer(model, model_cfg, x_axis, self.config, gaussian_cfg.params_per_gaussian, work_dir, logger, dataset.normalizer)
+        trainer = UnrolledTrainer(model, model_cfg, x_axis, self._trainer_config(work_dir, gaussian_cfg), work_dir, logger, dataset.normalizer)
 
         return trainer, dataset, model
 
@@ -174,27 +174,28 @@ class UnrolledTrainingPipeline:
         meta_directory.mkdir(parents=True, exist_ok=True)
         UnrolledModelConfigIO.save(model_cfg, self.config.model_name, meta_directory)
 
-        x_axis = np.asarray(dataset_config.x_axis, dtype=np.float32)
+        x_axis         = np.asarray(dataset_config.x_axis, dtype=np.float32)
+        trainer_config = self._trainer_config(run_directory, gaussian_cfg)
 
-        UnrolledOverfitGate(self.config, run_directory, logger).run(model_cfg, x_axis, gaussian_cfg.params_per_gaussian, datasets["train"].normalizer, datasets["train"])
+        UnrolledOverfitGate(self.config, run_directory, logger).run(model_cfg, x_axis, trainer_config, datasets["train"].normalizer, datasets["train"])
 
         trainer = UnrolledTrainer(
-            model        = model,
-            model_cfg    = model_cfg,
-            x_axis       = x_axis,
-            entry_config = self.config,
-            ppg          = gaussian_cfg.params_per_gaussian,
-            run_dir      = run_directory,
-            logger       = logger,
-            norm_stats   = datasets["train"].normalizer,
+            model      = model,
+            model_cfg  = model_cfg,
+            x_axis     = x_axis,
+            config     = trainer_config,
+            run_dir    = run_directory,
+            logger     = logger,
+            norm_stats = datasets["train"].normalizer,
         )
 
         try:
             results = trainer.train(train_loader, val_loader, test_loader)
+            summary = self._save_training_summary(run_directory, trainer, results)
         finally:
             logger.close()
 
-        return results
+        return summary
 
 
 class UnrolledSingleTrainRunner(EntryConfigTrainRunner):
@@ -207,10 +208,6 @@ class UnrolledSingleTrainRunner(EntryConfigTrainRunner):
 
     def _resolve_run_name(self) -> str:
         return TrainingRunMetadata.resolve_name(self.config.model_name, self.config.run_name)
-
-    def _build_unit_resume(self) -> UnitResume:
-        self.unit_resume = UnitResume(self.run_directory, enabled=self.config.resume, trainer_resume=False)
-        return self.unit_resume
 
 
 class UnrolledTrainingLauncher:

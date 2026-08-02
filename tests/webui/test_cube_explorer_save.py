@@ -1,67 +1,17 @@
 from __future__ import annotations
 
-import json
-import sys
-import time
 from pathlib import Path
-
-import numpy as np
-
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
 
 from cube_explorer import CubeExplorer
 from web_logger    import WebLogger
 
+from tests.webui.conftest import N_AZ, loaded_cube, make_cube_run
 
-N_ELEV, N_AZ, N_RG = 5, 8, 6
-
-
-def _make_cube_run(base: Path) -> Path:
-    rng     = np.random.default_rng(0)
-    preproc = base / "preproc"
-    (preproc / "data").mkdir(parents=True)
-
-    primary = rng.normal(size=(N_AZ, N_RG)) + 1j * rng.normal(size=(N_AZ, N_RG))
-    np.save(preproc / "data" / "primary.npy", primary)
-
-    layout = {"global_crop": [0, N_AZ, 0, N_RG], "artifacts": {"primary": "primary.npy"}}
-    (preproc / "data" / "dataset.json").write_text(json.dumps(layout))
-
-    run   = base / "group" / "run_a"
-    stamp = run / "inference" / "stamp_1"
-    (stamp / "cubes").mkdir(parents=True)
-    (run / "meta").mkdir(parents=True)
-
-    (run / "meta" / "dataset_creation_config.json").write_text(json.dumps({"preprocessing_run_directory": str(preproc)}))
-    (stamp / "metrics.json").write_text(json.dumps({"x_axis_min": -10.0, "x_axis_max": 30.0, "split_region": [0, N_AZ, 0, N_RG]}))
-
-    for source in ("pred", "gt", "reduced"):
-        np.save(stamp / "cubes" / f"{source}_curves.npy", rng.random((N_ELEV, N_AZ, N_RG)).astype(np.float32))
-
-    return stamp
+SOURCES = ("pred", "gt", "reduced")
 
 
 def _loaded_explorer(base: Path) -> tuple[CubeExplorer, str]:
-    _make_cube_run(base)
-    explorer = CubeExplorer(WebLogger())
-
-    listing = explorer.list_cubes(str(base))
-    assert listing["ok"] and len(listing["cubes"]) == 1
-
-    cube_id = listing["cubes"][0]["id"]
-    assert explorer.start_load(cube_id)["ok"]
-
-    deadline = time.time() + 30.0
-    while explorer.load_status()["state"] == "loading" and time.time() < deadline:
-        time.sleep(0.05)
-
-    status = explorer.load_status()
-    assert status["state"] == "ready", status
-    return explorer, cube_id
+    return loaded_cube(base, sources=SOURCES)
 
 
 def test_save_slices_writes_paper_figures(tmp_path):
@@ -74,7 +24,7 @@ def test_save_slices_writes_paper_figures(tmp_path):
     assert out_dir == Path(cube_id).parent.parent / "figures" / "cube_slices" / "az0003_rg0002"
     assert result["rel"] == "figures/cube_slices/az0003_rg0002"
 
-    expected = {f"{axis}_{source}_physical.png" for source in ("pred", "gt", "reduced") for axis in ("range", "azimuth")}
+    expected = {f"{axis}_{source}_physical.png" for source in SOURCES for axis in ("range", "azimuth")}
     assert set(result["files"]) == expected
 
     for name in expected:
@@ -109,7 +59,7 @@ def test_save_slices_rejects_unknown_space(tmp_path):
 
 
 def test_save_slices_requires_loaded_cube(tmp_path):
-    stamp    = _make_cube_run(tmp_path)
+    stamp    = make_cube_run(tmp_path, sources=SOURCES)
     explorer = CubeExplorer(WebLogger())
 
     result = explorer.save_slices(str(stamp), az=0, rg=0)

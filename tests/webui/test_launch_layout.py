@@ -2,16 +2,8 @@ from __future__ import annotations
 
 import ast
 import re
-import sys
-from pathlib import Path
 
 import pytest
-
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
 
 from launch_layout            import LaunchLayout, LayoutError
 from project_paths            import ProjectPaths
@@ -29,6 +21,8 @@ from configuration.training                 import BackboneEntryConfig, DualEntr
 from configuration.tuning.general           import TuningEntryConfig
 from models.backbone                        import BACKBONE_MODEL_REGISTRY
 from pipelines.backbone.training.loss_terms import LOSS_TERMS, LossComponentCatalog
+
+from tests.webui.conftest import WEBUI_ROOT
 
 _DISPATCH_ONLY = {"generate_tomogram", "generate_interferograms"}
 

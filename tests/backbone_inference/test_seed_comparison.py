@@ -9,10 +9,7 @@ import pytest
 
 from pipelines.backbone.inference.seed_comparison import SeedComparison, SeedComparisonReport, SeedInferenceResolver
 
-
-class _SilentLogger:
-    def __getattr__(self, name):
-        return lambda *args, **kwargs: None
+from tests.conftest import SilentLogger
 
 
 def _seed_run(group: Path, seed_name: str, metrics: dict, stamp: str = "stamp") -> Path:
@@ -35,7 +32,7 @@ def _report(group: Path, runs: list[Path], stamp: str = "stamp") -> SeedComparis
         output_subdir    = stamp,
         metrics_filename = "metrics.json",
         report_filename  = "report.md",
-        logger           = _SilentLogger(),
+        logger           = SilentLogger(),
     )
 
 

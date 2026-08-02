@@ -20,16 +20,11 @@ from pipelines.shared.config.run_metadata            import TrainingRunMetadata
 from tools.data.regions                              import CropRegion
 
 
-pytestmark = pytest.mark.slow
+pytestmark = [pytest.mark.slow, pytest.mark.usefixtures("force_cpu")]
 
 
 PROFILE_LENGTH = 16
 EMBEDDING_DIM  = 8
-
-
-@pytest.fixture(autouse=True)
-def _force_cpu(monkeypatch):
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
 
 
 def _trainer_config(cfg):

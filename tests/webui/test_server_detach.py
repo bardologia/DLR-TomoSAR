@@ -11,8 +11,7 @@ from pathlib import Path
 
 import pytest
 
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
+from tests.webui.conftest import WEBUI_ROOT
 
 
 def _free_port() -> int:

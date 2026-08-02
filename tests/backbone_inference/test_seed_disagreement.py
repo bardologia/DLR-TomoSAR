@@ -11,13 +11,10 @@ import pytest
 from pipelines.backbone.inference.seed_comparison   import SeedComparison
 from pipelines.backbone.inference.seed_disagreement import SeedDisagreementMaps
 
+from tests.conftest import SilentLogger
+
 
 N_ELEV, N_AZ, N_RG = 4, 3, 2
-
-
-class _SilentLogger:
-    def __getattr__(self, name):
-        return lambda *args, **kwargs: None
 
 
 def _params(*slots: tuple) -> np.ndarray:
@@ -57,7 +54,7 @@ def _maps(group: Path, runs: list[Path], stamp: str = "stamp") -> SeedDisagreeme
         cubes_subdir     = "cubes",
         metrics_filename = "metrics.json",
         output_dir       = group / "inference" / "agg",
-        logger           = _SilentLogger(),
+        logger           = SilentLogger(),
     )
 
 

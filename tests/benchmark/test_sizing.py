@@ -9,16 +9,6 @@ from configuration.benchmark    import BenchmarkConfig
 LOCKED = ("embedding_dim", "embedding_dims")
 
 
-class _SilentLogger:
-    def __getattr__(self, name):
-        return lambda *args, **kwargs: None
-
-
-@pytest.fixture
-def logger_stub():
-    return _SilentLogger()
-
-
 @pytest.fixture
 def scaler():
     return WidthScaler(locked=LOCKED)

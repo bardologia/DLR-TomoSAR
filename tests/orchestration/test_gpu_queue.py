@@ -12,17 +12,10 @@ import pytest
 
 from tools.orchestration.gpu_queue import GpuJob, GpuPoolFile, GpuProgressFile, GpuQueue, GpuJobResult
 
-
-class NullLogger:
-    def section(self, *a, **k):    pass
-    def subsection(self, *a, **k): pass
-    def info(self, *a, **k):       pass
-    def warning(self, *a, **k):    pass
-    def error(self, *a, **k):      pass
-    def kv_table(self, *a, **k):   pass
+from tests.conftest import SilentLogger
 
 
-class RecordingLogger(NullLogger):
+class RecordingLogger(SilentLogger):
     def __init__(self) -> None:
         self.errors   = []
         self.warnings = []
@@ -35,7 +28,7 @@ class RecordingLogger(NullLogger):
 
 @pytest.fixture
 def logger():
-    return NullLogger()
+    return SilentLogger()
 
 
 def _ok_command(payload: str = "ok") -> list[str]:
@@ -213,7 +206,7 @@ def _write_pool(path: Path, payload) -> None:
 
 def _pool_queue(tmp_path: Path, gpus: list[int], logger=None, poll_interval_s: float = 0.0):
     pool  = tmp_path / "gpu_pool.json"
-    queue = GpuQueue(gpus=gpus, logger=logger or NullLogger(), poll_interval_s=poll_interval_s, handle_signals=False, pool_file=pool)
+    queue = GpuQueue(gpus=gpus, logger=logger or SilentLogger(), poll_interval_s=poll_interval_s, handle_signals=False, pool_file=pool)
 
     return queue, pool
 
@@ -483,7 +476,7 @@ def test_queue_without_pool_file_writes_no_progress_file(tmp_path, logger):
 
 
 def test_progress_eta_unknown_until_the_first_unit_completes(tmp_path):
-    progress = GpuProgressFile(tmp_path / "p.json", total=4, logger=NullLogger())
+    progress = GpuProgressFile(tmp_path / "p.json", total=4, logger=SilentLogger())
     snapshot = progress.snapshot([{"name": "a", "gpu": 0, "elapsed_s": 5.0}], queued=3, workers=1)
 
     assert snapshot["eta_s"]     is None
@@ -492,7 +485,7 @@ def test_progress_eta_unknown_until_the_first_unit_completes(tmp_path):
 
 
 def test_progress_eta_splits_remaining_work_across_workers(tmp_path):
-    progress = GpuProgressFile(tmp_path / "p.json", total=8, logger=NullLogger())
+    progress = GpuProgressFile(tmp_path / "p.json", total=8, logger=SilentLogger())
     progress.record(_progress_result("a", "DONE", 80.0))
     progress.record(_progress_result("b", "DONE", 120.0))
 
@@ -506,7 +499,7 @@ def test_progress_eta_splits_remaining_work_across_workers(tmp_path):
 
 
 def test_progress_eta_is_bounded_below_by_the_longest_running_unit(tmp_path):
-    progress = GpuProgressFile(tmp_path / "p.json", total=3, logger=NullLogger())
+    progress = GpuProgressFile(tmp_path / "p.json", total=3, logger=SilentLogger())
     progress.record(_progress_result("a", "DONE", 100.0))
 
     running  = [{"name": "b", "gpu": 0, "elapsed_s": 10.0}, {"name": "c", "gpu": 1, "elapsed_s": 95.0}]
@@ -516,7 +509,7 @@ def test_progress_eta_is_bounded_below_by_the_longest_running_unit(tmp_path):
 
 
 def test_progress_write_is_throttled_between_completions(tmp_path):
-    progress = GpuProgressFile(tmp_path / "p.json", total=2, logger=NullLogger())
+    progress = GpuProgressFile(tmp_path / "p.json", total=2, logger=SilentLogger())
 
     progress.write(progress.snapshot([], 2, 1))
     stamp = (tmp_path / "p.json").stat().st_mtime_ns
@@ -542,7 +535,7 @@ def test_signal_handlers_restored_after_run(tmp_path):
     before_term = signal.getsignal(signal.SIGTERM)
     before_int  = signal.getsignal(signal.SIGINT)
 
-    queue = GpuQueue(gpus=[0], logger=NullLogger(), poll_interval_s=0.0, handle_signals=True)
+    queue = GpuQueue(gpus=[0], logger=SilentLogger(), poll_interval_s=0.0, handle_signals=True)
     queue.run([_job(tmp_path, "a", _ok_command())])
 
     assert signal.getsignal(signal.SIGTERM) is before_term

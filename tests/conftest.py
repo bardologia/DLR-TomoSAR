@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import contextlib
 import json
 import sys
 from pathlib import Path
 
 import numpy as np
 import pytest
+import torch
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 if str(_REPO_ROOT) not in sys.path:
@@ -19,6 +21,50 @@ _PARAMS    = _TEST_DATA / "params" / "params_k5_lam0.01_sig4_sigma"
 _HAS_DATA = _TEST_DATA.is_dir() and (_DATA / "dataset.json").is_file()
 
 
+class SilentProgress:
+
+    def add_task(self, *args, **kwargs):
+        return 0
+
+    def advance(self, *args, **kwargs):
+        pass
+
+    def update(self, *args, **kwargs):
+        pass
+
+
+class SilentLogger:
+
+    def section(self, *args, **kwargs):       pass
+    def subsection(self, *args, **kwargs):    pass
+    def debug(self, *args, **kwargs):         pass
+    def info(self, *args, **kwargs):          pass
+    def warning(self, *args, **kwargs):       pass
+    def error(self, *args, **kwargs):         pass
+    def critical(self, *args, **kwargs):      pass
+    def ok(self, *args, **kwargs):            pass
+    def render(self, *args, **kwargs):        pass
+    def panel(self, *args, **kwargs):         pass
+    def rule(self, *args, **kwargs):          pass
+    def kv_table(self, *args, **kwargs):      pass
+    def metrics_table(self, *args, **kwargs): pass
+    def close(self, *args, **kwargs):         pass
+
+    @contextlib.contextmanager
+    def timer(self, label: str):
+        yield
+
+    @contextlib.contextmanager
+    def track(self, transient: bool = False):
+        yield SilentProgress()
+
+    progress_bar = track
+
+    @contextlib.contextmanager
+    def live_monitor(self, title: str = "Training Monitor"):
+        yield SilentProgress()
+
+
 def pytest_configure(config):
     config.addinivalue_line("markers", "real_data: test depends on the transferred real SAR data under test_data/")
     config.addinivalue_line("markers", "slow: heavier test (full-frame numerics, many model forwards)")
@@ -27,6 +73,16 @@ def pytest_configure(config):
 def _require_data():
     if not _HAS_DATA:
         pytest.skip("real data not present under test_data/")
+
+
+@pytest.fixture
+def logger_stub() -> SilentLogger:
+    return SilentLogger()
+
+
+@pytest.fixture
+def force_cpu(monkeypatch):
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
 
 
 @pytest.fixture(scope="session")

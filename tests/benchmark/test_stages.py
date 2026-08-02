@@ -18,16 +18,6 @@ from tools.data.io              import FileIO
 from tools.orchestration        import QueuedInferenceStage, QueuedTrainingStage
 
 
-class _SilentLogger:
-    def __getattr__(self, name):
-        return lambda *args, **kwargs: None
-
-
-@pytest.fixture
-def logger_stub():
-    return _SilentLogger()
-
-
 @pytest.fixture
 def config(tmp_path):
     config                    = BenchmarkConfig()

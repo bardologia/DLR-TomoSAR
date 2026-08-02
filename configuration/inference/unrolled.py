@@ -24,7 +24,7 @@ class UnrolledInferenceConfig:
     log_level       : str           = "INFO"
 
     split           : str = "test"
-    checkpoint_name : str = "best.pt"
+    checkpoint_name : str = "best_model.pt"
 
     measurement_noise_std : Optional[float] = None
     chunk_cells           : int             = 4_000_000

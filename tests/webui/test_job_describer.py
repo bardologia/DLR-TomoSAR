@@ -1,15 +1,6 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pytest
-
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
 
 from job_describer import JobDescriber
 
@@ -58,7 +49,7 @@ EXTRACT_LEAVES = [
 ]
 
 
-class StubPaths:
+class KnownScriptPaths:
 
     def __init__(self, known: set[str]) -> None:
         self.known = known
@@ -80,7 +71,7 @@ class StubResolver:
 
 
 def _describer(leaves_by_key: dict, ok: bool = True) -> JobDescriber:
-    return JobDescriber(StubPaths(set(leaves_by_key)), StubResolver(leaves_by_key, ok))
+    return JobDescriber(KnownScriptPaths(set(leaves_by_key)), StubResolver(leaves_by_key, ok))
 
 
 def test_backbone_defaults_read_as_single_training():

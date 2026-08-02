@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from pathlib     import Path
 
 import numpy as np
-import torch
 
 from configuration.inference.unrolled           import UnrolledInferenceConfig
 from configuration.sar.gaussian_config          import GaussianConfig
@@ -59,18 +58,18 @@ class UnrolledRunLoader(RunArtifactLoader):
         model_config, model_name = UnrolledModelConfigIO.load(self.meta_directory)
         model, _                 = get_unrolled(model_name, config=model_config)
 
-        checkpoint_path = self.run_directory / "checkpoints" / checkpoint_name
+        checkpoint_path = self.run_directory / checkpoint_name
         if not checkpoint_path.is_file():
-            available = sorted(entry.name for entry in checkpoint_path.parent.glob("*.pt")) if checkpoint_path.parent.is_dir() else []
+            available = sorted(entry.name for entry in self.run_directory.glob("*.pt"))
             raise FileNotFoundError(f"Checkpoint '{checkpoint_path}' not found; available checkpoints: {available}")
 
-        state = torch.load(str(checkpoint_path), map_location=device, weights_only=True)
-        model.load_state_dict(state)
+        checkpoint, _x_axis, checkpoint_meta = self._load_checkpoint(checkpoint_path, device)
+        model.load_state_dict(checkpoint["params"])
 
         model = model.to(device)
         model.eval()
 
-        return model, model_name, model_config, checkpoint_path
+        return model, model_name, model_config, checkpoint_path, checkpoint_meta
 
     def _region_ground_truth(self, dataset_config, split: str, normalizer: Normalizer):
         layout  = Layout(dataset_config.preprocessing_run_directory, logger=self.logger, parameters_path=dataset_config.parameters_path)
@@ -113,7 +112,7 @@ class UnrolledRunLoader(RunArtifactLoader):
             num_workers = 0,
         )
 
-        model, model_name, model_config, checkpoint_path = self._build_unrolled_model(device, config.checkpoint_name)
+        model, model_name, model_config, checkpoint_path, checkpoint_meta = self._build_unrolled_model(device, config.checkpoint_name)
 
         norm_stats = Stats.load(self.meta_directory, self.logger)
         normalizer = Normalizer(norm_stats)
@@ -129,6 +128,7 @@ class UnrolledRunLoader(RunArtifactLoader):
         self.logger.section(f"[Unrolled Model] : '{model_name}'")
         self.logger.kv_table({
             "Checkpoint"   : checkpoint_path,
+            "Best epoch"   : f"{checkpoint_meta['best_epoch'] + 1} (val loss {checkpoint_meta['best_val_loss']:.6f})",
             "Iterations"   : model_config.n_iterations,
             "Parameters"   : sum(parameter.numel() for parameter in model.parameters()),
             "Split"        : config.split,

@@ -15,16 +15,6 @@ from tools.data.io             import FileIO
 from tools.runtime.completion  import CompletionMarker
 
 
-class _SilentLogger:
-    def __getattr__(self, name):
-        return lambda *args, **kwargs: None
-
-
-@pytest.fixture
-def logger_stub():
-    return _SilentLogger()
-
-
 def _write_json(path: Path, payload) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload), encoding="utf-8")

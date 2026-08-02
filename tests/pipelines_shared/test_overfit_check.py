@@ -10,13 +10,7 @@ import torch
 from configuration.training                  import OverfitCheckConfig, ProfileAeTrainerConfig
 from pipelines.shared.training.overfit_check import OverfitCheck
 
-
-class _NullLogger:
-    def section(self, *a, **k):    pass
-    def subsection(self, *a, **k): pass
-    def info(self, *a, **k):       pass
-    def warning(self, *a, **k):    pass
-    def kv_table(self, *a, **k):   pass
+from tests.conftest import SilentLogger
 
 
 class _StubTrainer:
@@ -67,11 +61,11 @@ class _ArchConfig:
 
 def _check(tmp_path, **overrides):
     config = OverfitCheckConfig(enabled=True, **overrides)
-    return OverfitCheck(config, tmp_path, _NullLogger())
+    return OverfitCheck(config, tmp_path, SilentLogger())
 
 
 def test_disabled_check_is_inert(tmp_path):
-    check = OverfitCheck(OverfitCheckConfig(), tmp_path, _NullLogger())
+    check = OverfitCheck(OverfitCheckConfig(), tmp_path, SilentLogger())
 
     assert check.enabled is False
     assert check.rng     is None

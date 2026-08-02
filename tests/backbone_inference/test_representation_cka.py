@@ -6,10 +6,7 @@ import pytest
 from configuration.diagnostics                       import CkaConfig
 from pipelines.backbone.inference.representation_cka import CkaComparison, CkaComputation
 
-
-class _SilentLogger:
-    def __getattr__(self, name):
-        return lambda *args, **kwargs: None
+from tests.conftest import SilentLogger
 
 
 def _features(n: int = 200, d: int = 8, seed: int = 0) -> np.ndarray:
@@ -62,7 +59,7 @@ def test_alignment_score_of_identity_matrix_is_one():
 
 
 def test_alignment_is_validated_from_sample_grids(tmp_path):
-    comparison = CkaComparison(CkaConfig(output_dir=tmp_path), _SilentLogger())
+    comparison = CkaComparison(CkaConfig(output_dir=tmp_path), SilentLogger())
 
     grid    = ((1000, 2000, 500, 900), (64, 32), (32, 16))
     strided = ((1000, 2000, 500, 900), (64, 32), (64, 32))

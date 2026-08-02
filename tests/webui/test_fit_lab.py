@@ -3,18 +3,11 @@ from __future__ import annotations
 import importlib.util
 import json
 import struct
-import sys
 import time
 from pathlib import Path
 
 import numpy as np
 import pytest
-
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
 
 from fit_lab    import FitLab
 from web_logger import WebLogger

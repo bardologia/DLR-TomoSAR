@@ -1,14 +1,5 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
-
 from request_router import RequestRouter
 
 

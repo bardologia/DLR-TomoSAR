@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-import torch
 
 from configuration.dataset                import DatasetConfig, InputConfig, PatchConfig, Representation, SplitRegions
 from configuration.sar.gaussian_config    import GaussianConfig
@@ -12,9 +11,7 @@ from tools.data.regions                   import CropRegion
 from tests.backbone_training._helpers import geometry_config
 
 
-@pytest.fixture(autouse=True)
-def force_cpu(monkeypatch):
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+pytestmark = pytest.mark.usefixtures("force_cpu")
 
 
 def _dataset_config(test_data_dir, params_dir) -> DatasetConfig:

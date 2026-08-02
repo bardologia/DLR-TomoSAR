@@ -13,9 +13,7 @@ from tests.backbone_training._helpers import identity_normalizer, tiny_model, ti
 from tools.monitoring.logger import Logger
 
 
-@pytest.fixture(autouse=True)
-def force_cpu(monkeypatch):
-    monkeypatch.setattr(torch.cuda, "is_available", lambda: False)
+pytestmark = pytest.mark.usefixtures("force_cpu")
 
 
 def _loader(in_channels: int = 2, n_gaussians: int = 2, n: int = 6, hw: int = 16) -> DataLoader:

@@ -2,21 +2,12 @@ from __future__ import annotations
 
 import json
 import sys
-import time
 from dataclasses import fields
 from pathlib     import Path
 
 import pytest
 
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
-
-from notifier        import JobNotifier
 from process_manager import ProcessManager
-from web_logger      import WebLogger
 
 from configuration.benchmark.general        import BenchmarkConfig
 from configuration.cross_validation.general import CrossValidationConfig
@@ -25,7 +16,7 @@ from configuration.patch_sweep.general      import PatchSweepConfig
 from configuration.training                 import BackboneEntryConfig, DualEntryConfig, ImageAeEntryConfig, JepaEntryConfig, ProfileAeEntryConfig, UnrolledEntryConfig
 from configuration.tuning.general           import TuningEntryConfig
 
-SLEEP_LONG = "import time\ntime.sleep(30)\n"
+from tests.webui.conftest import SLEEP_LONG, wait_for_status, wait_until_finished
 
 _SCHEDULING_PAGES = [
     ("train_backbone",            BackboneEntryConfig),
@@ -46,51 +37,9 @@ _SCHEDULING_PAGES = [
 ]
 
 
-class StubPaths:
-
-    def __init__(self, root: Path) -> None:
-        self.repo_root     = root
-        self.main_dir      = root / "main"
-        self.logs_dir      = root / "logs"
-        self.gpu_pools_dir = root / "logs" / "gpu_pools"
-
-    def has_script(self, key: str) -> bool:
-        return (self.main_dir / "analysis" / f"{key}.py").exists()
-
-    def script_entry(self, key: str) -> dict:
-        path = self.main_dir / "analysis" / f"{key}.py"
-        return {"path": path, "rel": f"main/analysis/{key}.py"}
-
-
-class StubDescriber:
-
-    def describe(self, key: str, interpreter: str, overrides: dict | None) -> str:
-        return f"stub description for {key}"
-
-
 @pytest.fixture
-def manager(tmp_path):
-    scripts = tmp_path / "main" / "analysis"
-    scripts.mkdir(parents=True)
-    (scripts / "train_backbone.py").write_text(SLEEP_LONG)
-    (scripts / "train_dual.py").write_text(SLEEP_LONG)
-    (scripts / "sweep_patches.py").write_text(SLEEP_LONG)
-    (scripts / "train_jepa.py").write_text(SLEEP_LONG)
-    (scripts / "tune_dataloader.py").write_text(SLEEP_LONG)
-
-    paths  = StubPaths(tmp_path)
-    logger = WebLogger()
-    yield ProcessManager(paths, logger, JobNotifier(paths, logger), StubDescriber())
-
-
-def _wait_running(manager: ProcessManager, job_id: str, timeout: float = 10.0) -> bool:
-    deadline = time.monotonic() + timeout
-    while time.monotonic() < deadline:
-        with manager.lock:
-            if manager.jobs[job_id]["status"] == "running":
-                return True
-        time.sleep(0.05)
-    return False
+def manager(make_manager):
+    return make_manager({name: SLEEP_LONG for name in ("train_backbone", "train_dual", "sweep_patches", "train_jepa", "tune_dataloader")})
 
 
 def _pool_path(manager: ProcessManager, job_id: str) -> Path:
@@ -145,7 +94,7 @@ def test_set_gpus_writes_the_pool_file_of_a_running_fan_out(manager):
     result = manager.launch("train_backbone", sys.executable)
     job_id = result["job_id"]
 
-    assert _wait_running(manager, job_id)
+    assert wait_for_status(manager, job_id, "running")
 
     pool = _pool_path(manager, job_id)
     pool.parent.mkdir(parents=True, exist_ok=True)
@@ -164,7 +113,7 @@ def test_set_gpus_refuses_a_job_that_seeded_no_pool(manager):
     result = manager.launch("train_backbone", sys.executable)
     job_id = result["job_id"]
 
-    assert _wait_running(manager, job_id)
+    assert wait_for_status(manager, job_id, "running")
 
     applied = manager.set_gpus(job_id, [0, 1])
 
@@ -179,7 +128,7 @@ def test_set_gpus_parks_only_when_parking_is_confirmed(manager):
     result = manager.launch("train_backbone", sys.executable)
     job_id = result["job_id"]
 
-    assert _wait_running(manager, job_id)
+    assert wait_for_status(manager, job_id, "running")
 
     pool = _pool_path(manager, job_id)
     pool.parent.mkdir(parents=True, exist_ok=True)
@@ -215,7 +164,7 @@ def test_set_gpus_rejects_an_invalid_selection(manager, gpus, reason):
     result = manager.launch("train_backbone", sys.executable)
     job_id = result["job_id"]
 
-    assert _wait_running(manager, job_id)
+    assert wait_for_status(manager, job_id, "running")
 
     pool = _pool_path(manager, job_id)
     pool.parent.mkdir(parents=True, exist_ok=True)
@@ -234,15 +183,10 @@ def test_set_gpus_refuses_a_finished_job(manager):
     result = manager.launch("train_backbone", sys.executable)
     job_id = result["job_id"]
 
-    assert _wait_running(manager, job_id)
+    assert wait_for_status(manager, job_id, "running")
     manager.stop(job_id)
 
-    deadline = time.monotonic() + 10.0
-    while time.monotonic() < deadline:
-        with manager.lock:
-            if manager.jobs[job_id]["status"] != "running":
-                break
-        time.sleep(0.05)
+    assert wait_until_finished(manager, job_id)
 
     applied = manager.set_gpus(job_id, [0, 1])
 

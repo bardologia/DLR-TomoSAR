@@ -20,15 +20,7 @@ from pipelines.dataloader_tuning.adapters import (
 )
 from tools.data.gaussians import GaussianMixture
 
-
-class _SilentLogger:
-    def __getattr__(self, name):
-        return lambda *args, **kwargs: None
-
-
-@pytest.fixture
-def logger_stub():
-    return _SilentLogger()
+from tests.conftest import SilentLogger
 
 
 def test_feed_modes_match_adapter_registry():
@@ -177,6 +169,6 @@ def test_build_feed_target_dispatches_to_synthetic(logger_stub, tmp_path):
 
 
 def test_real_data_adapters_default_models_are_distinct():
-    assert ProfileFeedAdapter(DataLoaderTuningEntryConfig(mode="profile_autoencoder"), ".", _SilentLogger()).model_name == DEFAULT_MODEL["profile_autoencoder"]
-    assert ImageFeedAdapter(DataLoaderTuningEntryConfig(mode="image_autoencoder"), ".", _SilentLogger()).model_name     == DEFAULT_MODEL["image_autoencoder"]
-    assert BackboneFeedAdapter(DataLoaderTuningEntryConfig(mode="backbone"), ".", _SilentLogger()).model_name           == DEFAULT_MODEL["backbone"]
+    assert ProfileFeedAdapter(DataLoaderTuningEntryConfig(mode="profile_autoencoder"), ".", SilentLogger()).model_name == DEFAULT_MODEL["profile_autoencoder"]
+    assert ImageFeedAdapter(DataLoaderTuningEntryConfig(mode="image_autoencoder"), ".", SilentLogger()).model_name     == DEFAULT_MODEL["image_autoencoder"]
+    assert BackboneFeedAdapter(DataLoaderTuningEntryConfig(mode="backbone"), ".", SilentLogger()).model_name           == DEFAULT_MODEL["backbone"]

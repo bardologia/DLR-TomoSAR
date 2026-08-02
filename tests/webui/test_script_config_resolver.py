@@ -4,18 +4,13 @@ import ast
 import json
 import subprocess
 import sys
-from pathlib import Path
 
 import pytest
 
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
-
 from configuration.training.general.ablation import AblationCatalog
 from script_config_resolver                  import ScriptConfigResolver
+
+from tests.webui.conftest import REPO_ROOT
 
 
 @pytest.fixture(scope="module")

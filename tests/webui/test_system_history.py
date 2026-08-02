@@ -1,18 +1,8 @@
 from __future__ import annotations
 
-import sys
-from pathlib import Path
-
 import pytest
 
-REPO_ROOT  = Path(__file__).resolve().parents[2]
-WEBUI_ROOT = REPO_ROOT / "webui"
-
-if str(WEBUI_ROOT) not in sys.path:
-    sys.path.insert(0, str(WEBUI_ROOT))
-
-from system_monitor import ActiveUsers, SystemHistory, SystemMonitor
-from web_logger     import WebLogger
+from system_monitor import SystemHistory
 
 FAKE_DEVICES = [
     {"index": 0, "util": 50,   "mem_used": 8000, "mem_total": 16000, "name": "GPU A", "temp": 40, "power": 30, "power_limit": 90, "uuid": "GPU-a"},
@@ -20,24 +10,9 @@ FAKE_DEVICES = [
 ]
 
 
-class StubPaths:
-
-    def __init__(self, root: Path) -> None:
-        self.repo_root = root
-
-
 @pytest.fixture
-def monitor(tmp_path, monkeypatch):
-    monkeypatch.setattr(SystemMonitor, "_du_loop", lambda self: None)
-    monkeypatch.setattr(SystemHistory, "sample_loop", lambda self: None)
-    monkeypatch.setattr(ActiveUsers, "sample_loop", lambda self: None)
-    instance = SystemMonitor(StubPaths(tmp_path), WebLogger())
-    monkeypatch.setattr(instance, "_gpu_devices", lambda: FAKE_DEVICES)
-    return instance
-
-
-@pytest.fixture
-def history(monitor):
+def history(monitor, monkeypatch):
+    monkeypatch.setattr(monitor, "_gpu_devices", lambda: FAKE_DEVICES)
     return SystemHistory(monitor)
 
 
