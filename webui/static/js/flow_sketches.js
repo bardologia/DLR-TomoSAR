@@ -774,7 +774,7 @@ window.FLOW_SKETCHES = {
   },
 
   paramterms: {
-    tip: "GT sorts by mu, empty slots mask to zero weight; Param-L1 is active-normalised in normalised space, TV penalises roughness.",
+    tip: "GT sorts by mu and predictions are permuted onto it by optimal assignment (hungarian, the default); empty slots mask to zero weight. Param-L1 is active-normalised in normalised space, TV penalises roughness.",
     build(svg) { svg.innerHTML = `
       <rect x="34" y="42" width="22" height="20" rx="2" class="skl-pop f-cal"/>
       <rect x="34" y="66" width="22" height="20" rx="2" class="skl-pop f-cal"/>

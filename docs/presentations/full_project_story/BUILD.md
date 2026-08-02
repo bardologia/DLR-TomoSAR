@@ -2523,8 +2523,8 @@ All builds run inside this directory (images resolve via `../../results/...`).
 
 - STEP 8 SHRINKAGE-TO-COLLAPSE CORRECTION 2026-07-10 (audit: the "pi·E < tau"
   bridge fails arithmetically — pi = 0.26 measured, amplitude scale O(0.1–1)
-  per the ablation table's a-MAE 0.33–0.72, tau = ACTIVE_AMP_THR = 1e-3, so
-  conditional-mean shrinkage lands at ~0.03–0.13, two orders ABOVE the
+  per the ablation table's a-MAE 0.33–0.72, tau = ACTIVE_AMP_THR = 1e-4, so
+  conditional-mean shrinkage lands at ~0.03–0.13, more than two orders ABOVE the
   threshold; a head that truly converged to the conditional mean would keep
   every second slot active and the paradox would not exist. The measured
   state is stronger than shrinkage: the trained conv head collapses slot 2
@@ -2543,7 +2543,7 @@ All builds run inside this directory (images resolve via `../../results/...`).
   both from the ablation table — recall inversions only bind at matched
   precision); the faint-pixel burial paragraph REPLACED by "Past the mean,
   onto the floor" — even total doubt stops the mean at 0.26·E, orders above
-  tau = 1e-3, shrinkage cannot bury a slot, yet the measured active counts
+  tau = 1e-4, shrinkage cannot bury a slot, yet the measured active counts
   (results/extra_tracks_exp/metrics_comparison(1).md: baseline
   active_count_pred_mean 1.01 vs GT 1.2605, count_under_frac 0.31438;
   phi-only 1.2965 / 0.052993) show the slot buried on ~every pair pixel:
@@ -3703,7 +3703,7 @@ All builds run inside this directory (images resolve via `../../results/...`).
   normalization slide never defines what an active pixel is, and the visualization is too
   vague). A definition strip now spans the top of the frame, above both columns: "Active
   slot = the GT placed a real scatterer in it: m_{p,k} = 1[a^GT_{p,k} > tau]", with a soft
-  subline giving tau = 1e-3 linear amplitude (ParamMatcher.ACTIVE_AMP_THR in
+  subline giving tau = 1e-4 linear amplitude (ParamMatcher.ACTIVE_AMP_THR in
   tools/loss/param_loss.py), "empty slots carry a=0", and the pixel-level corollary (a
   pixel is active when any of its K slots is). The left panel's old strip of 10
   undifferentiated boxes (2 filled, nothing saying what a box was) became a concrete batch:

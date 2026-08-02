@@ -605,10 +605,11 @@ class FlowLibrary:
             },
             {
                 "id": "paramterms", "title": "Parameter-space terms", "phase": "Parameter loss",
-                "note": "The default sorted-GT matching orders GT slots by mu among active components (inactive amplitudes < 1e-3 pushed to the end); inactive slots mask their mu and sigma to zero so empty slots contribute amplitude only. Param-L1 (the default supervised term) is active-normalised in normalised space; TV is an optional roughness penalty.",
+                "note": "The default hungarian matching first orders GT slots by mu among active components (amplitudes at or below amp_zero_thr = 1e-4 pushed to the end), then permutes each pixel's predicted slots onto the GT slots by the optimal assignment, found by enumerating all K! permutations of the active-weighted L1 cost; the loss is therefore invariant to the predicted slot order. Under the opt-in sorted_gt mode the GT sort still happens but predictions keep their slot order, so each slot learns a fixed height rank. Inactive slots mask their mu and sigma to zero so empty slots contribute amplitude only. Param-L1 (the default supervised term) is active-normalised in normalised space; TV is an optional roughness penalty.",
                 "inputs": ["thrn", "gtp"], "outputs": ["lj"],
                 "lines": [
-                    [{"id": "lj", "tex": r"\ell_{\mathrm{p\text{-}L1}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{\sum w_p\,m\,|\,\tilde{\theta}_{\mathrm{n}} - \theta^{\mathrm{GT}}\,|}{\sum w_p\,m},\quad m = \mathbb{1}[a^{\mathrm{GT}} > 10^{-3}]\ (\mu,\sigma)"}],
+                    [{"tex": r"\pi^{\star} = \operatorname*{arg\,min}_{\pi \in S_K}\ \textstyle\sum_k \mathbb{1}[a^{\mathrm{GT}}_k > 10^{-4}]\,\big|\tilde{\theta}_{\pi(k)} - \theta^{\mathrm{GT}}_{k}\big|_1"}],
+                    [{"id": "lj", "tex": r"\ell_{\mathrm{p\text{-}L1}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{\sum w_p\,m\,|\,\tilde{\theta}_{\mathrm{n}} - \theta^{\mathrm{GT}}\,|}{\sum w_p\,m},\quad m = \mathbb{1}[a^{\mathrm{GT}} > 10^{-4}]\ (\mu,\sigma)"}],
                     [{"tex": r"\ell_{\mathrm{TV}} = \overline{|\tilde\theta_{h}-\tilde\theta_{h-1}|} + \overline{|\tilde\theta_{w}-\tilde\theta_{w-1}|}"}],
                 ],
             },
@@ -631,9 +632,9 @@ class FlowLibrary:
             },
             {
                 "id": "adamw", "title": "AdamW update", "phase": "Optimiser step",
-                "note": "Bias-corrected adaptive moments (betas 0.9/0.999, eps 1e-8) with decoupled weight decay 0.1 and per-group learning rates; the epoch loop drives the training loss down over many steps, with optional EMA shadow weights.",
+                "note": "Bias-corrected adaptive moments (betas 0.9/0.999, eps 1e-8) with per-group learning rates and per-group decoupled weight decay (1e-4 for the UNet, UNet-skip and ResUNet families, 5e-3 or 1e-2 for some transformer backbones); the OptimizerConfig.weight_decay = 0.1 field is only a fallback for groups that carry no decay of their own, which no architecture config leaves unset. The epoch loop drives the training loss down over many steps, with optional EMA shadow weights.",
                 "inputs": ["grad", "eta"], "outputs": ["w"],
-                "iterative": {"var": "loss", "steps": 100, "unit": "epoch", "symbol": "L",
+                "iterative": {"var": "loss", "steps": 60, "unit": "epoch", "symbol": "L",
                               "trace": ["4.1e-2", "2.7e-2", "1.9e-2", "1.4e-2", "1.1e-2", "9.6e-3"]},
                 "lines": [
                     [{"tex": r"\hat m_t = \tfrac{m_t}{1-\beta_1^t},\quad \hat v_t = \tfrac{v_t}{1-\beta_2^t}"}],
@@ -642,7 +643,7 @@ class FlowLibrary:
             },
             {
                 "id": "schedule", "title": "Warmup, cosine schedule, curriculum", "phase": "Schedule & curriculum",
-                "note": "Each group's effective LR is its base rate times the per-epoch cosine factor (T=100, eta_min=1e-6) times the per-step warmup factor (200 steps from start factor 0.1); at swap epoch 15 the loss curriculum moves from the warmup objective to the complete objective, and with the curriculum disabled the complete objective runs from the first epoch.",
+                "note": "Each group's effective LR is its base rate times the per-epoch cosine factor (T = scheduler.epochs, which ConfigFactory installs from training.epochs = 60 unless scheduler_epochs is set, so the standalone SchedulerConfig default of 100 is never what a run gets; eta_min = 1e-6) times the per-step warmup factor (200 steps from start factor 0.1); at swap epoch 15 the loss curriculum moves from the warmup objective to the complete objective, and with the curriculum disabled the complete objective runs from the first epoch.",
                 "inputs": [], "outputs": ["eta"],
                 "lines": [
                     [{"tex": r"F(t) = \tfrac{\eta_{\min}}{\eta_0} + \tfrac12\big(1 - \tfrac{\eta_{\min}}{\eta_0}\big)\big(1 + \cos\tfrac{\pi\min(t,T)}{T}\big)"}],
@@ -651,7 +652,7 @@ class FlowLibrary:
             },
             {
                 "id": "checkpoint", "title": "Validation and checkpoint", "phase": "Eval & checkpoint",
-                "note": "Evaluation runs every 5 epochs (EMA weights when enabled); the best epoch is checkpointed on strict improvement and early stopping reverts to it after 15 evaluations without a new minimum. The best-loss baseline resets across a curriculum swap.",
+                "note": "Evaluation runs every validation_frequency epochs, which the entry point sets to 1 (EMA weights when enabled); the best epoch is checkpointed on strict improvement and early stopping reverts to it after early_stop_patience = 30 evaluations without a new minimum. The best-loss baseline resets across a curriculum swap.",
                 "inputs": ["w"], "outputs": ["wbest"],
                 "lines": [
                     [{"id": "wbest", "tex": r"\theta^{\star}", "role": "final"}, {"tex": "="}, {"tex": r"\operatorname*{arg\,min}_{t}\ \mathcal{L}_{\mathrm{val}}("}, {"id": "w", "tex": r"\theta_t", "role": "intermediate"}, {"tex": r")"}],
@@ -661,6 +662,114 @@ class FlowLibrary:
         return {
             "key": "training", "name": "Training (Supervised backbone)",
             "blurb": "One forward pass predicts all Gaussian parameters; predictions are denormalised, physically clamped and renormalised, then a weight-normalised composite over curve, parameter and optional physics terms is backpropagated through AdamW with linear warmup, cosine annealing, a two-phase loss curriculum, gradient clipping and early stopping.",
+            "nodes": nodes, "steps": steps,
+        }
+
+    def _dual_train(self) -> dict:
+        nodes = [
+            {"id": "xhat",   "tex": r"\hat{\mathbf{x}}",          "role": "measured",     "kind": "tensor", "shape": "B x C_in x P x P", "desc": "normalised input batch: primary magnitude, secondary magnitudes, interferogram phases", "sample": [["0.41", "-0.20"], ["-0.33", "0.27"]]},
+            {"id": "keys",   "tex": r"\mathcal{K}",               "role": "intermediate", "kind": "vector", "shape": "C_in",             "desc": "per-channel group keys from InputConfig.channel_group_keys",                            "sample": ["pass/mag", "pass/mag", "ifg/angle", "..."]},
+            {"id": "xp",     "tex": r"\hat{\mathbf{x}}^{P}",      "role": "intermediate", "kind": "tensor", "shape": "B x C_P x P x P",  "desc": "channels routed to the parameter trunk (params_input groups)",                          "sample": [["0.41", "-0.20"], ["0.15", "0.62"]]},
+            {"id": "xe",     "tex": r"\hat{\mathbf{x}}^{E}",      "role": "intermediate", "kind": "tensor", "shape": "B x C_E x P x P",  "desc": "channels routed to the existence trunk (existence_input groups)",                       "sample": [["0.41", "-0.20"], ["0.15", "0.62"]]},
+            {"id": "zp",     "tex": r"\mathbf{z}^{P}",            "role": "calculated",   "kind": "tensor", "shape": "B x D_P x P x P",  "desc": "parameter-trunk decoder embedding (headless backbone output)",                          "sample": [["0.72", "0.11"], ["-0.34", "0.58"]]},
+            {"id": "ze",     "tex": r"\mathbf{z}^{E}",            "role": "calculated",   "kind": "tensor", "shape": "B x D_E x P x P",  "desc": "existence-trunk decoder embedding (headless backbone output)",                          "sample": [["0.19", "-0.42"], ["0.63", "0.07"]]},
+            {"id": "uk",     "tex": r"\mathbf{u}_k",              "role": "intermediate", "kind": "tensor", "shape": "B x K x 3 x P x P","desc": "per-slot head output: raw amplitude, mu and sigma in normalised space",                 "sample": [["0.83", "0.55", "0.31"], ["0.12", "0.74", "0.44"]]},
+            {"id": "gate",   "tex": r"\mathbf{g}",                "role": "calculated",   "kind": "tensor", "shape": "B x K x P x P",    "desc": "per-slot existence gate in (0, 1) from the existence trunk",                            "sample": [["0.97", "0.04"], ["0.91", "0.62"]]},
+            {"id": "aoff",   "tex": r"\mathbf{b}",                "role": "intermediate", "kind": "vector", "shape": "K",                "desc": "learned closed-gate amplitude offset amp_off, initialised to zero",                     "sample": ["-0.02", "0.01"]},
+            {"id": "thn",    "tex": r"\hat{\theta}_{\mathrm{n}}", "role": "calculated",   "kind": "tensor", "shape": "B x 3K x P x P",   "desc": "interleaved normalised parameter output, identical in layout to the backbone output",   "sample": ["0.81", "0.55", "0.31", "..."]},
+            {"id": "loss",   "tex": r"\mathcal{L}",               "role": "calculated",   "kind": "scalar", "shape": "1",                "desc": "weight-normalised composite loss, the same catalog the backbone uses",                  "sample": "4.4e-2"},
+            {"id": "groups", "tex": r"\{g_P, g_E, g_H\}",         "role": "intermediate", "kind": "set",    "shape": "3",                "desc": "AdamW parameter groups: parameter trunk, existence trunk, output head",                 "sample": ["params_trunk", "existence_trunk", "output_head"]},
+            {"id": "wbest",  "tex": r"\theta^{\star}",            "role": "final",        "kind": "vector", "shape": "|theta|",          "desc": "best-epoch checkpointed dual-trunk weights",                                            "sample": ["0.30", "-0.09", "..."]},
+        ]
+        steps = [
+            {
+                "id": "dual_keys", "title": "Channel group keys", "phase": "A - Input routing",
+                "note": "The dataset stack labels every input channel with a group key: the primary magnitude and the secondary magnitudes are pass/*, the interferogram channels are ifg/*. TrunkChannelMap infers the track count that reproduces in_channels under the active InputConfig and raises when that count is not unique. The dual pipeline refuses input.use_dem, so no dem/* key can appear.",
+                "inputs": ["xhat"], "outputs": ["keys"],
+                "lines": [
+                    [{"id": "keys", "tex": r"\mathcal{K}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\big(\underbrace{\mathtt{pass}/\ast}_{1 + N_s},\ \underbrace{\mathtt{ifg}/\ast}_{N_i}\big),\qquad C_{\mathrm{in}} = 1 + N_s + N_i = 9\ \text{for the default stack}"}],
+                ],
+            },
+            {
+                "id": "dual_route", "title": "Trunk input routing", "phase": "A - Input routing",
+                "note": "params_input and existence_input each select a subset of the groups {pass, ifg}; the resolved index tuples are stored as the params_channels and existence_channels buffers and applied with index_select. The shipped default is full-full, meaning both trunks see all nine channels; the routing trials mode enumerates the seven asymmetric variants (pass-full, full-pass, ifg-full, full-ifg, pass-ifg, ifg-pass and full-full).",
+                "inputs": ["xhat", "keys"], "outputs": ["xp", "xe"],
+                "lines": [
+                    [{"id": "xp", "tex": r"\hat{\mathbf{x}}^{P}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\hat{\mathbf{x}}\big[\,\mathcal{C}_P\,\big],\qquad \mathcal{C}_P = \{\,c : \mathrm{group}(\mathcal{K}_c) \in \mathtt{params\_input}\,\}"}],
+                    [{"id": "xe", "tex": r"\hat{\mathbf{x}}^{E}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\hat{\mathbf{x}}\big[\,\mathcal{C}_E\,\big],\qquad \mathcal{C}_E = \{\,c : \mathrm{group}(\mathcal{K}_c) \in \mathtt{existence\_input}\,\}"}],
+                ],
+            },
+            {
+                "id": "dual_trunks", "title": "Two independent trunks", "phase": "B - Trunks",
+                "note": "Each trunk is any architecture from the backbone zoo, built with head = 'none' so its encode_decode returns the decoder embedding instead of parameters. The trunks share no weights and no activations. Both default to unet_skip; params_features and existence_features resize their feature ladders, and per-trunk overrides reach any remaining field of the trunk config except the six reserved ones the dual model sets itself (in_channels, out_channels, params_per_gaussian, head, init_mode, features).",
+                "inputs": ["xp", "xe"], "outputs": ["zp", "ze"],
+                "lines": [
+                    [{"id": "zp", "tex": r"\mathbf{z}^{P}", "role": "calculated"}, {"tex": "="}, {"tex": r"f_{P}\big("}, {"id": "xp", "tex": r"\hat{\mathbf{x}}^{P}", "role": "intermediate"}, {"tex": r"\big),\qquad"}, {"id": "ze", "tex": r"\mathbf{z}^{E}", "role": "calculated"}, {"tex": "="}, {"tex": r"f_{E}\big("}, {"id": "xe", "tex": r"\hat{\mathbf{x}}^{E}", "role": "intermediate"}, {"tex": r"\big)"}],
+                    [{"tex": r"\text{features}_P = [64, 128, 248, 472],\quad \text{features}_E = [24, 48, 84, 156]\ \Rightarrow\ D_P = 64,\ D_E = 24"}],
+                ],
+            },
+            {
+                "id": "dual_capacity", "title": "Capacity split between the arms", "phase": "B - Trunks",
+                "note": "The two feature ladders set how the parameter budget is divided. The shipped defaults are the 90-10 rung of ratio_trials: 28.06 M weights in the parameter arm (parameter trunk plus the per-slot heads) against 3.12 M in the existence arm (existence trunk, existence head and amp_off), an exact 90.0 / 10.0 split. The ratio trials mode sweeps 50-50, 60-40, 70-30, 80-20 and 90-10 at a matched total, with match_tolerance = 0.01 guarding the parity.",
+                "inputs": ["zp", "ze"], "outputs": ["zp", "ze"],
+                "lines": [
+                    [{"tex": r"\rho = \dfrac{|f_P| + |h_{1..K}|}{|f_P| + |h_{1..K}| + |f_E| + |h_{\mathrm{ex}}| + K} = \dfrac{28.06\,\mathrm{M}}{31.18\,\mathrm{M}} = 0.900"}],
+                ],
+            },
+            {
+                "id": "dual_heads", "title": "Per-slot parameter heads", "phase": "C - Dual set-prediction head",
+                "note": "The parameter embedding feeds K independent pixelwise MLPs, one per Gaussian slot, each a 1x1 convolution to max(D_P/2, 16) hidden channels, a ReLU and a 1x1 convolution to the three parameters of that slot. set_pred is the only head the dual model accepts; any other head value raises at construction.",
+                "inputs": ["zp"], "outputs": ["uk"],
+                "lines": [
+                    [{"id": "uk", "tex": r"\mathbf{u}_k", "role": "intermediate"}, {"tex": "="}, {"tex": r"W^{(k)}_2\,\mathrm{ReLU}\big(W^{(k)}_1\,"}, {"id": "zp", "tex": r"\mathbf{z}^{P}", "role": "calculated"}, {"tex": r" + b^{(k)}_1\big) + b^{(k)}_2,\qquad k = 1,\dots,K"}],
+                ],
+            },
+            {
+                "id": "dual_gate", "title": "Existence gate and amplitude blend", "phase": "C - Dual set-prediction head",
+                "note": "The existence embedding feeds one pixelwise MLP that emits K logits, squashed by a sigmoid into per-slot occupancy gates. Only the amplitude channel is gated: it is a convex blend of the predicted amplitude and the learned per-slot offset amp_off, so a closed gate drives the slot towards its learned empty value while mu and sigma pass through untouched. The split lets the occupancy decision and the placement decision read different channels and be sized independently: the routing trials vary which groups feed which trunk, the ratio trials vary how much capacity each arm gets.",
+                "inputs": ["ze", "uk", "aoff"], "outputs": ["gate", "thn"],
+                "lines": [
+                    [{"id": "gate", "tex": r"\mathbf{g}", "role": "calculated"}, {"tex": "="}, {"tex": r"\sigma\big(h_{\mathrm{ex}}("}, {"id": "ze", "tex": r"\mathbf{z}^{E}", "role": "calculated"}, {"tex": r")\big) \in (0,1)^{K}"}],
+                    [{"tex": r"\hat{a}_k = g_k\,u_{k,1} + (1 - g_k)\,"}, {"id": "aoff", "tex": r"b_k", "role": "intermediate"}, {"tex": r",\qquad (\hat{\mu}_k, \hat{\sigma}_k) = (u_{k,2},\ u_{k,3})"}],
+                ],
+            },
+            {
+                "id": "dual_assemble", "title": "Interleaved output tensor", "phase": "C - Dual set-prediction head",
+                "note": "The gated slots are stacked and flattened back into the interleaved 3K channel layout the rest of the stack expects, so everything downstream (denormalisation, physical clamping, the loss catalog, inference, the cube explorer) treats a dual run exactly like a backbone run.",
+                "inputs": ["gate", "uk"], "outputs": ["thn"],
+                "lines": [
+                    [{"id": "thn", "tex": r"\hat{\theta}_{\mathrm{n}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\big(\hat{a}_1, \hat{\mu}_1, \hat{\sigma}_1,\ \dots,\ \hat{a}_K, \hat{\mu}_K, \hat{\sigma}_K\big),\qquad 3K = C_{\mathrm{out}}"}],
+                ],
+            },
+            {
+                "id": "dual_loss", "title": "Shared composite loss", "phase": "D - Loss and optimisation",
+                "note": "The dual curriculum is the backbone curriculum: the same two-phase warmup and complete stages, the same weight-normalised composite over curve, parameter and optional physics terms, and hungarian matching in both stages. The full training flow documents every term; nothing in the loss is dual-specific.",
+                "inputs": ["thn"], "outputs": ["loss"],
+                "lines": [
+                    [{"id": "loss", "tex": r"\mathcal{L}", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{\sum_j \alpha_j\,\ell_j}{\sum_j \alpha_j},\qquad \text{matching} = \mathtt{hungarian}"}],
+                ],
+            },
+            {
+                "id": "dual_groups", "title": "Three-group AdamW", "phase": "D - Loss and optimisation",
+                "note": "get_param_groups splits the model into the parameter trunk, the existence trunk and the output head, each with its own learning rate and weight decay (3e-4 / 3e-4 / 1e-3 and 1e-4 throughout). All six values are exposed to the tuner over a log-uniform range. Warmup, cosine annealing, gradient clipping, EMA, early stopping and checkpointing are the shared trainer components.",
+                "inputs": ["loss"], "outputs": ["groups", "wbest"],
+                "lines": [
+                    [{"id": "groups", "tex": r"\{g_P, g_E, g_H\}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\big\{(f_P;\ 3\!\times\!10^{-4}, 10^{-4}),\ (f_E;\ 3\!\times\!10^{-4}, 10^{-4}),\ (h;\ 10^{-3}, 10^{-4})\big\}"}],
+                    [{"id": "wbest", "tex": r"\theta^{\star}", "role": "final"}, {"tex": "="}, {"tex": r"\operatorname*{arg\,min}_{t}\ \mathcal{L}_{\mathrm{val}}(\theta_t)"}],
+                ],
+            },
+            {
+                "id": "dual_persist", "title": "Run naming, persistence and trials", "phase": "E - Run artifacts",
+                "note": "The run name carries both trunks: dual_<params>.<existence>, collapsed to dual_<backbone> when they match, followed by the head, matching, slot count, augmentation and presence tags and a routing tag built from the two group labels (full.full by default). DualModelConfigIO writes dual_model_config.json under meta/ so inference reconstructs both trunks faithfully. Beyond the shared trial modes, the dual scheduler adds routing (which channel groups feed which trunk) and ratio (how the parameter budget splits).",
+                "inputs": ["wbest"], "outputs": ["wbest"],
+                "lines": [
+                    [{"tex": r"\texttt{dual\_unet\_skip-set\_pred-hungarian-K2-...-full.full}"}],
+                ],
+            },
+        ]
+        return {
+            "key": "dual_train", "name": "Dual Trunks (Train)",
+            "blurb": "Two independent backbones read their own slice of the input stack: the parameter trunk feeds K per-slot MLP heads that place the Gaussians, the existence trunk feeds one head whose sigmoid gate decides which slots are occupied, and the gate blends each amplitude with a learned empty-slot offset. The output is the same interleaved 3K tensor a backbone produces, so the loss catalog, the curriculum and the whole inference stack are shared; only the routing of channels to trunks and the capacity split between the two arms are new axes.",
             "nodes": nodes, "steps": steps,
         }
 
@@ -783,10 +892,10 @@ class FlowLibrary:
             },
             {
                 "id": "pae_schedule", "title": "Warmup and cosine schedule", "phase": "E - Optimiser step",
-                "note": "Each group's effective LR is its base rate times the cosine-annealing factor toward eta_min = 1e-6 over the epoch horizon T = 100, times a linear warmup ramping from warmup_start_factor = 0.1 over warmup_steps = 200 optimiser steps.",
+                "note": "Each group's effective LR is its base rate times the cosine-annealing factor toward eta_min = 1e-6 over the epoch horizon T = scheduler.epochs, which the entry point resolves to training.epochs = 60, times a linear warmup ramping from warmup_start_factor = 0.1 over warmup_steps = 200 optimiser steps.",
                 "inputs": ["groups"], "outputs": ["eta"],
                 "lines": [
-                    [{"tex": r"F(t) = \tfrac{\eta_{\min}}{\eta_0} + \tfrac12\big(1 - \tfrac{\eta_{\min}}{\eta_0}\big)\big(1 + \cos\tfrac{\pi\min(t,T)}{T}\big),\quad \eta_{\min} = 10^{-6},\ T = 100"}],
+                    [{"tex": r"F(t) = \tfrac{\eta_{\min}}{\eta_0} + \tfrac12\big(1 - \tfrac{\eta_{\min}}{\eta_0}\big)\big(1 + \cos\tfrac{\pi\min(t,T)}{T}\big),\quad \eta_{\min} = 10^{-6},\ T = 60"}],
                     [{"id": "eta", "tex": r"\eta_{\mathrm{eff}}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\eta_0\,F(t)\,f_{\mathrm{w}}(s),\qquad f_{\mathrm{w}}(s) = \alpha_0 + (1-\alpha_0)\tfrac{s}{S},\ \ \alpha_0 = 0.1,\ S = 200"}],
                 ],
             },
@@ -794,7 +903,7 @@ class FlowLibrary:
                 "id": "pae_gradstep", "title": "Grad clip and AdamW update", "phase": "E - Optimiser step",
                 "note": "After a finiteness guard the global gradient norm is clipped to max_grad_norm = 1.0 (fixed mode), then AdamW applies bias-corrected moments with decoupled weight decay; the epoch loop drives the reconstruction loss down.",
                 "inputs": ["loss", "eta"], "outputs": ["gnorm", "w"],
-                "iterative": {"var": "loss", "steps": 100, "unit": "epoch", "symbol": "L",
+                "iterative": {"var": "loss", "steps": 60, "unit": "epoch", "symbol": "L",
                               "trace": ["6.4e-2", "4.0e-2", "2.9e-2", "2.1e-2", "1.6e-2", "1.3e-2"]},
                 "lines": [
                     [{"id": "gnorm", "tex": r"\lVert\mathbf{g}\rVert_2", "role": "intermediate"}, {"tex": "="}, {"tex": r"\Big(\textstyle\sum_i\lVert\nabla_{\theta^{(i)}}"}, {"id": "loss", "tex": r"\mathcal{L}", "role": "calculated"}, {"tex": r"\rVert_2^2\Big)^{1/2},\quad \mathbf{g}\leftarrow\mathbf{g}\,\min\!\big(1,\ \tfrac{\tau}{\lVert\mathbf{g}\rVert_2 + \epsilon}\big),\ \tau = 1"}],
@@ -803,10 +912,10 @@ class FlowLibrary:
             },
             {
                 "id": "pae_checkpoint", "title": "Validation and checkpoint", "phase": "E - Optimiser step",
-                "note": "Every validation_frequency epochs the model (under EMA when enabled) is evaluated; the best epoch is checkpointed on strict improvement and early stopping restores it after patience = 15 evaluations without a new minimum.",
+                "note": "Every validation_frequency epochs, which the entry point sets to 1, the model (under EMA when enabled) is evaluated; the best epoch is checkpointed on strict improvement and early stopping restores it after early_stop_patience = 30 evaluations without a new minimum.",
                 "inputs": ["w"], "outputs": ["wbest"],
                 "lines": [
-                    [{"id": "wbest", "tex": r"\theta^{\star}", "role": "final"}, {"tex": "="}, {"tex": r"\operatorname*{arg\,min}_{t}\ \mathcal{L}_{\mathrm{val}}\!\big("}, {"id": "w", "tex": r"\theta_t", "role": "intermediate"}, {"tex": r"\big),\qquad \mathrm{patience} = 15\ \text{evals}"}],
+                    [{"id": "wbest", "tex": r"\theta^{\star}", "role": "final"}, {"tex": "="}, {"tex": r"\operatorname*{arg\,min}_{t}\ \mathcal{L}_{\mathrm{val}}\!\big("}, {"id": "w", "tex": r"\theta_t", "role": "intermediate"}, {"tex": r"\big),\qquad \mathrm{patience} = 30\ \text{evals}"}],
                 ],
             },
         ]
@@ -888,7 +997,7 @@ class FlowLibrary:
                 "id": "iae_adamw", "title": "AdamW update", "phase": "Optimiser step",
                 "note": "Two parameter groups, encoder and decoder, each at lr = 3e-4 with decoupled weight decay 1e-4; bias-corrected adaptive moments use betas (0.9, 0.999) and eps 1e-8. The epoch loop drives the reconstruction loss down.",
                 "inputs": ["grad", "eta"], "outputs": ["w"],
-                "iterative": {"var": "lrec", "steps": 100, "unit": "epoch", "symbol": "L",
+                "iterative": {"var": "lrec", "steps": 60, "unit": "epoch", "symbol": "L",
                               "trace": ["4.8e-2", "3.1e-2", "2.4e-2", "2.0e-2", "1.8e-2"]},
                 "lines": [
                     [{"tex": r"\hat m_t = \tfrac{m_t}{1-\beta_1^t},\quad \hat v_t = \tfrac{v_t}{1-\beta_2^t},\quad (\beta_1,\beta_2) = (0.9,\,0.999)"}],
@@ -897,19 +1006,19 @@ class FlowLibrary:
             },
             {
                 "id": "iae_schedule", "title": "Warmup and cosine schedule", "phase": "Schedule & checkpoint",
-                "note": "Each group's effective LR is its base rate times the per-epoch cosine factor (T = scheduler.epochs = 100, eta_min = 1e-6) times the per-step linear warmup factor (200 steps, start factor 0.1).",
+                "note": "Each group's effective LR is its base rate times the per-epoch cosine factor (T = scheduler.epochs, resolved by the entry point to training.epochs = 60, eta_min = 1e-6) times the per-step linear warmup factor (200 steps, start factor 0.1).",
                 "inputs": [], "outputs": ["eta"],
                 "lines": [
-                    [{"tex": r"F(t) = \tfrac{\eta_{\min}}{\eta_0} + \tfrac12\big(1 - \tfrac{\eta_{\min}}{\eta_0}\big)\big(1 + \cos\tfrac{\pi\min(t,T)}{T}\big),\quad T = 100,\ \eta_{\min} = 10^{-6}"}],
+                    [{"tex": r"F(t) = \tfrac{\eta_{\min}}{\eta_0} + \tfrac12\big(1 - \tfrac{\eta_{\min}}{\eta_0}\big)\big(1 + \cos\tfrac{\pi\min(t,T)}{T}\big),\quad T = 60,\ \eta_{\min} = 10^{-6}"}],
                     [{"id": "eta", "tex": r"\eta_{\mathrm{eff}}", "role": "intermediate"}, {"tex": "="}, {"tex": r"\eta_0\cdot F(t)\cdot f_{\mathrm{w}}(s),\qquad f_{\mathrm{w}}(s) = \alpha_0 + (1-\alpha_0)\tfrac{s}{S},\ \ \alpha_0 = 0.1,\ S = 200"}],
                 ],
             },
             {
                 "id": "iae_checkpoint", "title": "Validation and checkpoint", "phase": "Schedule & checkpoint",
-                "note": "Evaluation runs every 5 epochs; the best epoch is checkpointed on strict improvement of the validation reconstruction loss, and after 15 evaluations without a new minimum early stopping restores the best weights.",
+                "note": "Evaluation runs every epoch at the entry-point default validation_frequency = 1; the best epoch is checkpointed on strict improvement of the validation reconstruction loss, and after early_stop_patience = 30 evaluations without a new minimum early stopping restores the best weights.",
                 "inputs": ["w"], "outputs": ["wbest"],
                 "lines": [
-                    [{"id": "wbest", "tex": r"\theta^{\star}", "role": "final"}, {"tex": "="}, {"tex": r"\operatorname*{arg\,min}_{t}\ \mathcal{L}_{\mathrm{val}}\!\big("}, {"id": "w", "tex": r"\theta_t", "role": "intermediate"}, {"tex": r"\big),\qquad \text{eval every } 5,\ \ \mathrm{patience} = 15"}],
+                    [{"id": "wbest", "tex": r"\theta^{\star}", "role": "final"}, {"tex": "="}, {"tex": r"\operatorname*{arg\,min}_{t}\ \mathcal{L}_{\mathrm{val}}\!\big("}, {"id": "w", "tex": r"\theta_t", "role": "intermediate"}, {"tex": r"\big),\qquad \text{eval every } 1,\ \ \mathrm{patience} = 30"}],
                 ],
             },
         ]
@@ -1014,7 +1123,7 @@ class FlowLibrary:
                 "id": "jep_step", "title": "AdamW update", "phase": "D - Optimise",
                 "note": "The loss backpropagates into the backbone and, in finetune mode, the coupled autoencoder; AdamW steps all groups with linear warmup, cosine annealing and gradient clipping shared from the base trainer. The autoencoder finetune group carries its own learning rate 3e-5 and weight decay 1e-4; a frozen AE contributes no group.",
                 "inputs": ["Ltot"], "outputs": ["w"],
-                "iterative": {"var": "loss", "steps": 100, "unit": "epoch", "symbol": "L",
+                "iterative": {"var": "loss", "steps": 60, "unit": "epoch", "symbol": "L",
                               "trace": ["4.9e-2", "3.1e-2", "2.2e-2", "1.6e-2", "1.2e-2", "9.4e-3"]},
                 "lines": [
                     [{"id": "w", "tex": r"\theta_{t+1}", "role": "intermediate"}, {"tex": "="}, {"id": "w", "tex": r"\theta_t", "role": "intermediate"}, {"tex": r"\ -\ \eta_{\mathrm{eff}}\,\mathrm{AdamW}\big(\nabla_\theta"}, {"id": "Ltot", "tex": r"\mathcal{L}", "role": "final"}, {"tex": r"\big)"}],
@@ -2078,6 +2187,7 @@ class FlowLibrary:
             self._param_extraction(),
             self._dataset(),
             self._training(),
+            self._dual_train(),
             self._profile_ae_train(),
             self._image_ae_train(),
             self._jepa_train(),

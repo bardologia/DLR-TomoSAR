@@ -108,14 +108,17 @@ webui/run.sh          # http://127.0.0.1:8765
 webui/run.sh 9000     # different port
 ```
 
-The backend is standard library only, so nothing extra to install. It lists the `main/`
-entry points, renders each one's configuration fields as typed controls, shows the exact
-command it will run, and streams the output back live. It also carries the run
-leaderboard, the results and cube browsers, the fit lab, and server telemetry.
-`webui/README.md` documents every tab.
+The HTTP layer is standard library only, but the console runs inside the project
+environment: the cube explorer, fit lab, model probe and training-curve readers are
+imported at boot, so numpy, matplotlib, scipy, torch, scikit-image, tensorboard and
+psutil all have to be there. `run.sh` picks the `Dune` interpreter for exactly that
+reason. The console lists the `main/` entry points, renders each one's configuration
+fields as typed controls, shows the exact command it will run, and streams the output
+back live. It also carries the run leaderboard, the results and cube browsers, the fit
+lab, and server telemetry. `webui/README.md` documents every tab.
 
-The frontend pulls KaTeX, GSAP and highlight.js from a CDN. Offline it still works, with
-plain text where the equations would be.
+The frontend pulls MathJax, GSAP, highlight.js and xterm.js from a CDN. Offline it still
+works, with plain text where the equations would be.
 
 ## 5. The data pipeline
 
@@ -178,7 +181,7 @@ configuration/  dataclasses holding every default
 pipelines/      the pipelines behind the entry points
 models/         backbones, heads, blocks
 tools/          shared components (logger, training, metrics, SAR, monitoring)
-webui/          the control console, standard library backend plus static frontend
+webui/          the control console, stdlib HTTP server plus static frontend
 tests/          about 4000 tests, real-data ones skip without test_data/
 scripts/        maintenance and migration utilities
 docs/           the tracked presentations

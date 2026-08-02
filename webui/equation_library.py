@@ -840,12 +840,13 @@ class EquationLibrary:
                 },
                 {
                     "title" : "GT sort and optimal prediction matching",
-                    "tex"   : r"\pi^\star_{h,w} = \operatorname*{argmin}_{\pi \in S_K} \sum_k \mathbf{1}\!\left[a^{\mathrm{GT}}_k > 10^{-3}\right] \sum_p \left|\hat{\theta}_{\pi(k),p} - \theta^{\mathrm{GT}}_{k,p}\right|, \qquad \hat{\Theta} \leftarrow \hat{\Theta}_{\pi^\star}",
-                    "note"  : "Both modes first sort GT components by mu with inactive GT slots (amp <= tau_a) pushed last. Under param_matching = 'hungarian' - the shipped full-model and curriculum default (AblationCatalog.PARAM_MATCH_FULL) as well as the bare LossConfig default - predictions are permuted to the GT slots per pixel by the optimal assignment minimising the active-weighted L1 cost, found by exhaustive enumeration of all K! permutations (param_loss.py ParamMatcher, K <= MAX_GAUSSIANS = 6), making the loss permutation-invariant in the predicted slot order. Under param_matching = 'sorted_gt' predictions keep their slot order (positional matching), so each predicted slot learns a fixed rank along the height axis.",
+                    "tex"   : r"\pi^\star_{h,w} = \operatorname*{argmin}_{\pi \in S_K} \sum_k \mathbf{1}\!\left[a^{\mathrm{GT}}_k > \tau_a\right] \sum_p \left|\hat{\theta}_{\pi(k),p} - \theta^{\mathrm{GT}}_{k,p}\right|, \qquad \hat{\Theta} \leftarrow \hat{\Theta}_{\pi^\star}",
+                    "note"  : "Both modes first sort GT components by mu with inactive GT slots (amp <= tau_a = amp_zero_thr = 1e-4) pushed last. Under param_matching = 'hungarian' - the shipped full-model and curriculum default (AblationCatalog.PARAM_MATCH_FULL) as well as the bare LossConfig default - predictions are permuted to the GT slots per pixel by the optimal assignment minimising the active-weighted L1 cost, found by exhaustive enumeration of all K! permutations (param_loss.py ParamMatcher, K <= MAX_GAUSSIANS = 6), making the loss permutation-invariant in the predicted slot order. Under param_matching = 'sorted_gt' predictions keep their slot order (positional matching), so each predicted slot learns a fixed rank along the height axis.",
                     "vars"  : [
                         {"sym": r"\pi^\star_{h,w}",                    "desc": "optimal pred-to-GT slot permutation at pixel (h, w)"},
                         {"sym": r"S_K",                                "desc": "all K! slot permutations"},
                         {"sym": r"a^{\mathrm{GT}}_k",                  "desc": "GT amplitude of slot k at physical scale"},
+                        {"sym": r"\tau_a",                             "desc": "active-slot threshold, amp_zero_thr = 1e-4"},
                         {"sym": r"\hat{\theta}, \theta^{\mathrm{GT}}", "desc": "predicted and GT slot parameters"},
                         {"sym": r"\hat{\Theta}_{\pi^\star}",           "desc": "predictions reordered by the optimal permutation"},
                     ],
@@ -1247,8 +1248,8 @@ class EquationLibrary:
                 },
                 {
                     "title" : "GT slot alignment",
-                    "tex"   : r"\kappa_k = \begin{cases} +\infty & a^{\mathrm{GT}}_k \le 10^{-3} \\ \mu^{\mathrm{GT}}_k & \text{otherwise} \end{cases}, \qquad \mathrm{GT} \leftarrow \mathrm{take}\!\left(\mathrm{GT},\ \operatorname{argsort}_k \kappa_k\right)",
-                    "note"  : "GT components are mu-sorted with inactive slots pushed last; predictions keep their raw slot order (predictor.py _cpu_worker).",
+                    "tex"   : r"\kappa_k = \begin{cases} +\infty & a^{\mathrm{GT}}_k < 10^{-4} \\ \mu^{\mathrm{GT}}_k & \text{otherwise} \end{cases}, \qquad \mathrm{GT} \leftarrow \mathrm{take}\!\left(\mathrm{GT},\ \operatorname{argsort}_k \kappa_k\right)",
+                    "note"  : "GT components are mu-sorted with inactive slots pushed last; a slot counts as active under ParamMatcher.is_active, amplitude >= ACTIVE_AMP_THR = 1e-4. Predictions keep their raw slot order (predictor.py _cpu_worker).",
                     "vars"  : [
                         {"sym": r"\kappa_k",            "desc": "sort key of GT slot k"},
                         {"sym": r"a^{\mathrm{GT}}_k",   "desc": "GT amplitude of slot k (physical scale)"},
@@ -1325,8 +1326,8 @@ class EquationLibrary:
                 },
                 {
                     "title" : "Placeholder masking in the GT cube",
-                    "tex"   : r"\mu^{\mathrm{GT}}_k,\ \sigma^{\mathrm{GT}}_k \leftarrow \mathrm{NaN} \quad \text{where } a^{\mathrm{GT}}_k \le 10^{-3}",
-                    "note"  : "After stitching, mu and sigma of GT slots whose amplitude is at or below the active threshold (1e-3) are set to NaN so downstream statistics skip inactive slots (predictor.py _finalize_results).",
+                    "tex"   : r"\mu^{\mathrm{GT}}_k,\ \sigma^{\mathrm{GT}}_k \leftarrow \mathrm{NaN} \quad \text{where } a^{\mathrm{GT}}_k < 10^{-4}",
+                    "note"  : "After stitching, mu and sigma of GT slots that fail ParamMatcher.is_active (amplitude below ACTIVE_AMP_THR = 1e-4) are set to NaN so downstream statistics skip inactive slots (predictor.py _finalize_results).",
                     "vars"  : [
                         {"sym": r"a^{\mathrm{GT}}_k",                           "desc": "stitched GT amplitude of slot k"},
                         {"sym": r"\mu^{\mathrm{GT}}_k, \sigma^{\mathrm{GT}}_k", "desc": "GT mean and spread of slot k"},
@@ -1469,7 +1470,7 @@ class EquationLibrary:
                 {
                     "title" : "Permutation cost and optimal assignment",
                     "tex"   : r"C_{ij} = \left|\hat{\mu}_i - \mu^{\mathrm{GT}}_j\right|, \qquad \pi^*_{a,r} = \operatorname*{arg\,min}_{\pi \in S_K} \sum_k C_{k,\pi(k)}",
-                    "note"  : "Inactive pairs and NaN/posinf entries take a large cost (1e7) so only mutually-active slots (amp >= 1e-3) match cheaply. The optimum is found by exhaustively enumerating all K! permutations for every K (no Hungarian fallback), in pixel chunks of 250000 (gaussian_matching.py GaussianMatcher).",
+                    "note"  : "Inactive pairs and NaN/posinf entries take a large cost (1e7) so only mutually-active slots (amp >= ParamMatcher.ACTIVE_AMP_THR = 1e-4) match cheaply. The optimum is found by exhaustively enumerating all K! permutations for every K (no Hungarian fallback), in pixel chunks of 250000 (gaussian_matching.py GaussianMatcher).",
                     "vars"  : [
                         {"sym": r"C_{ij}",              "desc": "cost of matching predicted slot i to GT slot j"},
                         {"sym": r"\hat{\mu}_i",         "desc": "predicted mean of slot i (raw slot order)"},
@@ -1506,7 +1507,7 @@ class EquationLibrary:
                     "note"  : "Predicted slot usage is summarised by a normalised usage entropy; two diagonality scores measure how consistently each predicted slot holds its elevation-rank position (slot_mu_rank_diag) and matches the same-index GT slot under the optimal assignment (slot_gt_alignment), each the trace fraction of a K×K count matrix (metrics.py _slot_organization_stats, tools/metrics/slot_organization.py).",
                     "vars"  : [
                         {"sym": r"H_{\mathrm{slot}}", "desc": "normalised entropy of predicted slot usage"},
-                        {"sym": r"u_k",               "desc": "fraction of pixels where slot k is active (amp >= 1e-3)"},
+                        {"sym": r"u_k",               "desc": "fraction of pixels where slot k is active (amp >= 1e-4)"},
                         {"sym": r"q_k",               "desc": "usage-normalised weight of slot k"},
                         {"sym": r"\mathbf{N}",        "desc": "K×K count matrix (mu-rank occupancy or pred->GT assignment)"},
                         {"sym": r"D",                 "desc": "diagonal-mass fraction, trace over total"},
@@ -1548,7 +1549,7 @@ class EquationLibrary:
                 {
                     "title" : "Interferometric coherence-resynthesis error map",
                     "tex"   : r"E^{\mathrm{coh}}_{a,r} = \frac{1}{V}\sum_{v=1}^{V}\left|\frac{\gamma^{\mathrm{pred}}_{v}}{\hat{p}_0} - \frac{\gamma^{\mathrm{GT}}_{v}}{p_0}\right|^2, \qquad m_{a,r} = \mathbb{1}\!\left[\textstyle\sum_n Y_{n,a,r}\,\Delta x > \phi\right]",
-                    "note"  : "Per-pixel mean over tracks of the squared difference between the power-normalised predicted and GT coherences; a pixel is valid only where the GT total power exceeds physics_floor (1e-3), and the normalising powers are floored at the same value. The map is reduced to masked mean/median/p95 plus a per-track error breakdown and saved when cubes are kept (data_consistency.py, PhysicalLoss.coherence_resynthesis_pp_map).",
+                    "note"  : "Per-pixel mean over tracks of the squared difference between the power-normalised predicted and GT coherences; a pixel is valid only where the GT total power exceeds physics_floor (1e-3), and the normalising powers are floored at the same value. The map is accumulated track by track inside DataConsistency._evaluate_chunks, which calls PhysicalLoss.synthesise_track once per track and divides the summed squared error by the track count, then reduced to masked mean/median/p95 plus a per-track error breakdown and saved when cubes are kept (pipelines/backbone/inference/data_consistency.py).",
                     "vars"  : [
                         {"sym": r"E^{\mathrm{coh}}_{a,r}",                               "desc": "per-pixel coherence-resynthesis error"},
                         {"sym": r"V",                                                    "desc": "number of tracks (primary + secondaries)"},
