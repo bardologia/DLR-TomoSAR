@@ -467,7 +467,7 @@ def test_label_quality_perfect_fit_gives_r2_one():
     assert r2_map.shape == (4, 3)
     assert np.allclose(r2_map, 1.0, atol=1e-5)
     assert stats["label_r2_mean"]          == pytest.approx(1.0, abs=1e-5)
-    assert stats["label_r2_frac_below_05"] == pytest.approx(0.0)
+    assert stats["label_r2_frac_below_half"] == pytest.approx(0.0)
 
 
 def test_label_quality_noisier_labels_score_lower():

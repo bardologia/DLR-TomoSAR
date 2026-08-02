@@ -106,6 +106,15 @@ class StratifiedErrors:
         return rows
 
     @staticmethod
+    def _tie_ranks(values: np.ndarray) -> np.ndarray:
+        _uniques, inverse, counts = np.unique(values, return_inverse=True, return_counts=True)
+
+        starts   = np.cumsum(counts) - counts
+        averaged = starts + (counts - 1) / 2.0
+
+        return averaged[inverse]
+
+    @staticmethod
     def _spearman(cov: np.ndarray, err: np.ndarray) -> float:
         flat_cov = cov.reshape(-1)
         flat_err = err.reshape(-1)
@@ -114,8 +123,11 @@ class StratifiedErrors:
         if both.sum() < 3:
             return float("nan")
 
-        rank_cov = np.argsort(np.argsort(flat_cov[both])).astype(np.float64)
-        rank_err = np.argsort(np.argsort(flat_err[both])).astype(np.float64)
+        rank_cov = StratifiedErrors._tie_ranks(flat_cov[both])
+        rank_err = StratifiedErrors._tie_ranks(flat_err[both])
+
+        if rank_cov.std() == 0.0 or rank_err.std() == 0.0:
+            return float("nan")
 
         return float(np.corrcoef(rank_cov, rank_err)[0, 1])
 

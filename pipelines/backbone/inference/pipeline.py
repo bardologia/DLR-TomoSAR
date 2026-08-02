@@ -211,7 +211,7 @@ class InferencePipeline:
         if cfg.save_cubes:
             np.save(meta.cube_dir / "label_r2.npy", r2_map)
 
-        logger.subsection(f"Label quality : mean fit R² = {stats['label_r2_mean']:.4f}, {stats['label_r2_frac_below_05'] * 100.0:.1f}% of labels below R² 0.5")
+        logger.subsection(f"Label quality : mean fit R² = {stats['label_r2_mean']:.4f}, {stats['label_r2_frac_below_half'] * 100.0:.1f}% of labels below R² 0.5")
 
     def _evaluate_flip_consistency(self, cfg: InferenceConfig, meta: InferenceMetadata, run, result, global_metrics: dict, logger: Logger) -> None:
         if not cfg.compute_flip_consistency:
@@ -325,7 +325,7 @@ class InferencePipeline:
         )
 
         if "clamp_amp_ceil_frac" in stats:
-            logger.subsection(f"Clamp hits  : amp ceil {stats['clamp_amp_ceil_frac'] * 100.0:.2f}%, sigma floor {stats['clamp_sigma_floor_frac'] * 100.0:.2f}%, mu out of axis {stats['clamp_mu_out_of_axis_frac'] * 100.0:.2f}%")
+            logger.subsection(f"Clamp hits  : amp ceil {stats['clamp_amp_ceil_frac'] * 100.0:.2f}%, sigma floor {stats['clamp_sigma_floor_frac'] * 100.0:.2f}%, mu at axis edge {stats['clamp_mu_edge_frac'] * 100.0:.2f}%")
 
     def _compose_figures(self, composer: FigureComposer, result, run, global_metrics: dict, x_axis_np: np.ndarray, indices: dict) -> Dict[str, List[Path]]:
         return composer.compose(

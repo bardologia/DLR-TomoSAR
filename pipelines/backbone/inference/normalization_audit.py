@@ -57,6 +57,11 @@ class NormalizationAudit:
         n_k    = self.loaded.n_gaussians
         x_min  = float(self.loaded.x_axis[0])
         x_max  = float(self.loaded.x_axis[-1])
+        x_step = float(self.loaded.x_axis[1]) - x_min
+
+        sigma_floor = 0.5 * x_step
+        sigma_ceil  = 0.5 * (x_max - x_min)
+        mu_edge     = self.EDGE_FRACTION * (x_max - x_min)
 
         amps   = np.stack([params[3 * k]     for k in range(n_k)])
         mus    = np.stack([params[3 * k + 1] for k in range(n_k)])
@@ -68,13 +73,11 @@ class NormalizationAudit:
         out = {"clamp_n_active": float(n_active)}
 
         if n_active == 0:
-            out["clamp_amp_ceil_frac"]        = float("nan")
-            out["clamp_sigma_floor_frac"]     = float("nan")
-            out["clamp_sigma_ceil_frac"]      = float("nan")
-            out["clamp_mu_out_of_axis_frac"]  = float("nan")
+            out["clamp_amp_ceil_frac"]    = float("nan")
+            out["clamp_sigma_floor_frac"] = float("nan")
+            out["clamp_sigma_ceil_frac"]  = float("nan")
+            out["clamp_mu_edge_frac"]     = float("nan")
             return out
-
-        edge = self.EDGE_FRACTION * (clamp.ceil - clamp.floor)
 
         amp_act   = amps[active]
         mu_act    = mus[active]
@@ -82,10 +85,10 @@ class NormalizationAudit:
 
         amp_cap = clamp.amp_max if clamp.enabled else None
 
-        out["clamp_amp_ceil_frac"]       = float((amp_act >= amp_cap * (1.0 - self.EDGE_FRACTION)).mean()) if amp_cap else float("nan")
-        out["clamp_sigma_floor_frac"]    = float((sigma_act <= clamp.floor + edge).mean())
-        out["clamp_sigma_ceil_frac"]     = float((sigma_act >= clamp.ceil - edge).mean())
-        out["clamp_mu_out_of_axis_frac"] = float(((mu_act < x_min) | (mu_act > x_max)).mean())
+        out["clamp_amp_ceil_frac"]    = float((amp_act >= amp_cap * (1.0 - self.EDGE_FRACTION)).mean()) if amp_cap else float("nan")
+        out["clamp_sigma_floor_frac"] = float((sigma_act <= sigma_floor * (1.0 + self.EDGE_FRACTION)).mean())
+        out["clamp_sigma_ceil_frac"]  = float((sigma_act >= sigma_ceil * (1.0 - self.EDGE_FRACTION)).mean())
+        out["clamp_mu_edge_frac"]     = float(((mu_act <= x_min + mu_edge) | (mu_act >= x_max - mu_edge)).mean())
 
         return out
 

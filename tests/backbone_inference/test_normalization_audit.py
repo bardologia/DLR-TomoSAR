@@ -51,18 +51,18 @@ def test_output_health_counts_clamp_hits_over_active_slots():
     params[0]       = 1.0
     params[0, 0, 0] = 200.0
     params[1]       = 30.0
-    params[1, 0, 1] = 500.0
-    params[2]       = 5.0
-    params[2, 0, 2] = 0.0
-    params[2, 0, 3] = 199.9
+    params[1, 0, 1] = -19.95
+    params[2]       = 20.0
+    params[2, 0, 2] = 5.0
+    params[2, 0, 3] = 49.99
 
     out = NormalizationAudit(_run(inputs), _result(params)).run()
 
-    assert out["clamp_n_active"]            == 16.0
-    assert out["clamp_amp_ceil_frac"]       == pytest.approx(1 / 16)
-    assert out["clamp_mu_out_of_axis_frac"] == pytest.approx(1 / 16)
-    assert out["clamp_sigma_floor_frac"]    == pytest.approx(1 / 16)
-    assert out["clamp_sigma_ceil_frac"]     == pytest.approx(1 / 16)
+    assert out["clamp_n_active"]         == 16.0
+    assert out["clamp_amp_ceil_frac"]    == pytest.approx(1 / 16)
+    assert out["clamp_mu_edge_frac"]     == pytest.approx(1 / 16)
+    assert out["clamp_sigma_floor_frac"] == pytest.approx(1 / 16)
+    assert out["clamp_sigma_ceil_frac"]  == pytest.approx(1 / 16)
 
 
 def test_output_health_ignores_inactive_slots():
@@ -75,12 +75,14 @@ def test_output_health_ignores_inactive_slots():
     out = NormalizationAudit(_run(inputs), _result(params)).run()
 
     assert out["clamp_n_active"] == 0.0
-    assert math.isnan(out["clamp_mu_out_of_axis_frac"])
+    assert math.isnan(out["clamp_mu_edge_frac"])
 
 
 def test_disabled_clamp_reports_nan_amp_ceil():
     inputs = np.zeros((1, 4, 4))
     params = np.ones((3, 4, 4), dtype=np.float64)
+
+    params[2] = 20.0
 
     out = NormalizationAudit(_run(inputs, enabled=False), _result(params)).run()
 

@@ -573,10 +573,10 @@ class Metrics:
             raise ValueError("Label-quality R² map holds no finite value; the GT curves or the raw tomogram are degenerate on this region")
 
         stats = {
-            "label_r2_mean"          : float(finite.mean()),
-            "label_r2_median"        : float(np.median(finite)),
-            "label_r2_p05"           : float(np.percentile(finite, 5.0)),
-            "label_r2_frac_below_05" : float((finite < 0.5).mean()),
+            "label_r2_mean"            : float(finite.mean()),
+            "label_r2_median"          : float(np.median(finite)),
+            "label_r2_p05"             : float(np.percentile(finite, 5.0)),
+            "label_r2_frac_below_half" : float((finite < 0.5).mean()),
         }
 
         stats.update(self._label_noise_split(r2_map))
