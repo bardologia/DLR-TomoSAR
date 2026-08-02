@@ -44,7 +44,8 @@ def test_relative_and_webui_local_imports_resolve():
     graph = ImportGraph(REPO_ROOT).build()
 
     assert "models.blocks" in graph["models.backbone.swin_unet"]
-    assert "webui.project_paths" in graph["webui.request_router"]
+    assert "webui.project_paths" in graph["webui.script_config_resolver"]
+    assert "webui.routers.dispatch" in graph["webui.request_router"]
 
     webui_edges = sum(len(targets) for name, targets in graph.items() if name.startswith("webui."))
     assert webui_edges > 30

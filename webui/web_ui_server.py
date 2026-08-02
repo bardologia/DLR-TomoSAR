@@ -30,6 +30,7 @@ from request_router                    import RequestRouter
 from resource_watchdog                 import ResourceWatchdog
 from contention_monitor                import ContentionMonitor
 from results_browser                   import ResultsBrowser
+from run_launcher                      import RunLauncher
 from run_leaderboard                   import RunLeaderboard
 from saved_run_store                   import SavedRunStore
 from script_catalog                    import ScriptCatalog
@@ -38,6 +39,15 @@ from system_monitor                    import SystemMonitor
 from tensorboard_manager               import TensorboardManager
 from training_curves                   import TrainingCurves
 from web_logger                        import WebLogger
+
+from routers.analysis_routers   import AutopsyRouter, FitLabRouter, ProbeRouter, TriageRouter
+from routers.cube_routers       import CubeRouter, SliceRouter
+from routers.launch_routers     import CatalogRouter, JobRouter, SavedRunRouter
+from routers.library_routers    import BackboneRouter, ContentLibraryRouter, ModelLibraryRouter
+from routers.results_routers    import CurvesRouter, DatasetRouter, LeaderboardRouter, ResultsRouter
+from routers.static_router      import StaticRouter
+from routers.system_router      import SystemRouter
+from routers.tensorboard_router import TensorboardRouter
 
 
 class _Server(ThreadingHTTPServer):
@@ -104,45 +114,36 @@ class WebUIServer:
         self.probe             = ModelProbe(self.logger)
         self.triage            = TriageBoard(self.paths, self.logger)
         self.autopsy           = AbAutopsy(self.logger)
+        self.launcher          = RunLauncher(self.paths, self.logger, self.resolver, self.processes, self.tensorboard)
 
-        self.router = RequestRouter(
-            paths             = self.paths,
-            logger            = self.logger,
-            catalog           = self.catalog,
-            resolver          = self.resolver,
-            layout            = self.layout,
-            configs           = self.configs,
-            equations         = self.equations,
-            physics_loss      = self.physics_loss,
-            flows             = self.flows,
-            models            = self.models,
-            profile_ae_models = self.profile_ae_models,
-            image_ae_models   = self.image_ae_models,
-            jepa_models       = self.jepa_models,
-            pipelines         = self.pipelines,
-            repomap           = self.repomap,
-            processes         = self.processes,
-            saved_runs        = self.saved_runs,
-            notifier          = self.notifier,
-            nuke              = self.nuke,
-            detacher          = self.detacher,
-            system            = self.system,
-            watchdog          = self.watchdog,
-            contention        = self.contention,
-            gpu_guard         = self.gpu_guard,
-            gpu_schedule      = self.gpu_schedule,
-            tensorboard       = self.tensorboard,
-            results           = self.results,
-            cubes             = self.cubes,
-            slices            = self.slices,
-            datasets          = self.datasets,
-            leaderboard       = self.leaderboard,
-            curves            = self.curves,
-            fitlab            = self.fitlab,
-            probe             = self.probe,
-            triage            = self.triage,
-            autopsy           = self.autopsy,
-        )
+        self.router = RequestRouter(self.logger, [
+            StaticRouter(self.paths, self.results),
+            ResultsRouter(self.results),
+            DatasetRouter(self.datasets),
+            LeaderboardRouter(self.leaderboard),
+            CurvesRouter(self.curves),
+            CubeRouter(self.cubes),
+            SliceRouter(self.slices),
+            FitLabRouter(self.fitlab),
+            ProbeRouter(self.probe),
+            TriageRouter(self.triage),
+            AutopsyRouter(self.autopsy),
+            ContentLibraryRouter("/api/equations",    self.equations,    "groups"),
+            ContentLibraryRouter("/api/physics-loss", self.physics_loss),
+            ContentLibraryRouter("/api/flows",        self.flows,        "flows"),
+            ContentLibraryRouter("/api/pipelines",    self.pipelines,    "pipelines"),
+            ContentLibraryRouter("/api/repomap",      self.repomap,      "folders"),
+            ContentLibraryRouter("/api/configs",      self.configs,      "groups"),
+            BackboneRouter("/api/backbones", self.models),
+            ModelLibraryRouter("/api/profile-autoencoders", self.profile_ae_models),
+            ModelLibraryRouter("/api/image-autoencoders",   self.image_ae_models),
+            ModelLibraryRouter("/api/jepa-variants",        self.jepa_models),
+            CatalogRouter(self.paths, self.catalog, self.resolver, self.layout, self.models, self.launcher),
+            JobRouter(self.paths, self.processes, self.launcher),
+            SavedRunRouter(self.paths, self.saved_runs, self.launcher),
+            SystemRouter(self.system, self.watchdog, self.contention, self.gpu_guard, self.gpu_schedule, self.detacher, self.notifier, self.nuke, self.processes),
+            TensorboardRouter(self.tensorboard, self.launcher),
+        ])
 
     def serve(self) -> None:
         server        = _Server((self.host, self.port), _Handler)

@@ -92,11 +92,18 @@ machine without them, a launched job streams its real traceback to the console.
 
 One class per file, no comments, per the vault coding rules.
 
-**Server.** `serve.py` builds and runs the threaded HTTP server in `web_ui_server.py`; the
-request-router layer dispatches paths to the modules below and handles JSON, static files
-and SSE. `project_paths.py` resolves repository paths and candidate interpreters,
-`catalog_roots.py` gates filesystem browsing to roots the user has opened, and
-`web_logger.py` handles console logging.
+**Server.** `serve.py` builds and runs the threaded HTTP server in `web_ui_server.py`,
+which owns one instance of every collaborator and composes the routing table. Requests
+enter `request_router.py`, which resolves the path's leading section to exactly one
+sub-router under `routers/` and delegates: `routers/dispatch.py` carries the shared
+`HttpExchange` (query accessors, JSON, PNG, byte and file responses) and the per-router
+`RouteTable`; `static_router.py`, `results_routers.py`, `cube_routers.py`,
+`analysis_routers.py`, `library_routers.py`, `launch_routers.py`, `system_router.py` and
+`tensorboard_router.py` declare the routes of their own domain and hold only the
+collaborators they use. A section may be claimed by one sub-router only; a second claim
+raises at construction. `project_paths.py` resolves repository paths and candidate
+interpreters, `catalog_roots.py` gates filesystem browsing to roots the user has opened,
+and `web_logger.py` handles console logging.
 
 **Launching and supervision.** `script_catalog.py`, `script_config_resolver.py`,
 `launch_layout.py`, `config_registry.py`, `run_launcher.py`, `process_manager.py`,
