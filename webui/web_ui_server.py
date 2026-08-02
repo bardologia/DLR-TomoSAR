@@ -8,6 +8,7 @@ from cube_explorer                     import CubeExplorer, SliceCollector
 from dataset_browser                   import DatasetBrowser
 from equation_library                  import EquationLibrary
 from fit_lab                           import FitLab
+from model_probe                       import ModelProbe
 from flow_library                      import FlowLibrary
 from gpu_schedule                      import GpuSchedule
 from gpu_watchdog                      import GpuWatchdog
@@ -98,6 +99,7 @@ class WebUIServer:
         self.leaderboard       = RunLeaderboard(self.logger)
         self.curves            = TrainingCurves(self.logger)
         self.fitlab            = FitLab(self.paths, self.logger)
+        self.probe             = ModelProbe(self.paths, self.logger)
 
         self.router = RequestRouter(
             paths             = self.paths,
@@ -133,6 +135,7 @@ class WebUIServer:
             leaderboard       = self.leaderboard,
             curves            = self.curves,
             fitlab            = self.fitlab,
+            probe             = self.probe,
         )
 
     def serve(self) -> None:

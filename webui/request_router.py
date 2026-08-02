@@ -14,6 +14,7 @@ from cube_explorer                     import CubeExplorer, SliceCollector
 from dataset_browser                   import DatasetBrowser
 from equation_library                  import EquationLibrary
 from fit_lab                           import FitLab
+from model_probe                       import ModelProbe
 from flow_library                      import FlowLibrary
 from gpu_schedule                      import GpuSchedule
 from gpu_watchdog                      import GpuWatchdog
@@ -50,7 +51,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, saved_runs: SavedRunStore, notifier: JobNotifier, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, slices: SliceCollector, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves, fitlab: FitLab) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, saved_runs: SavedRunStore, notifier: JobNotifier, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, slices: SliceCollector, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves, fitlab: FitLab, probe: ModelProbe) -> None:
         self.paths             = paths
         self.logger            = logger
         self.catalog           = catalog
@@ -84,6 +85,7 @@ class RequestRouter:
         self.leaderboard       = leaderboard
         self.curves            = curves
         self.fitlab            = fitlab
+        self.probe             = probe
 
     def _route_get(self, handler, path: str) -> None:
         if path == "/" or path == "":
@@ -173,6 +175,27 @@ class RequestRouter:
             return
         if path == "/api/fitlab/status":
             self._send_json(handler, self.fitlab.load_status())
+            return
+
+        if path == "/api/probe/status":
+            self._send_json(handler, self.probe.load_status())
+            return
+
+        if path == "/api/probe/layers":
+            result = self.probe.layers()
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/probe/map":
+            self._send_png(handler, self.probe.map_png())
+            return
+
+        if path == "/api/probe/features":
+            self._send_png(handler, self.probe.features_png(
+                int((query.get("az") or ["0"])[0]),
+                int((query.get("rg") or ["0"])[0]),
+                (query.get("layer") or [""])[0],
+            ))
             return
         if path == "/api/fitlab/map":
             query = parse_qs(urlparse(handler.path).query)
@@ -583,6 +606,26 @@ class RequestRouter:
 
         if path == "/api/fitlab/fit":
             result = self.fitlab.start_fit(body)
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/probe/load":
+            result = self.probe.start_load(body.get("path", ""), body.get("split", "test"), body.get("device", "cpu"))
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/probe/predict":
+            result = self.probe.predict(body)
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/probe/saliency":
+            result = self.probe.saliency(body)
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/probe/whatif":
+            result = self.probe.whatif(body)
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 
