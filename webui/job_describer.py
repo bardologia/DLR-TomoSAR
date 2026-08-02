@@ -198,6 +198,10 @@ class JobDescriber:
             ("root",   "runs_dir",   "opt_tail"),
             ("layers", "max_layers", "text"),
         ],
+        "compare_representations": [
+            ("runs", "run_filter", "list", "all runs"),
+            ("root", "runs_dir",   "opt_tail"),
+        ],
         "export_tensorboard_plots": [
             ("runs", "run_filter", "list", "all runs"),
             ("root", "runs_dir",   "opt_tail"),

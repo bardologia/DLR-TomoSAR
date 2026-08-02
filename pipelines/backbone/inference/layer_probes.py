@@ -58,18 +58,45 @@ class RidgeProbe:
         return 1.0 - ss_res / ss_total
 
 
-class LayerProbeCore:
+class FeatureSampler:
 
     MAX_FEATURES = 512
 
-    def __init__(self, model, layers: list[str], ppg: int, amp_thr: float, samples_per_batch: int, probe: RidgeProbe, seed: int = 0) -> None:
-        self.model             = model
-        self.layers            = list(layers)
-        self.ppg               = ppg
-        self.amp_thr           = amp_thr
+    def __init__(self, samples_per_batch: int, seed: int = 0) -> None:
         self.samples_per_batch = int(samples_per_batch)
-        self.probe             = probe
         self.rng               = np.random.default_rng(seed)
+
+    def sample_coords(self, B: int, H: int, W: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        n  = min(self.samples_per_batch, B * H * W)
+        ix = self.rng.choice(B * H * W, size=n, replace=False)
+
+        return ix // (H * W), (ix // W) % H, ix % W
+
+    def features_at(self, stored: torch.Tensor, b: np.ndarray, i: np.ndarray, j: np.ndarray, H: int, W: int) -> np.ndarray:
+        maps        = stored.numpy()
+        _B, C, h, w = maps.shape
+
+        fi = np.clip((i * h) // H, 0, h - 1)
+        fj = np.clip((j * w) // W, 0, w - 1)
+
+        features = maps[b, :, fi, fj]
+
+        if C > self.MAX_FEATURES:
+            keep     = np.linspace(0, C - 1, self.MAX_FEATURES).astype(int)
+            features = features[:, keep]
+
+        return features
+
+
+class LayerProbeCore:
+
+    def __init__(self, model, layers: list[str], ppg: int, amp_thr: float, samples_per_batch: int, probe: RidgeProbe, seed: int = 0) -> None:
+        self.model   = model
+        self.layers  = list(layers)
+        self.ppg     = ppg
+        self.amp_thr = amp_thr
+        self.probe   = probe
+        self.sampler = FeatureSampler(samples_per_batch, seed)
 
     def _targets(self, gt_phys: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         B, C, H, W = gt_phys.shape
@@ -83,27 +110,6 @@ class LayerProbeCore:
         dominant = np.where(counts > 0, dominant, np.nan)
 
         return counts, dominant
-
-    def _sample_coords(self, B: int, H: int, W: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        n  = min(self.samples_per_batch, B * H * W)
-        ix = self.rng.choice(B * H * W, size=n, replace=False)
-
-        return ix // (H * W), (ix // W) % H, ix % W
-
-    def _features_at(self, stored: torch.Tensor, b: np.ndarray, i: np.ndarray, j: np.ndarray, H: int, W: int) -> np.ndarray:
-        maps    = stored.numpy()
-        _B, C, h, w = maps.shape
-
-        fi = np.clip((i * h) // H, 0, h - 1)
-        fj = np.clip((j * w) // W, 0, w - 1)
-
-        features = maps[b, :, fi, fj]
-
-        if C > self.MAX_FEATURES:
-            keep     = np.linspace(0, C - 1, self.MAX_FEATURES).astype(int)
-            features = features[:, keep]
-
-        return features
 
     def collect(self, batches: list[tuple[torch.Tensor, np.ndarray]]) -> dict[str, dict]:
         store: dict[str, list] = {layer: [] for layer in self.layers}
@@ -119,7 +125,7 @@ class LayerProbeCore:
 
             stored     = recorder.stored()
             B, _, H, W = images.shape
-            b, i, j    = self._sample_coords(B, H, W)
+            b, i, j    = self.sampler.sample_coords(B, H, W)
 
             counts, dominant = self._targets(gt_phys)
             counts_all.append(counts[b, i, j])
@@ -131,7 +137,7 @@ class LayerProbeCore:
                     store.pop(layer, None)
                     continue
                 if layer in store:
-                    store[layer].append(self._features_at(tensor, b, i, j, H, W))
+                    store[layer].append(self.sampler.features_at(tensor, b, i, j, H, W))
 
         recorder.detach()
 

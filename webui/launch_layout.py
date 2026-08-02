@@ -1278,6 +1278,30 @@ class LaunchLayout:
                 ]},
             ],
         },
+        "compare_representations": {
+            "sections": [
+                {"key": "config", "title": "Configuration", "panels": [
+                    {"kind": "fields", "groups": [
+                        {"title": "Runs", "fields": [
+                            "runs_dir",
+                            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir", "checkpointOnly": True}},
+                            "checkpoint_name",
+                            "output_dir",
+                        ]},
+                        {"title": "Sampling", "fields": [
+                            "split",
+                            "device",
+                            {"path": "batch_size",        "widget": {"kind": "number", "min": 1, "max": 64, "step": 1}},
+                            {"path": "max_batches",       "widget": {"kind": "number", "min": 1, "max": 64, "step": 1}},
+                            {"path": "max_layers",        "widget": {"kind": "number", "min": 2, "max": 64, "step": 1}},
+                            {"path": "samples_per_batch", "widget": {"kind": "number", "min": 64, "max": 8192, "step": 64}},
+                            {"path": "sample_seed",       "widget": NUM_SEED},
+                        ]},
+                        {"title": "Figures", "fields": ["figure_style"]},
+                    ]},
+                ]},
+            ],
+        },
         "probe_layers": {
             "sections": [
                 {"key": "config", "title": "Configuration", "panels": [

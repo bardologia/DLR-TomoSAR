@@ -167,6 +167,11 @@ class ScriptCatalog:
             "category"  : "Analysis",
             "purpose"   : "Probe trained backbone runs layer by layer with linear readouts. Ridge probes on sampled real pixels predict the GT active Gaussian count and the dominant scatterer elevation from each layer's features; the held-out R² by depth shows where each quantity becomes linearly decodable inside the network.",
         },
+        "compare_representations": {
+            "title"     : "Compare Representations",
+            "category"  : "Analysis",
+            "purpose"   : "Compare the internal representations of two or more trained backbone runs with linear CKA on identical sampled pixels. Per-pair cross-layer heatmaps expose which depths learn matching features, and a run-by-run alignment matrix shows whether different architectures or seeds converge to similar representations. Requires runs sharing the split region and patch grid.",
+        },
         "export_tensorboard_plots": {
             "title"     : "Export TensorBoard Plots",
             "category"  : "Analysis",

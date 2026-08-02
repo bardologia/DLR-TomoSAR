@@ -292,3 +292,22 @@ class LayerProbeConfig:
     test_fraction     : float = 0.5
 
     figure_style : str = "report"
+
+
+@dataclass
+class CkaConfig:
+    runs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
+    run_filter : List[str] = field(default_factory=list)
+
+    split           : str  = "test"
+    device          : str  = "cpu"
+    checkpoint_name : str  = "best_model.pt"
+    output_dir      : Path = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/results/cka")
+
+    batch_size        : int = 4
+    max_batches       : int = 4
+    max_layers        : int = 16
+    samples_per_batch : int = 512
+    sample_seed       : int = 0
+
+    figure_style : str = "report"

@@ -116,6 +116,7 @@ class ProjectPaths:
         "attribute_inputs"                : "analysis",
         "capture_attention"               : "analysis",
         "probe_layers"                    : "analysis",
+        "compare_representations"         : "analysis",
         "export_tensorboard_plots"        : "analysis",
         "collect_reports"                 : "analysis",
     }
