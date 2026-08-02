@@ -2470,6 +2470,24 @@
         "max_gate_figures": "Maximum number of attention-gate maps rendered as individual figures",
         "figure_style": "PlotBase figure style the figures are rendered with (report or paper)"
       }
+    },
+    "diagnostics::LayerProbeConfig": {
+      "summary": "Entry config that trains ridge linear probes on the intermediate features of one or more trained backbone runs, reporting held-out R² by depth for the GT active count and dominant scatterer elevation, written into each run directory",
+      "fields": {
+        "runs_dir": "Root directory scanned recursively for run directories holding the configured checkpoint file; each selected run is probed in sequence",
+        "run_filter": "Run directory names (or names of parent directories whose nested runs are expanded) to probe; empty selects interactively on a TTY and every discovered run otherwise",
+        "split": "Dataset split the probe batches and sampled pixels are drawn from",
+        "device": "Torch device the model runs on during feature capture",
+        "checkpoint_name": "Checkpoint filename loaded from each run directory and used as the run-discovery marker",
+        "output_subdir": "Name of the output directory created inside each run directory for the JSON, depth figures and markdown report",
+        "batch_size": "Batch size of the capture forward passes",
+        "max_batches": "Number of loader batches whose activations feed the probes; more batches mean more probe samples at linear cost",
+        "max_layers": "Maximum number of leaf layers probed, spread evenly across the network depth",
+        "samples_per_batch": "Number of pixels sampled per batch as probe examples; features are read at each pixel's location scaled into every layer's spatial grid",
+        "ridge_lambda": "Ridge regularization strength of the linear probes",
+        "test_fraction": "Fraction of probe samples held out for the reported R²",
+        "figure_style": "PlotBase figure style the decodability curves are rendered with (report or paper)"
+      }
     }
   }
 }

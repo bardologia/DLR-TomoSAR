@@ -272,3 +272,23 @@ class AttentionCaptureConfig:
     max_gate_figures : int = 8
 
     figure_style : str = "report"
+
+
+@dataclass
+class LayerProbeConfig:
+    runs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
+    run_filter : List[str] = field(default_factory=list)
+
+    split           : str = "test"
+    device          : str = "cpu"
+    checkpoint_name : str = "best_model.pt"
+    output_subdir   : str = "layer_probes"
+
+    batch_size        : int   = 4
+    max_batches       : int   = 4
+    max_layers        : int   = 24
+    samples_per_batch : int   = 512
+    ridge_lambda      : float = 1.0
+    test_fraction     : float = 0.5
+
+    figure_style : str = "report"

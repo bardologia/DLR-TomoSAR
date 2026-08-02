@@ -115,6 +115,7 @@ class ProjectPaths:
         "measure_receptive_field"         : "analysis",
         "attribute_inputs"                : "analysis",
         "capture_attention"               : "analysis",
+        "probe_layers"                    : "analysis",
         "export_tensorboard_plots"        : "analysis",
         "collect_reports"                 : "analysis",
     }

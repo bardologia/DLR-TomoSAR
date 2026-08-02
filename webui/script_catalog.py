@@ -162,6 +162,11 @@ class ScriptCatalog:
             "category"  : "Analysis",
             "purpose"   : "Capture the attention of trained attention-based backbone runs on one real batch. Records attention-gate maps (attention UNet), shared-block attention weights (Swin, TransUNet, UNETR and friends) and torch multi-head attention (SegFormer), then reports per-layer entropy and peak concentration plus gate-map figures. Refuses runs whose model holds no attention module.",
         },
+        "probe_layers": {
+            "title"     : "Probe Layers",
+            "category"  : "Analysis",
+            "purpose"   : "Probe trained backbone runs layer by layer with linear readouts. Ridge probes on sampled real pixels predict the GT active Gaussian count and the dominant scatterer elevation from each layer's features; the held-out R² by depth shows where each quantity becomes linearly decodable inside the network.",
+        },
         "export_tensorboard_plots": {
             "title"     : "Export TensorBoard Plots",
             "category"  : "Analysis",

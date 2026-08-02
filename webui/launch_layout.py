@@ -1278,6 +1278,31 @@ class LaunchLayout:
                 ]},
             ],
         },
+        "probe_layers": {
+            "sections": [
+                {"key": "config", "title": "Configuration", "panels": [
+                    {"kind": "fields", "groups": [
+                        {"title": "Runs", "fields": [
+                            "runs_dir",
+                            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir", "checkpointOnly": True}},
+                            "checkpoint_name",
+                            "output_subdir",
+                        ]},
+                        {"title": "Probing", "fields": [
+                            "split",
+                            "device",
+                            {"path": "batch_size",        "widget": {"kind": "number", "min": 1, "max": 64, "step": 1}},
+                            {"path": "max_batches",       "widget": {"kind": "number", "min": 1, "max": 64, "step": 1}},
+                            {"path": "max_layers",        "widget": {"kind": "number", "min": 2, "max": 128, "step": 1}},
+                            {"path": "samples_per_batch", "widget": {"kind": "number", "min": 64, "max": 8192, "step": 64}},
+                            "ridge_lambda",
+                            "test_fraction",
+                        ]},
+                        {"title": "Figures", "fields": ["figure_style"]},
+                    ]},
+                ]},
+            ],
+        },
         "capture_attention": {
             "sections": [
                 {"key": "config", "title": "Configuration", "panels": [

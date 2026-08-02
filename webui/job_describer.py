@@ -193,6 +193,11 @@ class JobDescriber:
             ("runs", "run_filter", "list", "all runs"),
             ("root", "runs_dir",   "opt_tail"),
         ],
+        "probe_layers": [
+            ("runs",   "run_filter", "list", "all runs"),
+            ("root",   "runs_dir",   "opt_tail"),
+            ("layers", "max_layers", "text"),
+        ],
         "export_tensorboard_plots": [
             ("runs", "run_filter", "list", "all runs"),
             ("root", "runs_dir",   "opt_tail"),
