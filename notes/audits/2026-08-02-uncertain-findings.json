@@ -1,0 +1,296 @@
+[
+ {
+  "category": "inefficiency",
+  "severity": "minor",
+  "file": "webui/cube_explorer.py",
+  "line": 552,
+  "title": "_curve_points scans the whole cube twice with the same mask"
+ },
+ {
+  "category": "bug",
+  "severity": "minor",
+  "file": "webui/cube_explorer.py",
+  "line": 1389,
+  "title": "SliceCollector builds contexts outside the lock, so concurrent requests duplicate the work and can evict each other"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "webui/cube_explorer.py",
+  "line": 1304,
+  "title": "Reusing a collection name leaves stale figures on disk that the manifest does not list"
+ },
+ {
+  "category": "bug",
+  "severity": "minor",
+  "file": "webui/cube_explorer.py",
+  "line": 289,
+  "title": "slice_ssim returns unclipped az/rg on the no-GT early return"
+ },
+ {
+  "category": "inefficiency",
+  "severity": "minor",
+  "file": "webui/training_curves.py",
+  "line": 19,
+  "title": "TrainingCurves scalar cache grows without bound and is not thread-safe"
+ },
+ {
+  "category": "bug",
+  "severity": "minor",
+  "file": "webui/ab_autopsy.py",
+  "line": 45,
+  "title": "Boolean metric values are rejected on side A but accepted on side B"
+ },
+ {
+  "category": "bug",
+  "severity": "minor",
+  "file": "webui/physics_loss_library.py",
+  "line": 76,
+  "title": "Total-power term card renders \"Invariant to: Absolute power\", contradicting its own caveat and the comparison table"
+ },
+ {
+  "category": "dead-code",
+  "severity": "minor",
+  "file": "webui/static/js/flow_sketches.js",
+  "line": 1258,
+  "title": "Orphan jep_ema sketch for a JEPA target provider that was removed, and no sketches at all for the unrolled flow"
+ },
+ {
+  "category": "dead-code",
+  "severity": "minor",
+  "file": "webui/physics_loss_library.py",
+  "line": 68,
+  "title": "Per-term \"key\" field is never consumed by the physics-loss view"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "webui/static/js/models.js",
+  "line": 461,
+  "title": "Architecture legend claims skip concatenation for backbones that have no skips"
+ },
+ {
+  "category": "bug",
+  "severity": "minor",
+  "file": "webui/static/js/leaderboard.js",
+  "line": 483,
+  "title": "Curves view: sidebar dot colours and labels can disagree with the chart lines"
+ },
+ {
+  "category": "dead-code",
+  "severity": "minor",
+  "file": "webui/static/js/launch_widgets.js",
+  "line": 513,
+  "title": "Four write-only / never-called frontend members"
+ },
+ {
+  "category": "dead-code",
+  "severity": "minor",
+  "file": "webui/static/css/styles.css",
+  "line": 1946,
+  "title": "~60 orphaned CSS rules from removed markup"
+ },
+ {
+  "category": "inefficiency",
+  "severity": "minor",
+  "file": "webui/static/js/tomogram.js",
+  "line": 2139,
+  "title": "ImageBitmaps are never closed and the sweep cache byte budget drifts"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "webui/static/js/microscope.js",
+  "line": 208,
+  "title": "Microscope status poll bypasses apiGet and re-runs the ready handler on every tab entry"
+ },
+ {
+  "category": "bug",
+  "severity": "minor",
+  "file": "webui/static/js/radar.js",
+  "line": 13,
+  "title": "CanvasBase never unregisters its resize listener or ResizeObserver, so status-board rebuilds leak gauges"
+ },
+ {
+  "category": "dead-code",
+  "severity": "minor",
+  "file": "tests/backbone_training/_helpers.py",
+  "line": 161,
+  "title": "Unreferenced helpers in shared test-helper modules"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "tests/cross_validation/test_cv_report.py",
+  "line": 95,
+  "title": "Tautological self-comparison as the first assertion of test_format_std_empty_when_too_few"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "tests/cross_validation/test_cv_report.py",
+  "line": 183,
+  "title": "test_aggregate_markdown_reports_correct_mean only checks that the digit '3' appears in the row"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "tests/backbone_inference/test_attention_capture.py",
+  "line": 44,
+  "title": "Weak disjunct assertion in test_swin_attention_weights_are_captured_and_labelled"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "tests/benchmark/test_sizing.py",
+  "line": 28,
+  "title": "test_width_scaler_registers_a_rule_for_every_model passes vacuously on an empty rule table"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "tests/configuration/test_architectures.py",
+  "line": 121,
+  "title": "'round trip' config tests never compare values, only isinstance of the rebuilt object"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "tests/entrypoints/test_main_entrypoints.py",
+  "line": 508,
+  "title": "Entry-config CLI tests assert only 'is not None' / identity, which constructors guarantee"
+ },
+ {
+  "category": "dead-code",
+  "severity": "minor",
+  "file": "tests/backbone_training/test_diagnostics.py",
+  "line": 268,
+  "title": "Dead parameters threaded through test helpers"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "tests/ae_inference/test_metrics.py",
+  "line": 59,
+  "title": "test_write_json_roundtrip does not round-trip \u2014 it only checks the file exists"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "tests/backbone_inference/test_plots.py",
+  "line": 58,
+  "title": "test_ploter_composes_subplotters ends with a tautological identity check"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "tests/processing/test_param_extraction.py",
+  "line": 229,
+  "title": "Module-scoped Logger fixtures leak temp directories and open file handles"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "tests/processing/test_param_extraction.py",
+  "line": 602,
+  "title": "Assertions guarded by data-dependent conditions can pass vacuously"
+ },
+ {
+  "category": "dead-code",
+  "severity": "minor",
+  "file": "tests/tuning/conftest.py",
+  "line": 64,
+  "title": "Unused pytest fixtures in conftest files"
+ },
+ {
+  "category": "bug",
+  "severity": "minor",
+  "file": "tests/sar_geometry/test_sar_launchers.py",
+  "line": 143,
+  "title": "PyRatEnvironment tests leak LD_LIBRARY_PATH and QT_QPA_PLATFORM into the rest of the session"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "tests/webui/test_ab_autopsy.py",
+  "line": 35,
+  "title": "Fixture cubes are seeded from the builtin hash(), so test data changes every run"
+ },
+ {
+  "category": "dead-code",
+  "severity": "minor",
+  "file": "tests/orchestration/test_gpu_queue.py",
+  "line": 13,
+  "title": "Unused imports across the suite"
+ },
+ {
+  "category": "dead-code",
+  "severity": "minor",
+  "file": "tools/data/regions.py",
+  "line": 125,
+  "title": "Seven public helpers are exercised only by their own unit tests and by no production caller"
+ },
+ {
+  "category": "dead-code",
+  "severity": "minor",
+  "file": "scripts/fix_config_names.py",
+  "line": 13,
+  "title": "Four scripts/ utilities are referenced by nothing in the repo"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "webui/repomap_data.json",
+  "line": 1279,
+  "title": "Repo Map shows four module labels naming .py files that were split into packages"
+ },
+ {
+  "category": "dead-code",
+  "severity": "minor",
+  "file": "tools/monitoring/logger.py",
+  "line": 3,
+  "title": "Eleven unused imports across production modules"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "docs/presentations/full_project_story/joint_error_heatmap.py",
+  "line": 218,
+  "title": "Deck figure generators write to docs/results/ but the deck reads ../figures/"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "webui/launch_layout.py",
+  "line": 41,
+  "title": "Normalization dropdowns offer fixed_bounds for input channels, which always raises"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "configuration/training/backbone.py",
+  "line": 245,
+  "title": "probe_reference is typed str, so the documented None behaviour is unreachable and typos fall back silently"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "webui/launch_layout.py",
+  "line": 609,
+  "title": "Loss-scale probe panel is titled \"Throughput probe\""
+ },
+ {
+  "category": "dead-code",
+  "severity": "minor",
+  "file": "webui/launch_layout.py",
+  "line": 42,
+  "title": "CH_NORM_CHANNEL widget constant is never referenced"
+ },
+ {
+  "category": "unintended-behavior",
+  "severity": "minor",
+  "file": "webui/launch_layout.py",
+  "line": 297,
+  "title": "Derived provenance field baselines_origin is exposed as an editable launch widget"
+ }
+]
