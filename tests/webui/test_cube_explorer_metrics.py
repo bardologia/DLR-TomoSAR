@@ -139,8 +139,9 @@ def test_selective_metrics_keep_low_confidence_share(tmp_path):
     r2_full = next(row for row in full["rows"] if row["key"] == "pixel_r2")
     r2_half = next(row for row in half["rows"] if row["key"] == "pixel_r2")
 
+    assert full["direction"] == "high"
     assert r2_full["kept"] == r2_full["full"]
-    assert r2_half["kept"] <= r2_half["full"]
+    assert r2_half["kept"] >= r2_half["full"]
 
 
 def test_selective_metrics_reject_unknown_layer(tmp_path):

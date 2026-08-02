@@ -92,6 +92,7 @@ class ModelProbe:
                     "types"    : {name: type(modules[name]).__name__ for name in layers},
                     "renderer" : renderer,
                     "patch"    : tuple(run.dataset_config.patch.size),
+                    "device"   : device,
                 }
                 self.status = {"state": "ready", "path": run_path, "progress": 1.0, "stage": "ready", "error": "", "info": info}
 
@@ -222,11 +223,10 @@ class ModelProbe:
                 window, cy, cx = self._window(az, rg)
                 offset         = self.FAMILIES.index(family)
 
-                x = torch.from_numpy(window).requires_grad_(True)
-                y = self.loaded["run"].model.module(x)
-
-                y[0, offset::3, cy, cx].abs().sum().backward()
-                grad = x.grad.abs()[0].numpy()
+                x      = torch.from_numpy(window).to(self.loaded["device"]).requires_grad_(True)
+                y      = self.loaded["run"].model.module(x)
+                target = y[0, offset::3, cy, cx].abs().sum()
+                grad   = torch.autograd.grad(target, x)[0].abs()[0].cpu().numpy()
 
                 shares = grad.sum(axis=(1, 2))
                 total  = float(shares.sum())
@@ -312,10 +312,12 @@ class ModelProbe:
             recorder = ActivationRecorder(self.loaded["run"].model.module)
             recorder.attach_store([layer])
 
-            with torch.no_grad():
-                self.loaded["run"].model.module(torch.from_numpy(window))
+            try:
+                with torch.no_grad():
+                    self.loaded["run"].model.module(torch.from_numpy(window).to(self.loaded["device"]))
+            finally:
+                recorder.detach()
 
-            recorder.detach()
             stored = recorder.stored().get(layer)
 
         if stored is None or stored.ndim < 4:

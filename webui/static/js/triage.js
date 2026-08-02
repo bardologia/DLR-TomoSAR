@@ -151,12 +151,7 @@ class TriageView {
       note    : noteOverride !== undefined ? noteOverride : (annotation.note || ""),
     };
 
-    const res = await fetch("/api/triage/annotate", {
-      method  : "POST",
-      headers : { "Content-Type": "application/json" },
-      body    : JSON.stringify(body),
-    });
-    const out = await res.json();
+    const out = await window.apiPost("/api/triage/annotate", body);
 
     if (out.ok) {
       row.annotation = out.annotation || null;

@@ -642,7 +642,8 @@ class CubeExplorer:
             return None
         return data, primary
 
-    SELECTIVE_KEYS = ("pixel_mse", "pixel_mae", "pixel_r2", "pixel_cos", "pixel_peak")
+    SELECTIVE_KEYS   = ("pixel_mse", "pixel_mae", "pixel_r2", "pixel_cos", "pixel_peak")
+    HIGH_IS_CONFIDENT = ("pixel_r2", "pixel_cos", "label_r2", "physics_valid_mask")
 
     def selective_metrics(self, cube_id: str, key: str, coverage: float) -> dict:
         resolved = self._metric_state(cube_id, key)
@@ -665,8 +666,14 @@ class CubeExplorer:
         if not finite.any():
             return {"ok": False, "error": f"confidence layer '{key}' holds no finite value"}
 
-        threshold = float(np.quantile(confidence[finite], coverage))
-        keep      = finite & (confidence <= threshold)
+        keep_high = key in self.HIGH_IS_CONFIDENT
+
+        if keep_high:
+            threshold = float(np.quantile(confidence[finite], 1.0 - coverage))
+            keep      = finite & (confidence >= threshold)
+        else:
+            threshold = float(np.quantile(confidence[finite], coverage))
+            keep      = finite & (confidence <= threshold)
 
         rows = []
         for name, data in sorted(maps.items()):
@@ -687,6 +694,7 @@ class CubeExplorer:
             "layer"     : key,
             "coverage"  : float(keep.sum() / max(finite.sum(), 1)),
             "threshold" : threshold,
+            "direction" : "high" if keep_high else "low",
             "n_kept"    : int(keep.sum()),
             "n_total"   : int(finite.sum()),
             "rows"      : rows,

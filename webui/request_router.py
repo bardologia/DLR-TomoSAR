@@ -186,6 +186,7 @@ class RequestRouter:
             return
 
         if path == "/api/triage/cases":
+            query  = parse_qs(urlparse(handler.path).query)
             result = self.triage.cases(
                 cube_id = (query.get("id") or [""])[0],
                 top_n   = int((query.get("n") or ["40"])[0]),
@@ -194,6 +195,7 @@ class RequestRouter:
             return
 
         if path == "/api/autopsy/compare":
+            query  = parse_qs(urlparse(handler.path).query)
             result = self.autopsy.compare(
                 a = (query.get("a") or [""])[0],
                 b = (query.get("b") or [""])[0],
@@ -202,6 +204,7 @@ class RequestRouter:
             return
 
         if path == "/api/autopsy/profile":
+            query  = parse_qs(urlparse(handler.path).query)
             result = self.autopsy.profile(
                 a  = (query.get("a") or [""])[0],
                 b  = (query.get("b") or [""])[0],
@@ -221,6 +224,7 @@ class RequestRouter:
             return
 
         if path == "/api/probe/features":
+            query = parse_qs(urlparse(handler.path).query)
             self._send_png(handler, self.probe.features_png(
                 int((query.get("az") or ["0"])[0]),
                 int((query.get("rg") or ["0"])[0]),

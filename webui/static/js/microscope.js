@@ -45,12 +45,12 @@ class MicroscopeView {
               <span class="cube-coords" id="probe-model-badge"></span>
             </div>
             <div class="fl-map__frame">
-              <span class="cube-axis cube-axis--y">range &rarr;</span>
+              <span class="cube-axis cube-axis--y">azimuth &darr;</span>
               <div class="fl-map__wrap" id="probe-map-wrap">
                 <img id="probe-map-img" alt="Primary SLC amplitude" />
                 <div class="fl-marks" id="probe-marks"></div>
               </div>
-              <span class="cube-axis cube-axis--x">azimuth &rarr;</span>
+              <span class="cube-axis cube-axis--x">range &rarr;</span>
             </div>
             <p class="cube-coords" id="probe-coords">Click the map to probe a pixel.</p>
             <div class="fl-pixrow" role="group" aria-label="Probe a pixel by index">
@@ -190,12 +190,7 @@ class MicroscopeView {
     const path = this.refs.runInput.value.trim();
     if (!path) return;
 
-    const res = await fetch("/api/probe/load", {
-      method  : "POST",
-      headers : { "Content-Type": "application/json" },
-      body    : JSON.stringify({ path }),
-    });
-    const out = await res.json();
+    const out = await window.apiPost("/api/probe/load", { path });
     if (!out.ok) {
       this.refs.hint.textContent = out.error || "load failed";
       return;
@@ -271,12 +266,7 @@ class MicroscopeView {
     this.refs.coords.textContent = `probing az ${az}, rg ${rg}`;
     this._renderMark(az, rg);
 
-    const res = await fetch("/api/probe/predict", {
-      method  : "POST",
-      headers : { "Content-Type": "application/json" },
-      body    : JSON.stringify({ az, rg }),
-    });
-    const out = await res.json();
+    const out = await window.apiPost("/api/probe/predict", { az, rg });
     if (!out.ok) {
       this.refs.coords.textContent = out.error;
       return;
@@ -318,12 +308,7 @@ class MicroscopeView {
   async _loadSaliency() {
     if (!this.pixel) return;
 
-    const res = await fetch("/api/probe/saliency", {
-      method  : "POST",
-      headers : { "Content-Type": "application/json" },
-      body    : JSON.stringify({ az: this.pixel.az, rg: this.pixel.rg, family: this.family }),
-    });
-    const out = await res.json();
+    const out = await window.apiPost("/api/probe/saliency", { az: this.pixel.az, rg: this.pixel.rg, family: this.family });
 
     if (!out.ok) {
       this.refs.shares.innerHTML = `<p class="cube-hint">${this._esc(out.error)}</p>`;
@@ -364,12 +349,7 @@ class MicroscopeView {
     if (kind === "scale_channel") perturbation.factor = parseFloat(this.refs.wValue.value);
     if (kind === "noise") perturbation.sigma = parseFloat(this.refs.wValue.value);
 
-    const res = await fetch("/api/probe/whatif", {
-      method  : "POST",
-      headers : { "Content-Type": "application/json" },
-      body    : JSON.stringify({ az: this.pixel.az, rg: this.pixel.rg, perturbation }),
-    });
-    const out = await res.json();
+    const out = await window.apiPost("/api/probe/whatif", { az: this.pixel.az, rg: this.pixel.rg, perturbation });
 
     if (!out.ok) {
       this.refs.wDelta.textContent = out.error;

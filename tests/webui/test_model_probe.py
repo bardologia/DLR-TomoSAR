@@ -84,6 +84,7 @@ def _probe() -> ModelProbe:
         "types"    : {"conv": "Conv2d"},
         "renderer" : PredictionCurves(1, run.x_axis),
         "patch"    : (PH, PW),
+        "device"   : "cpu",
     }
     probe.status = {"state": "ready", "path": "fake", "progress": 1.0, "stage": "ready", "error": "", "info": None}
 

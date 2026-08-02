@@ -52,13 +52,18 @@ class TriageStore:
 class TriageBoard:
 
     BLOCK      = 16
-    MODES      = ("ok", "missed", "hallucinated", "position", "width", "amplitude")
     AUX_LAYERS = ("label_r2", "seed_std_profile", "flip_consistency")
 
     def __init__(self, paths: ProjectPaths, logger: WebLogger) -> None:
         self.paths  = paths
         self.logger = logger
         self.store  = TriageStore(paths.logs_dir / "triage")
+
+    @property
+    def modes(self) -> tuple:
+        from pipelines.backbone.inference.failure_modes import FailureModes
+
+        return FailureModes.MODES
 
     def _load_map(self, cubes_dir: Path, name: str) -> np.ndarray | None:
         path = cubes_dir / f"{name}.npy"
@@ -99,7 +104,8 @@ class TriageBoard:
                     modes            = mode_map[az0:az0 + self.BLOCK, rg0:rg0 + self.BLOCK].astype(np.int64)
                     failing          = modes[modes > 0]
                     dominant         = int(np.bincount(failing).argmax()) if failing.size else 0
-                    row["mode"]      = self.MODES[dominant] if dominant < len(self.MODES) else str(dominant)
+                    mode_names       = self.modes
+                    row["mode"]      = mode_names[dominant] if dominant < len(mode_names) else str(dominant)
                     row["fail_frac"] = float((modes > 0).mean())
 
                 for name, layer in aux.items():

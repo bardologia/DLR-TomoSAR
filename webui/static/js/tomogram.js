@@ -538,7 +538,8 @@ class TomogramMetrics {
         html += `<tr><td>${row.label}</td><td>${kept}</td><td>${this.host._fmt(row.full)}</td></tr>`;
       });
       html += `</tbody></table>`;
-      html += `<p class="cube-hint">${data.n_kept.toLocaleString()} of ${data.n_total.toLocaleString()} pixels kept (layer ≤ ${this.host._fmt(data.threshold)})</p>`;
+      const cmp = data.direction === "high" ? "≥" : "≤";
+      html += `<p class="cube-hint">${data.n_kept.toLocaleString()} of ${data.n_total.toLocaleString()} pixels kept (layer ${cmp} ${this.host._fmt(data.threshold)})</p>`;
       this.selTabEl.innerHTML = html;
     } catch (err) {
       this.selTabEl.innerHTML = `<p class="cube-hint">selective metrics failed</p>`;
