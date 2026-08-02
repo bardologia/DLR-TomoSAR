@@ -331,3 +331,23 @@ class LossLandscapeConfig:
     direction_seed : int   = 0
 
     figure_style : str = "report"
+
+
+@dataclass
+class RobustnessConfig:
+    runs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
+    run_filter : List[str] = field(default_factory=list)
+
+    split           : str = "test"
+    device          : str = "cpu"
+    checkpoint_name : str = "best_model.pt"
+    output_subdir   : str = "robustness"
+
+    batch_size       : int         = 4
+    max_batches      : int         = 2
+    noise_sigmas     : List[float] = field(default_factory=lambda: [0.0, 0.1, 0.25, 0.5, 1.0])
+    draws_per_count  : int         = 3
+    render_amp_floor : float       = 0.0
+    seed             : int         = 0
+
+    figure_style : str = "report"

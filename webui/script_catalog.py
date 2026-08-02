@@ -177,6 +177,11 @@ class ScriptCatalog:
             "category"  : "Analysis",
             "purpose"   : "Map the curve-MSE landscape around the trained weights of backbone runs along two filter-normalized random directions (Li et al. 2018). Writes 1D cuts, a 2D log-scale contour, and a sharpness scalar per direction into each run directory. The physical curve objective keeps runs trained under different losses comparable, replacing the synthetic shift/scale landscape.",
         },
+        "stress_inputs": {
+            "title"     : "Stress Inputs",
+            "category"  : "Analysis",
+            "purpose"   : "Stress trained backbone runs with controlled input degradation. Curve-MSE-vs-severity under gaussian noise on the normalized inputs and under whole-track dropout (secondary and interferogram channels zeroed, averaged over random track subsets). Complements the secondaries experiment with a post-hoc robustness axis that needs no retraining.",
+        },
         "export_tensorboard_plots": {
             "title"     : "Export TensorBoard Plots",
             "category"  : "Analysis",

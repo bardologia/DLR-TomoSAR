@@ -2523,6 +2523,24 @@
         "direction_seed": "Seed of the two random directions (seed and seed+1); fixed seeds make landscapes comparable across runs",
         "figure_style": "PlotBase figure style the cuts and contour are rendered with (report or paper)"
       }
+    },
+    "diagnostics::RobustnessConfig": {
+      "summary": "Entry config that stresses one or more trained backbone runs with controlled input degradation: curve MSE versus noise severity and versus number of dropped tracks, written into each run directory",
+      "fields": {
+        "runs_dir": "Root directory scanned recursively for run directories holding the configured checkpoint file; each selected run is stressed in sequence",
+        "run_filter": "Run directory names (or names of parent directories whose nested runs are expanded) to stress; empty selects interactively on a TTY and every discovered run otherwise",
+        "split": "Dataset split the fixed evaluation batches are drawn from",
+        "device": "Torch device the perturbed evaluations run on",
+        "checkpoint_name": "Checkpoint filename loaded from each run directory and used as the run-discovery marker",
+        "output_subdir": "Name of the output directory created inside each run directory for the JSON, curves and markdown report",
+        "batch_size": "Batch size of the fixed evaluation batches",
+        "max_batches": "Number of batches the curve MSE is averaged over at every severity level",
+        "noise_sigmas": "Gaussian noise standard deviations (in normalized input units) the degradation curve samples; include 0.0 for the clean reference",
+        "draws_per_count": "Number of random track subsets averaged for each dropped-track count",
+        "render_amp_floor": "Amplitude floor below which predicted Gaussians are dropped before rendering the comparison curves, matching the inference render floor",
+        "seed": "Seed of the noise draws and dropped-track subsets",
+        "figure_style": "PlotBase figure style the severity curves are rendered with (report or paper)"
+      }
     }
   }
 }

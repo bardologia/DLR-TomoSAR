@@ -46,6 +46,37 @@ class ChannelLabeler:
         return labels
 
 
+class TrackChannels:
+
+    @staticmethod
+    def build(run) -> list[list[int]]:
+        input_config = run.dataset.input_config
+        offset       = 0
+
+        if input_config.use_primary:
+            offset += input_config.primary_channels_per_pass
+
+        n_tracks  = run.n_secondaries
+        per_track = [[] for _ in range(n_tracks)]
+
+        if input_config.use_secondaries:
+            per_pass = input_config.secondaries_channels_per_pass
+            for track in range(n_tracks):
+                per_track[track] += list(range(offset + track * per_pass, offset + (track + 1) * per_pass))
+            offset += n_tracks * per_pass
+
+        if input_config.use_interferograms:
+            per_pass = input_config.interferograms_channels_per_pass
+            for track in range(n_tracks):
+                per_track[track] += list(range(offset + track * per_pass, offset + (track + 1) * per_pass))
+            offset += n_tracks * per_pass
+
+        if not any(per_track):
+            raise ValueError("The input configuration holds neither secondaries nor interferograms; there is no track channel to drop")
+
+        return per_track
+
+
 class GradientAttribution:
 
     FAMILIES = ("amp", "mu", "sigma")

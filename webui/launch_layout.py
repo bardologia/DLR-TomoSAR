@@ -1278,6 +1278,31 @@ class LaunchLayout:
                 ]},
             ],
         },
+        "stress_inputs": {
+            "sections": [
+                {"key": "config", "title": "Configuration", "panels": [
+                    {"kind": "fields", "groups": [
+                        {"title": "Runs", "fields": [
+                            "runs_dir",
+                            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir", "checkpointOnly": True}},
+                            "checkpoint_name",
+                            "output_subdir",
+                        ]},
+                        {"title": "Stress", "fields": [
+                            "split",
+                            "device",
+                            {"path": "batch_size",      "widget": {"kind": "number", "min": 1, "max": 64, "step": 1}},
+                            {"path": "max_batches",     "widget": {"kind": "number", "min": 1, "max": 16, "step": 1}},
+                            {"path": "noise_sigmas",    "widget": {"kind": "multi", "numeric": True}},
+                            {"path": "draws_per_count", "widget": {"kind": "number", "min": 1, "max": 16, "step": 1}},
+                            "render_amp_floor",
+                            {"path": "seed", "widget": NUM_SEED},
+                        ]},
+                        {"title": "Figures", "fields": ["figure_style"]},
+                    ]},
+                ]},
+            ],
+        },
         "map_loss_landscape": {
             "sections": [
                 {"key": "config", "title": "Configuration", "panels": [
