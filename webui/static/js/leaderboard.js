@@ -660,6 +660,7 @@ class LeaderboardView {
     let html = `<div class="lb-bar-top">`;
     html += `<button type="button" class="btn btn--mini" id="lb-back">&larr; Back to table</button>`;
     html += `<span class="lb-count">Comparing ${sides.length} inference results</span>`;
+    if (pair) html += `<button type="button" class="btn btn--mini" id="lb-autopsy">Autopsy A vs B</button>`;
     html += `</div>`;
 
     html += `<div class="lb-diff__heads">`;
@@ -824,6 +825,13 @@ class LeaderboardView {
     if (back) back.addEventListener("click", () => {
       this.view = "table";
       this._render();
+    });
+
+    const autopsy = this.root.querySelector("#lb-autopsy");
+    if (autopsy) autopsy.addEventListener("click", () => {
+      const sides = this.diffData.sides;
+      window.abAutopsyPair = { a: sides[0].id, b: sides[1].id };
+      window.location.hash = "#/autopsy";
     });
 
     const filter = this.root.querySelector("#lb-diff-filter");

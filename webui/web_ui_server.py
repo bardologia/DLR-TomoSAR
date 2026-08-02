@@ -7,6 +7,7 @@ from config_registry                   import ConfigRegistry
 from cube_explorer                     import CubeExplorer, SliceCollector
 from dataset_browser                   import DatasetBrowser
 from equation_library                  import EquationLibrary
+from ab_autopsy                        import AbAutopsy
 from fit_lab                           import FitLab
 from model_probe                       import ModelProbe
 from triage_board                      import TriageBoard
@@ -102,6 +103,7 @@ class WebUIServer:
         self.fitlab            = FitLab(self.paths, self.logger)
         self.probe             = ModelProbe(self.paths, self.logger)
         self.triage            = TriageBoard(self.paths, self.logger)
+        self.autopsy           = AbAutopsy(self.paths, self.logger)
 
         self.router = RequestRouter(
             paths             = self.paths,
@@ -139,6 +141,7 @@ class WebUIServer:
             fitlab            = self.fitlab,
             probe             = self.probe,
             triage            = self.triage,
+            autopsy           = self.autopsy,
         )
 
     def serve(self) -> None:

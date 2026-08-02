@@ -13,6 +13,7 @@ from config_registry                   import ConfigRegistry
 from cube_explorer                     import CubeExplorer, SliceCollector
 from dataset_browser                   import DatasetBrowser
 from equation_library                  import EquationLibrary
+from ab_autopsy                        import AbAutopsy
 from fit_lab                           import FitLab
 from model_probe                       import ModelProbe
 from triage_board                      import TriageBoard
@@ -52,7 +53,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, saved_runs: SavedRunStore, notifier: JobNotifier, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, slices: SliceCollector, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves, fitlab: FitLab, probe: ModelProbe, triage: TriageBoard) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, saved_runs: SavedRunStore, notifier: JobNotifier, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, slices: SliceCollector, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves, fitlab: FitLab, probe: ModelProbe, triage: TriageBoard, autopsy: AbAutopsy) -> None:
         self.paths             = paths
         self.logger            = logger
         self.catalog           = catalog
@@ -88,6 +89,7 @@ class RequestRouter:
         self.fitlab            = fitlab
         self.probe             = probe
         self.triage            = triage
+        self.autopsy           = autopsy
 
     def _route_get(self, handler, path: str) -> None:
         if path == "/" or path == "":
@@ -187,6 +189,24 @@ class RequestRouter:
             result = self.triage.cases(
                 cube_id = (query.get("id") or [""])[0],
                 top_n   = int((query.get("n") or ["40"])[0]),
+            )
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/autopsy/compare":
+            result = self.autopsy.compare(
+                a = (query.get("a") or [""])[0],
+                b = (query.get("b") or [""])[0],
+            )
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/autopsy/profile":
+            result = self.autopsy.profile(
+                a  = (query.get("a") or [""])[0],
+                b  = (query.get("b") or [""])[0],
+                az = int((query.get("az") or ["0"])[0]),
+                rg = int((query.get("rg") or ["0"])[0]),
             )
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return

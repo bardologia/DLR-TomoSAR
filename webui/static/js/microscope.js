@@ -384,49 +384,7 @@ class MicroscopeView {
   }
 
   _lineChart(canvas, xAxis, series) {
-    const ctx = canvas.getContext("2d");
-    const W   = canvas.width;
-    const H   = canvas.height;
-    const pad = { l: 42, r: 10, t: 8, b: 22 };
-
-    ctx.clearRect(0, 0, W, H);
-
-    const all = series.flatMap((s) => s.values).filter((v) => Number.isFinite(v));
-    if (!all.length) return;
-
-    const lo = Math.min(0, ...all);
-    const hi = Math.max(...all) * 1.05 || 1;
-    const x0 = xAxis[0];
-    const x1 = xAxis[xAxis.length - 1];
-
-    const px = (x) => pad.l + ((x - x0) / (x1 - x0)) * (W - pad.l - pad.r);
-    const py = (v) => H - pad.b - ((v - lo) / (hi - lo)) * (H - pad.t - pad.b);
-
-    ctx.strokeStyle = "rgba(120,130,150,.35)";
-    ctx.lineWidth   = 1;
-    ctx.strokeRect(pad.l, pad.t, W - pad.l - pad.r, H - pad.t - pad.b);
-
-    ctx.fillStyle = "rgba(110,120,140,.9)";
-    ctx.font      = "10px JetBrains Mono, monospace";
-    ctx.fillText(hi.toPrecision(3), 4, pad.t + 10);
-    ctx.fillText(lo.toPrecision(3), 4, H - pad.b);
-    ctx.fillText(`${x0.toFixed(0)}m`, pad.l, H - 6);
-    ctx.fillText(`${x1.toFixed(0)}m`, W - pad.r - 34, H - 6);
-
-    series.forEach((s, index) => {
-      ctx.strokeStyle = s.color;
-      ctx.lineWidth   = s.width;
-      ctx.beginPath();
-      s.values.forEach((v, i) => {
-        const x = px(xAxis[i]);
-        const y = py(v);
-        if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      });
-      ctx.stroke();
-
-      ctx.fillStyle = s.color;
-      ctx.fillText(s.label, W - pad.r - 60, pad.t + 12 + index * 12);
-    });
+    window.drawLineChart(canvas, xAxis, series);
   }
 
   _heatmap(canvas, map, center) {
@@ -459,5 +417,51 @@ class MicroscopeView {
     return String(text).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
   }
 }
+
+window.drawLineChart = (canvas, xAxis, series) => {
+  const ctx = canvas.getContext("2d");
+  const W   = canvas.width;
+  const H   = canvas.height;
+  const pad = { l: 42, r: 10, t: 8, b: 22 };
+
+  ctx.clearRect(0, 0, W, H);
+
+  const all = series.flatMap((s) => s.values).filter((v) => Number.isFinite(v));
+  if (!all.length) return;
+
+  const lo = Math.min(0, ...all);
+  const hi = Math.max(...all) * 1.05 || 1;
+  const x0 = xAxis[0];
+  const x1 = xAxis[xAxis.length - 1];
+
+  const px = (x) => pad.l + ((x - x0) / (x1 - x0)) * (W - pad.l - pad.r);
+  const py = (v) => H - pad.b - ((v - lo) / (hi - lo)) * (H - pad.t - pad.b);
+
+  ctx.strokeStyle = "rgba(120,130,150,.35)";
+  ctx.lineWidth   = 1;
+  ctx.strokeRect(pad.l, pad.t, W - pad.l - pad.r, H - pad.t - pad.b);
+
+  ctx.fillStyle = "rgba(110,120,140,.9)";
+  ctx.font      = "10px JetBrains Mono, monospace";
+  ctx.fillText(hi.toPrecision(3), 4, pad.t + 10);
+  ctx.fillText(lo.toPrecision(3), 4, H - pad.b);
+  ctx.fillText(`${x0.toFixed(0)}m`, pad.l, H - 6);
+  ctx.fillText(`${x1.toFixed(0)}m`, W - pad.r - 34, H - 6);
+
+  series.forEach((s, index) => {
+    ctx.strokeStyle = s.color;
+    ctx.lineWidth   = s.width;
+    ctx.beginPath();
+    s.values.forEach((v, i) => {
+      const x = px(xAxis[i]);
+      const y = py(v);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+
+    ctx.fillStyle = s.color;
+    ctx.fillText(s.label, W - pad.r - 60, pad.t + 12 + index * 12);
+  });
+};
 
 window.MicroscopeView = MicroscopeView;

@@ -40,6 +40,7 @@
     <a href="#/fitlab" data-route="fitlab">Fit Lab</a>
     <a href="#/microscope" data-route="microscope">Microscope</a>
     <a href="#/triage" data-route="triage">Triage</a>
+    <a href="#/autopsy" data-route="autopsy">Autopsy</a>
     <a href="#/leaderboard" data-route="leaderboard">Leaderboard</a>
     <a href="#/feedtuner" data-route="feedtuner">Feed Tuner</a>
     <a href="#/tensorboard" data-route="tensorboard">TensorBoard</a>
@@ -715,6 +716,19 @@
     </div>
   </section>
 
+  <!-- A/B AUTOPSY -->
+  <section class="page page--pad" data-page="autopsy">
+    <div class="page__head">
+      <h2 class="page__title">A/B autopsy</h2>
+      <p class="page__lead">
+        A guided comparison of two saved inferences over the same region: the largest
+        relative metric gaps with the winner per row, and the locations where the runs
+        disagree most, each with both predicted profiles against the ground truth.
+      </p>
+    </div>
+    <div id="autopsy-root"></div>
+  </section>
+
   <!-- ERROR TRIAGE -->
   <section class="page page--pad" data-page="triage">
     <div class="page__head">
@@ -1131,6 +1145,7 @@
 <script src="/static/js/fit_lab.js?v=20260721a"></script>
 <script src="/static/js/microscope.js?v=20260802a"></script>
 <script src="/static/js/triage.js?v=20260802a"></script>
+<script src="/static/js/autopsy.js?v=20260802a"></script>
 <script src="/static/js/tensorboard.js?v=20260702r"></script>
 <script src="/static/js/feed_tuner.js?v=20260624a"></script>
 <script src="/static/js/app.js?v=20260802a"></script>

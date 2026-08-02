@@ -233,6 +233,7 @@ class App {
 
     this.microscopeView = new window.MicroscopeView(document.getElementById("probe-root"));
     this.triageView     = new window.TriageView(document.getElementById("triage-root"));
+    this.autopsyView    = new window.AutopsyView(document.getElementById("autopsy-root"));
 
     this.fitLabView = new window.FitLabView({
       baseInput        : document.getElementById("fl-base"),
@@ -480,6 +481,7 @@ class App {
     if (route === "fitlab") this.fitLabView.enter();
     if (route === "microscope") this.microscopeView.enter();
     if (route === "triage") this.triageView.enter();
+    if (route === "autopsy") this.autopsyView.enter();
     if (route === "console") this.runConsole.onShow();
     setTimeout(() => this.reveal.scan(), 60);
   }
