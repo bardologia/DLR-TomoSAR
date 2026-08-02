@@ -9,6 +9,7 @@ from dataset_browser                   import DatasetBrowser
 from equation_library                  import EquationLibrary
 from fit_lab                           import FitLab
 from model_probe                       import ModelProbe
+from triage_board                      import TriageBoard
 from flow_library                      import FlowLibrary
 from gpu_schedule                      import GpuSchedule
 from gpu_watchdog                      import GpuWatchdog
@@ -100,6 +101,7 @@ class WebUIServer:
         self.curves            = TrainingCurves(self.logger)
         self.fitlab            = FitLab(self.paths, self.logger)
         self.probe             = ModelProbe(self.paths, self.logger)
+        self.triage            = TriageBoard(self.paths, self.logger)
 
         self.router = RequestRouter(
             paths             = self.paths,
@@ -136,6 +138,7 @@ class WebUIServer:
             curves            = self.curves,
             fitlab            = self.fitlab,
             probe             = self.probe,
+            triage            = self.triage,
         )
 
     def serve(self) -> None:

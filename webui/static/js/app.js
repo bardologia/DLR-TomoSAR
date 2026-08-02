@@ -232,6 +232,7 @@ class App {
     this.leaderboardView = new window.LeaderboardView(document.getElementById("leaderboard-root"));
 
     this.microscopeView = new window.MicroscopeView(document.getElementById("probe-root"));
+    this.triageView     = new window.TriageView(document.getElementById("triage-root"));
 
     this.fitLabView = new window.FitLabView({
       baseInput        : document.getElementById("fl-base"),
@@ -396,6 +397,7 @@ class App {
         canvas : root.querySelector("canvas"),
       })),
     });
+    window.tomogramView = this.tomogramView;
 
     this.sliceCollectorView = new window.SliceCollectorView({
       strip       : document.getElementById("sc-strip"),
@@ -477,6 +479,7 @@ class App {
     if (route === "slices") this.sliceCollectorView.enter();
     if (route === "fitlab") this.fitLabView.enter();
     if (route === "microscope") this.microscopeView.enter();
+    if (route === "triage") this.triageView.enter();
     if (route === "console") this.runConsole.onShow();
     setTimeout(() => this.reveal.scan(), 60);
   }

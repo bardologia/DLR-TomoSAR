@@ -15,6 +15,7 @@ from dataset_browser                   import DatasetBrowser
 from equation_library                  import EquationLibrary
 from fit_lab                           import FitLab
 from model_probe                       import ModelProbe
+from triage_board                      import TriageBoard
 from flow_library                      import FlowLibrary
 from gpu_schedule                      import GpuSchedule
 from gpu_watchdog                      import GpuWatchdog
@@ -51,7 +52,7 @@ class RequestRouter:
         "pipelines"   : ["Processing", "Parameter Extraction", "Dataset", "Training", "Inference", "Tuning"],
     }
 
-    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, saved_runs: SavedRunStore, notifier: JobNotifier, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, slices: SliceCollector, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves, fitlab: FitLab, probe: ModelProbe) -> None:
+    def __init__(self, paths: ProjectPaths, logger: WebLogger, catalog: ScriptCatalog, resolver: ScriptConfigResolver, layout: LaunchLayout, configs: ConfigRegistry, equations: EquationLibrary, physics_loss: PhysicsLossLibrary, flows: FlowLibrary, models: BackboneModelLibrary, profile_ae_models: ProfileAutoencoderModelLibrary, image_ae_models: ImageAutoencoderModelLibrary, jepa_models: JepaModelLibrary, pipelines: PipelineLibrary, repomap: RepoMapLibrary, processes: ProcessManager, saved_runs: SavedRunStore, notifier: JobNotifier, nuke: ProcessNuke, detacher: ServerDetacher, system: SystemMonitor, watchdog: ResourceWatchdog, contention: ContentionMonitor, gpu_guard: GpuWatchdog, gpu_schedule: GpuSchedule, tensorboard: TensorboardManager, results: ResultsBrowser, cubes: CubeExplorer, slices: SliceCollector, datasets: DatasetBrowser, leaderboard: RunLeaderboard, curves: TrainingCurves, fitlab: FitLab, probe: ModelProbe, triage: TriageBoard) -> None:
         self.paths             = paths
         self.logger            = logger
         self.catalog           = catalog
@@ -86,6 +87,7 @@ class RequestRouter:
         self.curves            = curves
         self.fitlab            = fitlab
         self.probe             = probe
+        self.triage            = triage
 
     def _route_get(self, handler, path: str) -> None:
         if path == "/" or path == "":
@@ -179,6 +181,14 @@ class RequestRouter:
 
         if path == "/api/probe/status":
             self._send_json(handler, self.probe.load_status())
+            return
+
+        if path == "/api/triage/cases":
+            result = self.triage.cases(
+                cube_id = (query.get("id") or [""])[0],
+                top_n   = int((query.get("n") or ["40"])[0]),
+            )
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 
         if path == "/api/probe/layers":
@@ -635,6 +645,11 @@ class RequestRouter:
 
         if path == "/api/probe/whatif":
             result = self.probe.whatif(body)
+            self._send_json(handler, result, 200 if result.get("ok") else 400)
+            return
+
+        if path == "/api/triage/annotate":
+            result = self.triage.annotate(body)
             self._send_json(handler, result, 200 if result.get("ok") else 400)
             return
 

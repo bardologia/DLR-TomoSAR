@@ -1628,9 +1628,36 @@ class TomogramView {
     }
 
     this._follow({ az: Math.floor(meta.n_az / 2), rg: Math.floor(meta.n_rg / 2), fx: 0.5, fy: 0.5 }, true);
+    this._consumeFocus();
 
     const sweep = this._sweepFor(this.view);
     if (sweep) sweep.play();
+  }
+
+  openAt(cubeId, az, rg) {
+    this.pendingFocus = { az, rg };
+    if (cubeId === this.selectedId && this.meta) {
+      this._consumeFocus();
+      return;
+    }
+    this.select(cubeId);
+  }
+
+  _consumeFocus() {
+    if (!this.pendingFocus || !this.meta) return;
+    const { az, rg } = this.pendingFocus;
+    this.pendingFocus = null;
+
+    const clampedAz = Math.max(0, Math.min(this.meta.n_az - 1, az));
+    const clampedRg = Math.max(0, Math.min(this.meta.n_rg - 1, rg));
+
+    this._setView("explorer");
+    this._follow({
+      az : clampedAz,
+      rg : clampedRg,
+      fx : this.meta.n_rg > 1 ? clampedRg / (this.meta.n_rg - 1) : 0.5,
+      fy : this.meta.n_az > 1 ? clampedAz / (this.meta.n_az - 1) : 0.5,
+    }, true);
   }
 
   async _toggleAttach(otherId) {

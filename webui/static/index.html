@@ -39,6 +39,7 @@
     <a href="#/slices" data-route="slices">Slices</a>
     <a href="#/fitlab" data-route="fitlab">Fit Lab</a>
     <a href="#/microscope" data-route="microscope">Microscope</a>
+    <a href="#/triage" data-route="triage">Triage</a>
     <a href="#/leaderboard" data-route="leaderboard">Leaderboard</a>
     <a href="#/feedtuner" data-route="feedtuner">Feed Tuner</a>
     <a href="#/tensorboard" data-route="tensorboard">TensorBoard</a>
@@ -714,6 +715,20 @@
     </div>
   </section>
 
+  <!-- ERROR TRIAGE -->
+  <section class="page page--pad" data-page="triage">
+    <div class="page__head">
+      <h2 class="page__title">Error triage</h2>
+      <p class="page__lead">
+        The worst regions of a saved inference, ranked by error and tagged with their dominant
+        failure mode, label quality, and seed disagreement. Open any case in the cube explorer,
+        then record a verdict: label problem, model problem, or interesting. Annotations persist
+        under <code>logs/triage/</code> and build the qualitative case library.
+      </p>
+    </div>
+    <div id="triage-root"></div>
+  </section>
+
   <!-- MODEL MICROSCOPE -->
   <section class="page page--pad" data-page="microscope">
     <div class="page__head">
@@ -1115,6 +1130,7 @@
 <script src="/static/js/slice_collector.js?v=20260802a"></script>
 <script src="/static/js/fit_lab.js?v=20260721a"></script>
 <script src="/static/js/microscope.js?v=20260802a"></script>
+<script src="/static/js/triage.js?v=20260802a"></script>
 <script src="/static/js/tensorboard.js?v=20260702r"></script>
 <script src="/static/js/feed_tuner.js?v=20260624a"></script>
 <script src="/static/js/app.js?v=20260802a"></script>
