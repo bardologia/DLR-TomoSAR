@@ -10,7 +10,7 @@ import torch
 
 from configuration.diagnostics             import ReceptiveFieldConfig
 from pipelines.backbone.inference.loader   import RunLoader
-from pipelines.backbone.inference.probes   import ProbeWindows
+from pipelines.backbone.inference.probes   import ModelDevice, ProbeWindows
 from tools.data.io                         import FileIO
 from tools.reporting.markdown              import MarkdownDoc, MarkdownTable
 from tools.reporting.plotting              import PlotBase
@@ -30,13 +30,14 @@ class ErfComputation:
 
     def gradient_map(self, windows: torch.Tensor) -> np.ndarray:
         half        = self.window // 2
+        device      = ModelDevice.of(self.model)
         accumulated = torch.zeros(self.window, self.window)
 
         for p in range(windows.shape[0]):
-            x = windows[p:p + 1].clone().requires_grad_(True)
+            x = windows[p:p + 1].clone().to(device).requires_grad_(True)
             y = self.model(x)
             y[0, :, half, half].abs().sum().backward()
-            accumulated += x.grad.abs().sum(dim=(0, 1))
+            accumulated += x.grad.abs().sum(dim=(0, 1)).cpu()
 
         grad  = accumulated / windows.shape[0]
         total = float(grad.sum())

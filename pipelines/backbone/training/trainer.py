@@ -71,7 +71,7 @@ class Trainer(BaseTrainer):
         self.norm_stats       = norm_stats
         self.emit_docs        = emit_docs
         self.param_sampler    = ParamSampler(config.gaussian.params_per_gaussian, self.initial_loss_cfg.amp_zero_thr)
-        self.slot_vitals      = SlotVitals(config.gaussian.params_per_gaussian, self.initial_loss_cfg.amp_zero_thr)
+        self.slot_vitals      = SlotVitals(config.gaussian.params_per_gaussian, self.initial_loss_cfg.amp_zero_thr, grad_scale=float(config.training.gradient_accumulation_steps))
 
         super().__init__(model, config, run_dir, logger, x_axis)
 

@@ -29,10 +29,13 @@ class PaperFigurePack:
             return selector.select()
         return selector.all()
 
-    @staticmethod
-    def _stable_name(run_dir: Path, figures_dir: Path, figure: Path) -> str:
+    def _run_label(self, run_dir: Path) -> str:
+        relative = run_dir.relative_to(self.config.runs_dir) if run_dir.is_relative_to(self.config.runs_dir) else Path(run_dir.name)
+        return "__".join(relative.parts)
+
+    def _stable_name(self, run_dir: Path, figures_dir: Path, figure: Path) -> str:
         relative = figure.relative_to(figures_dir)
-        return f"{run_dir.name}__{'__'.join(relative.with_suffix('').parts)}{figure.suffix}"
+        return f"{self._run_label(run_dir)}__{'__'.join(relative.with_suffix('').parts)}{figure.suffix}"
 
     def _collect_run(self, run_dir: Path, resolver: SeedInferenceResolver) -> list[dict]:
         inference_dir = resolver.resolve(run_dir)
@@ -46,7 +49,7 @@ class PaperFigurePack:
             for figure in sorted(figures_dir.glob(pattern)):
                 target = self.output_dir / self._stable_name(run_dir, figures_dir, figure)
                 shutil.copy2(figure, target)
-                entries.append({"run": run_dir.name, "source": str(figure), "target": target.name})
+                entries.append({"run": self._run_label(run_dir), "source": str(figure), "target": target.name})
 
         if not entries:
             raise FileNotFoundError(f"No figure under {figures_dir} matches {self.config.patterns}; adjust patterns or re-run inference with save_plots")

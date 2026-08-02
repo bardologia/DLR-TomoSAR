@@ -7,6 +7,14 @@ from pipelines.backbone.inference.predictor import Predictor
 from tools.data.gaussians                   import GaussianReconstructor
 
 
+class ModelDevice:
+
+    @staticmethod
+    def of(model: torch.nn.Module) -> torch.device:
+        parameters = list(model.parameters())
+        return parameters[0].device if parameters else torch.device("cpu")
+
+
 class ProbeWindows:
 
     def __init__(self, run, window: int) -> None:

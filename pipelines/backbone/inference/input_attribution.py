@@ -9,7 +9,7 @@ import torch
 
 from configuration.diagnostics           import InputAttributionConfig
 from pipelines.backbone.inference.loader import RunLoader
-from pipelines.backbone.inference.probes import PredictionCurves, ProbeWindows
+from pipelines.backbone.inference.probes import ModelDevice, PredictionCurves, ProbeWindows
 from tools.data.io                       import FileIO
 from tools.reporting.markdown            import MarkdownDoc, MarkdownTable
 from tools.reporting.plotting            import PlotBase
@@ -87,18 +87,19 @@ class GradientAttribution:
 
     def channel_importance(self, windows: torch.Tensor) -> dict[str, np.ndarray]:
         half       = self.window // 2
+        device     = ModelDevice.of(self.model)
         n_channels = windows.shape[1]
         totals     = {family: np.zeros(n_channels, dtype=np.float64) for family in self.FAMILIES}
 
         for p in range(windows.shape[0]):
-            x = windows[p:p + 1].clone().requires_grad_(True)
+            x = windows[p:p + 1].clone().to(device).requires_grad_(True)
             y = self.model(x)
 
             for f, family in enumerate(self.FAMILIES):
                 target = y[0, f::3, half, half].abs().sum()
                 grad   = torch.autograd.grad(target, x, retain_graph=True)[0]
 
-                totals[family] += grad.abs().sum(dim=(0, 2, 3)).numpy()
+                totals[family] += grad.abs().sum(dim=(0, 2, 3)).cpu().numpy()
 
         live = [family for family in self.FAMILIES if totals[family].sum() > 0.0]
         if not live:

@@ -11,6 +11,7 @@ import torch
 from configuration.diagnostics             import CkaConfig
 from pipelines.backbone.inference.loader   import RunLoader
 from pipelines.backbone.inference.layer_probes import FeatureSampler
+from pipelines.backbone.inference.probes import ModelDevice
 from tools.data.io                         import FileIO
 from tools.diagnostics.activation_recorder import ActivationRecorder
 from tools.reporting.markdown              import MarkdownDoc, MarkdownTable
@@ -159,7 +160,7 @@ class CkaComparison:
 
             images = batch[0]
             with torch.no_grad():
-                run.model.module(images)
+                run.model.module(images.to(ModelDevice.of(run.model.module)))
 
             stored     = recorder.stored()
             B, _, H, W = images.shape
@@ -207,7 +208,7 @@ class CkaComparison:
         runs     = [self._load(run_dir) for run_dir in run_dirs]
         self._validate_alignment(runs)
 
-        names    = [run_dir.name for run_dir in run_dirs]
+        names = ["/".join(run_dir.relative_to(self.config.runs_dir).parts) if run_dir.is_relative_to(self.config.runs_dir) else run_dir.name for run_dir in run_dirs]
         features = [self._collect(run) for run in runs]
 
         plots        = CkaPlots()

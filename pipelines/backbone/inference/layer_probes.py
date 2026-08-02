@@ -9,6 +9,7 @@ import torch
 
 from configuration.diagnostics             import LayerProbeConfig
 from pipelines.backbone.inference.loader   import RunLoader
+from pipelines.backbone.inference.probes   import ModelDevice
 from tools.data.io                         import FileIO
 from tools.diagnostics.activation_recorder import ActivationRecorder
 from tools.loss.param_loss                 import ParamMatcher
@@ -22,7 +23,7 @@ class RidgeProbe:
     def __init__(self, ridge_lambda: float = 1.0, test_fraction: float = 0.5, seed: int = 0) -> None:
         self.ridge_lambda  = float(ridge_lambda)
         self.test_fraction = float(test_fraction)
-        self.rng           = np.random.default_rng(seed)
+        self.seed          = int(seed)
 
     def score(self, features: np.ndarray, targets: np.ndarray) -> float:
         X = np.asarray(features, dtype=np.float64)
@@ -33,7 +34,7 @@ class RidgeProbe:
         if X.shape[0] < 20:
             raise ValueError(f"Probe needs at least 20 samples, got {X.shape[0]}")
 
-        order   = self.rng.permutation(X.shape[0])
+        order   = np.random.default_rng(self.seed).permutation(X.shape[0])
         n_test  = max(1, int(round(self.test_fraction * X.shape[0])))
         test    = order[:n_test]
         train   = order[n_test:]
@@ -119,9 +120,11 @@ class LayerProbeCore:
         recorder = ActivationRecorder(self.model)
         recorder.attach_store(self.layers)
 
+        device = ModelDevice.of(self.model)
+
         for images, gt_phys in batches:
             with torch.no_grad():
-                self.model(images)
+                self.model(images.to(device))
 
             stored     = recorder.stored()
             B, _, H, W = images.shape

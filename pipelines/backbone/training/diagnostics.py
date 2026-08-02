@@ -65,10 +65,11 @@ class ParamSampler:
 
 class SlotVitals:
 
-    def __init__(self, params_per_gaussian: int, amp_zero_thr: float):
-        self.ppg    = params_per_gaussian
-        self.thr    = amp_zero_thr
-        self.active = False
+    def __init__(self, params_per_gaussian: int, amp_zero_thr: float, grad_scale: float = 1.0):
+        self.ppg        = params_per_gaussian
+        self.thr        = amp_zero_thr
+        self.grad_scale = float(grad_scale)
+        self.active     = False
 
         self._reset_val()
         self._reset_grad()
@@ -102,7 +103,7 @@ class SlotVitals:
     def observe_gradient(self, grad: torch.Tensor) -> None:
         B, C, H, W = grad.shape
         g          = grad.detach().reshape(B, C // self.ppg, self.ppg, H, W)
-        norms      = g.pow(2).sum(dim=(0, 2, 3, 4)).sqrt().float().cpu()
+        norms      = g.pow(2).sum(dim=(0, 2, 3, 4)).sqrt().float().cpu() * self.grad_scale
 
         if self._grad_sum is None:
             self._grad_sum = norms

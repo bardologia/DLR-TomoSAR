@@ -52,7 +52,7 @@ class LandscapeEvaluator:
     def _apply(self, alpha: float, beta: float, dir1: dict, dir2: dict) -> None:
         with torch.no_grad():
             for name, param in self.model.named_parameters():
-                param.copy_(self.origin[name] + alpha * dir1[name] + beta * dir2[name])
+                param.copy_(self.origin[name] + alpha * dir1[name].to(param.device) + beta * dir2[name].to(param.device))
 
     def restore(self) -> None:
         self._apply(0.0, 0.0, {name: torch.zeros_like(t) for name, t in self.origin.items()}, {name: torch.zeros_like(t) for name, t in self.origin.items()})
