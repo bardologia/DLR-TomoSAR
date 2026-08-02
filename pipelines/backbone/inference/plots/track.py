@@ -32,6 +32,46 @@ class TrackPlotter(PlotTools):
 
         return self._save(fig, out_path)
 
+    def plot_residual_spectroscopy(self, rows: List[dict], out_path: Path) -> Path:
+        self._apply_style()
+
+        kz     = [row["kz_abs_mean"] for row in rows]
+        errors = [row["coherence_error"] for row in rows]
+
+        fig, ax = plt.subplots(figsize=self.figsize(self.FULL_WIDTH))
+        ax.plot(kz, errors, marker="o", color="#D55E00", linewidth=1.4)
+        for row in rows:
+            ax.annotate(row["label"], (row["kz_abs_mean"], row["coherence_error"]), textcoords="offset points", xytext=(4, 4), fontsize=7)
+
+        ax.set_xlabel("Mean |kz| of the track [rad/m]")
+        ax.set_ylabel("Coherence-resynthesis error")
+        ax.set_yscale("log")
+        ax.set_title("Physics residual by baseline")
+        ax.grid(True, alpha=0.3)
+        fig.tight_layout()
+
+        return self._save(fig, out_path)
+
+    def plot_phase_spread_spectrum(self, rows: List[dict], out_path: Path) -> Path:
+        self._apply_style()
+
+        kz = [row["kz_abs_mean"] for row in rows]
+
+        fig, ax = plt.subplots(figsize=self.figsize(self.FULL_WIDTH))
+        ax.plot(kz, [row["spread_gt"] for row in rows],   marker="s", color="#0072B2", linewidth=1.2, label="GT labels")
+        ax.plot(kz, [row["spread_pred"] for row in rows], marker="o", color="#D55E00", linewidth=1.4, label="Prediction")
+        for row in rows:
+            ax.annotate(row["label"], (row["kz_abs_mean"], row["spread_pred"]), textcoords="offset points", xytext=(4, 4), fontsize=7)
+
+        ax.set_xlabel("Mean |kz| of the track [rad/m]")
+        ax.set_ylabel("Random phase spread [rad]")
+        ax.set_title("Random residual phase after removing the systematic offset")
+        ax.legend(frameon=False)
+        ax.grid(True, alpha=0.3)
+        fig.tight_layout()
+
+        return self._save(fig, out_path)
+
     def plot_phase_agreement(self, labels: List[str], aligned: List[float], flipped: List[float], source: str, out_path: Path) -> Path:
         fig, ax = plt.subplots(figsize=(6.4, 3.8))
 

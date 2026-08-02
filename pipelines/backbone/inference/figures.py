@@ -580,6 +580,13 @@ class FigureComposer:
             ))
 
         figure_paths["phase_agreement"] = agreement
+
+        if consistency.track_rows:
+            figure_paths["physics_spectroscopy"] = [
+                track_plotter.plot_residual_spectroscopy(consistency.track_rows, physics_dir / "residual_vs_kz.png"),
+                track_plotter.plot_phase_spread_spectrum(consistency.track_rows, physics_dir / "phase_spread_vs_kz.png"),
+            ]
+
         self.logger.subsection(f"Data-consistency figures : {physics_dir}")
 
     def compose(

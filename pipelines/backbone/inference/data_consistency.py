@@ -23,6 +23,19 @@ class DataConsistency:
     valid_mask           : np.ndarray
     track_labels         : List[str]
     metrics              : Dict[str, float]
+    track_rows           : List[dict]
+
+
+class PhaseResidualStats:
+
+    @staticmethod
+    def offset(phasor_sum: complex) -> float:
+        return float(np.angle(phasor_sum))
+
+    @staticmethod
+    def spread(agreement: float) -> float:
+        r = float(np.clip(agreement, 1e-6, 1.0))
+        return float(np.sqrt(-2.0 * np.log(r)))
 
 
 class DataConsistencyEvaluator:
@@ -206,6 +219,8 @@ class DataConsistencyEvaluator:
 
                 metrics[f"phase_agreement_{source}_track_{label}"]         = r_al
                 metrics[f"phase_agreement_{source}_flipped_track_{label}"] = r_fl
+                metrics[f"physics_phase_offset_{source}_track_{label}"]    = PhaseResidualStats.offset(chunks["aligned_sum"][source][index])
+                metrics[f"physics_phase_spread_{source}_track_{label}"]    = PhaseResidualStats.spread(r_al)
                 aligned.append(r_al)
                 flipped.append(r_fl)
 
@@ -213,6 +228,27 @@ class DataConsistencyEvaluator:
             metrics[f"phase_agreement_{source}_flipped_mean"] = float(np.mean(flipped))
 
         return metrics
+
+    def _spectroscopy_rows(self, metrics: Dict[str, float], labels: List[str], kz: np.ndarray) -> List[dict]:
+        rows = []
+        for index, label in enumerate(labels[1:], start=1):
+            rows.append({
+                "label"           : label,
+                "kz_abs_mean"     : float(np.abs(kz[index]).mean(dtype=np.float64)),
+                "coherence_error" : metrics[f"physics_coherence_error_track_{label}"],
+                "agreement_pred"  : metrics[f"phase_agreement_pred_track_{label}"],
+                "agreement_gt"    : metrics[f"phase_agreement_gt_track_{label}"],
+                "offset_pred"     : metrics[f"physics_phase_offset_pred_track_{label}"],
+                "spread_pred"     : metrics[f"physics_phase_spread_pred_track_{label}"],
+                "spread_gt"       : metrics[f"physics_phase_spread_gt_track_{label}"],
+            })
+
+        rows.sort(key=lambda row: row["kz_abs_mean"])
+
+        for row in rows:
+            metrics[f"physics_kz_abs_mean_track_{row['label']}"] = row["kz_abs_mean"]
+
+        return rows
 
     def _report(self, metrics: Dict[str, float]) -> None:
         self.logger.kv_table({
@@ -234,6 +270,7 @@ class DataConsistencyEvaluator:
         measured   = self._measured_unit_phasors(kz)
         chunks     = self._evaluate_chunks(pred_curves, gt_curves, kz, measured, x_axis_np)
         metrics    = self._assemble_metrics(chunks, labels)
+        rows       = self._spectroscopy_rows(metrics, labels, kz)
 
         self._report(metrics)
 
@@ -243,4 +280,5 @@ class DataConsistencyEvaluator:
             valid_mask           = chunks["mask"],
             track_labels         = labels,
             metrics              = metrics,
+            track_rows           = rows,
         )

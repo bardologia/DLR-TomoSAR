@@ -173,3 +173,14 @@ def test_per_track_metrics_present_and_labelled(tmp_path):
     for label in ("S1", "S2"):
         assert f"phase_agreement_gt_track_{label}" in consistency.metrics
         assert f"phase_agreement_pred_flipped_track_{label}" in consistency.metrics
+
+
+def test_phase_residual_stats_offset_and_spread():
+    from pipelines.backbone.inference.data_consistency import PhaseResidualStats
+
+    assert PhaseResidualStats.offset(1.0 + 0.0j) == pytest.approx(0.0)
+    assert PhaseResidualStats.offset(0.0 + 1.0j) == pytest.approx(np.pi / 2.0)
+
+    assert PhaseResidualStats.spread(1.0)  == pytest.approx(0.0)
+    assert PhaseResidualStats.spread(0.5)  > PhaseResidualStats.spread(0.9)
+    assert np.isfinite(PhaseResidualStats.spread(0.0))

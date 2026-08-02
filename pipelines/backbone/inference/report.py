@@ -883,6 +883,7 @@ class Report:
             ("coherence_error_map",  "9b.1 Per-pixel coherence-resynthesis error (pred vs GT)"),
             ("covariance_error_map", "9b.2 Per-pixel covariance-matching error (pred vs GT)"),
             ("phase_agreement",      "9b.3 Measured-interferogram phase agreement per secondary pass"),
+            ("physics_spectroscopy", "9b.4 Residual spectroscopy: error and phase spread by mean |kz|"),
         ))
 
         return out
