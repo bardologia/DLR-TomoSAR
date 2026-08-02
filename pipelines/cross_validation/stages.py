@@ -6,7 +6,7 @@ from pathlib import Path
 
 from configuration.cross_validation import CrossValidationConfig
 from pipelines.cross_validation.cv_report import CrossValidationReport
-from pipelines.cross_validation.folds     import FoldNaming, FoldPlanner
+from pipelines.cross_validation.folds     import FoldPlanner, FoldRunNaming
 from pipelines.cross_validation.workers   import FoldCollector
 from pipelines.shared.training.seed_sweep import SeedSet
 from tools                    import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
@@ -19,9 +19,8 @@ class FoldTrainingStage(QueuedTrainingStage):
     stage_subdir = "folds"
 
     def __init__(self, config: CrossValidationConfig, entry_script: Path, run_tag: str, logger: Logger) -> None:
-        fold_names = [FoldNaming.name(index) for index in range(config.folds.n_folds)]
-        units      = SeedSet.units(fold_names, config.seeds)
-        self._unit = {run_name: (FoldNaming.index(fold_name), seed) for fold_name, seed, run_name in units}
+        units      = FoldRunNaming(config).units()
+        self._unit = {run_name: (fold_index, seed) for fold_index, seed, run_name in units}
         super().__init__(config=config, entry_script=entry_script, run_tag=run_tag, items=[run_name for _, _, run_name in units], logger=logger)
 
     def _config_kv(self) -> dict:
@@ -50,9 +49,8 @@ class FoldInferenceStage(QueuedInferenceStage):
     stage_subdir = "folds"
 
     def __init__(self, config: CrossValidationConfig, entry_script: Path, run_tag: str, planner: FoldPlanner, logger: Logger) -> None:
-        fold_names = [FoldNaming.name(index) for index in range(config.folds.n_folds)]
-        units      = SeedSet.units(fold_names, config.seeds)
-        self._unit = {run_name: (FoldNaming.index(fold_name), seed) for fold_name, seed, run_name in units}
+        units      = FoldRunNaming(config).units()
+        self._unit = {run_name: (fold_index, seed) for fold_index, seed, run_name in units}
         super().__init__(config=config, entry_script=entry_script, run_tag=run_tag, items=[run_name for _, _, run_name in units], logger=logger)
         self.planner = planner
         self.splits  = config.inference_splits

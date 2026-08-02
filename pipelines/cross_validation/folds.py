@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib     import Path
 
-from configuration.cross_validation import CrossValidationConfig
-from configuration.inference        import InferenceConfig
+from configuration.cross_validation    import CrossValidationConfig
+from configuration.inference           import InferenceConfig
+from configuration.sar.gaussian_config import GaussianConfig
 from pipelines.shared.config.config_factory import ConfigFactory
 from pipelines.shared.training.seed_sweep   import SeedSet
 from tools.data.regions import CropRegion, SplitRegions
@@ -132,6 +133,41 @@ class FoldNaming:
     def seed(name: str) -> int | None:
         parts = name.split("/seed")
         return int(parts[1]) if len(parts) == 2 else None
+
+
+class FoldRunNaming:
+    def __init__(self, config: CrossValidationConfig) -> None:
+        self.config       = config
+        self.training_tag = self._training_tag()
+
+    def _n_gaussians(self) -> int:
+        return GaussianConfig.from_dataset(self.config.paths.dataset_path, self.config.paths.parameters_path).n_default_gaussians
+
+    def _training_tag(self) -> str | None:
+        from pipelines.shared.training.run_naming import RunNaming
+
+        config = self.config
+
+        if config.training_type == "backbone":
+            return RunNaming.training_tag(config.backbone_name, config.backbone_head, config.curriculum, self._n_gaussians(), config.augmentation)
+
+        if config.training_type == "jepa":
+            return RunNaming.tag(config.backbone_name, config.backbone_head, config.jepa.param_loss, self._n_gaussians(), config.augmentation)
+
+        return None
+
+    def run_name(self, fold_index: int, seed: int | None) -> str:
+        from pipelines.shared.training.run_naming import RunNaming
+
+        fold = FoldNaming.run_name(fold_index, seed)
+
+        return fold if self.training_tag is None else RunNaming.compose(self.training_tag, fold)
+
+    def units(self) -> list[tuple[int, int | None, str]]:
+        indices = {self.run_name(index, None): index for index in range(self.config.folds.n_folds)}
+        units   = SeedSet.units(list(indices), self.config.seeds)
+
+        return [(indices[base], seed, run_name) for base, seed, run_name in units]
 
 
 class FoldConfigFactory(ConfigFactory):

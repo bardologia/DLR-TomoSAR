@@ -8,7 +8,7 @@ import numpy as np
 from configuration.cross_validation import CrossValidationConfig
 from pipelines.shared.comparison.trial_collection import TrialCollector, TrialRecord
 from pipelines.shared.training.worker_base        import WorkerBase
-from pipelines.cross_validation.folds             import FoldConfigFactory, FoldNaming
+from pipelines.cross_validation.folds             import FoldConfigFactory, FoldNaming, FoldRunNaming
 from tools.data.io           import FileIO
 from tools.metrics.scoring   import SeedAggregation
 from tools.data.regions      import SplitRegions
@@ -108,22 +108,13 @@ class CrossValidationWorker(WorkerBase):
     def __init__(self, config: CrossValidationConfig, run_tag: str) -> None:
         super().__init__(config=config, run_tag=run_tag)
         self.factory = FoldConfigFactory(config)
+        self.naming  = FoldRunNaming(config)
 
     def fold_name(self, fold_index: int) -> str:
         return FoldNaming.name(fold_index)
 
     def fold_run_name(self, fold_index: int, seed: int | None) -> str:
-        from pipelines.shared.training.run_naming import RunNaming
-
-        fold = FoldNaming.run_name(fold_index, seed)
-        if self.config.training_type == "backbone":
-            n_gaussians = self.factory.gaussian_config().n_default_gaussians
-            return RunNaming.compose(RunNaming.training_tag(self.config.backbone_name, self.config.backbone_head, self.config.curriculum, n_gaussians, self.config.augmentation), fold)
-        if self.config.training_type == "jepa":
-            n_gaussians = self.factory.gaussian_config().n_default_gaussians
-            return RunNaming.compose(RunNaming.tag(self.config.backbone_name, self.config.backbone_head, self.config.jepa.param_loss, n_gaussians, self.config.augmentation), fold)
-
-        return fold
+        return self.naming.run_name(fold_index, seed)
 
 
 class FoldTrainingWorker(CrossValidationWorker):
