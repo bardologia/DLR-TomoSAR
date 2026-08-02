@@ -44,3 +44,13 @@ def test_drift_reports_vanished_modules():
 
     assert len(drift["missing_files"]) == 1
     assert drift["missing_files"][0]["module"] == "tools/erased_module.py"
+
+
+def test_relative_and_webui_local_imports_resolve():
+    graph = ImportGraph(REPO_ROOT).build()
+
+    assert "models.blocks" in graph["models.backbone.swin_unet"]
+    assert "webui.project_paths" in graph["webui.request_router"]
+
+    webui_edges = sum(len(targets) for name, targets in graph.items() if name.startswith("webui."))
+    assert webui_edges > 30

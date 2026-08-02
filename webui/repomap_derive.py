@@ -25,15 +25,30 @@ class ImportGraph:
     def _module_name(self, path: Path) -> str:
         return str(path.relative_to(self.repo_root).with_suffix("")).replace("/", ".")
 
-    def _imports_of(self, path: Path) -> set[str]:
+    @staticmethod
+    def _package_parts(module_name: str) -> list[str]:
+        parts = module_name.split(".")
+        return parts[:-1] if parts[-1] != "__init__" else parts[:-2] + [parts[-2]]
+
+    def _imports_of(self, path: Path, module_name: str) -> set[str]:
         tree    = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
         imports = set()
 
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 imports.update(alias.name for alias in node.names)
-            elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
-                imports.add(node.module)
+            elif isinstance(node, ast.ImportFrom):
+                if node.level == 0 and node.module:
+                    imports.add(node.module)
+                elif node.level > 0:
+                    package = self._package_parts(module_name)
+                    base    = package[: len(package) - (node.level - 1)]
+                    if not base:
+                        continue
+                    if node.module:
+                        imports.add(".".join(base + node.module.split(".")))
+                    else:
+                        imports.update(".".join(base + [alias.name]) for alias in node.names)
 
         return imports
 
@@ -45,7 +60,10 @@ class ImportGraph:
         graph = {}
         for name, path in by_name.items():
             internal = set()
-            for imported in self._imports_of(path):
+            for imported in self._imports_of(path, name):
+                if name.startswith("webui.") and not imported.startswith(prefixes) and f"webui.{imported}" in by_name:
+                    imported = f"webui.{imported}"
+
                 if not (imported in by_name or imported.startswith(prefixes) or imported in self.ROOTS):
                     continue
 
