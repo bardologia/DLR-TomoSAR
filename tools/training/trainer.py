@@ -360,6 +360,19 @@ class BaseTrainer:
         if physical:
             self.tracker.log_staged("param_error", physical, stage, epoch)
 
+    def _maybe_snapshot(self, epoch: int) -> None:
+        every = self.config.training.snapshot_every_n_epochs
+        if every <= 0 or (epoch + 1) % every != 0:
+            return
+
+        path = Path(self.run_dir) / "checkpoints" / f"epoch_{epoch + 1:04d}.pt"
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        with self.ema.applied(self.model):
+            torch.save({"epoch": epoch, "params": self.model.state_dict()}, path)
+
+        self.logger.subsection(f"Epoch snapshot -> {path}")
+
     def _maybe_resume(self, loader_generator) -> int:
         if not self.resume:
             return 0
@@ -451,6 +464,7 @@ class BaseTrainer:
                         self._update_optimizer(effective_lrs)
 
                         TrainerState.save(self, epoch, self.state_path, loader_generator)
+                        self._maybe_snapshot(epoch)
 
                         live_mon.update(
                             epoch         = f"{epoch_num}/{self.epochs}",

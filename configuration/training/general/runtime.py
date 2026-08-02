@@ -31,6 +31,7 @@ class TrainingLoopConfig:
     use_ema                     : bool  = False
     ema_decay                   : float = 0.999
     resume                      : bool  = False
+    snapshot_every_n_epochs     : int   = 0
 
 
 @dataclass

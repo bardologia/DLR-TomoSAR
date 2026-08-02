@@ -119,6 +119,7 @@ class ProjectPaths:
         "compare_representations"         : "analysis",
         "map_loss_landscape"              : "analysis",
         "stress_inputs"                   : "analysis",
+        "animate_training"                : "analysis",
         "export_tensorboard_plots"        : "analysis",
         "collect_reports"                 : "analysis",
     }

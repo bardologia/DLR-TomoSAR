@@ -351,3 +351,21 @@ class RobustnessConfig:
     seed             : int         = 0
 
     figure_style : str = "report"
+
+
+@dataclass
+class TrainingEvolutionConfig:
+    runs_dir   : Path      = Path("/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone")
+    run_filter : List[str] = field(default_factory=list)
+
+    split           : str = "test"
+    device          : str = "cpu"
+    checkpoint_name : str = "best_model.pt"
+    output_subdir   : str = "training_evolution"
+
+    window           : int = 64
+    n_azimuth_probes : int = 2
+    n_range_probes   : int = 2
+    fps              : int = 4
+
+    figure_style : str = "report"

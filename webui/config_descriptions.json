@@ -1386,7 +1386,8 @@
         "patch_stride": "per-axis (vertical, horizontal) pixel stride between overlapping extracted patches",
         "train_azimuth": "azimuth line range (start, end) assigned to the training split, paired with the dataset's full range extent",
         "val_azimuth": "azimuth line range (start, end) assigned to the validation split, paired with the dataset's full range extent",
-        "test_azimuth": "azimuth line range (start, end) assigned to the test split, paired with the dataset's full range extent"
+        "test_azimuth": "azimuth line range (start, end) assigned to the test split, paired with the dataset's full range extent",
+        "snapshot_every_n_epochs": "Save a weights-only epoch snapshot to checkpoints/epoch_<N>.pt every N epochs (EMA weights when EMA is on); 0 disables. Snapshots feed the training-evolution animation and cost one state_dict write each"
       }
     },
     "training/general/runtime::IOConfig": {
@@ -1418,7 +1419,8 @@
         "abort_on_nonfinite_loss": "Raise and stop training on a NaN/infinite loss; when False, only warn and skip that batch",
         "use_ema": "Maintain a WeightEma shadow copy of model weights, decayed by ema_decay, for evaluation/checkpointing",
         "ema_decay": "Decay rate of the weight EMA; closer to 1.0 averages over more steps, only active when use_ema is True",
-        "resume": "Resume training from the latest checkpoint found in this run's logdir instead of starting fresh"
+        "resume": "Resume training from the latest checkpoint found in this run's logdir instead of starting fresh",
+        "snapshot_every_n_epochs": "Save a weights-only epoch snapshot to checkpoints/epoch_<N>.pt every N epochs (EMA weights when EMA is on); 0 disables. Snapshots feed the training-evolution animation and cost one state_dict write each"
       }
     },
     "training/general/runtime::MemoryConfig": {
@@ -2540,6 +2542,22 @@
         "render_amp_floor": "Amplitude floor below which predicted Gaussians are dropped before rendering the comparison curves, matching the inference render floor",
         "seed": "Seed of the noise draws and dropped-track subsets",
         "figure_style": "PlotBase figure style the severity curves are rendered with (report or paper)"
+      }
+    },
+    "diagnostics::TrainingEvolutionConfig": {
+      "summary": "Entry config that animates how one or more backbone runs learned: probe pixels re-predicted from every saved epoch snapshot, one GIF per pixel converging onto the fixed ground truth, written into each run directory",
+      "fields": {
+        "runs_dir": "Root directory scanned recursively for run directories holding the configured checkpoint file; each selected run is animated in sequence",
+        "run_filter": "Run directory names (or names of parent directories whose nested runs are expanded) to animate; empty selects interactively on a TTY and every discovered run otherwise",
+        "split": "Dataset split the probe windows are cut from",
+        "device": "Torch device the snapshot evaluations run on",
+        "checkpoint_name": "Checkpoint filename loaded from each run directory and used as the run-discovery marker; the model is restored to it after the sweep",
+        "output_subdir": "Name of the output directory created inside each run directory for the GIFs, JSON and markdown report",
+        "window": "Side length in pixels of the square window cut around each probe pixel for the forward passes",
+        "n_azimuth_probes": "Number of probe pixels along azimuth, spread evenly across the split region",
+        "n_range_probes": "Number of probe pixels along range, spread evenly across the split region",
+        "fps": "Frames per second of the rendered GIFs (one frame per epoch snapshot)",
+        "figure_style": "PlotBase figure style the frames are rendered with (report or paper)"
       }
     }
   }

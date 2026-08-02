@@ -214,6 +214,7 @@ class LaunchLayout:
                 "log_all_losses",
                 "log_debug",
                 "resume",
+                "snapshot_every_n_epochs",
             ]},
             {"title": "Weight averaging", "fields": [
                 {"gate": "use_ema", "fields": ["ema_decay"]},
@@ -1272,6 +1273,29 @@ class LaunchLayout:
                             {"path": "n_azimuth_probes", "widget": {"kind": "number", "min": 1, "max": 16, "step": 1}},
                             {"path": "n_range_probes",   "widget": {"kind": "number", "min": 1, "max": 16, "step": 1}},
                             {"path": "mass_windows",     "widget": {"kind": "multi", "numeric": True}},
+                        ]},
+                        {"title": "Figures", "fields": ["figure_style"]},
+                    ]},
+                ]},
+            ],
+        },
+        "animate_training": {
+            "sections": [
+                {"key": "config", "title": "Configuration", "panels": [
+                    {"kind": "fields", "groups": [
+                        {"title": "Runs", "fields": [
+                            "runs_dir",
+                            {"path": "run_filter", "widget": {"kind": "dataset", "mode": "runs", "multi": True, "baseFrom": "runs_dir", "checkpointOnly": True}},
+                            "checkpoint_name",
+                            "output_subdir",
+                        ]},
+                        {"title": "Animation", "fields": [
+                            "split",
+                            "device",
+                            {"path": "window",           "widget": {"kind": "number", "min": 16, "max": 256, "step": 16}},
+                            {"path": "n_azimuth_probes", "widget": {"kind": "number", "min": 1, "max": 8, "step": 1}},
+                            {"path": "n_range_probes",   "widget": {"kind": "number", "min": 1, "max": 8, "step": 1}},
+                            {"path": "fps",              "widget": {"kind": "number", "min": 1, "max": 30, "step": 1}},
                         ]},
                         {"title": "Figures", "fields": ["figure_style"]},
                     ]},

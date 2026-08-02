@@ -182,6 +182,11 @@ class ScriptCatalog:
             "category"  : "Analysis",
             "purpose"   : "Stress trained backbone runs with controlled input degradation. Curve-MSE-vs-severity under gaussian noise on the normalized inputs and under whole-track dropout (secondary and interferogram channels zeroed, averaged over random track subsets). Complements the secondaries experiment with a post-hoc robustness axis that needs no retraining.",
         },
+        "animate_training": {
+            "title"     : "Animate Training",
+            "category"  : "Analysis",
+            "purpose"   : "Animate how a backbone run learned. Re-predicts probe pixels from every epoch snapshot saved during training (enable snapshot_every_n_epochs on the training entry) and renders one GIF per pixel of the prediction converging onto the fixed ground-truth profile.",
+        },
         "export_tensorboard_plots": {
             "title"     : "Export TensorBoard Plots",
             "category"  : "Analysis",

@@ -46,6 +46,7 @@ class TrainingQueueConfig:
     use_ema                     : bool  = False
     ema_decay                   : float = 0.999
     resume                      : bool  = False
+    snapshot_every_n_epochs     : int   = 0
 
     reserve_vram      : bool  = False
     vram_keep_free_gb : float = 1.0
