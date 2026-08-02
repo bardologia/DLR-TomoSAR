@@ -507,7 +507,7 @@
             {
               "id": "tomo_in",
               "label": "tomogram_full.npy",
-              "module": "pipelines/tomogram",
+              "module": "pipelines/processing",
               "role": "external",
               "fn": "Full tomogram cube (H x Az x R) produced by the tomogram-generation pipeline, discovered from each dataset's data/ directory.",
               "col": 1,
@@ -2427,7 +2427,7 @@
             {
               "id": "metadata",
               "label": "ProfileAeInferenceMetadata (AeInferenceMetadata)",
-              "module": "pipelines/autoencoder_common/inference/metadata.py",
+              "module": "pipelines/shared/inference/metadata.py",
               "role": "io",
               "fn": "Shared inference metadata: mints the timestamped output directory and the figures/logs/metrics/report paths.",
               "col": 4,
@@ -2980,7 +2980,7 @@
             {
               "id": "meta",
               "label": "ImageAeInferenceMetadata (AeInferenceMetadata)",
-              "module": "pipelines/autoencoder_common/inference/metadata.py",
+              "module": "pipelines/shared/inference/metadata.py",
               "role": "io",
               "fn": "Creates the output/figures/logs directories under run/inference/image_ae and holds the metrics and report paths.",
               "col": 5,
@@ -3223,7 +3223,7 @@
             {
               "id": "preproc",
               "label": "Preprocessing arrays",
-              "module": "pipelines/preprocessing",
+              "module": "pipelines/processing",
               "role": "external",
               "fn": "Preprocessing run supplying the input SLC stack and per-pixel Gaussian-parameter arrays consumed by the dataset preparation.",
               "col": 1,
