@@ -132,11 +132,11 @@ class ScriptConfigResolver:
         try:
             proc = subprocess.run(argv, cwd=str(self.paths.repo_root), capture_output=True, text=True, timeout=180)
         except (OSError, subprocess.TimeoutExpired) as exc:
-            return {"ok": False, "error": f"config resolution failed: {exc}"}
+            return {"ok": False, "error": f"config resolution failed under {interpreter}: {exc}"}
 
         if proc.returncode != 0:
             tail = "\n".join(proc.stderr.strip().splitlines()[-4:])
-            return {"ok": False, "error": f"config resolution failed:\n{tail}"}
+            return {"ok": False, "error": f"config resolution failed under {interpreter}:\n{tail}"}
 
         try:
             leaves = json.loads(proc.stdout.strip().splitlines()[-1])
