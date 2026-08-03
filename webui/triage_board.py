@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import json
 import threading
 import time
 from pathlib import Path
 
+import matplotlib
+
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
 import numpy as np
 
 from project_paths import ProjectPaths
@@ -148,6 +154,72 @@ class TriageBoard:
             "aux"       : sorted(aux),
             "cases"     : rows,
         }
+
+    def thumb(self, cube_id: str, az0: int, rg0: int) -> bytes | None:
+        error_map = self._load_map(Path(cube_id) / "cubes", "pixel_mse")
+        if error_map is None:
+            return None
+
+        n_az, n_rg = error_map.shape
+        if not (0 <= az0 < n_az and 0 <= rg0 < n_rg):
+            return None
+
+        az_lo, az_hi = max(0, az0 - self.BLOCK), min(n_az, az0 + 2 * self.BLOCK)
+        rg_lo, rg_hi = max(0, rg0 - self.BLOCK), min(n_rg, rg0 + 2 * self.BLOCK)
+        crop         = error_map[az_lo:az_hi, rg_lo:rg_hi]
+
+        finite = np.isfinite(crop) & (crop > 0)
+        logs   = np.log10(crop, out=np.full_like(crop, np.nan), where=finite)
+        lo, hi = (np.nanpercentile(logs, [1.0, 99.0]) if finite.any() else (0.0, 1.0))
+
+        norm    = np.clip((logs - lo) / max(hi - lo, 1e-12), 0.0, 1.0)
+        colored = plt.get_cmap("viridis")(np.nan_to_num(norm))[..., :3]
+        colored[~finite] = (0.06, 0.08, 0.10)
+
+        b_az_lo, b_az_hi = az0 - az_lo, min(az0 + self.BLOCK, n_az) - az_lo
+        b_rg_lo, b_rg_hi = rg0 - rg_lo, min(rg0 + self.BLOCK, n_rg) - rg_lo
+
+        colored[b_az_lo, b_rg_lo:b_rg_hi]         = 1.0
+        colored[b_az_hi - 1, b_rg_lo:b_rg_hi]     = 1.0
+        colored[b_az_lo:b_az_hi, b_rg_lo]         = 1.0
+        colored[b_az_lo:b_az_hi, b_rg_hi - 1]     = 1.0
+
+        block = crop[b_az_lo:b_az_hi, b_rg_lo:b_rg_hi]
+        valid = np.isfinite(block)
+        if valid.any():
+            worst = np.nanargmax(np.where(valid, block, -np.inf))
+            w_az  = b_az_lo + int(worst // block.shape[1])
+            w_rg  = b_rg_lo + int(worst % block.shape[1])
+            colored[max(0, w_az - 1):w_az + 2, max(0, w_rg - 1):w_rg + 2] = (0.85, 0.10, 0.10)
+
+        buf = io.BytesIO()
+        plt.imsave(buf, colored.astype(np.float32), format="png")
+        return buf.getvalue()
+
+    def profile(self, cube_id: str, az: int, rg: int) -> dict:
+        stamp_dir = Path(cube_id)
+        cubes_dir = stamp_dir / "cubes"
+
+        try:
+            pred = np.load(cubes_dir / "pred_curves.npy", mmap_mode="r")
+            gt   = np.load(cubes_dir / "gt_curves.npy", mmap_mode="r")
+
+            if not (0 <= az < pred.shape[1] and 0 <= rg < pred.shape[2]):
+                return {"ok": False, "error": f"pixel ({az}, {rg}) is outside the region {pred.shape[1:]}"}
+
+            metrics = json.loads((stamp_dir / "metrics.json").read_text(encoding="utf-8"))
+            x_axis  = np.linspace(float(metrics["x_axis_min"]), float(metrics["x_axis_max"]), pred.shape[0])
+
+            return {
+                "ok"     : True,
+                "az"     : az,
+                "rg"     : rg,
+                "x_axis" : [float(v) for v in x_axis],
+                "pred"   : [float(v) for v in pred[:, az, rg]],
+                "gt"     : [float(v) for v in gt[:, az, rg]],
+            }
+        except (OSError, ValueError, KeyError) as error:
+            return {"ok": False, "error": str(error)}
 
     def annotate(self, body: dict) -> dict:
         cube_id = str(body.get("id", ""))

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types   import SimpleNamespace
 
@@ -96,5 +97,63 @@ def test_unknown_verdict_is_rejected(tmp_path):
     store = TriageStore(tmp_path / "logs" / "triage")
 
     out = store.annotate("cube", "0_0", "who knows", "")
+
+    assert out["ok"] is False
+
+
+def _curves(stamp: Path, n_elev: int = 6) -> None:
+    cubes = stamp / "cubes"
+    rng   = np.random.default_rng(0)
+
+    np.save(cubes / "pred_curves.npy", rng.random((n_elev, N_AZ, N_RG)).astype(np.float32))
+    np.save(cubes / "gt_curves.npy",   rng.random((n_elev, N_AZ, N_RG)).astype(np.float32))
+
+    (stamp / "metrics.json").write_text(json.dumps({"x_axis_min": -10.0, "x_axis_max": 30.0}), encoding="utf-8")
+
+
+def test_thumb_renders_a_png_crop(tmp_path):
+    stamp = _stamp(tmp_path)
+    png   = _board(tmp_path).thumb(str(stamp), az0=0, rg0=0)
+
+    assert png is not None
+    assert png[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_thumb_refuses_bad_blocks(tmp_path):
+    stamp = _stamp(tmp_path)
+    board = _board(tmp_path)
+
+    assert board.thumb(str(stamp), az0=N_AZ + 16, rg0=0) is None
+    assert board.thumb(str(tmp_path / "nowhere"), az0=0, rg0=0) is None
+
+
+def test_profile_returns_gt_and_prediction(tmp_path):
+    stamp = _stamp(tmp_path)
+    _curves(stamp)
+
+    out = _board(tmp_path).profile(str(stamp), az=3, rg=4)
+
+    assert out["ok"] is True
+    assert len(out["x_axis"]) == 6
+    assert len(out["gt"])     == 6
+    assert len(out["pred"])   == 6
+    assert out["x_axis"][0] == -10.0
+    assert out["x_axis"][-1] == 30.0
+
+
+def test_profile_outside_region_fails(tmp_path):
+    stamp = _stamp(tmp_path)
+    _curves(stamp)
+
+    out = _board(tmp_path).profile(str(stamp), az=N_AZ + 5, rg=0)
+
+    assert out["ok"] is False
+    assert "outside" in out["error"]
+
+
+def test_profile_without_curves_fails_cleanly(tmp_path):
+    stamp = _stamp(tmp_path)
+
+    out = _board(tmp_path).profile(str(stamp), az=0, rg=0)
 
     assert out["ok"] is False
