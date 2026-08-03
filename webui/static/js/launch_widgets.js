@@ -422,7 +422,7 @@ class ExperimentBuilder {
       },
       names     : (b, model) => b.variants.warmup.map((w) => `${model}_nc-${w.label}`) },
 
-    { key: "physics",    label: "physics loss", hint: "physics components crossed with weights on top of the base config, one trial per pair plus an optional no-physics baseline",
+    { key: "physics",    label: "physics loss", hint: "physics components crossed with weights on top of the base config under the loss curriculum, one trial per pair plus an optional no-physics baseline",
       at        : 2,
       el        : "physicsEl",
       available : (b) => b.physics.size > 0,
@@ -431,19 +431,15 @@ class ExperimentBuilder {
       summary   : (b, gpus) => {
         const nComp    = b._physicsComponents().length;
         const nWeight  = b._physicsWeights().length;
-        const nCur     = b._physicsCurriculumStates().length;
         const baseline = b._physicsBaselineOn();
-        const total    = nComp * nWeight * nCur + (baseline ? nCur : 0);
-        return `${nComp} component${nComp === 1 ? "" : "s"} x ${nWeight} weight${nWeight === 1 ? "" : "s"} x ${nCur} curriculum${baseline ? ` + ${nCur} baseline` : ""} = ${total} trial${total === 1 ? "" : "s"}${b._seedsSuffix(total)}${gpus}`;
+        const total    = nComp * nWeight + (baseline ? 1 : 0);
+        return `${nComp} component${nComp === 1 ? "" : "s"} x ${nWeight} weight${nWeight === 1 ? "" : "s"}${baseline ? " + baseline" : ""} = ${total} trial${total === 1 ? "" : "s"}${b._seedsSuffix(total)}${gpus}`;
       },
       names     : (b, model) => {
-        const names    = [];
-        const suffixes = b._physicsCurriculumStates().map((state) => state ? "cur" : "nc");
-        if (b._physicsBaselineOn()) suffixes.forEach((suffix) => names.push(`${model}_phys-baseline-${suffix}`));
+        const names = [];
+        if (b._physicsBaselineOn()) names.push(`${model}_phys-baseline`);
         b._physicsComponents().forEach((component) => {
-          b._physicsWeights().forEach((weight) => {
-            suffixes.forEach((suffix) => names.push(`${model}_phys-${component}-w${weight}-${suffix}`));
-          });
+          b._physicsWeights().forEach((weight) => names.push(`${model}_phys-${component}-w${weight}`));
         });
         return names;
       } },
@@ -642,11 +638,6 @@ class ExperimentBuilder {
     { key: "capon_cycle",      label: "capon cycle" },
   ];
 
-  static PHYSICS_CURRICULUM = [
-    { key: true,  suffix: "cur", label: "curriculum on · physics after the swap" },
-    { key: false, suffix: "nc",  label: "curriculum off · physics from epoch 0" },
-  ];
-
   static PAIR_COMPONENTS = [
     "mse_curve", "l1_curve", "huber_curve", "charbonnier_curve", "cosine_curve",
     "total_power_relerr", "moments", "coherence_resyn", "covariance_match", "capon_cycle",
@@ -742,7 +733,6 @@ class ExperimentBuilder {
     this.physicsEl           = null;
     this.physicsComponentsEl = null;
     this.physicsWeightsEl    = null;
-    this.physicsCurriculumEl = null;
     this.pairEl              = null;
     this.pairBaseSelect      = null;
     this.pairCandidatesEl    = null;
@@ -1140,7 +1130,7 @@ class ExperimentBuilder {
     head.innerHTML = `<span class="exp-col__name">physics loss sweep</span>`;
 
     const baselineLeaf = this.physics.get("include_baseline");
-    if (baselineLeaf) head.appendChild(this._patchFlag(baselineLeaf, "baseline", "prepend one run of the plain base config per curriculum state with every physics term disabled, as the reference"));
+    if (baselineLeaf) head.appendChild(this._patchFlag(baselineLeaf, "baseline", "prepend one run of the plain base config with every physics term disabled, as the reference"));
 
     head.appendChild(LaunchWidgetDom.mini("Add weight", () => {
       const weights = this._physicsWeights();
@@ -1150,7 +1140,7 @@ class ExperimentBuilder {
 
     const note       = document.createElement("p");
     note.className   = "exp-secondary__note";
-    note.textContent = "each checked component trains once per weight and curriculum state on top of the base config, with every other physics term disabled in both stages; curriculum on adds the tested term only after the swap epoch, curriculum off trains the complete-stage loss plus the tested term from epoch 0";
+    note.textContent = "each checked component trains once per weight on top of the base config, with every other physics term disabled in both stages; the loss curriculum stays on, so the tested term joins only after the swap epoch";
 
     const componentsHead       = document.createElement("div");
     componentsHead.className   = "exp-presence__sub";
@@ -1168,22 +1158,12 @@ class ExperimentBuilder {
     weights.className     = "exp-patch__sizes";
     this.physicsWeightsEl = weights;
 
-    const curriculumHead       = document.createElement("div");
-    curriculumHead.className   = "exp-presence__sub";
-    curriculumHead.textContent = "curriculum";
-
-    const curriculum         = document.createElement("div");
-    curriculum.className     = "exp-builder__names exp-presence__strategies";
-    this.physicsCurriculumEl = curriculum;
-
     panel.appendChild(head);
     panel.appendChild(note);
     panel.appendChild(componentsHead);
     panel.appendChild(components);
     panel.appendChild(weightsHead);
     panel.appendChild(weights);
-    panel.appendChild(curriculumHead);
-    panel.appendChild(curriculum);
     this.physicsEl = panel;
 
     const componentsLeaf = this.physics.get("components");
@@ -1191,9 +1171,6 @@ class ExperimentBuilder {
 
     const weightsLeaf = this.physics.get("weights");
     if (weightsLeaf) this.view.controls[weightsLeaf.path] = { leaf: weightsLeaf, reset: () => this._repaintPhysics() };
-
-    const curriculumLeaf = this.physics.get("curriculum_states");
-    if (curriculumLeaf) this.view.controls[curriculumLeaf.path] = { leaf: curriculumLeaf, reset: () => this._repaintPhysics() };
 
     this._paintPhysics();
     return panel;
@@ -1210,23 +1187,6 @@ class ExperimentBuilder {
   _physicsBaselineOn() {
     const leaf = this.physics.get("include_baseline");
     return leaf ? this.view._effective(leaf) === "True" : false;
-  }
-
-  _physicsCurriculumStates() {
-    return this._listOf(this.physics.get("curriculum_states"), (value) => typeof value === "boolean");
-  }
-
-  _emitPhysicsCurriculum(states) {
-    const leaf = this.physics.get("curriculum_states");
-    if (!leaf) return;
-
-    this.view._setValue(leaf, PythonLiteral.render(states));
-    this._repaintPhysics();
-  }
-
-  _togglePhysicsCurriculum(key) {
-    const order = ExperimentBuilder.PHYSICS_CURRICULUM.map((entry) => entry.key);
-    this._toggleInCatalog(order, this._physicsCurriculumStates(), key, (states) => this._emitPhysicsCurriculum(states));
   }
 
   _emitPhysicsComponents(components) {
@@ -1267,15 +1227,6 @@ class ExperimentBuilder {
       const weights = this._physicsWeights();
       this.physicsWeightsEl.innerHTML = "";
       weights.forEach((weight, index) => this.physicsWeightsEl.appendChild(this._weightChip(weight, index, weights, "physics loss weight applied to the tested component", (next) => this._emitPhysicsWeights(next))));
-    }
-
-    if (this.physicsCurriculumEl) {
-      this.physicsCurriculumEl.innerHTML = "";
-      const states = this._physicsCurriculumStates();
-      ExperimentBuilder.PHYSICS_CURRICULUM.forEach(({ key, label }) => {
-        const chip = this._toggleChip(label, states.includes(key), "Click to drop this curriculum state from the sweep", "Click to sweep this curriculum state", () => this._togglePhysicsCurriculum(key));
-        this.physicsCurriculumEl.appendChild(chip);
-      });
     }
 
     this.patchFlagPaints.forEach((paint) => paint());

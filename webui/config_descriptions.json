@@ -1078,12 +1078,11 @@
       }
     },
     "training/backbone::PhysicsTrialsConfig": {
-      "summary": "Sweep of physics loss components, weights, and curriculum states for the physics-loss trial planner",
+      "summary": "Sweep of physics loss components and weights for the physics-loss trial planner",
       "fields": {
-        "components": "Physics loss components to test, each crossed with every weight and curriculum state as one training run: total_power, moments, coherence_resyn, covariance_match, or capon_cycle",
+        "components": "Physics loss components to test, each crossed with every weight as one training run: total_power, moments, coherence_resyn, covariance_match, or capon_cycle",
         "weights": "Candidate loss weights applied to the tested component in the complete-stage loss, all must be positive",
-        "curriculum_states": "Curriculum states crossed into the sweep: True warms up on the base warmup loss and adds the tested physics term only after the swap epoch, False trains the complete-stage loss plus the tested term from the first epoch",
-        "include_baseline": "Prepend one run of the plain base config per curriculum state with every physics term disabled, as the reference for the sweep"
+        "include_baseline": "Prepend one run of the plain base config with every physics term disabled, as the reference for the sweep"
       }
     },
     "training/backbone::PairTrialsConfig": {

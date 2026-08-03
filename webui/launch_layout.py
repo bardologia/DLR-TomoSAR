@@ -474,7 +474,7 @@ class LaunchLayout:
         "head_trials.backbone", "head_trials.heads", "head_trials.matchings",
         "normalization_trials.initial_pass_mag", "normalization_trials.initial_ifg_phase", "normalization_trials.initial_out_amp", "normalization_trials.initial_out_sigma",
         "normalization_trials.final_pass_mag", "normalization_trials.final_ifg_phase", "normalization_trials.final_out_amp", "normalization_trials.final_out_sigma",
-        "physics_trials.components", "physics_trials.weights", "physics_trials.curriculum_states", "physics_trials.include_baseline",
+        "physics_trials.components", "physics_trials.weights", "physics_trials.include_baseline",
         "pair_trials.base_component", "pair_trials.base_weight", "pair_trials.components", "pair_trials.weights", "pair_trials.include_baseline",
         "secondary_trials.strategy", "secondary_trials.n_secondaries", "secondary_trials.n_trials", "secondary_trials.mean",
         "secondary_trials.sigma", "secondary_trials.block_step", "secondary_trials.spacing", "secondary_trials.seed",
