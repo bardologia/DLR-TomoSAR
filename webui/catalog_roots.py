@@ -55,3 +55,53 @@ class CatalogRoots:
 
         self.add(root)
         return root, ""
+
+
+class RunScanner:
+
+    STAMP_MARKER = "inference/*/cubes/pred_curves.npy"
+
+    def __init__(self, roots: CatalogRoots) -> None:
+        self.roots = roots
+
+    @staticmethod
+    def _entry(root: Path, run_dir: Path, stamp: str, target: Path) -> dict:
+        return {
+            "id"    : str(target),
+            "run"   : run_dir.name,
+            "group" : str(run_dir.relative_to(root).parent),
+            "stamp" : stamp,
+        }
+
+    def stamps(self, base: str, required: tuple[str, ...] = ()) -> dict:
+        root, error = self.roots.open(base)
+        if error:
+            return {"ok": False, "error": error, "entries": []}
+
+        entries = []
+        for marker in sorted(root.rglob(self.STAMP_MARKER)):
+            stamp_dir = marker.parent.parent
+            if any(not (stamp_dir / rel).is_file() for rel in required):
+                continue
+
+            run_dir = stamp_dir.parent.parent
+            entries.append(self._entry(root, run_dir, stamp_dir.name, stamp_dir))
+
+        entries.sort(key=lambda entry: entry["id"], reverse=True)
+        return {"ok": True, "root": str(root), "entries": entries}
+
+    def checkpoint_runs(self, base: str, checkpoint_name: str, config_name: str) -> dict:
+        root, error = self.roots.open(base)
+        if error:
+            return {"ok": False, "error": error, "entries": []}
+
+        entries = []
+        for marker in sorted(root.rglob(checkpoint_name)):
+            run_dir = marker.parent
+            if not (run_dir / "meta" / config_name).is_file():
+                continue
+
+            entries.append(self._entry(root, run_dir, "", run_dir))
+
+        entries.sort(key=lambda entry: entry["id"], reverse=True)
+        return {"ok": True, "root": str(root), "entries": entries}

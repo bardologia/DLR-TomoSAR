@@ -113,3 +113,28 @@ def test_profile_rejects_elevation_length_mismatch(tmp_path):
 
     assert out["ok"] is False
     assert "different cubes" in out["error"]
+
+
+def test_runs_lists_only_comparable_stamps(tmp_path):
+    complete = tmp_path / "backbone" / "run_a" / "inference" / "s1"
+    (complete / "cubes").mkdir(parents=True)
+    (complete / "cubes" / "pred_curves.npy").write_bytes(b"x")
+    (complete / "cubes" / "pixel_mse.npy").write_bytes(b"x")
+    (complete / "metrics.json").write_text("{}")
+
+    bare = tmp_path / "backbone" / "run_b" / "inference" / "s2"
+    (bare / "cubes").mkdir(parents=True)
+    (bare / "cubes" / "pred_curves.npy").write_bytes(b"x")
+
+    out = AbAutopsy(WebLogger()).runs(str(tmp_path))
+
+    assert out["ok"] is True
+    assert [run["id"] for run in out["runs"]] == [str(complete)]
+    assert out["runs"][0]["stamp"] == "s1"
+
+
+def test_runs_reports_root_errors(tmp_path):
+    out = AbAutopsy(WebLogger()).runs(str(tmp_path / "nowhere"))
+
+    assert out["ok"] is False
+    assert out["runs"] == []

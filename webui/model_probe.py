@@ -11,6 +11,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from catalog_roots            import CatalogRoots, RunScanner
 from tools.reporting.plotting import PlotBase
 from web_logger               import WebLogger
 
@@ -20,15 +21,41 @@ class ModelProbe:
     FAMILIES      = ("amp", "mu", "sigma")
     PERTURBATIONS = ("drop_channel", "scale_channel", "noise")
     LOADER_NAME   = "model_probe"
+    CHECKPOINT    = "best_model.pt"
+    CONFIG_NAME   = "model_config.json"
 
     def __init__(self, logger: WebLogger) -> None:
-        self.logger = logger
-        self.lock   = threading.Lock()
+        self.logger  = logger
+        self.lock    = threading.Lock()
+        self.scanner = RunScanner(CatalogRoots())
 
         self.loaded = None
         self.status = {"state": "idle", "path": "", "progress": 0.0, "stage": "", "error": "", "info": None}
 
+    def runs(self, base: str) -> dict:
+        scanned = self.scanner.checkpoint_runs(base, self.CHECKPOINT, self.CONFIG_NAME)
+        if not scanned["ok"]:
+            return {"ok": False, "error": scanned["error"], "runs": []}
+
+        return {"ok": True, "root": scanned["root"], "runs": scanned["entries"]}
+
+    def _reject_unloadable(self, run_path: str) -> str:
+        run_dir = Path(run_path)
+
+        if not run_dir.is_dir():
+            return f"'{run_path}' is not a directory; pick a training run from the list"
+        if not (run_dir / self.CHECKPOINT).is_file():
+            return f"'{run_dir.name}' holds no {self.CHECKPOINT}; it is not a finished training run (did you point at a runs root or an inference stamp?)"
+        if not (run_dir / "meta" / self.CONFIG_NAME).is_file():
+            return f"'{run_dir.name}' holds no meta/{self.CONFIG_NAME}; the microscope probes backbone runs only, and this run is another family or predates config persistence"
+
+        return ""
+
     def start_load(self, run_path: str, split: str = "test", device: str = "cpu") -> dict:
+        refusal = self._reject_unloadable(run_path)
+        if refusal:
+            return {"ok": False, "error": refusal}
+
         with self.lock:
             if self.status["state"] == "loading":
                 return {"ok": False, "error": "a model load is already running"}

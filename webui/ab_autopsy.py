@@ -5,6 +5,7 @@ from pathlib import Path
 
 import numpy as np
 
+from catalog_roots         import CatalogRoots, RunScanner
 from tools.metrics.scoring import MetricOrientation
 from web_logger            import WebLogger
 
@@ -15,9 +16,18 @@ class AbAutopsy:
     MAX_METRICS  = 40
     MAX_HOTSPOTS = 3
     SKIP_PREFIX  = ("tracks", "track_positions", "split", "x_axis")
+    REQUIRED     = ("metrics.json", "cubes/pixel_mse.npy")
 
     def __init__(self, logger: WebLogger) -> None:
-        self.logger = logger
+        self.logger  = logger
+        self.scanner = RunScanner(CatalogRoots())
+
+    def runs(self, base: str) -> dict:
+        scanned = self.scanner.stamps(base, self.REQUIRED)
+        if not scanned["ok"]:
+            return {"ok": False, "error": scanned["error"], "runs": []}
+
+        return {"ok": True, "root": scanned["root"], "runs": scanned["entries"]}
 
     def _metrics(self, stamp: Path) -> dict:
         path = stamp / "metrics.json"

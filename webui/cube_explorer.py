@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from skimage.metrics import structural_similarity as ssim
 
-from catalog_roots              import CatalogRoots
+from catalog_roots              import CatalogRoots, RunScanner
 from tools.loss.param_loss      import ParamMatcher
 from tools.reporting.plotting   import PlotBase
 from tools.sar.track_parameters import TrackParameters
@@ -120,29 +120,17 @@ class CubeExplorer:
         self.logger   = logger
         self.archiver = SliceFigureArchiver()
         self.roots    = CatalogRoots()
+        self.scanner  = RunScanner(self.roots)
         self.lock     = threading.Lock()
         self.loaded   = None
         self.status   = {"state": "idle", "id": None, "progress": 0.0, "stage": "", "error": ""}
 
     def list_cubes(self, base: str) -> dict:
-        root, error = self.roots.open(base)
-        if error:
-            return {"ok": False, "error": error, "cubes": []}
+        scanned = self.scanner.stamps(base)
+        if not scanned["ok"]:
+            return {"ok": False, "error": scanned["error"], "cubes": []}
 
-        cubes = []
-        for cube_file in sorted(root.rglob("inference/*/cubes/pred_curves.npy")):
-            stamp_dir = cube_file.parent.parent
-            run_dir   = stamp_dir.parent.parent
-
-            cubes.append({
-                "id"    : str(stamp_dir),
-                "run"   : run_dir.name,
-                "group" : str(run_dir.relative_to(root).parent),
-                "stamp" : stamp_dir.name,
-            })
-
-        cubes.sort(key=lambda c: c["id"], reverse=True)
-        return {"ok": True, "root": str(root), "cubes": cubes}
+        return {"ok": True, "root": scanned["root"], "cubes": scanned["entries"]}
 
     def start_load(self, cube_id: str) -> dict:
         stamp_dir = self._stamp_dir(cube_id)

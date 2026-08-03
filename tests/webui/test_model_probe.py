@@ -150,3 +150,63 @@ def test_map_png_renders_for_a_loaded_run():
 
     assert png is not None
     assert png[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def _loadable_run(tmp_path):
+    run_dir = tmp_path / "backbone" / "run_ok"
+    run_dir.mkdir(parents=True)
+    (run_dir / "best_model.pt").write_bytes(b"x")
+    (run_dir / "meta").mkdir()
+    (run_dir / "meta" / "model_config.json").write_text("{}")
+    return run_dir
+
+
+def test_runs_lists_only_loadable_backbone_runs(tmp_path):
+    run_dir = _loadable_run(tmp_path)
+
+    bare = tmp_path / "backbone" / "run_bare"
+    bare.mkdir(parents=True)
+    (bare / "best_model.pt").write_bytes(b"x")
+
+    dual = tmp_path / "dual" / "run_dual"
+    dual.mkdir(parents=True)
+    (dual / "best_model.pt").write_bytes(b"x")
+    (dual / "meta").mkdir()
+    (dual / "meta" / "dual_model_config.json").write_text("{}")
+
+    out = ModelProbe(SilentLogger()).runs(str(tmp_path))
+
+    assert out["ok"] is True
+    assert [run["id"] for run in out["runs"]] == [str(run_dir)]
+
+
+def test_runs_reports_root_errors(tmp_path):
+    out = ModelProbe(SilentLogger()).runs(str(tmp_path / "nowhere"))
+
+    assert out["ok"] is False
+    assert out["runs"] == []
+
+
+def test_load_refuses_a_directory_that_is_not_a_run(tmp_path):
+    probe = ModelProbe(SilentLogger())
+
+    missing = probe.start_load(str(tmp_path / "nowhere"))
+    assert missing["ok"] is False
+    assert "not a directory" in missing["error"]
+
+    (tmp_path / "runs_root").mkdir()
+    rootish = probe.start_load(str(tmp_path / "runs_root"))
+    assert rootish["ok"] is False
+    assert "best_model.pt" in rootish["error"]
+
+
+def test_load_refuses_a_run_without_the_persisted_config(tmp_path):
+    run_dir = tmp_path / "run_bare"
+    run_dir.mkdir()
+    (run_dir / "best_model.pt").write_bytes(b"x")
+
+    out = ModelProbe(SilentLogger()).start_load(str(run_dir))
+
+    assert out["ok"] is False
+    assert "meta/model_config.json" in out["error"]
+    assert "backbone" in out["error"]
