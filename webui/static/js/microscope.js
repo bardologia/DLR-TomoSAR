@@ -1,17 +1,19 @@
 "use strict";
 
 class MicroscopeView {
-  static DEFAULT_RUN = "/ste/rnd/User/vice_vi/DLR-TomoSAR/runs/backbone";
-  static FAMILIES    = ["amp", "mu", "sigma"];
+  static FAMILIES = ["amp", "mu", "sigma"];
 
   constructor(root) {
-    this.root      = root;
-    this.info      = null;
-    this.pixel     = null;
-    this.family    = "mu";
-    this.layer     = "";
-    this.built     = false;
-    this.pollToken = 0;
+    this.root       = root;
+    this.info       = null;
+    this.pixel      = null;
+    this.family     = "mu";
+    this.layer      = "";
+    this.built      = false;
+    this.pollToken  = 0;
+    this.runs       = [];
+    this.selectedId = null;
+    this.openGroups = new Set();
   }
 
   enter() {
@@ -19,18 +21,15 @@ class MicroscopeView {
       this._build();
       this.built = true;
     }
+    this._refreshRuns();
     this._pollStatus();
   }
 
   _build() {
     this.root.innerHTML = `
       <div class="cube-pick">
-        <div class="fl-src" role="group" aria-label="Run directory">
-          <label for="probe-run">Run dir</label>
-          <input id="probe-run" type="text" spellcheck="false" autocomplete="off" placeholder="${MicroscopeView.DEFAULT_RUN}" />
-          <button type="button" class="btn btn--mini" id="probe-load">Load</button>
-        </div>
-        <p class="cube-hint" id="probe-hint">Point at a training run directory holding best_model.pt, then load it.</p>
+        <div class="cube-grouplist" id="probe-strip" aria-label="Trained backbone runs"></div>
+        <p class="cube-hint" id="probe-hint">Scanning the runs directory for loadable backbone runs&hellip;</p>
         <div class="cube-progress" id="probe-progress" hidden>
           <div class="cube-progress__track"><i class="cube-progress__fill" id="probe-progress-fill"></i></div>
           <p class="cube-progress__label" id="probe-progress-label">loading&hellip;</p>
@@ -121,8 +120,7 @@ class MicroscopeView {
       </div>`;
 
     this.refs = {
-      runInput   : this.root.querySelector("#probe-run"),
-      loadBtn    : this.root.querySelector("#probe-load"),
+      strip      : this.root.querySelector("#probe-strip"),
       hint       : this.root.querySelector("#probe-hint"),
       progress   : this.root.querySelector("#probe-progress"),
       fill       : this.root.querySelector("#probe-progress-fill"),
@@ -154,9 +152,6 @@ class MicroscopeView {
       wDelta     : this.root.querySelector("#probe-whatif-delta"),
     };
 
-    this.refs.runInput.value = MicroscopeView.DEFAULT_RUN;
-    this.refs.loadBtn.addEventListener("click", () => this._load());
-    this.refs.runInput.addEventListener("keydown", (ev) => { if (ev.key === "Enter") this._load(); });
     this.refs.mapImg.addEventListener("click", (ev) => this._onMapClick(ev));
     this.refs.goBtn.addEventListener("click", () => this._probeInputs());
     this.refs.layerSel.addEventListener("change", () => this._loadFeatures());
@@ -186,15 +181,94 @@ class MicroscopeView {
     if (kind === "noise") this.refs.wValue.value = "0.5";
   }
 
-  async _load() {
-    const path = this.refs.runInput.value.trim();
-    if (!path) return;
+  _runsBase() {
+    try {
+      const raw = JSON.parse(localStorage.getItem("results-sources") || "{}");
+      return raw.logs || ResultsView.DEFAULT_RUNS;
+    } catch (e) {
+      return ResultsView.DEFAULT_RUNS;
+    }
+  }
 
+  async _refreshRuns() {
+    const base = this._runsBase();
+    const data = await window.apiGet(`/api/probe/runs?base=${encodeURIComponent(base)}`);
+
+    if (!data || !data.ok) {
+      this.refs.hint.textContent = (data && data.error) || "Backend unreachable.";
+      return;
+    }
+
+    this.runs = data.runs || [];
+    this._renderStrip();
+
+    if (!this.runs.length) {
+      this.refs.hint.textContent = `No loadable backbone runs under ${data.root} (a loadable run holds best_model.pt and meta/model_config.json). Train a backbone run, or point the runs directory in the Results tab at the right place.`;
+      return;
+    }
+
+    if (!this.info) this.refs.hint.textContent = "Pick a trained backbone run to put under the microscope.";
+  }
+
+  _renderStrip() {
+    this.refs.strip.innerHTML = "";
+
+    const groups = new Map();
+    this.runs.forEach((run) => {
+      if (!groups.has(run.group)) groups.set(run.group, []);
+      groups.get(run.group).push(run);
+    });
+
+    const selectedGroup = (this.runs.find((r) => r.id === this.selectedId) || {}).group;
+
+    groups.forEach((runs, group) => {
+      const isOpen = this.openGroups.has(group);
+      const label  = group === "." ? "runs" : group;
+
+      const card = document.createElement("div");
+      card.className = "cube-group" + (isOpen ? " is-open" : "") + (group === selectedGroup ? " is-current" : "");
+
+      const head = document.createElement("button");
+      head.type = "button";
+      head.className = "cube-group__head";
+      head.title = label;
+      head.innerHTML =
+        `<span class="cube-group__chev" aria-hidden="true"></span>` +
+        `<span class="cube-group__name">${this._esc(label)}</span>` +
+        `<span class="cube-group__count">${runs.length}</span>`;
+      head.addEventListener("click", () => {
+        if (this.openGroups.has(group)) this.openGroups.delete(group);
+        else this.openGroups.add(group);
+        this._renderStrip();
+      });
+      card.appendChild(head);
+
+      const body = document.createElement("div");
+      body.className = "cube-group__body";
+      runs.forEach((run) => {
+        const row = document.createElement("button");
+        row.type = "button";
+        row.className = "cube-run" + (run.id === this.selectedId ? " is-active" : "");
+        row.title = run.id;
+        row.innerHTML = `<span class="cube-run__name">${this._esc(run.run)}</span>`;
+        row.addEventListener("click", () => this._load(run.id));
+        body.appendChild(row);
+      });
+      card.appendChild(body);
+
+      this.refs.strip.appendChild(card);
+    });
+  }
+
+  async _load(path) {
     const out = await window.apiPost("/api/probe/load", { path });
     if (!out.ok) {
       this.refs.hint.textContent = out.error || "load failed";
       return;
     }
+
+    this.selectedId = path;
+    this._renderStrip();
 
     this.refs.progress.hidden = false;
     this._pollStatus();
@@ -223,6 +297,10 @@ class MicroscopeView {
         return;
       }
       if (st.state === "ready" && st.info) {
+        if (st.path && st.path !== this.selectedId) {
+          this.selectedId = st.path;
+          this._renderStrip();
+        }
         this._onReady(st.info);
       }
     };

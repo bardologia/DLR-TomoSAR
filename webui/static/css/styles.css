@@ -4039,3 +4039,46 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
   .sc-cell { width: 240px; }
   .sc-cell img { height: 150px; }
 }
+
+/* ==== A/B autopsy picker ==== */
+.autopsy-run { cursor: default; padding-right: 66px; }
+.autopsy-side {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  font: 600 0.6rem/1 var(--mono); letter-spacing: 0.05em;
+  color: var(--ink-faint); border: 1px solid var(--line); border-radius: 2px;
+  padding: 3px 7px; background: var(--surface); cursor: pointer; transition: color 0.15s var(--ease), border-color 0.15s var(--ease);
+}
+.autopsy-side--a { right: 36px; }
+.autopsy-side--b { right: 8px; }
+.autopsy-side:hover { color: var(--accent); border-color: var(--accent); }
+.autopsy-side.is-on { color: #f7f9ff; background: var(--accent); border-color: var(--accent); }
+.autopsy-slot {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: 500 0.68rem/1 var(--mono); color: var(--ink-faint);
+  border: 1px dashed var(--line); border-radius: var(--r-card); padding: 6px 10px;
+  max-width: 340px; overflow: hidden;
+}
+.autopsy-slot b { font-weight: 700; color: var(--ink-dim); }
+.autopsy-slot span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.autopsy-slot.is-set { border-style: solid; color: var(--ink-dim); }
+
+/* ==== Triage visual cases ==== */
+.triage-media { display: flex; gap: 10px; align-items: stretch; margin: 8px 0; }
+.triage-thumb {
+  width: 132px; height: 132px; flex: 0 0 auto; cursor: pointer;
+  image-rendering: pixelated; object-fit: fill;
+  background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-card);
+}
+.triage-profile { flex: 1; min-width: 0; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r-card); }
+.triage-verdicts { display: flex; gap: 6px; flex-wrap: wrap; }
+.triage-verdict {
+  font: 600 0.66rem/1 var(--mono); letter-spacing: 0.03em;
+  border: 1px solid var(--line); border-radius: 2px; padding: 6px 10px;
+  background: var(--surface); color: var(--ink-dim); cursor: pointer;
+  transition: color 0.15s var(--ease), border-color 0.15s var(--ease), background 0.15s var(--ease);
+}
+.triage-verdict:hover { border-color: var(--tone, var(--accent)); color: var(--tone, var(--accent)); }
+.triage-verdict.is-active { background: var(--tone, var(--accent)); border-color: var(--tone, var(--accent)); color: #f7f9ff; }
+.triage-verdict--label { --tone: #b45309; }
+.triage-verdict--model { --tone: #b91c1c; }
+.triage-verdict--interesting { --tone: #1d4ed8; }

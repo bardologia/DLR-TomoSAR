@@ -53,6 +53,7 @@ class ProbeRouter(SubRouter):
         super().__init__(("/api/probe",))
 
     def declare(self, table: RouteTable) -> None:
+        table.add("GET",  "/api/probe/runs",     self.runs)
         table.add("GET",  "/api/probe/status",   self.status)
         table.add("GET",  "/api/probe/layers",   self.layers)
         table.add("GET",  "/api/probe/map",      self.map_view)
@@ -61,6 +62,9 @@ class ProbeRouter(SubRouter):
         table.add("POST", "/api/probe/predict",  self.predict)
         table.add("POST", "/api/probe/saliency", self.saliency)
         table.add("POST", "/api/probe/whatif",   self.whatif)
+
+    def runs(self, exchange: HttpExchange) -> None:
+        exchange.send_result(self.probe.runs(exchange.text("base")))
 
     def status(self, exchange: HttpExchange) -> None:
         exchange.send_json(self.probe.load_status())
@@ -97,7 +101,15 @@ class TriageRouter(SubRouter):
 
     def declare(self, table: RouteTable) -> None:
         table.add("GET",  "/api/triage/cases",    self.cases)
+        table.add("GET",  "/api/triage/thumb",    self.thumb)
+        table.add("GET",  "/api/triage/profile",  self.profile)
         table.add("POST", "/api/triage/annotate", self.annotate)
+
+    def thumb(self, exchange: HttpExchange) -> None:
+        exchange.send_png(self.triage.thumb(exchange.text("id"), exchange.integer("az0"), exchange.integer("rg0")))
+
+    def profile(self, exchange: HttpExchange) -> None:
+        exchange.send_result(self.triage.profile(exchange.text("id"), exchange.integer("az"), exchange.integer("rg")))
 
     def cases(self, exchange: HttpExchange) -> None:
         result = self.triage.cases(
@@ -118,8 +130,12 @@ class AutopsyRouter(SubRouter):
         super().__init__(("/api/autopsy",))
 
     def declare(self, table: RouteTable) -> None:
+        table.add("GET", "/api/autopsy/runs",    self.runs)
         table.add("GET", "/api/autopsy/compare", self.compare)
         table.add("GET", "/api/autopsy/profile", self.profile)
+
+    def runs(self, exchange: HttpExchange) -> None:
+        exchange.send_result(self.autopsy.runs(exchange.text("base")))
 
     def compare(self, exchange: HttpExchange) -> None:
         result = self.autopsy.compare(

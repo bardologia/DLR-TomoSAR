@@ -95,7 +95,14 @@ class TriageView {
     const cards = this.cases.map((row, index) => this._card(row, index)).join("");
     this.refs.cases.innerHTML = `<div class="script-grid">${cards}</div>`;
     this._wire(this.refs.cases);
+    this.cases.forEach((row, index) => this._loadProfile(row, index));
   }
+
+  static VERDICT_TONES = {
+    "label problem" : "triage-verdict--label",
+    "model problem" : "triage-verdict--model",
+    "interesting"   : "triage-verdict--interesting",
+  };
 
   _card(row, index) {
     const data       = this.payload || {};
@@ -106,25 +113,47 @@ class TriageView {
       .map((name) => `${this._esc(name)}: ${Number(row[name]).toPrecision(3)}`)
       .join(" · ");
 
+    const thumb = `/api/triage/thumb?id=${encodeURIComponent(this.cubeId)}&az0=${row.az0}&rg0=${row.rg0}`;
+
     const verdictBtns = TriageView.VERDICTS.map((verdict) => {
       const active = annotation.verdict === verdict;
-      return `<button type="button" class="cube-space${active ? " is-active" : ""}" data-case="${index}" data-verdict="${active ? "" : verdict}">${verdict}</button>`;
+      const tone   = TriageView.VERDICT_TONES[verdict] || "";
+      return `<button type="button" class="triage-verdict ${tone}${active ? " is-active" : ""}" data-case="${index}" data-verdict="${active ? "" : verdict}">${verdict}</button>`;
     }).join("");
 
     return `
       <article class="fl-card">
         <h3 class="cube-panel-title">#${index + 1} · az ${row.az0}–${row.az1}, rg ${row.rg0}–${row.rg1}</h3>
+        <div class="triage-media">
+          <img class="triage-thumb" src="${thumb}" loading="lazy" alt="pixel MSE around the block" title="log MSE, white = this block, red = worst pixel; click to open cuts" data-open="${index}" />
+          <canvas class="triage-profile" id="triage-profile-${index}" width="420" height="132" title="GT vs prediction at the worst pixel"></canvas>
+        </div>
         <p class="cube-hint">
           block MSE ${row.mse_mean.toExponential(2)} (peak ${row.mse_max.toExponential(2)} at az ${row.worst_az}, rg ${row.worst_rg})<br>
           ${modeBadge}${aux ? `${aux}<br>` : ""}
         </p>
-        <div class="cube-spaces" role="group" aria-label="Verdict">${verdictBtns}</div>
+        <div class="triage-verdicts" role="group" aria-label="Verdict">${verdictBtns}</div>
         <div class="fl-pixrow">
           <input type="text" class="cube-jump__input cube-jump__input--wide" placeholder="note" value="${this._esc(annotation.note || "")}" data-note="${index}" />
           <button type="button" class="btn btn--mini" data-open="${index}">Open cuts</button>
         </div>
         ${annotation.updated ? `<p class="cube-hint">last touched ${this._esc(annotation.updated)}</p>` : ""}
       </article>`;
+  }
+
+  async _loadProfile(row, index) {
+    const data = await window.apiGet(
+      `/api/triage/profile?id=${encodeURIComponent(this.cubeId)}&az=${row.worst_az}&rg=${row.worst_rg}`
+    );
+    if (!data.ok) return;
+
+    const canvas = this.refs.cases.querySelector(`#triage-profile-${index}`);
+    if (!canvas) return;
+
+    window.drawLineChart(canvas, data.x_axis, [
+      { values: data.gt,   color: "#111827", width: 1.2, label: "GT" },
+      { values: data.pred, color: "#0f766e", width: 1.7, label: "pred" },
+    ]);
   }
 
   async _annotate(index, verdict, noteOverride) {
@@ -156,6 +185,7 @@ class TriageView {
 
     old.replaceWith(card);
     this._wire(card);
+    this._loadProfile(this.cases[index], index);
   }
 
   _wire(scope) {

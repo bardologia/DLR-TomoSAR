@@ -16,7 +16,7 @@ from routers.static_router      import StaticRouter
 from routers.system_router      import SystemRouter
 from routers.tensorboard_router import TensorboardRouter
 
-ROUTE_COUNT   = 103
+ROUTE_COUNT   = 107
 SECTION_COUNT = 34
 
 RESOLUTIONS = [
@@ -33,8 +33,12 @@ RESOLUTIONS = [
     ("POST", "/api/slices/collect",                SliceRouter),
     ("GET",  "/api/fitlab/map",                    FitLabRouter),
     ("POST", "/api/probe/predict",                 ProbeRouter),
+    ("GET",  "/api/probe/runs",                    ProbeRouter),
     ("GET",  "/api/triage/cases",                  TriageRouter),
+    ("GET",  "/api/triage/thumb",                  TriageRouter),
+    ("GET",  "/api/triage/profile",                TriageRouter),
     ("GET",  "/api/autopsy/compare",               AutopsyRouter),
+    ("GET",  "/api/autopsy/runs",                  AutopsyRouter),
     ("GET",  "/api/backbones",                     BackboneRouter),
     ("GET",  "/api/backbones/unet/note",           BackboneRouter),
     ("GET",  "/api/jepa-variants/jepa_vit/note",   ModelLibraryRouter),

@@ -2,9 +2,13 @@
 
 class AutopsyView {
   constructor(root) {
-    this.root  = root;
-    this.built = false;
-    this.pair  = null;
+    this.root       = root;
+    this.built      = false;
+    this.pair       = null;
+    this.runs       = [];
+    this.sideA      = null;
+    this.sideB      = null;
+    this.openGroups = new Set();
   }
 
   enter() {
@@ -12,49 +16,163 @@ class AutopsyView {
       this._build();
       this.built = true;
     }
+
     const pending = window.abAutopsyPair;
     if (pending) {
       window.abAutopsyPair = null;
-      this.refs.aInput.value = pending.a;
-      this.refs.bInput.value = pending.b;
+      this.sideA = pending.a;
+      this.sideB = pending.b;
       this._compare();
     }
+
+    this._refreshRuns();
   }
 
   _build() {
     this.root.innerHTML = `
       <div class="cube-pick">
-        <div class="fl-src" role="group" aria-label="Run A">
-          <label for="autopsy-a">A</label>
-          <input id="autopsy-a" type="text" spellcheck="false" autocomplete="off" placeholder="/path/to/run_a/inference/<stamp>" />
+        <div class="cube-grouplist" id="autopsy-strip" aria-label="Saved inferences"></div>
+        <div class="fl-src" role="group" aria-label="Chosen pair">
+          <span class="autopsy-slot" id="autopsy-slot-a"><b>A</b> <span>none</span></span>
+          <span class="autopsy-slot" id="autopsy-slot-b"><b>B</b> <span>none</span></span>
+          <button type="button" class="btn btn--mini" id="autopsy-go" disabled>Compare</button>
         </div>
-        <div class="fl-src" role="group" aria-label="Run B">
-          <label for="autopsy-b">B</label>
-          <input id="autopsy-b" type="text" spellcheck="false" autocomplete="off" placeholder="/path/to/run_b/inference/<stamp>" />
-        </div>
-        <div class="fl-src">
-          <button type="button" class="btn btn--mini" id="autopsy-go">Compare</button>
-        </div>
-        <p class="cube-hint" id="autopsy-hint">Point A and B at two saved inference stamps of the same region, or send a pair over from the leaderboard diff.</p>
+        <p class="cube-hint" id="autopsy-hint">Assign one saved inference to A and one to B (same region), or send a pair over from the leaderboard diff.</p>
       </div>
       <div id="autopsy-out"></div>`;
 
     this.refs = {
-      aInput : this.root.querySelector("#autopsy-a"),
-      bInput : this.root.querySelector("#autopsy-b"),
-      goBtn  : this.root.querySelector("#autopsy-go"),
-      hint   : this.root.querySelector("#autopsy-hint"),
-      out    : this.root.querySelector("#autopsy-out"),
+      strip : this.root.querySelector("#autopsy-strip"),
+      slotA : this.root.querySelector("#autopsy-slot-a"),
+      slotB : this.root.querySelector("#autopsy-slot-b"),
+      goBtn : this.root.querySelector("#autopsy-go"),
+      hint  : this.root.querySelector("#autopsy-hint"),
+      out   : this.root.querySelector("#autopsy-out"),
     };
 
     this.refs.goBtn.addEventListener("click", () => this._compare());
   }
 
-  async _compare() {
-    const a = this.refs.aInput.value.trim();
-    const b = this.refs.bInput.value.trim();
-    if (!a || !b) return;
+  _runsBase() {
+    try {
+      const raw = JSON.parse(localStorage.getItem("results-sources") || "{}");
+      return raw.logs || ResultsView.DEFAULT_RUNS;
+    } catch (e) {
+      return ResultsView.DEFAULT_RUNS;
+    }
+  }
 
+  async _refreshRuns() {
+    const data = await window.apiGet(`/api/autopsy/runs?base=${encodeURIComponent(this._runsBase())}`);
+
+    if (!data || !data.ok) {
+      this.refs.hint.textContent = (data && data.error) || "Backend unreachable.";
+      return;
+    }
+
+    this.runs = data.runs || [];
+    this._renderStrip();
+
+    if (!this.runs.length) {
+      this.refs.hint.textContent = `No comparable inferences under ${data.root} (each needs metrics.json and cubes/pixel_mse.npy). Run inference with save_cubes first, or point the runs directory in the Results tab at the right place.`;
+    }
+  }
+
+  _label(id) {
+    const run = this.runs.find((r) => r.id === id);
+    return run ? `${run.run} · ${run.stamp}` : (id ? id.split("/").slice(-3).join("/") : "none");
+  }
+
+  _syncSlots() {
+    this.refs.slotA.querySelector("span").textContent = this._label(this.sideA);
+    this.refs.slotB.querySelector("span").textContent = this._label(this.sideB);
+    this.refs.slotA.classList.toggle("is-set", Boolean(this.sideA));
+    this.refs.slotB.classList.toggle("is-set", Boolean(this.sideB));
+    this.refs.goBtn.disabled = !(this.sideA && this.sideB && this.sideA !== this.sideB);
+  }
+
+  _assign(side, id) {
+    if (side === "A") this.sideA = this.sideA === id ? null : id;
+    else this.sideB = this.sideB === id ? null : id;
+    this._renderStrip();
+
+    if (this.sideA && this.sideB && this.sideA !== this.sideB) this._compare();
+  }
+
+  _renderStrip() {
+    this.refs.strip.innerHTML = "";
+    this._syncSlots();
+
+    const groups = new Map();
+    this.runs.forEach((run) => {
+      if (!groups.has(run.group)) groups.set(run.group, []);
+      groups.get(run.group).push(run);
+    });
+
+    groups.forEach((runs, group) => {
+      const isOpen  = this.openGroups.has(group);
+      const label   = group === "." ? "runs" : group;
+      const current = runs.some((r) => r.id === this.sideA || r.id === this.sideB);
+
+      const card = document.createElement("div");
+      card.className = "cube-group" + (isOpen ? " is-open" : "") + (current ? " is-current" : "");
+
+      const head = document.createElement("button");
+      head.type = "button";
+      head.className = "cube-group__head";
+      head.title = label;
+      head.innerHTML =
+        `<span class="cube-group__chev" aria-hidden="true"></span>` +
+        `<span class="cube-group__name">${this._esc(label)}</span>` +
+        `<span class="cube-group__count">${runs.length}</span>`;
+      head.addEventListener("click", () => {
+        if (this.openGroups.has(group)) this.openGroups.delete(group);
+        else this.openGroups.add(group);
+        this._renderStrip();
+      });
+      card.appendChild(head);
+
+      const body = document.createElement("div");
+      body.className = "cube-group__body";
+      runs.forEach((run) => {
+        const isA = run.id === this.sideA;
+        const isB = run.id === this.sideB;
+
+        const row = document.createElement("div");
+        row.className = "cube-run autopsy-run" + (isA || isB ? " is-active" : "");
+        row.title = run.id;
+        row.innerHTML =
+          `<span class="cube-run__name">${this._esc(run.run)}</span>` +
+          `<span class="cube-run__stamp">${this._esc(run.stamp)}</span>`;
+
+        ["A", "B"].forEach((side) => {
+          const on  = side === "A" ? isA : isB;
+          const btn = document.createElement("button");
+          btn.type = "button";
+          btn.className = `autopsy-side autopsy-side--${side.toLowerCase()}` + (on ? " is-on" : "");
+          btn.textContent = side;
+          btn.title = on ? `Unassign ${side}` : `Use as ${side}`;
+          btn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            this._assign(side, run.id);
+          });
+          row.appendChild(btn);
+        });
+
+        body.appendChild(row);
+      });
+      card.appendChild(body);
+
+      this.refs.strip.appendChild(card);
+    });
+  }
+
+  async _compare() {
+    const a = this.sideA;
+    const b = this.sideB;
+    if (!a || !b || a === b) return;
+
+    this._syncSlots();
     this.refs.hint.textContent = "comparing…";
     const data = await window.apiGet(`/api/autopsy/compare?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}`);
 
