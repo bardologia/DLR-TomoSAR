@@ -6,7 +6,7 @@ from pathlib import Path
 
 class ProjectPaths:
 
-    PRIORITY        = ["conda:Dune"]
+    PRIORITY        = ["conda:dlr-cu12", "conda:Dune", "conda:nazaria"]
     SCRIPT_PRIORITY = {
         "generate_tomogram"       : ["conda:stetools"],
         "generate_interferograms" : ["conda:stetools"],
