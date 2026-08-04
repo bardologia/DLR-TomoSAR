@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260803a" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260804a" />
 </head>
 <body>
 
@@ -750,8 +750,9 @@
       <p class="page__lead">
         Load a trained backbone checkpoint, pick a pixel on the scene, and inspect the model
         from the inside: the predicted profile against ground truth and the raw tomogram,
-        which input channels the prediction depends on, per-layer feature maps, and live
-        what-if perturbations of the input.
+        gradient attribution of every output family to every input channel, spatial maps of
+        where in the window those gradients concentrate, feature maps along a clickable view
+        of the architecture, and live what-if perturbations of the input.
       </p>
     </div>
     <div id="probe-root"></div>
@@ -1143,7 +1144,7 @@
 <script src="/static/js/tomogram.js?v=20260714f"></script>
 <script src="/static/js/slice_collector.js?v=20260802a"></script>
 <script src="/static/js/fit_lab.js?v=20260721a"></script>
-<script src="/static/js/microscope.js?v=20260803a"></script>
+<script src="/static/js/microscope.js?v=20260804a"></script>
 <script src="/static/js/triage.js?v=20260803a"></script>
 <script src="/static/js/autopsy.js?v=20260803a"></script>
 <script src="/static/js/tensorboard.js?v=20260702r"></script>
