@@ -82,6 +82,18 @@
   \end{columns}
 \end{frame}
 
+% contributions agenda (short deck only)
+\begin{frame}{My contributions}
+  \begin{itemize}\setlength{\itemsep}{12pt}
+    \item \textbf{Multi-GPU parameter fitting on a JAX framework}: the ground-truth Gaussian fits, batched over the full scene.
+    \item \textbf{Improvements in the model architecture}: set-prediction head, dual trunks, the backbone zoo.
+    \item \textbf{Improvements in training stability}: matching, imbalance levers, sanity gates.
+    \item \textbf{Improvements in pre-training}: autoencoder and JEPA directions.
+    \item \textbf{Multiple experiments}: benchmark board, patch sweep, context ladder, input ablations, pair losses.
+    \item \textbf{A full toolset for diagnosing and visualizing results}: leaderboards, run health, cube slices, per-pixel microscope.
+  \end{itemize}
+\end{frame}
+
 % full deck p.3 --- sections/01_overview.tex
 \begin{frame}{Methodology}
   \centering
@@ -832,18 +844,6 @@
     \end{minipage}}
   \vspace{7pt}
   \parbox{0.90\textwidth}{\scriptsize\color{soft} The second cut, $\mathrm{rg}=3377$, same three panels: raw full-stack tomogram in inversion-grid bins, GT re-synthesis and prediction re-synthesis in $z\in[-20,80]$\,m, per-column peak normalisation.\par}
-\end{frame}
-
-% contributions agenda (short deck only)
-\begin{frame}{My contributions}
-  \begin{itemize}\setlength{\itemsep}{12pt}
-    \item \textbf{Multi-GPU parameter fitting on a JAX framework}: the ground-truth Gaussian fits, batched over the full scene.
-    \item \textbf{Improvements in the model architecture}: set-prediction head, dual trunks, the backbone zoo.
-    \item \textbf{Improvements in training stability}: matching, imbalance levers, sanity gates.
-    \item \textbf{Improvements in pre-training}: autoencoder and JEPA directions.
-    \item \textbf{Multiple experiments}: benchmark board, patch sweep, context ladder, input ablations, pair losses.
-    \item \textbf{A full toolset for diagnosing and visualizing results}: leaderboards, run health, cube slices, per-pixel microscope.
-  \end{itemize}
 \end{frame}
 
 % next-steps agenda (short deck only)
