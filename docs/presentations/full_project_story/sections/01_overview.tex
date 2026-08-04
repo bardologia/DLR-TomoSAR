@@ -1,3 +1,81 @@
+% ---------------------------------------------------------------- 2b Motivation (area vs flight time)
+\begin{frame}{Motivation: more area from the same flight time}
+  \begin{columns}[c]
+    \begin{column}{0.46\textwidth}
+      \centering
+      \resizebox{\linewidth}{!}{%
+      \begin{tikzpicture}[font=\scriptsize]
+        \node[font=\tiny,text=soft,rotate=90,anchor=south] at (-0.12,0.06) {vertical baseline: 29 passes};
+        \foreach \i in {1,...,29} \fill[soft!70] (0.25,{-2.31+0.165*(\i-1)}) circle (0.036);
+        \foreach \i in {1,8,15,22,29} \fill[accent] (0.25,{-2.31+0.165*(\i-1)}) circle (0.065);
+        \node[font=\tiny,text=soft,anchor=north west] at (-0.30,-2.68) {\textcolor{accent}{$\bullet$} $=$ the 5 kept};
+        \node[gate,minimum height=7mm] (cfull) at (2.45,2.20) {Capon\\29 passes};
+        \node[gate,minimum height=7mm] (cred)  at (2.45,0.00) {Capon\\5 passes};
+        \node[box,fill=accent!16,minimum height=7mm] (net) at (2.45,-2.20) {network\\5 passes};
+        \draw[flow,soft] (0.50,2.20) -- (cfull.west);
+        \draw[flow] (0.50,0.00) -- (cred.west);
+        \draw[flow] (0.50,-2.20) -- (net.west);
+        \draw[soft,thin,fill=black!2] (3.85,1.81) rectangle ++(1.05,0.78);
+        \draw[soft,thin] (3.93,1.93) -- (4.82,1.93);
+        \draw[accent,semithick] plot[domain=3.93:4.82,samples=60] (\x,{1.93+0.40*exp(-(\x-4.18)^2/0.010)+0.25*exp(-(\x-4.54)^2/0.006)});
+        \draw[flow,soft] (cfull.east) -- (3.85,2.20);
+        \node[font=\tiny,text=good,anchor=north] at (4.375,1.73) {the reference};
+        \draw[soft,thin,fill=black!2] (3.85,-0.39) rectangle ++(1.05,0.78);
+        \draw[soft,thin] (3.93,-0.27) -- (4.82,-0.27);
+        \draw[soft!80,densely dashed,thin] (4.18,-0.27) -- (4.18,0.24);
+        \draw[soft!80,densely dashed,thin] (4.54,-0.27) -- (4.54,0.24);
+        \draw[accent,semithick] plot[domain=3.93:4.82,samples=70] (\x,{-0.27+0.24*exp(-(\x-4.36)^2/0.050)+0.07*exp(-(\x-4.00)^2/0.004)+0.07*exp(-(\x-4.72)^2/0.004)});
+        \draw[flow] (cred.east) -- (3.85,0.00);
+        \node[font=\tiny,text=accent,anchor=north,align=center] at (4.375,-0.47) {$\neq$ scatterers merge,\\sidelobes appear};
+        \draw[soft,thin,fill=black!2] (3.85,-2.59) rectangle ++(1.05,0.78);
+        \draw[soft,thin] (3.93,-2.47) -- (4.82,-2.47);
+        \draw[accent,semithick] plot[domain=3.93:4.82,samples=60] (\x,{-2.47+0.40*exp(-(\x-4.18)^2/0.010)+0.25*exp(-(\x-4.54)^2/0.006)});
+        \draw[flow] (net.east) -- (3.85,-2.20);
+        \node[font=\tiny,text=good,anchor=north] at (4.375,-2.67) {$\approx$ the reference};
+      \end{tikzpicture}}
+    \end{column}
+    \begin{column}{0.50\textwidth}
+      \centering
+      \resizebox{\linewidth}{!}{%
+      \begin{tikzpicture}[font=\scriptsize]
+        \node[font=\tiny,text=soft,anchor=south west] at (0,1.33) {flight line: 29 passes};
+        \draw[soft,thin,rounded corners=1pt,fill=black!2] (0.5,0) -- (2.7,0) -- (3.12,0.28) -- (0.92,0.28) -- cycle;
+        \foreach \f in {0.25,0.5,0.75} \draw[black!7,very thin] ({0.5+\f*0.42},{\f*0.28}) -- ({2.7+\f*0.42},{\f*0.28});
+        \foreach \g in {0.2,0.4,0.6,0.8} \draw[black!7,very thin] ({0.5+\g*2.2},0) -- ({0.5+\g*2.2+0.42},0.28);
+        \fill[accent!20] (0.81,0) -- (0.95,0) -- (1.37,0.28) -- (1.23,0.28) -- cycle;
+        \fill[accent!12] (0.75,1.21) -- (0.88,0.02) -- (1.30,0.30) -- cycle;
+        \draw[accent!50,very thin] (0.75,1.21) -- (0.88,0.02);
+        \draw[accent!50,very thin] (0.75,1.21) -- (1.30,0.30);
+        \draw[soft,dotted,thin] (0.75,1.19) -- (0.75,-0.08);
+        \fill[soft] (0.75,-0.08) circle (0.022);
+        \foreach \o in {-0.06,-0.03,0,0.03,0.06} \draw[ink!50,very thin] (-0.1,{1.25+\o}) -- (2.4,{1.25+\o});
+        \fill[ink!70] (0.75,1.25) -- ++(-0.15,0.055) -- ++(0.045,-0.055) -- ++(-0.045,-0.055) -- cycle;
+        \node[font=\tiny,text=accent!80,anchor=west] at (1.48,0.68) {side-looking beam};
+        \node[font=\tiny,text=soft,anchor=north] at (1.7,-0.16) {one scene};
+        \node[font=\scriptsize\bfseries,text=accent,anchor=west] at (3.25,0.30) {$\times\,5.8$ area};
+        \node[font=\tiny,text=soft,anchor=south west] at (0,-1.47) {flight line: 5 passes per scene};
+        \foreach \x in {0.5,1.32,2.14,2.96,3.78} {
+          \draw[soft,thin,rounded corners=1pt,fill=black!2] (\x,-2.85) -- ++(0.72,0) -- ++(0.42,0.28) -- ++(-0.72,0) -- cycle;
+          \foreach \f in {0.33,0.66} \draw[black!7,very thin] ({\x+\f*0.42},{-2.85+\f*0.28}) -- ({\x+0.72+\f*0.42},{-2.85+\f*0.28});
+          \foreach \g in {0.33,0.66} \draw[black!7,very thin] ({\x+\g*0.72},-2.85) -- ({\x+\g*0.72+0.42},-2.57);
+        }
+        \draw[soft,thin,densely dashed] (4.60,-2.85) -- ++(0.58,0) -- ++(0.42,0.28) -- ++(-0.58,0) -- cycle;
+        \fill[accent!20] (4.61,-2.85) -- (4.75,-2.85) -- (5.17,-2.57) -- (5.03,-2.57) -- cycle;
+        \fill[accent!12] (4.55,-1.59) -- (4.68,-2.83) -- (5.10,-2.55) -- cycle;
+        \draw[accent!50,very thin] (4.55,-1.59) -- (4.68,-2.83);
+        \draw[accent!50,very thin] (4.55,-1.59) -- (5.10,-2.55);
+        \draw[soft,dotted,thin] (4.55,-1.61) -- (4.55,-2.93);
+        \fill[soft] (4.55,-2.93) circle (0.022);
+        \foreach \o in {-0.025,0.025} \draw[ink!50,very thin] (-0.1,{-1.55+\o}) -- (5.15,{-1.55+\o});
+        \fill[ink!70] (4.55,-1.55) -- ++(-0.15,0.055) -- ++(0.045,-0.055) -- ++(-0.045,-0.055) -- cycle;
+        \node[font=\tiny,text=soft,anchor=north] at (2.9,-2.99) {$29/5 \approx 5.8$ scenes};
+        \draw[decorate,decoration={brace,amplitude=4pt},soft] (-0.35,-2.85) -- (-0.35,1.37);
+        \node[font=\tiny,text=soft,rotate=90,anchor=south] at (-0.57,-0.74) {same flight time};
+      \end{tikzpicture}}
+    \end{column}
+  \end{columns}
+\end{frame}
+
 % ---------------------------------------------------------------- 3 What this project does
 \begin{frame}{What this project does}
   \centering

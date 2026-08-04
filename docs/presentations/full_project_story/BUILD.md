@@ -20,6 +20,23 @@ All builds run inside this directory (images resolve via `../../results/...`).
 
 # Design log
 
+- MOTIVATION FRAME ADDED 2026-08-04 (user: built for the short talk, then "copy him
+  to the beginning of the full project presentation"): new frame "Motivation: more
+  area from the same flight time" at the TOP of 01_overview (marker 2b, before
+  "What this project does"; renders p3 after title + outline, deck 154 -> 155
+  pages). Two resizebox'd tikz panels side by side, no prose column (user removed
+  the bullets): LEFT = 29-dot vertical-baseline column (5 kept passes in accent)
+  feeding three chains (Capon-29 = reference, Capon-5 = merged scatterers +
+  sidelobes with dashed GT ghosts, network-5 = restores the reference; verdict
+  labels under each profile card); RIGHT = oblique-perspective survey budget
+  (parallelogram scene tiles, elevated offset flight lines, plane glyphs with
+  dotted nadir landing OFF the tile, accent beam sheet onto a footprint strip,
+  brace "same flight time", x5.8 area from 29/5 production passes). SIDE-LOOKING
+  GRAMMAR RULE (user): flight lines never over the scene middle, beam footprint
+  shown on the ground, and survey sketches drawn in perspective (flat top-down
+  versions rejected twice). sub_01_problem.pdf rebuilt (includes 01_overview).
+
+
 - PAIR-LOSS BLOCK ADDED 2026-08-04 (user: "the pair_k5 and pair_k2 results need
   to go to the presentations"). EIGHT frames appended to 12b_dual after the
   90-10 cube-slice frames (markers 25z-25ag, full-deck pages 123-130, deck 146
