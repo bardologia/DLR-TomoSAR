@@ -3,11 +3,15 @@ from __future__ import annotations
 import ast
 import re
 
+from importlib import import_module
+
 import pytest
 
-from launch_layout            import LaunchLayout, LayoutError
-from project_paths            import ProjectPaths
-from script_catalog           import ScriptCatalog
+from launch_layout          import LaunchLayout, LayoutError
+from project_paths          import ProjectPaths
+from script_catalog         import ScriptCatalog
+from script_config_resolver import ScriptConfigResolver
+
 from tools.runtime.config_cli import ConfigCli
 
 from configuration.benchmark.general        import BenchmarkConfig
@@ -59,6 +63,15 @@ def test_training_layout_claims_every_config_field_exactly_once(key, flow_config
 @pytest.mark.parametrize("key, flow_config", _INFERENCE_PAGES)
 def test_inference_layout_claims_every_config_field_exactly_once(key, flow_config):
     leaves = [{"path": path} for path, _value in ConfigCli._leaves(flow_config())]
+
+    LaunchLayout().build(key, leaves)
+
+
+@pytest.mark.parametrize("key", sorted(key for key in ProjectPaths.SCRIPT_DIRS if key not in _DISPATCH_ONLY))
+def test_every_script_layout_builds_against_its_entry_config(key):
+    entry  = ScriptConfigResolver(ProjectPaths()).entry_config(key)
+    config = getattr(import_module(entry["module"]), entry["class"])()
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(config)]
 
     LaunchLayout().build(key, leaves)
 

@@ -3729,7 +3729,7 @@ class NumberField {
 
   _resolve(spec) {
     const r = spec
-      ? { min: spec.min, max: spec.max, step: spec.step || 1, log: Boolean(spec.log), presets: spec.presets.slice() }
+      ? { min: spec.min, max: spec.max, step: spec.step || 1, log: Boolean(spec.log), presets: spec.presets ? spec.presets.slice() : this._spanPresets(spec) }
       : this._fallback();
 
     this.log = r.log;
@@ -3738,6 +3738,13 @@ class NumberField {
     r.presets.push(this.default);
     r.presets = this._cleanPresets(r.presets, r);
     return r;
+  }
+
+  _spanPresets(spec) {
+    const step = spec.step || 1;
+    const span = spec.max - spec.min;
+    const snap = (x) => spec.min + Math.round((x - spec.min) / step) * step;
+    return [0, 0.25, 0.5, 0.75, 1].map((f) => snap(spec.min + span * f));
   }
 
   _fallback() {

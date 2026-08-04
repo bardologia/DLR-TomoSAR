@@ -1611,6 +1611,10 @@ class LaunchLayout:
             if when and when["field"] not in known:
                 problems.append(f"section {section['key']} gates on unknown field {when['field']}")
 
+        for path, widget in layout["widgets"].items():
+            if widget.get("kind") == "number" and not ("min" in widget and "max" in widget):
+                problems.append(f"number widget for {path} lacks min/max bounds")
+
         legacy = layout.get("legacy")
         if legacy:
             section_keys = {section["key"] for section in layout["sections"]}
