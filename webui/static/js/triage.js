@@ -5,12 +5,13 @@ class TriageView {
   static VERDICTS     = ["label problem", "model problem", "interesting"];
 
   constructor(root) {
-    this.root    = root;
-    this.cubes   = [];
-    this.cubeId  = null;
-    this.cases   = [];
-    this.payload = null;
-    this.built   = false;
+    this.root     = root;
+    this.cubes    = [];
+    this.cubeId   = null;
+    this.cases    = [];
+    this.payload  = null;
+    this.built    = false;
+    this.runStrip = null;
   }
 
   enter() {
@@ -28,7 +29,7 @@ class TriageView {
           <input id="triage-base" type="text" spellcheck="false" autocomplete="off" placeholder="${TriageView.DEFAULT_BASE}" />
           <button type="button" class="btn btn--mini" id="triage-scan">Scan</button>
         </div>
-        <div class="cube-grouplist" id="triage-strip" aria-label="Saved inferences"></div>
+        <div class="run-strip" id="triage-strip" aria-label="Saved inferences"></div>
         <p class="cube-hint" id="triage-hint">Scan a runs directory for saved inference cubes, then pick one to triage.</p>
       </div>
       <div id="triage-cases"></div>`;
@@ -59,21 +60,18 @@ class TriageView {
     this.cubes = data.cubes || [];
     this.refs.hint.textContent = this.cubes.length ? `${this.cubes.length} saved inference(s); pick one.` : "no saved inference cubes under this directory";
 
-    this.refs.strip.innerHTML = "";
-    this.cubes.forEach((cube) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "cube-space";
-      btn.textContent = `${cube.run} · ${cube.stamp || ""}`;
-      btn.title = cube.id;
-      btn.addEventListener("click", () => this._pick(cube.id, btn));
-      this.refs.strip.appendChild(btn);
-    });
+    if (!this.runStrip) {
+      this.runStrip = new RunStrip(this.refs.strip, {
+        stateFor : (cube) => cube.id === this.cubeId,
+        onPick   : (cube) => this._pick(cube.id),
+      });
+    }
+    this.runStrip.render(this.cubes);
   }
 
-  async _pick(cubeId, btn) {
-    this.refs.strip.querySelectorAll(".cube-space").forEach((b) => b.classList.toggle("is-active", b === btn));
+  async _pick(cubeId) {
     this.cubeId = cubeId;
+    this.runStrip.repaint();
 
     const data = await window.apiGet(`/api/triage/cases?id=${encodeURIComponent(cubeId)}&n=40`);
     if (!data.ok) {

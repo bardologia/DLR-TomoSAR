@@ -2678,6 +2678,18 @@ main { margin-left: var(--navw); }
   gap: 8px;
   margin-bottom: 10px;
 }
+
+.run-strip { margin-bottom: 10px; }
+.run-strip__bar { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.run-strip__bar[hidden] { display: none; }
+.run-strip__filter { font-family: var(--mono); font-size: 12.5px; padding: 6px 10px; flex: 0 1 320px; min-width: 140px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-input); color: var(--ink); transition: border-color 0.2s var(--ease); }
+.run-strip__filter:focus { outline: none; border-color: var(--accent); }
+.run-strip__total { font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); white-space: nowrap; }
+.run-strip__groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
+  gap: 8px;
+}
 .cube-group {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card);
   overflow: hidden;
@@ -2708,7 +2720,7 @@ main { margin-left: var(--navw); }
 .cube-group__body { display: none; flex-direction: column; padding: 4px; border-top: 1px solid var(--line); max-height: 280px; overflow-y: auto; scrollbar-color: rgba(180, 195, 205, 0.25) transparent; }
 .cube-group.is-open .cube-group__body { display: flex; }
 .cube-run {
-  display: flex; flex-direction: column; gap: 2px; width: 100%;
+  display: flex; align-items: center; gap: 10px; width: 100%;
   padding: 7px 9px; border-radius: var(--r-btn, 8px);
   background: none; border: 1px solid transparent; cursor: pointer;
   font-family: var(--mono); text-align: left;
@@ -2716,8 +2728,14 @@ main { margin-left: var(--navw); }
 }
 .cube-run:hover { background: var(--line); }
 .cube-run.is-active { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
-.cube-run__name { font-size: 12.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.cube-run__stamp { font-size: 11px; color: var(--ink-faint); }
+.cube-run__main { display: flex; flex-direction: column; gap: 3px; flex: 1 1 auto; min-width: 0; }
+.run-name { font-size: 12.5px; line-height: 1.5; color: var(--ink); overflow-wrap: anywhere; }
+.run-name__tok--model { font-weight: 700; }
+.run-name__sep { color: var(--ink-faint); }
+.cube-run__meta { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
+.cube-run__when { font-size: 10.5px; color: var(--ink-faint); white-space: nowrap; }
+.cube-run__badge { font-size: 10px; line-height: 1; padding: 2px 6px; border-radius: var(--r-pill); border: 1px solid var(--line-strong); color: var(--ink-dim); background: var(--surface-2); }
+.cube-run__extras { display: flex; align-items: center; gap: 4px; flex: none; }
 
 .cube-progress { max-width: 520px; margin: 12px 0 0; }
 .cube-progress__track { height: 6px; border-radius: 3px; background: var(--line-strong); overflow: hidden; }
@@ -3854,9 +3872,7 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .lb-trials-table[open] summary { color: var(--ink-dim); }
 
 /* ==== Cube comparison attach ==== */
-.cube-run { position: relative; }
 .cube-run__vs {
-  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
   font: 600 0.56rem/1 var(--mono); letter-spacing: 0.05em; text-transform: uppercase;
   color: var(--ink-faint); border: 1px solid var(--line); border-radius: 2px;
   padding: 3px 6px; background: var(--surface); opacity: 0; transition: opacity 0.15s var(--ease);
@@ -4041,15 +4057,12 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 }
 
 /* ==== A/B autopsy picker ==== */
-.autopsy-run { cursor: default; padding-right: 66px; }
+.autopsy-run { cursor: default; }
 .autopsy-side {
-  position: absolute; top: 50%; transform: translateY(-50%);
   font: 600 0.6rem/1 var(--mono); letter-spacing: 0.05em;
   color: var(--ink-faint); border: 1px solid var(--line); border-radius: 2px;
   padding: 3px 7px; background: var(--surface); cursor: pointer; transition: color 0.15s var(--ease), border-color 0.15s var(--ease);
 }
-.autopsy-side--a { right: 36px; }
-.autopsy-side--b { right: 8px; }
 .autopsy-side:hover { color: var(--accent); border-color: var(--accent); }
 .autopsy-side.is-on { color: #f7f9ff; background: var(--accent); border-color: var(--accent); }
 .autopsy-slot {

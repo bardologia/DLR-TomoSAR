@@ -20,7 +20,7 @@ class MicroscopeView {
     this.wiToken     = 0;
     this.runs        = [];
     this.selectedId  = null;
-    this.openGroups  = new Set();
+    this.runStrip    = null;
     this.lastPredict = null;
     this.attrib      = null;
     this.gridChannel = -1;
@@ -40,7 +40,7 @@ class MicroscopeView {
   _build() {
     this.root.innerHTML = `
       <div class="cube-pick">
-        <div class="cube-grouplist" id="probe-strip" aria-label="Trained backbone runs"></div>
+        <div class="run-strip" id="probe-strip" aria-label="Trained backbone runs"></div>
         <p class="cube-hint" id="probe-hint">Scanning the runs directory for loadable backbone runs&hellip;</p>
         <div class="cube-progress" id="probe-progress" hidden>
           <div class="cube-progress__track"><i class="cube-progress__fill" id="probe-progress-fill"></i></div>
@@ -254,53 +254,13 @@ class MicroscopeView {
   }
 
   _renderStrip() {
-    this.refs.strip.innerHTML = "";
-
-    const groups = new Map();
-    this.runs.forEach((run) => {
-      if (!groups.has(run.group)) groups.set(run.group, []);
-      groups.get(run.group).push(run);
-    });
-
-    const selectedGroup = (this.runs.find((r) => r.id === this.selectedId) || {}).group;
-
-    groups.forEach((runs, group) => {
-      const isOpen = this.openGroups.has(group);
-      const label  = group === "." ? "runs" : group;
-
-      const card = document.createElement("div");
-      card.className = "cube-group" + (isOpen ? " is-open" : "") + (group === selectedGroup ? " is-current" : "");
-
-      const head = document.createElement("button");
-      head.type = "button";
-      head.className = "cube-group__head";
-      head.title = label;
-      head.innerHTML =
-        `<span class="cube-group__chev" aria-hidden="true"></span>` +
-        `<span class="cube-group__name">${this._esc(label)}</span>` +
-        `<span class="cube-group__count">${runs.length}</span>`;
-      head.addEventListener("click", () => {
-        if (this.openGroups.has(group)) this.openGroups.delete(group);
-        else this.openGroups.add(group);
-        this._renderStrip();
+    if (!this.runStrip) {
+      this.runStrip = new RunStrip(this.refs.strip, {
+        stateFor : (run) => run.id === this.selectedId,
+        onPick   : (run) => this._load(run.id),
       });
-      card.appendChild(head);
-
-      const body = document.createElement("div");
-      body.className = "cube-group__body";
-      runs.forEach((run) => {
-        const row = document.createElement("button");
-        row.type = "button";
-        row.className = "cube-run" + (run.id === this.selectedId ? " is-active" : "");
-        row.title = run.id;
-        row.innerHTML = `<span class="cube-run__name">${this._esc(run.run)}</span>`;
-        row.addEventListener("click", () => this._load(run.id));
-        body.appendChild(row);
-      });
-      card.appendChild(body);
-
-      this.refs.strip.appendChild(card);
-    });
+    }
+    this.runStrip.render(this.runs);
   }
 
   async _load(path) {

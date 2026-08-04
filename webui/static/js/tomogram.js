@@ -1268,7 +1268,7 @@ class TomogramView {
 
     this.cubes = [];
     this.selectedId = null;
-    this.openGroups = new Set();
+    this.runStrip = null;
     this.meta = null;
     this.space = "physical";
     this.point = null;
@@ -1400,72 +1400,30 @@ class TomogramView {
   }
 
   _renderStrip() {
-    this.strip.innerHTML = "";
-
-    const groups = new Map();
-    this.cubes.forEach((cube) => {
-      if (!groups.has(cube.group)) groups.set(cube.group, []);
-      groups.get(cube.group).push(cube);
-    });
-
-    const selectedGroup = (this.cubes.find((c) => c.id === this.selectedId) || {}).group;
-
-    groups.forEach((cubes, group) => {
-      const isOpen = this.openGroups.has(group);
-      const label  = group === "." ? "runs" : group;
-
-      const card = document.createElement("div");
-      card.className = "cube-group" + (isOpen ? " is-open" : "") + (group === selectedGroup ? " is-current" : "");
-
-      const head = document.createElement("button");
-      head.type = "button";
-      head.className = "cube-group__head";
-      head.title = label;
-      head.innerHTML =
-        `<span class="cube-group__chev" aria-hidden="true"></span>` +
-        `<span class="cube-group__name">${this._esc(label)}</span>` +
-        `<span class="cube-group__count">${cubes.length}</span>`;
-      head.addEventListener("click", () => this._toggleGroup(group));
-      card.appendChild(head);
-
-      const body = document.createElement("div");
-      body.className = "cube-group__body";
-      cubes.forEach((cube) => {
-        const row = document.createElement("button");
-        row.type = "button";
-        row.className = "cube-run" + (cube.id === this.selectedId ? " is-active" : "");
-        row.title = cube.id;
-        row.innerHTML =
-          `<span class="cube-run__name">${this._esc(cube.run)}</span>` +
-          `<span class="cube-run__stamp">${this._esc(cube.stamp)}</span>`;
-        row.addEventListener("click", () => this.select(cube.id));
-
-        if (this.meta && cube.id !== this.selectedId) {
-          const attached = this.meta.attached && this.meta.attached.id === cube.id;
-          const vs = document.createElement("span");
-          vs.className = "cube-run__vs" + (attached ? " is-on" : "");
-          vs.setAttribute("role", "button");
-          vs.title = attached ? "Detach this comparison" : "Compare against the loaded cube";
-          vs.textContent = attached ? "detach" : "vs";
-          vs.addEventListener("click", (ev) => {
-            ev.stopPropagation();
-            this._toggleAttach(cube.id);
-          });
-          row.appendChild(vs);
-        }
-
-        body.appendChild(row);
+    if (!this.runStrip) {
+      this.runStrip = new RunStrip(this.strip, {
+        stateFor : (cube) => cube.id === this.selectedId,
+        onPick   : (cube) => this.select(cube.id),
+        extras   : (cube) => this._stripExtras(cube),
       });
-      card.appendChild(body);
-
-      this.strip.appendChild(card);
-    });
+    }
+    this.runStrip.render(this.cubes);
   }
 
-  _toggleGroup(group) {
-    if (this.openGroups.has(group)) this.openGroups.delete(group);
-    else this.openGroups.add(group);
-    this._renderStrip();
+  _stripExtras(cube) {
+    if (!this.meta || cube.id === this.selectedId) return [];
+
+    const attached = this.meta.attached && this.meta.attached.id === cube.id;
+    const vs = document.createElement("span");
+    vs.className = "cube-run__vs" + (attached ? " is-on" : "");
+    vs.setAttribute("role", "button");
+    vs.title = attached ? "Detach this comparison" : "Compare against the loaded cube";
+    vs.textContent = attached ? "detach" : "vs";
+    vs.addEventListener("click", (ev) => {
+      ev.stopPropagation();
+      this._toggleAttach(cube.id);
+    });
+    return [vs];
   }
 
   async select(cubeId) {
@@ -1477,7 +1435,7 @@ class TomogramView {
 
     this._stopSweeps();
     this.selectedId = cubeId;
-    this.openGroups.delete((this.cubes.find((c) => c.id === cubeId) || {}).group);
+    if (this.runStrip) this.runStrip.close((this.cubes.find((c) => c.id === cubeId) || {}).group);
     this.meta = null;
     this.point = null;
     this.locked = null;

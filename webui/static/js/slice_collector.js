@@ -9,7 +9,7 @@ class SliceCollectorView {
     this.cubes = [];
     this.infos = new Map();
     this.selected = [];
-    this.openGroups = new Set();
+    this.runStrip = null;
     this.points = [];
     this.axes = new Set(["range"]);
     this.sources = new Set(["pred"]);
@@ -85,56 +85,14 @@ class SliceCollectorView {
   }
 
   _renderStrip() {
-    this.refs.strip.innerHTML = "";
-
-    const groups = new Map();
-    this.cubes.forEach((cube) => {
-      if (!groups.has(cube.group)) groups.set(cube.group, []);
-      groups.get(cube.group).push(cube);
-    });
-
-    groups.forEach((cubes, group) => {
-      const isOpen = this.openGroups.has(group);
-      const picked = cubes.filter((c) => this.selected.includes(c.id)).length;
-      const label = group === "." ? "runs" : group;
-
-      const card = document.createElement("div");
-      card.className = "cube-group" + (isOpen ? " is-open" : "") + (picked ? " is-current" : "");
-
-      const head = document.createElement("button");
-      head.type = "button";
-      head.className = "cube-group__head";
-      head.title = label;
-      head.innerHTML =
-        `<span class="cube-group__chev" aria-hidden="true"></span>` +
-        `<span class="cube-group__name">${this._esc(label)}</span>` +
-        `<span class="cube-group__count">${picked ? `${picked}/${cubes.length}` : cubes.length}</span>`;
-      head.addEventListener("click", () => this._toggleGroup(group));
-      card.appendChild(head);
-
-      const body = document.createElement("div");
-      body.className = "cube-group__body";
-      cubes.forEach((cube) => {
-        const row = document.createElement("button");
-        row.type = "button";
-        row.className = "cube-run" + (this.selected.includes(cube.id) ? " is-active" : "");
-        row.title = cube.id;
-        row.innerHTML =
-          `<span class="cube-run__name">${this._esc(cube.run)}</span>` +
-          `<span class="cube-run__stamp">${this._esc(cube.stamp)}</span>`;
-        row.addEventListener("click", () => this._togglePick(cube.id));
-        body.appendChild(row);
+    if (!this.runStrip) {
+      this.runStrip = new RunStrip(this.refs.strip, {
+        multi    : true,
+        stateFor : (cube) => this.selected.includes(cube.id),
+        onPick   : (cube) => this._togglePick(cube.id),
       });
-      card.appendChild(body);
-
-      this.refs.strip.appendChild(card);
-    });
-  }
-
-  _toggleGroup(group) {
-    if (this.openGroups.has(group)) this.openGroups.delete(group);
-    else this.openGroups.add(group);
-    this._renderStrip();
+    }
+    this.runStrip.render(this.cubes);
   }
 
   async _togglePick(id) {

@@ -8,7 +8,7 @@ class AutopsyView {
     this.runs       = [];
     this.sideA      = null;
     this.sideB      = null;
-    this.openGroups = new Set();
+    this.runStrip   = null;
   }
 
   enter() {
@@ -31,7 +31,7 @@ class AutopsyView {
   _build() {
     this.root.innerHTML = `
       <div class="cube-pick">
-        <div class="cube-grouplist" id="autopsy-strip" aria-label="Saved inferences"></div>
+        <div class="run-strip" id="autopsy-strip" aria-label="Saved inferences"></div>
         <div class="fl-src" role="group" aria-label="Chosen pair">
           <span class="autopsy-slot" id="autopsy-slot-a"><b>A</b> <span>none</span></span>
           <span class="autopsy-slot" id="autopsy-slot-b"><b>B</b> <span>none</span></span>
@@ -100,70 +100,28 @@ class AutopsyView {
   }
 
   _renderStrip() {
-    this.refs.strip.innerHTML = "";
     this._syncSlots();
 
-    const groups = new Map();
-    this.runs.forEach((run) => {
-      if (!groups.has(run.group)) groups.set(run.group, []);
-      groups.get(run.group).push(run);
-    });
-
-    groups.forEach((runs, group) => {
-      const isOpen  = this.openGroups.has(group);
-      const label   = group === "." ? "runs" : group;
-      const current = runs.some((r) => r.id === this.sideA || r.id === this.sideB);
-
-      const card = document.createElement("div");
-      card.className = "cube-group" + (isOpen ? " is-open" : "") + (current ? " is-current" : "");
-
-      const head = document.createElement("button");
-      head.type = "button";
-      head.className = "cube-group__head";
-      head.title = label;
-      head.innerHTML =
-        `<span class="cube-group__chev" aria-hidden="true"></span>` +
-        `<span class="cube-group__name">${this._esc(label)}</span>` +
-        `<span class="cube-group__count">${runs.length}</span>`;
-      head.addEventListener("click", () => {
-        if (this.openGroups.has(group)) this.openGroups.delete(group);
-        else this.openGroups.add(group);
-        this._renderStrip();
+    if (!this.runStrip) {
+      this.runStrip = new RunStrip(this.refs.strip, {
+        rowClass : "autopsy-run",
+        stateFor : (run) => run.id === this.sideA || run.id === this.sideB,
+        extras   : (run) => this._stripExtras(run),
       });
-      card.appendChild(head);
+    }
+    this.runStrip.render(this.runs);
+  }
 
-      const body = document.createElement("div");
-      body.className = "cube-group__body";
-      runs.forEach((run) => {
-        const isA = run.id === this.sideA;
-        const isB = run.id === this.sideB;
-
-        const row = document.createElement("div");
-        row.className = "cube-run autopsy-run" + (isA || isB ? " is-active" : "");
-        row.title = run.id;
-        row.innerHTML =
-          `<span class="cube-run__name">${this._esc(run.run)}</span>` +
-          `<span class="cube-run__stamp">${this._esc(run.stamp)}</span>`;
-
-        ["A", "B"].forEach((side) => {
-          const on  = side === "A" ? isA : isB;
-          const btn = document.createElement("button");
-          btn.type = "button";
-          btn.className = `autopsy-side autopsy-side--${side.toLowerCase()}` + (on ? " is-on" : "");
-          btn.textContent = side;
-          btn.title = on ? `Unassign ${side}` : `Use as ${side}`;
-          btn.addEventListener("click", (ev) => {
-            ev.stopPropagation();
-            this._assign(side, run.id);
-          });
-          row.appendChild(btn);
-        });
-
-        body.appendChild(row);
-      });
-      card.appendChild(body);
-
-      this.refs.strip.appendChild(card);
+  _stripExtras(run) {
+    return ["A", "B"].map((side) => {
+      const on  = run.id === (side === "A" ? this.sideA : this.sideB);
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = `autopsy-side autopsy-side--${side.toLowerCase()}` + (on ? " is-on" : "");
+      btn.textContent = side;
+      btn.title = on ? `Unassign ${side}` : `Use as ${side}`;
+      btn.addEventListener("click", () => this._assign(side, run.id));
+      return btn;
     });
   }
 
