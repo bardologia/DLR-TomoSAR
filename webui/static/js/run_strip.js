@@ -2,6 +2,7 @@
 
 class RunStrip {
   static FILTER_MIN = 7;
+  static ROOT_LABEL = "runs";
 
   constructor(container, opts = {}) {
     this.container  = container;
@@ -17,12 +18,12 @@ class RunStrip {
         <input type="text" class="run-strip__filter" placeholder="filter runs&hellip;" spellcheck="false" autocomplete="off" />
         <span class="run-strip__total"></span>
       </div>
-      <div class="run-strip__groups"></div>`;
+      <div class="run-strip__tree"></div>`;
 
-    this.bar    = this.container.querySelector(".run-strip__bar");
-    this.input  = this.container.querySelector(".run-strip__filter");
-    this.total  = this.container.querySelector(".run-strip__total");
-    this.groups = this.container.querySelector(".run-strip__groups");
+    this.bar   = this.container.querySelector(".run-strip__bar");
+    this.input = this.container.querySelector(".run-strip__filter");
+    this.total = this.container.querySelector(".run-strip__total");
+    this.tree  = this.container.querySelector(".run-strip__tree");
 
     this.input.addEventListener("input", () => {
       this.filter = this.input.value.trim().toLowerCase();
@@ -80,7 +81,39 @@ class RunStrip {
     return `${entry.group}/${entry.run} ${entry.stamp || ""}`.toLowerCase().includes(this.filter);
   }
 
-  _row(entry) {
+  _buildTree() {
+    const root = { name: "", rel: "", dirs: new Map(), entries: [] };
+
+    this.entries.forEach((entry) => {
+      const parts = entry.group === "." ? [RunStrip.ROOT_LABEL] : entry.group.split("/");
+      let   node  = root;
+      let   rel   = "";
+
+      parts.forEach((part, i) => {
+        rel = entry.group === "." && i === 0 ? "." : (rel ? `${rel}/${part}` : part);
+        if (!node.dirs.has(rel)) node.dirs.set(rel, { name: part, rel, dirs: new Map(), entries: [] });
+        node = node.dirs.get(rel);
+      });
+
+      node.entries.push(entry);
+    });
+
+    return root;
+  }
+
+  _shownBeneath(node) {
+    let count = node.entries.filter((entry) => this._matches(entry)).length;
+    node.dirs.forEach((dir) => { count += this._shownBeneath(dir); });
+    return count;
+  }
+
+  _pickedBeneath(node) {
+    let count = node.entries.filter((entry) => this._stateFor(entry)).length;
+    node.dirs.forEach((dir) => { count += this._pickedBeneath(dir); });
+    return count;
+  }
+
+  _row(entry, depth) {
     const state = this._stateFor(entry);
     const tag   = this.opts.onPick ? "button" : "div";
     const row   = document.createElement(tag);
@@ -88,6 +121,7 @@ class RunStrip {
     if (tag === "button") row.type = "button";
     row.className = "cube-run" + (this.opts.rowClass ? ` ${this.opts.rowClass}` : "") + (state ? " is-active" : "");
     row.title     = entry.id;
+    row.style.paddingLeft = `${9 + depth * 18}px`;
 
     const main = document.createElement("span");
     main.className = "cube-run__main";
@@ -106,60 +140,77 @@ class RunStrip {
     return row;
   }
 
-  _card(group, entries) {
-    const label   = group === "." ? "runs" : group;
-    const shown   = entries.filter((entry) => this._matches(entry));
-    const current = entries.some((entry) => this._stateFor(entry));
-    const isOpen  = this.filter ? shown.length > 0 : this.openGroups.has(group);
+  _dirRow(node, depth, isOpen) {
+    const shown  = this._shownBeneath(node);
+    const picked = this._pickedBeneath(node);
+    const count  = this.opts.multi && picked ? `${picked}/${shown}` : `${shown}`;
 
-    if (this.filter && !shown.length) return null;
-
-    const card = document.createElement("div");
-    card.className = "cube-group" + (isOpen ? " is-open" : "") + (current ? " is-current" : "");
-
-    const picked = entries.filter((entry) => this._stateFor(entry)).length;
-    const count  = this.opts.multi && picked ? `${picked}/${entries.length}` : `${entries.length}`;
-
-    const head = document.createElement("button");
-    head.type      = "button";
-    head.className = "cube-group__head";
-    head.title     = label;
-    head.innerHTML =
-      `<span class="cube-group__chev" aria-hidden="true"></span>` +
-      `<span class="cube-group__name">${RunStrip._esc(label)}</span>` +
-      `<span class="cube-group__count">${RunStrip._esc(count)}</span>`;
-    head.addEventListener("click", () => {
-      if (this.openGroups.has(group)) this.openGroups.delete(group);
-      else this.openGroups.add(group);
+    const row = document.createElement("button");
+    row.type      = "button";
+    row.className = "run-tree__dir" + (isOpen ? " is-open" : "") + (picked ? " is-current" : "");
+    row.title     = node.rel === "." ? RunStrip.ROOT_LABEL : node.rel;
+    row.style.paddingLeft = `${9 + depth * 18}px`;
+    row.innerHTML =
+      `<span class="run-tree__chev" aria-hidden="true"></span>` +
+      `<span class="run-tree__name">${RunStrip._esc(node.name)}</span>` +
+      `<span class="run-tree__count">${RunStrip._esc(count)}</span>`;
+    row.addEventListener("click", () => {
+      if (this.openGroups.has(node.rel)) this.openGroups.delete(node.rel);
+      else this.openGroups.add(node.rel);
       this._paint();
     });
-    card.appendChild(head);
 
-    const body = document.createElement("div");
-    body.className = "cube-group__body";
-    shown.forEach((entry) => body.appendChild(this._row(entry)));
-    card.appendChild(body);
+    return row;
+  }
 
-    return card;
+  _renderNode(node, depth, host) {
+    const dirs = [...node.dirs.values()].sort((a, b) => a.name.localeCompare(b.name));
+
+    dirs.forEach((dir) => {
+      if (this.filter && !this._shownBeneath(dir)) return;
+
+      const isOpen = this.filter ? true : this.openGroups.has(dir.rel);
+      host.appendChild(this._dirRow(dir, depth, isOpen));
+      if (isOpen) this._renderNode(dir, depth + 1, host);
+    });
+
+    node.entries.filter((entry) => this._matches(entry)).forEach((entry) => host.appendChild(this._row(entry, depth)));
   }
 
   _paint() {
-    this.groups.innerHTML = "";
-
-    const byGroup = new Map();
-    this.entries.forEach((entry) => {
-      if (!byGroup.has(entry.group)) byGroup.set(entry.group, []);
-      byGroup.get(entry.group).push(entry);
-    });
-
-    byGroup.forEach((entries, group) => {
-      const card = this._card(group, entries);
-      if (card) this.groups.appendChild(card);
-    });
+    this.tree.innerHTML = "";
+    this._renderNode(this._buildTree(), 0, this.tree);
 
     const shown = this.entries.filter((entry) => this._matches(entry)).length;
-    this.bar.hidden = this.entries.length < RunStrip.FILTER_MIN && !this.filter;
+    if (this.filter && !shown) {
+      const note = document.createElement("p");
+      note.className   = "run-strip__empty";
+      note.textContent = "no runs match the filter";
+      this.tree.appendChild(note);
+    }
+
+    this.tree.hidden       = !this.entries.length;
+    this.bar.hidden        = this.entries.length < RunStrip.FILTER_MIN && !this.filter;
     this.total.textContent = this.filter ? `${shown} / ${this.entries.length} runs` : `${this.entries.length} runs`;
+  }
+
+  _seed() {
+    this.entries.forEach((entry) => {
+      if (!this._stateFor(entry)) return;
+      if (entry.group === ".") { this.openGroups.add("."); return; }
+      const parts = entry.group.split("/");
+      let   rel   = "";
+      parts.forEach((part) => {
+        rel = rel ? `${rel}/${part}` : part;
+        this.openGroups.add(rel);
+      });
+    });
+
+    let node = this._buildTree();
+    while (node.dirs.size === 1 && !node.entries.length) {
+      node = node.dirs.values().next().value;
+      this.openGroups.add(node.rel);
+    }
   }
 
   repaint() {
@@ -171,9 +222,7 @@ class RunStrip {
 
     if (!this.seeded && this.entries.length) {
       this.seeded = true;
-      const groups = new Set(this.entries.map((entry) => entry.group));
-      if (groups.size === 1) this.openGroups.add([...groups][0]);
-      this.entries.forEach((entry) => { if (this._stateFor(entry)) this.openGroups.add(entry.group); });
+      this._seed();
     }
 
     this._paint();
