@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+
 from types   import SimpleNamespace
 
 import numpy as np
@@ -101,23 +103,35 @@ def test_predict_outside_region_fails():
 def test_predict_without_loaded_model_fails():
     probe = ModelProbe(SilentLogger())
 
-    assert probe.predict({"az": 0, "rg": 0})["ok"] is False
+    assert probe.predict({"az": 0, "rg": 0})["ok"]     is False
+    assert probe.attribution({"az": 0, "rg": 0})["ok"] is False
 
 
-def test_saliency_concentrates_on_the_used_channel():
-    result = _probe().saliency({"az": 10, "rg": 8, "family": "mu"})
+def test_attribution_concentrates_on_the_used_channel():
+    result = _probe().attribution({"az": 10, "rg": 8})
 
-    assert result["ok"] is True
-    assert result["shares"][0] == pytest.approx(1.0)
-    assert result["shares"][1] == pytest.approx(0.0)
-    assert len(result["map"])  == PH
-    assert max(max(row) for row in result["map"]) == pytest.approx(1.0)
+    assert result["ok"]       is True
+    assert result["channels"] == ["primary", "sec PS04"]
+    assert result["center"]   == [4, 4]
+    assert result["patch"]    == [PH, PW]
+
+    families = {payload["family"]: payload for payload in result["families"]}
+
+    assert families["mu"]["dead"] is False
+    assert families["mu"]["shares"][0] == pytest.approx(1.0)
+    assert families["mu"]["shares"][1] == pytest.approx(0.0)
+    assert base64.b64decode(families["mu"]["cells"][0])[:8] == b"\x89PNG\r\n\x1a\n"
+    assert families["mu"]["cells"][1] is None
 
 
-def test_saliency_dead_family_fails():
-    result = _probe().saliency({"az": 10, "rg": 8, "family": "sigma"})
+def test_attribution_marks_dead_families_instead_of_failing():
+    result = _probe().attribution({"az": 10, "rg": 8})
 
-    assert result["ok"] is False
+    families = {payload["family"]: payload for payload in result["families"]}
+
+    assert families["sigma"]["dead"]   is True
+    assert families["sigma"]["shares"] == [0.0, 0.0]
+    assert families["sigma"]["cells"]  == [None, None]
 
 
 def test_whatif_drop_of_used_channel_shifts_the_prediction():
@@ -136,6 +150,19 @@ def test_whatif_unknown_perturbation_fails():
 
     assert result["ok"] is False
     assert "unknown perturbation" in result["error"]
+
+
+class _WithContainer(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.conv       = torch.nn.Conv2d(1, 1, 1)
+        self.downsample = torch.nn.ModuleList()
+
+
+def test_probe_layers_skips_container_modules():
+    layers = ModelProbe(SilentLogger())._probe_layers(_WithContainer())
+
+    assert layers == ["conv"]
 
 
 def test_layers_and_map_need_a_loaded_model():

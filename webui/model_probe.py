@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import io
 import threading
 from pathlib import Path
@@ -18,11 +19,12 @@ from web_logger               import WebLogger
 
 class ModelProbe:
 
-    FAMILIES      = ("amp", "mu", "sigma")
-    PERTURBATIONS = ("drop_channel", "scale_channel", "noise")
-    LOADER_NAME   = "model_probe"
-    CHECKPOINT    = "best_model.pt"
-    CONFIG_NAME   = "model_config.json"
+    FAMILIES        = ("amp", "mu", "sigma")
+    PERTURBATIONS   = ("drop_channel", "scale_channel", "noise")
+    CONTAINER_TYPES = ("ModuleList", "ModuleDict", "Sequential")
+    LOADER_NAME     = "model_probe"
+    CHECKPOINT      = "best_model.pt"
+    CONFIG_NAME     = "model_config.json"
 
     def __init__(self, logger: WebLogger) -> None:
         self.logger  = logger
@@ -71,12 +73,17 @@ class ModelProbe:
             self.status["progress"] = progress
             self.status["stage"]    = stage
 
+    def _probe_layers(self, model) -> list[str]:
+        from tools.diagnostics.activation_recorder import ActivationRecorder
+
+        modules = dict(model.named_modules())
+        return [name for name in ActivationRecorder(model).leaf_names() if type(modules[name]).__name__ not in self.CONTAINER_TYPES]
+
     def _load_worker(self, run_path: str, split: str, device: str) -> None:
         try:
             from pipelines.backbone.inference.analysis.input_attribution import ChannelLabeler
             from pipelines.backbone.inference.loader            import RunLoader
             from pipelines.backbone.inference.probes            import PredictionCurves
-            from tools.diagnostics.activation_recorder          import ActivationRecorder
             from tools.monitoring.logger                        import Logger
 
             self._set_load(0.1, "loading checkpoint and dataset")
@@ -92,7 +99,7 @@ class ModelProbe:
             self._set_load(0.8, "indexing layers")
 
             labels   = ChannelLabeler.build(run)
-            layers   = ActivationRecorder(run.model.module).leaf_names()
+            layers   = self._probe_layers(run.model.module)
             modules  = dict(run.model.module.named_modules())
             renderer = PredictionCurves(run.n_gaussians, run.x_axis)
 
@@ -234,42 +241,57 @@ class ModelProbe:
             except (ValueError, KeyError) as error:
                 return {"ok": False, "error": str(error)}
 
-    def saliency(self, body: dict) -> dict:
+    def _family_gradients(self, window: np.ndarray, cy: int, cx: int) -> list[tuple[str, np.ndarray]]:
         import torch
 
+        x = torch.from_numpy(window).to(self.loaded["device"]).requires_grad_(True)
+        y = self.loaded["run"].model.module(x)
+
+        gradients = []
+        for offset, family in enumerate(self.FAMILIES):
+            target = y[0, offset::3, cy, cx].abs().sum()
+            keep   = offset < len(self.FAMILIES) - 1
+            grad   = torch.autograd.grad(target, x, retain_graph=keep)[0].abs()[0].cpu().numpy()
+            gradients.append((family, grad))
+
+        return gradients
+
+    def _cell_png(self, cell: np.ndarray) -> str:
+        buf = io.BytesIO()
+        plt.imsave(buf, cell, cmap="magma", vmin=0.0, vmax=1.0, format="png")
+        return base64.b64encode(buf.getvalue()).decode("ascii")
+
+    def _family_payload(self, family: str, grad: np.ndarray) -> dict:
+        total = float(grad.sum())
+        if total <= 0.0:
+            return {"family": family, "dead": True, "shares": [0.0] * grad.shape[0], "cells": [None] * grad.shape[0]}
+
+        shares = grad.sum(axis=(1, 2)) / total
+
+        cells = []
+        for channel in range(grad.shape[0]):
+            peak = float(grad[channel].max())
+            cells.append(self._cell_png(grad[channel] / peak) if peak > 0.0 else None)
+
+        return {"family": family, "dead": False, "shares": [float(v) for v in shares], "cells": cells}
+
+    def attribution(self, body: dict) -> dict:
         with self.lock:
             if self.loaded is None:
                 return {"ok": False, "error": "no model loaded"}
 
             try:
-                az, rg = int(body["az"]), int(body["rg"])
-                family = str(body.get("family", "mu"))
-                if family not in self.FAMILIES:
-                    return {"ok": False, "error": f"unknown family '{family}', expected one of {self.FAMILIES}"}
-
+                az, rg         = int(body["az"]), int(body["rg"])
                 window, cy, cx = self._window(az, rg)
-                offset         = self.FAMILIES.index(family)
 
-                x      = torch.from_numpy(window).to(self.loaded["device"]).requires_grad_(True)
-                y      = self.loaded["run"].model.module(x)
-                target = y[0, offset::3, cy, cx].abs().sum()
-                grad   = torch.autograd.grad(target, x)[0].abs()[0].cpu().numpy()
-
-                shares = grad.sum(axis=(1, 2))
-                total  = float(shares.sum())
-                if total <= 0.0:
-                    return {"ok": False, "error": f"the '{family}' output at this pixel does not depend on the input"}
-
-                spatial = grad.sum(axis=0)
-                spatial = spatial / spatial.max()
+                families = [self._family_payload(family, grad) for family, grad in self._family_gradients(window, cy, cx)]
 
                 return {
                     "ok"       : True,
-                    "family"   : family,
                     "channels" : self.loaded["labels"],
-                    "shares"   : [float(v / total) for v in shares],
-                    "map"      : [[float(v) for v in row] for row in spatial],
                     "center"   : [cy, cx],
+                    "patch"    : [int(window.shape[2]), int(window.shape[3])],
+                    "families" : families,
                 }
             except (ValueError, KeyError) as error:
                 return {"ok": False, "error": str(error)}
@@ -364,7 +386,7 @@ class ModelProbe:
 
         for index, channel in enumerate(order):
             ax = axes[index // n_cols][index % n_cols]
-            ax.imshow(maps[channel], cmap="magma", aspect="auto")
+            ax.imshow(maps[channel], cmap="magma", aspect="auto", interpolation="nearest")
             ax.set_title(f"ch {int(channel)}", fontsize=7)
             ax.axis("off")
 

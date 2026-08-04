@@ -58,10 +58,10 @@ class ProbeRouter(SubRouter):
         table.add("GET",  "/api/probe/layers",   self.layers)
         table.add("GET",  "/api/probe/map",      self.map_view)
         table.add("GET",  "/api/probe/features", self.features)
-        table.add("POST", "/api/probe/load",     self.load)
-        table.add("POST", "/api/probe/predict",  self.predict)
-        table.add("POST", "/api/probe/saliency", self.saliency)
-        table.add("POST", "/api/probe/whatif",   self.whatif)
+        table.add("POST", "/api/probe/load",        self.load)
+        table.add("POST", "/api/probe/predict",     self.predict)
+        table.add("POST", "/api/probe/attribution", self.attribution)
+        table.add("POST", "/api/probe/whatif",      self.whatif)
 
     def runs(self, exchange: HttpExchange) -> None:
         exchange.send_result(self.probe.runs(exchange.text("base")))
@@ -85,8 +85,8 @@ class ProbeRouter(SubRouter):
     def predict(self, exchange: HttpExchange) -> None:
         exchange.send_result(self.probe.predict(exchange.body))
 
-    def saliency(self, exchange: HttpExchange) -> None:
-        exchange.send_result(self.probe.saliency(exchange.body))
+    def attribution(self, exchange: HttpExchange) -> None:
+        exchange.send_result(self.probe.attribution(exchange.body))
 
     def whatif(self, exchange: HttpExchange) -> None:
         exchange.send_result(self.probe.whatif(exchange.body))
