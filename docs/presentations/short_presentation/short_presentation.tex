@@ -552,10 +552,6 @@
     \end{column}
     \begin{column}{0.43\textwidth}
       \small
-      The gated head asks two questions per slot: \emph{is a scatterer there}
-      ($g_k$) and \emph{what is it} ($\hat a_k,\mu_k,\sigma_k$). So far one
-      backbone embedding had to answer both.
-      \par\smallskip
       \begin{itemize}\setlength{\itemsep}{5pt}
         \item \textbf{Split the encoder, keep the head}: two independent UNet-skip
               trunks --- the Gaussian heads read one embedding, the existence
@@ -567,9 +563,6 @@
         \item \textbf{Why route}: the input ablation split the labour --- phase
               fires the slots, the full stack calibrates the parameters. The
               dual model can hand each head the input its job needs.
-        \item[\textcolor{accent}{$\blacksquare$}] \textbf{Default routing}: the
-              full stack $\to$ parameter trunk, $\varphi$ alone $\to$ existence
-              trunk.
       \end{itemize}
     \end{column}
   \end{columns}
