@@ -524,6 +524,7 @@
     \begin{column}{0.32\textwidth}
       \centering
       \begin{tikzpicture}[font=\scriptsize]
+        \path (-1.25,-2.50) rectangle (2.80,4.50);
         \node[font=\small\bfseries] at (0.55,4.18) {UNet};
         \node[font=\tiny,text=soft] at (0.55,3.85) {board, L1-curve: 0.760};
         \node[font=\scriptsize] at (0.3,3.52) {$x$};
@@ -544,6 +545,8 @@
     \begin{column}{0.32\textwidth}
       \centering
       \begin{tikzpicture}[font=\scriptsize]
+        \path (-1.25,-2.50) rectangle (2.80,4.50);
+        \begin{scope}[on background layer]\filldraw[fill=accent!6,draw=accent!25,thin,rounded corners=5pt] (-1.25,-2.50) rectangle (2.80,4.50);\end{scope}
         \node[font=\small\bfseries] at (0.55,4.18) {UNet-skip};
         \node[font=\tiny,text=soft] at (0.55,3.85) {board, L1-curve: 0.983};
         \node[font=\scriptsize] at (0.3,3.52) {$x$};
@@ -569,6 +572,7 @@
     \begin{column}{0.32\textwidth}
       \centering
       \begin{tikzpicture}[font=\scriptsize]
+        \path (-1.25,-2.50) rectangle (2.80,4.50);
         \node[font=\small\bfseries] at (0.55,4.18) {ResUNet};
         \node[font=\tiny,text=soft] at (0.55,3.85) {board, L1-curve: 0.930};
         \node[font=\scriptsize] at (0.3,3.52) {$x$};
