@@ -80,6 +80,84 @@
 
 \end{frame}
 
+% ---------------------------------------------------------------- 29gA2 Encoder-block anatomy (UNet family)
+\begin{frame}{One encoder block: UNet vs UNet-skip vs ResUNet}
+  \begin{columns}[T]
+    \begin{column}{0.32\textwidth}
+      \centering
+      \begin{tikzpicture}[font=\scriptsize]
+        \path (-1.25,-2.50) rectangle (2.80,4.50);
+        \node[font=\small\bfseries] at (0.55,4.18) {UNet};
+        \node[font=\tiny,text=soft] at (0.55,3.85) {board, L1-curve: 0.760};
+        \node[font=\scriptsize] at (0.3,3.52) {$x$};
+        \node[gate,minimum width=20mm,minimum height=5mm] (c1) at (0.3,2.80) {Conv $3{\times}3$};
+        \node[gate,minimum width=20mm,minimum height=4.5mm,font=\tiny] (n1) at (0.3,2.06) {Norm $\cdot$ Act};
+        \node[gate,minimum width=20mm,minimum height=5mm] (c2) at (0.3,1.32) {Conv $3{\times}3$};
+        \node[gate,minimum width=20mm,minimum height=4.5mm,font=\tiny] (n2) at (0.3,0.58) {Norm $\cdot$ Act};
+        \node[gate,minimum width=20mm,minimum height=5mm] (pool) at (0.3,-1.00) {MaxPool $2{\times}2$ $\downarrow 2$};
+        \draw[flow,soft] (0.3,3.30) -- (c1.north);
+        \draw[flow,soft] (c1.south) -- (n1.north);
+        \draw[flow,soft] (n1.south) -- (c2.north);
+        \draw[flow,soft] (c2.south) -- (n2.north);
+        \draw[flow,soft] (n2.south) -- (pool.north);
+        \draw[flow,soft] (pool.south) -- (0.3,-1.62);
+        \node[font=\tiny,text=soft,align=center] at (0.55,-2.05) {plain double conv, no shortcut;\\downsampling by max-pool};
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.32\textwidth}
+      \centering
+      \begin{tikzpicture}[font=\scriptsize]
+        \path (-1.25,-2.50) rectangle (2.80,4.50);
+        \begin{scope}[on background layer]\filldraw[fill=accent!6,draw=accent!25,thin,rounded corners=5pt] (-1.25,-2.50) rectangle (2.80,4.50);\end{scope}
+        \node[font=\small\bfseries] at (0.55,4.18) {UNet-skip};
+        \node[font=\tiny,text=soft] at (0.55,3.85) {board, L1-curve: 0.983};
+        \node[font=\scriptsize] at (0.3,3.52) {$x$};
+        \node[gate,draw=accent!70,minimum width=20mm,minimum height=4.5mm,font=\tiny] (n0) at (0.3,2.80) {Norm $\cdot$ Act};
+        \node[gate,minimum width=20mm,minimum height=5mm] (c1) at (0.3,2.06) {Conv $3{\times}3$};
+        \node[gate,minimum width=20mm,minimum height=4.5mm,font=\tiny] (n1) at (0.3,1.32) {Norm $\cdot$ Act};
+        \node[gate,minimum width=20mm,minimum height=5mm] (c2) at (0.3,0.58) {Conv $3{\times}3$};
+        \node[circle,draw=accent,inner sep=1.8pt,font=\scriptsize] (add) at (0.3,-0.16) {$+$};
+        \node[gate,minimum width=20mm,minimum height=5mm] (pool) at (0.3,-1.00) {MaxPool $2{\times}2$ $\downarrow 2$};
+        \draw[flow,soft] (0.3,3.30) -- (n0.north);
+        \draw[flow,soft] (n0.south) -- (c1.north);
+        \draw[flow,soft] (c1.south) -- (n1.north);
+        \draw[flow,soft] (n1.south) -- (c2.north);
+        \draw[flow,soft] (c2.south) -- (add.north);
+        \draw[flow,soft] (add.south) -- (pool.north);
+        \draw[flow,soft] (pool.south) -- (0.3,-1.62);
+        \node[gate,draw=accent!70,text=accent,font=\tiny,minimum height=4.5mm] (sc) at (2.05,1.32) {$1{\times}1$ conv};
+        \draw[accent!80,thick] (0.3,3.16) -- (2.05,3.16) -- (sc.north);
+        \draw[accent!80,thick,-{Stealth[length=1.8mm]}] (sc.south) |- (add.east);
+        \node[font=\tiny,text=soft,align=center] at (0.55,-2.05) {pre-activation + \textcolor{accent}{residual shortcut};\\max-pool kept};
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.32\textwidth}
+      \centering
+      \begin{tikzpicture}[font=\scriptsize]
+        \path (-1.25,-2.50) rectangle (2.80,4.50);
+        \node[font=\small\bfseries] at (0.55,4.18) {ResUNet};
+        \node[font=\tiny,text=soft] at (0.55,3.85) {board, L1-curve: 0.930};
+        \node[font=\scriptsize] at (0.3,3.52) {$x$};
+        \node[gate,minimum width=20mm,minimum height=4.5mm,font=\tiny] (n0) at (0.3,2.80) {Norm $\cdot$ Act};
+        \node[gate,draw=accent!70,minimum width=20mm,minimum height=5mm] (c1) at (0.3,2.06) {Conv $3{\times}3$, \textcolor{accent}{stride 2}};
+        \node[gate,minimum width=20mm,minimum height=4.5mm,font=\tiny] (n1) at (0.3,1.32) {Norm $\cdot$ Act};
+        \node[gate,minimum width=20mm,minimum height=5mm] (c2) at (0.3,0.58) {Conv $3{\times}3$};
+        \node[circle,draw=accent,inner sep=1.8pt,font=\scriptsize] (add) at (0.3,-0.16) {$+$};
+        \draw[flow,soft] (0.3,3.30) -- (n0.north);
+        \draw[flow,soft] (n0.south) -- (c1.north);
+        \draw[flow,soft] (c1.south) -- (n1.north);
+        \draw[flow,soft] (n1.south) -- (c2.north);
+        \draw[flow,soft] (c2.south) -- (add.north);
+        \draw[flow,soft] (add.south) -- (0.3,-1.62);
+        \node[gate,draw=accent!70,text=accent,font=\tiny,minimum height=4.5mm] (sc) at (2.05,1.32) {$1{\times}1$, \textcolor{accent}{stride 2}};
+        \draw[accent!80,thick] (0.3,3.16) -- (2.05,3.16) -- (sc.north);
+        \draw[accent!80,thick,-{Stealth[length=1.8mm]}] (sc.south) |- (add.east);
+        \node[font=\tiny,text=soft,align=center] at (0.55,-2.05) {downsampling inside the block: \textcolor{accent}{stride-2}\\conv and shortcut, no pooling (stage 1: stride 1)};
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
+\end{frame}
+
 % ---------------------------------------------------------------- 29gB Board by scatterer count
 \begin{frame}{The board by scatterer count --- curve-MSE drops the single scatterer}
     \centering

@@ -20,6 +20,23 @@ All builds run inside this directory (images resolve via `../../results/...`).
 
 # Design log
 
+- ENCODER-BLOCK ANATOMY FRAME 2026-08-04 (user: built for the short talk, then "copy
+  this slide to the full presentation as well"): "One encoder block: UNet vs
+  UNet-skip vs ResUNet" inserted in 10_benchmark_board directly after the five-seed
+  board frame (marker 29gA2; deck 155 -> 156 pages, sub_08 rebuilt). Three aligned
+  [T] columns, one encoder block each, structures verified against models/blocks.py
+  (ConvBlock + Encoder) and models/backbone/resunet.py (ResidualConvBlock): UNet =
+  post-act double conv + MaxPool; UNet-skip = pre-activation + 1x1-conv residual
+  shortcut, MaxPool kept; ResUNet = stride-2 first conv + stride-2 1x1 shortcut,
+  no pooling (stage 1 keeps stride 1). Accent marks only what CHANGES vs the column
+  to its left; headers carry the matched-loss board scores 0.760 / 0.983 / 0.930
+  (L1-curve); the winner (UNet-skip) column sits on an accent!6 rounded panel, and
+  all three pictures share an invisible \path bounding box so [T] alignment holds.
+  User iterations: Norm+Act merged into one node + doubled spacing (first cut was
+  "cramped up"), x-label clearance above the input arrow, crossed-out MaxPool ghost
+  REMOVED (caption keeps "no pooling"), winner panel added ("collor its area").
+
+
 - MOTIVATION FRAME ADDED 2026-08-04 (user: built for the short talk, then "copy him
   to the beginning of the full project presentation"): new frame "Motivation: more
   area from the same flight time" at the TOP of 01_overview (marker 2b, before
