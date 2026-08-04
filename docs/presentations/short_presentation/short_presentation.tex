@@ -40,31 +40,39 @@
       \end{tikzpicture}
       \\[9pt]
       \begin{tikzpicture}[font=\scriptsize]
-        \foreach \o in {-0.06,-0.03,0,0.03,0.06} \draw[ink!50,very thin] (0,{1.02+\o}) -- (2.2,{1.02+\o});
-        \fill[ink!70] (0.76,1.02) -- ++(-0.15,0.055) -- ++(0.045,-0.055) -- ++(-0.045,-0.055) -- cycle;
-        \node[font=\tiny,text=soft,anchor=west] at (2.30,1.02) {flight line: 29 passes};
-        \draw[soft,thin,rounded corners=1pt,fill=black!2] (0,0) rectangle (2.2,0.62);
-        \draw[black!6,step=0.11] (0.02,0.02) grid (2.18,0.60);
-        \fill[accent!12] (0.76,0.96) -- (0.62,0.03) -- (0.90,0.03) -- cycle;
-        \draw[accent!50,very thin] (0.76,0.96) -- (0.62,0.03);
-        \draw[accent!50,very thin] (0.76,0.96) -- (0.90,0.03);
-        \node[font=\tiny,text=accent!80,anchor=west] at (0.92,0.80) {side-looking beam};
-        \node[font=\tiny,text=soft,anchor=north] at (1.10,-0.05) {one scene};
-        \node[font=\scriptsize\bfseries,text=accent,anchor=west] at (2.85,0.40) {$\times\,5.8$ area};
-        \foreach \o in {-0.025,0.025} \draw[ink!50,very thin] (0,{-0.72+\o}) -- (6.5,{-0.72+\o});
-        \fill[ink!70] (6.12,-0.72) -- ++(-0.15,0.055) -- ++(0.045,-0.055) -- ++(-0.045,-0.055) -- cycle;
-        \node[font=\tiny,text=soft,anchor=south west] at (0,-0.66) {flight line: 5 passes per scene};
-        \foreach \x in {0,1.14,2.28,3.42,4.56} {
-          \draw[soft,thin,rounded corners=1pt,fill=black!2] (\x,-1.74) rectangle ++(1.0,0.62);
-          \draw[black!6,step=0.11] (\x+0.02,-1.72) grid (\x+0.98,-1.14);
+        \draw[soft,thin,rounded corners=1pt,fill=black!2] (0.5,0) -- (2.7,0) -- (3.12,0.28) -- (0.92,0.28) -- cycle;
+        \foreach \f in {0.25,0.5,0.75} \draw[black!7,very thin] ({0.5+\f*0.42},{\f*0.28}) -- ({2.7+\f*0.42},{\f*0.28});
+        \foreach \g in {0.2,0.4,0.6,0.8} \draw[black!7,very thin] ({0.5+\g*2.2},0) -- ({0.5+\g*2.2+0.42},0.28);
+        \fill[accent!20] (0.81,0) -- (0.95,0) -- (1.37,0.28) -- (1.23,0.28) -- cycle;
+        \fill[accent!12] (0.75,0.82) -- (0.88,0.02) -- (1.30,0.30) -- cycle;
+        \draw[accent!50,very thin] (0.75,0.82) -- (0.88,0.02);
+        \draw[accent!50,very thin] (0.75,0.82) -- (1.30,0.30);
+        \draw[soft,dotted,thin] (0.75,0.80) -- (0.75,-0.08);
+        \fill[soft] (0.75,-0.08) circle (0.022);
+        \foreach \o in {-0.06,-0.03,0,0.03,0.06} \draw[ink!50,very thin] (-0.1,{0.86+\o}) -- (2.3,{0.86+\o});
+        \fill[ink!70] (0.75,0.86) -- ++(-0.15,0.055) -- ++(0.045,-0.055) -- ++(-0.045,-0.055) -- cycle;
+        \node[font=\tiny,text=soft,anchor=west] at (2.42,0.86) {flight line: 29 passes};
+        \node[font=\tiny,text=accent!80,anchor=west] at (1.45,0.55) {side-looking beam};
+        \node[font=\tiny,text=soft,anchor=north] at (1.7,-0.14) {one scene};
+        \node[font=\scriptsize\bfseries,text=accent,anchor=west] at (3.35,0.30) {$\times\,5.8$ area};
+        \foreach \x in {0.5,1.48,2.46,3.44,4.42} {
+          \draw[soft,thin,rounded corners=1pt,fill=black!2] (\x,-1.85) -- ++(0.88,0) -- ++(0.42,0.28) -- ++(-0.88,0) -- cycle;
+          \foreach \f in {0.33,0.66} \draw[black!7,very thin] ({\x+\f*0.42},{-1.85+\f*0.28}) -- ({\x+0.88+\f*0.42},{-1.85+\f*0.28});
+          \foreach \g in {0.33,0.66} \draw[black!7,very thin] ({\x+\g*0.88},-1.85) -- ({\x+\g*0.88+0.42},-1.57);
         }
-        \draw[soft,thin,densely dashed,fill=black!2] (5.70,-1.74) rectangle ++(0.80,0.62);
-        \fill[accent!12] (6.12,-0.78) -- (5.98,-1.71) -- (6.26,-1.71) -- cycle;
-        \draw[accent!50,very thin] (6.12,-0.78) -- (5.98,-1.71);
-        \draw[accent!50,very thin] (6.12,-0.78) -- (6.26,-1.71);
-        \node[font=\tiny,text=soft,anchor=north] at (3.25,-1.79) {$29/5 \approx 5.8$ scenes};
-        \draw[decorate,decoration={brace,amplitude=4pt},soft] (-0.2,-1.74) -- (-0.2,1.08);
-        \node[font=\tiny,text=soft,rotate=90,anchor=south] at (-0.42,-0.33) {same flight time};
+        \draw[soft,thin,densely dashed] (5.40,-1.85) -- ++(0.70,0) -- ++(0.42,0.28) -- ++(-0.70,0) -- cycle;
+        \fill[accent!20] (5.41,-1.85) -- (5.55,-1.85) -- (5.97,-1.57) -- (5.83,-1.57) -- cycle;
+        \fill[accent!12] (5.35,-0.88) -- (5.48,-1.83) -- (5.90,-1.55) -- cycle;
+        \draw[accent!50,very thin] (5.35,-0.88) -- (5.48,-1.83);
+        \draw[accent!50,very thin] (5.35,-0.88) -- (5.90,-1.55);
+        \draw[soft,dotted,thin] (5.35,-0.90) -- (5.35,-1.93);
+        \fill[soft] (5.35,-1.93) circle (0.022);
+        \foreach \o in {-0.025,0.025} \draw[ink!50,very thin] (-0.1,{-0.84+\o}) -- (6.0,{-0.84+\o});
+        \fill[ink!70] (5.35,-0.84) -- ++(-0.15,0.055) -- ++(0.045,-0.055) -- ++(-0.045,-0.055) -- cycle;
+        \node[font=\tiny,text=soft,anchor=south west] at (0,-0.78) {flight line: 5 passes per scene};
+        \node[font=\tiny,text=soft,anchor=north] at (3.3,-1.97) {$29/5 \approx 5.8$ scenes};
+        \draw[decorate,decoration={brace,amplitude=4pt},soft] (-0.35,-1.85) -- (-0.35,0.92);
+        \node[font=\tiny,text=soft,rotate=90,anchor=south] at (-0.57,-0.465) {same flight time};
       \end{tikzpicture}
     \end{column}
     \begin{column}{0.40\textwidth}
