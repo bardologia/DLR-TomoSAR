@@ -22,6 +22,8 @@ class MicroscopeView {
     this.selectedId  = null;
     this.openGroups  = new Set();
     this.lastPredict = null;
+    this.attrib      = null;
+    this.gridChannel = -1;
     this.wi          = { kind: "drop_channel", channel: 0, factor: 0.5, sigma: 0.5, seed: 0 };
     this.wiTimer     = null;
   }
@@ -47,13 +49,8 @@ class MicroscopeView {
       </div>
 
       <div class="ms-stage" id="probe-stage" hidden>
-        <aside class="ms-side">
-          <div class="ms-card">
-            <div class="ms-card__head">
-              <h3 class="cube-panel-title">Scene</h3>
-              <span class="ms-badge" id="probe-model-badge"></span>
-            </div>
-            <div class="ms-meta" id="probe-meta"></div>
+        <section class="ms-card ms-scene">
+          <div class="ms-scene__map">
             <div class="fl-map__frame">
               <span class="cube-axis cube-axis--y">azimuth &darr;</span>
               <div class="fl-map__wrap" id="probe-map-wrap">
@@ -62,6 +59,13 @@ class MicroscopeView {
               </div>
               <span class="cube-axis cube-axis--x">range &rarr;</span>
             </div>
+          </div>
+          <div class="ms-scene__info">
+            <div class="ms-card__head">
+              <h3 class="cube-panel-title">Scene</h3>
+              <span class="ms-badge" id="probe-model-badge"></span>
+            </div>
+            <div class="ms-meta" id="probe-meta"></div>
             <p class="cube-coords" id="probe-coords">Click the map to probe a pixel.</p>
             <div class="fl-pixrow" role="group" aria-label="Probe a pixel by index">
               <span class="cube-jump__cell">
@@ -75,7 +79,7 @@ class MicroscopeView {
               <button type="button" class="btn btn--mini" id="probe-go">Probe</button>
             </div>
           </div>
-        </aside>
+        </section>
 
         <div class="ms-main">
           <div class="ms-idle" id="probe-idle">Click a pixel on the scene map, or type az / rg indices, to put it under the microscope.</div>
@@ -102,8 +106,9 @@ class MicroscopeView {
             <section class="ms-card">
               <div class="ms-card__head">
                 <h3 class="cube-panel-title">Spatial gradients</h3>
-                <span class="ms-card__note">|&part;output/&part;input| over the input window &mdash; one row per output, one column per input channel</span>
+                <span class="ms-card__note">|&part;output/&part;input| over the input window &mdash; pick an input channel or view all</span>
               </div>
+              <div class="ms-chiprow" id="probe-grid-channels"></div>
               <div class="ms-gridwrap"><div class="ms-grid" id="probe-grid"></div></div>
             </section>
 
@@ -127,7 +132,7 @@ class MicroscopeView {
                 </div>
               </div>
               <p class="ms-card__note" id="probe-whatif-desc"></p>
-              <div class="ms-wichannels" id="probe-whatif-channels"></div>
+              <div class="ms-chiprow" id="probe-whatif-channels"></div>
               <div class="ms-wival" id="probe-whatif-valrow" hidden>
                 <label id="probe-whatif-value-label" for="probe-whatif-range">factor</label>
                 <input type="range" id="probe-whatif-range" min="0" max="2" step="0.05" value="0.5" />
@@ -163,6 +168,7 @@ class MicroscopeView {
       slots      : this.root.querySelector("#probe-slots"),
       bars       : this.root.querySelector("#probe-bars"),
       barsLegend : this.root.querySelector("#probe-bars-legend"),
+      gridChips  : this.root.querySelector("#probe-grid-channels"),
       grid       : this.root.querySelector("#probe-grid"),
       arch       : this.root.querySelector("#probe-arch"),
       archLayers : this.root.querySelector("#probe-arch-layers"),
@@ -348,6 +354,8 @@ class MicroscopeView {
     this.info        = info;
     this.pixel       = null;
     this.lastPredict = null;
+    this.attrib      = null;
+    this.gridChannel = -1;
     this.wi.channel  = 0;
     this.wi.seed     = 0;
 
@@ -378,16 +386,21 @@ class MicroscopeView {
     if (layers.ok) this._buildArch(layers.layers);
   }
 
+  _chip(label, active, onPick) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = "ms-chipbtn" + (active ? " is-active" : "");
+    chip.textContent = label;
+    chip.addEventListener("click", onPick);
+    return chip;
+  }
+
   _buildWhatIfChannels(channels) {
     this.refs.wChannels.innerHTML = "";
     channels.forEach((label, index) => {
-      const chip = document.createElement("button");
-      chip.type = "button";
-      chip.className = "ms-wichannel" + (index === this.wi.channel ? " is-active" : "");
-      chip.textContent = label;
-      chip.addEventListener("click", () => {
+      const chip = this._chip(label, index === this.wi.channel, () => {
         this.wi.channel = index;
-        this.refs.wChannels.querySelectorAll(".ms-wichannel").forEach((b, i) => b.classList.toggle("is-active", i === index));
+        this.refs.wChannels.querySelectorAll(".ms-chipbtn").forEach((b, i) => b.classList.toggle("is-active", i === index));
         this._scheduleWhatIf();
       });
       this.refs.wChannels.appendChild(chip);
@@ -563,18 +576,22 @@ class MicroscopeView {
 
     this.refs.bars.innerHTML       = `<p class="cube-hint is-loading">computing gradients&hellip;</p>`;
     this.refs.barsLegend.innerHTML = "";
+    this.refs.gridChips.innerHTML  = "";
     this.refs.grid.innerHTML       = "";
 
     const out = await window.apiPost("/api/probe/attribution", { az: this.pixel.az, rg: this.pixel.rg });
     if (token !== this.attribToken) return;
 
     if (!out.ok) {
+      this.attrib = null;
       this.refs.bars.innerHTML = `<p class="cube-hint">${this._esc(out.error)}</p>`;
       return;
     }
 
+    this.attrib = out;
     this._renderBars(out);
-    this._renderGrid(out);
+    this._renderGridChips();
+    this._renderGrid();
   }
 
   _renderBars(out) {
@@ -595,33 +612,67 @@ class MicroscopeView {
     ).join("");
   }
 
-  _renderGrid(out) {
-    const [ph, pw] = out.patch;
-    const left     = (((out.center[1] + 0.5) / pw) * 100).toFixed(1);
-    const top      = (((out.center[0] + 0.5) / ph) * 100).toFixed(1);
+  _renderGridChips() {
+    this.refs.gridChips.innerHTML = "";
 
-    this.refs.grid.style.gridTemplateColumns = `92px repeat(${out.channels.length}, minmax(58px, 92px))`;
+    const pick = (index) => () => {
+      this.gridChannel = index;
+      this._renderGridChips();
+      this._renderGrid();
+    };
+
+    this.refs.gridChips.appendChild(this._chip("all channels", this.gridChannel === -1, pick(-1)));
+    this.attrib.channels.forEach((label, index) => {
+      this.refs.gridChips.appendChild(this._chip(label, this.gridChannel === index, pick(index)));
+    });
+  }
+
+  _cellDot() {
+    const [ph, pw] = this.attrib.patch;
+    const left     = (((this.attrib.center[1] + 0.5) / pw) * 100).toFixed(1);
+    const top      = (((this.attrib.center[0] + 0.5) / ph) * 100).toFixed(1);
+    return `<i class="ms-cell__dot" style="left:${left}%;top:${top}%"></i>`;
+  }
+
+  _gridCell(family, label, cell, share, head) {
+    const cap = head
+      ? `<figcaption class="ms-cellhead"><i style="background:${MicroscopeView.FAMILY_COLORS[family]}"></i>${family} &middot; ${(share * 100).toFixed(1)}%</figcaption>`
+      : "";
+    if (!cell) {
+      return `<figure class="ms-cell">${cap}<div class="ms-cell--dead"><span>0</span></div></figure>`;
+    }
+    const img = `
+      <span class="ms-cell__frame">
+        <img src="data:image/png;base64,${cell}" alt="${this._esc(`${family} sensitivity to ${label}`)}" />
+        ${this._cellDot()}
+      </span>`;
+    return head
+      ? `<figure class="ms-cell">${cap}${img}</figure>`
+      : `<figure class="ms-cell">${img}<figcaption>${(share * 100).toFixed(1)}%</figcaption></figure>`;
+  }
+
+  _renderGrid() {
+    const out = this.attrib;
+
+    if (this.gridChannel >= 0) {
+      const index = this.gridChannel;
+      const label = out.channels[index];
+
+      this.refs.grid.className = "ms-gridone";
+      this.refs.grid.style.gridTemplateColumns = "";
+      this.refs.grid.innerHTML = out.families.map((f) => this._gridCell(f.family, label, f.cells[index], f.shares[index], true)).join("");
+      return;
+    }
+
+    this.refs.grid.className = "ms-grid";
+    this.refs.grid.style.gridTemplateColumns = `92px repeat(${out.channels.length}, minmax(58px, 150px))`;
 
     const cells = [`<span class="ms-grid__corner"></span>`];
     out.channels.forEach((label) => cells.push(`<span class="ms-grid__col">${this._esc(label)}</span>`));
 
     out.families.forEach((f) => {
       cells.push(`<span class="ms-grid__row"><i style="background:${MicroscopeView.FAMILY_COLORS[f.family]}"></i>${f.family}</span>`);
-      out.channels.forEach((label, index) => {
-        const cell = f.cells[index];
-        if (!cell) {
-          cells.push(`<div class="ms-cell ms-cell--dead"><span>0</span></div>`);
-          return;
-        }
-        cells.push(`
-          <figure class="ms-cell">
-            <span class="ms-cell__frame">
-              <img src="data:image/png;base64,${cell}" alt="${this._esc(`${f.family} sensitivity to ${label}`)}" />
-              <i class="ms-cell__dot" style="left:${left}%;top:${top}%"></i>
-            </span>
-            <figcaption>${(f.shares[index] * 100).toFixed(1)}%</figcaption>
-          </figure>`);
-      });
+      out.channels.forEach((label, index) => cells.push(this._gridCell(f.family, label, f.cells[index], f.shares[index], false)));
     });
 
     this.refs.grid.innerHTML = cells.join("");
