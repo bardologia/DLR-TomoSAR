@@ -205,6 +205,18 @@
   \end{columns}
 \end{frame}
 
+% main-results agenda (short deck only)
+\begin{frame}{Main results}
+  \begin{itemize}\setlength{\itemsep}{12pt}
+    \item \textbf{Hungarian matching}: assigning predicted scatterers to ground-truth scatterers (next frame).
+    \item \textbf{Set-prediction head}: gated slots that decide existence and parameters per scatterer.
+    \item \textbf{Receptive field}: how much spatial context the network actually uses.
+    \item \textbf{Benchmarking}: 7 backbones $\times$ 5 objectives, five seeds each: the board.
+    \item \textbf{Dual backbone}: two trunks, one head: existence and parameters each get their own encoder.
+    \item \textbf{Pair loss function}: param-L1 paired with a curve term.
+  \end{itemize}
+\end{frame}
+
 % full deck p.33 --- sections/06_set_prediction.tex
 \begin{frame}{Hungarian matching}
   \small
