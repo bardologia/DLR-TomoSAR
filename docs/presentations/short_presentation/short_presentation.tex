@@ -454,46 +454,47 @@
 \end{frame}
 
 % full deck p.78 --- sections/10_benchmark_board.tex
+\newcommand{\sspm}[2]{\eqmakebox[bbSM][r]{#1}\,{\tiny\color{soft}$\pm$\eqmakebox[bbSS][l]{#2}}}
 \begin{frame}{The board at five seeds --- the L1 family owns the top nine}
     \centering
   \scriptsize
   \renewcommand{\arraystretch}{0.95}
-  \setlength{\tabcolsep}{4pt}
+  \setlength{\tabcolsep}{2pt}
   \renewcommand{\seedtag}{bbA}
-  \begin{tabular}{@{}c l l c c c c c@{}}
+  \begin{tabular}{@{}c l l c c c c c c c c c@{}}
     \toprule
-    \# & model & loss & curve $R^2$ $\uparrow$ & cosine $\uparrow$ & peak err $\downarrow$ & recall $\uparrow$ & score \\
+    \# & model & loss & curve $R^2$ $\uparrow$ & cosine $\uparrow$ & \shortstack{SSIM\\elev $\uparrow$} & \shortstack{SSIM\\range $\uparrow$} & \shortstack{SSIM\\azim $\uparrow$} & peak err $\downarrow$ & recall $\uparrow$ & \shortstack{2-sc\\recall $\uparrow$} & score \\
     \midrule
-    1 & unet-skip & L1-curve & \seedpm{\textbf{0.756}}{.012} & \seedpm{0.924}{.007} & \seedpm{1.29}{.05} & \seedpm{0.886}{.006} & \hlval{good}{\textbf{0.983}} \\
-    2 & unet-skip & Charbonnier & \seedpm{0.751}{.012} & \seedpm{0.928}{.004} & \seedpm{\textbf{1.25}}{.03} & \seedpm{0.886}{.004} & 0.977 \\
-    3 & unet-skip & param-L1 & \seedpm{0.741}{.016} & \seedpm{\textbf{0.931}}{.001} & \seedpm{1.38}{.03} & \seedpm{0.893}{.004} & 0.963 \\
+    1 & unet-skip & L1-curve & \seedpm{\textbf{0.756}}{.012} & \seedpm{0.924}{.007} & \sspm{0.9676}{.0004} & \sspm{0.9500}{.0016} & \sspm{0.9611}{.0008} & \seedpm{1.29}{.05} & \seedpm{0.886}{.006} & \seedpm{0.728}{.013} & \hlval{good}{\textbf{0.983}} \\
+    2 & unet-skip & Charbonnier & \seedpm{0.751}{.012} & \seedpm{0.928}{.004} & \sspm{0.9675}{.0007} & \sspm{0.9499}{.0024} & \sspm{0.9608}{.0012} & \seedpm{\textbf{1.25}}{.03} & \seedpm{0.886}{.004} & \seedpm{0.727}{.008} & 0.977 \\
+    3 & unet-skip & param-L1 & \seedpm{0.741}{.016} & \seedpm{\textbf{0.931}}{.001} & \sspm{0.9669}{.0004} & \sspm{0.9513}{.0006} & \sspm{0.9608}{.0005} & \seedpm{1.38}{.03} & \seedpm{0.893}{.004} & \seedpm{0.745}{.008} & 0.963 \\
     \addlinespace[2pt]
-    4 & resunet & param-L1 & \seedpm{0.734}{.013} & \seedpm{0.927}{.007} & \seedpm{1.32}{.07} & \seedpm{0.894}{.003} & 0.946 \\
-    5 & deeplab & param-L1 & \seedpm{0.731}{.006} & \seedpm{0.923}{.004} & \seedpm{1.35}{.05} & \seedpm{0.888}{.002} & 0.937 \\
-    6 & deeplab & L1-curve & \seedpm{0.731}{.012} & \seedpm{0.921}{.013} & \seedpm{1.33}{.07} & \seedpm{0.873}{.022} & 0.935 \\
-    7 & resunet & L1-curve & \seedpm{0.737}{.019} & \seedpm{0.916}{.007} & \seedpm{1.34}{.06} & \seedpm{0.881}{.005} & 0.930 \\
-    8 & resunet & Charbonnier & \seedpm{0.731}{.016} & \seedpm{0.921}{.014} & \seedpm{1.31}{.08} & \seedpm{0.881}{.006} & 0.929 \\
-    9 & deeplab & Charbonnier & \seedpm{0.735}{.008} & \seedpm{0.913}{.015} & \seedpm{1.62}{.45} & \seedpm{0.868}{.037} & 0.912 \\
-    10 & nafnet & Charbonnier & \seedpm{0.702}{.009} & \seedpm{0.906}{.007} & \seedpm{1.48}{.05} & \seedpm{0.875}{.008} & 0.829 \\
-    11 & segformer & Charbonnier & \seedpm{0.688}{.022} & \seedpm{0.910}{.016} & \seedpm{1.51}{.20} & \seedpm{0.866}{.019} & 0.829 \\
-    12 & nafnet & L1-curve & \seedpm{0.698}{.007} & \seedpm{0.908}{.010} & \seedpm{1.43}{.08} & \seedpm{0.879}{.005} & 0.828 \\
-    \multicolumn{8}{c}{{\color{soft}$\vdots$}} \\
-    16 & deeplab & MSE-curve & \seedpm{0.732}{.010} & \seedpm{0.872}{.019} & \seedpm{1.62}{.08} & \seedpm{0.869}{.004} & 0.785 \\
+    4 & resunet & param-L1 & \seedpm{0.734}{.013} & \seedpm{0.927}{.007} & \sspm{0.9664}{.0003} & \sspm{0.9502}{.0006} & \sspm{0.9601}{.0004} & \seedpm{1.32}{.07} & \seedpm{0.894}{.003} & \seedpm{\textbf{0.746}}{.006} & 0.946 \\
+    5 & deeplab & param-L1 & \seedpm{0.731}{.006} & \seedpm{0.923}{.004} & \sspm{0.9663}{.0003} & \sspm{0.9495}{.0004} & \sspm{0.9597}{.0003} & \seedpm{1.35}{.05} & \seedpm{0.888}{.002} & \seedpm{0.736}{.005} & 0.937 \\
+    6 & deeplab & L1-curve & \seedpm{0.731}{.012} & \seedpm{0.921}{.013} & \sspm{0.9667}{.0005} & \sspm{0.9491}{.0016} & \sspm{0.9599}{.0008} & \seedpm{1.33}{.07} & \seedpm{0.873}{.022} & \seedpm{0.721}{.007} & 0.935 \\
+    7 & resunet & L1-curve & \seedpm{0.737}{.019} & \seedpm{0.916}{.007} & \sspm{0.9668}{.0004} & \sspm{0.9488}{.0007} & \sspm{0.9601}{.0006} & \seedpm{1.34}{.06} & \seedpm{0.881}{.005} & \seedpm{0.715}{.007} & 0.930 \\
+    8 & resunet & Charbonnier & \seedpm{0.731}{.016} & \seedpm{0.921}{.014} & \sspm{0.9668}{.0006} & \sspm{0.9492}{.0015} & \sspm{0.9601}{.0006} & \seedpm{1.31}{.08} & \seedpm{0.881}{.006} & \seedpm{0.716}{.008} & 0.929 \\
+    9 & deeplab & Charbonnier & \seedpm{0.735}{.008} & \seedpm{0.913}{.015} & \sspm{0.9668}{.0005} & \sspm{0.9492}{.0020} & \sspm{0.9602}{.0008} & \seedpm{1.62}{.45} & \seedpm{0.868}{.037} & \seedpm{0.722}{.013} & 0.912 \\
+    10 & nafnet & Charbonnier & \seedpm{0.702}{.009} & \seedpm{0.906}{.007} & \sspm{0.9645}{.0004} & \sspm{0.9444}{.0010} & \sspm{0.9569}{.0004} & \seedpm{1.48}{.05} & \seedpm{0.875}{.008} & \seedpm{0.711}{.009} & 0.829 \\
+    11 & segformer & Charbonnier & \seedpm{0.688}{.022} & \seedpm{0.910}{.016} & \sspm{0.9651}{.0008} & \sspm{0.9447}{.0028} & \sspm{0.9572}{.0013} & \seedpm{1.51}{.20} & \seedpm{0.866}{.019} & \seedpm{0.704}{.019} & 0.829 \\
+    12 & nafnet & L1-curve & \seedpm{0.698}{.007} & \seedpm{0.908}{.010} & \sspm{0.9646}{.0005} & \sspm{0.9444}{.0013} & \sspm{0.9568}{.0007} & \seedpm{1.43}{.08} & \seedpm{0.879}{.005} & \seedpm{0.714}{.008} & 0.828 \\
+    \multicolumn{12}{c}{{\color{soft}$\vdots$}} \\
+    16 & deeplab & MSE-curve & \seedpm{0.732}{.010} & \seedpm{0.872}{.019} & \sspm{0.9615}{.0005} & \sspm{0.9368}{.0011} & \sspm{0.9527}{.0004} & \seedpm{1.62}{.08} & \seedpm{0.869}{.004} & \seedpm{0.710}{.003} & 0.785 \\
     \addlinespace[2pt]
-    20 & unet & L1-curve & \seedpm{0.660}{.015} & \seedpm{0.897}{.026} & \seedpm{1.51}{.28} & \seedpm{0.870}{.029} & 0.760 \\
+    20 & unet & L1-curve & \seedpm{0.660}{.015} & \seedpm{0.897}{.026} & \sspm{0.9649}{.0009} & \sspm{0.9441}{.0043} & \sspm{0.9563}{.0018} & \seedpm{1.51}{.28} & \seedpm{0.870}{.029} & \seedpm{0.711}{.020} & 0.760 \\
     \addlinespace[2pt]
-    21 & unet-skip & param-MSE & \seedpm{0.647}{.047} & \seedpm{0.879}{.017} & \seedpm{1.59}{.13} & \seedpm{0.881}{.022} & \hlval{accent}{0.692} \\
+    21 & unet-skip & param-MSE & \seedpm{0.647}{.047} & \seedpm{0.879}{.017} & \sspm{0.9626}{.0010} & \sspm{0.9398}{.0032} & \sspm{0.9536}{.0016} & \seedpm{1.59}{.13} & \seedpm{0.881}{.022} & \seedpm{0.739}{.014} & \hlval{accent}{0.692} \\
     \bottomrule
   \end{tabular}
   \par\vspace{2pt}
-  \parbox{0.82\textwidth}{\tiny\color{soft} runs: model $\cdot$ set-pred $\cdot$ Hungarian $\cdot$
+  \parbox{0.90\textwidth}{\tiny\color{soft} runs: model $\cdot$ set-pred $\cdot$ Hungarian $\cdot$
    $K{=}2$ $\cdot$ hv flips $\cdot$ presence A $\cdot$ loss $\cdot$ patch
    $64{\times}32$, five seeds; held-out band. Cells: mean $\pm$ seed std;
    \textbf{bold} $=$ best mean in column (rows shown), marked only where best and worst differ by more than $5\%$. score $=$ equal-weight mean
    of the five metric groups (curve error, variance, SSIM, cosine, peak), min--max
    scaled over the 35 arms; \# $=$ rank; ranks 13--15, 17--19, 22--35 on the next
    frame only. cosine $=$ per-pixel profile cosine mean; peak err in elevation
-   units; recall $=$ matched. \textcolor{good}{green} $=$ the winner's score; \textcolor{accent}{red} $=$ the param-MSE reference cell, 21st of 35.\par}
+   units; SSIM per axis vs the GT cube (denorm); recall $=$ matched, 2-sc recall on GT $k{=}2$ pixels. \textcolor{good}{green} $=$ the winner's score; \textcolor{accent}{red} $=$ the param-MSE reference cell, 21st of 35.\par}
     
 
 \end{frame}
@@ -619,6 +620,15 @@
       \end{itemize}
     \end{column}
   \end{columns}
+\end{frame}
+
+% next-steps agenda (short deck only)
+\begin{frame}{Next steps}
+  \begin{itemize}\setlength{\itemsep}{16pt}
+    \item \textbf{Physical loss terms}: the five ranked terms on the next three frames: covariance matching, coherence re-synthesis, moments, total power, the Capon cycle.
+    \item \textbf{$\gamma$-net adaptation}: adapting the $\gamma$-net architecture to this pipeline.
+    \item \textbf{JEPA pretraining}: predicting in representation space, the closing frame.
+  \end{itemize}
 \end{frame}
 
 % full deck p.134 --- sections/13_physics_losses.tex
