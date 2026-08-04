@@ -577,9 +577,6 @@
         \node[gate,minimum width=20mm,minimum height=4.5mm,font=\tiny] (n1) at (0.3,1.32) {Norm $\cdot$ Act};
         \node[gate,minimum width=20mm,minimum height=5mm] (c2) at (0.3,0.58) {Conv $3{\times}3$};
         \node[circle,draw=accent,inner sep=1.8pt,font=\scriptsize] (add) at (0.3,-0.16) {$+$};
-        \node[gate,densely dashed,text=soft!70,minimum width=16mm,minimum height=5mm] (ghost) at (2.05,-1.00) {MaxPool};
-        \draw[accent,semithick] (ghost.north west) -- (ghost.south east);
-        \draw[accent,semithick] (ghost.south west) -- (ghost.north east);
         \draw[flow,soft] (0.3,3.30) -- (n0.north);
         \draw[flow,soft] (n0.south) -- (c1.north);
         \draw[flow,soft] (c1.south) -- (n1.north);
