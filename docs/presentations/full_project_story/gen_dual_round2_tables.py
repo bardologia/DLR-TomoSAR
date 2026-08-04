@@ -164,12 +164,50 @@ class TableEmitter:
         return "\n".join(lines)
 
 
+class BoardEmitter:
+
+    def __init__(self, values: dict, formatter: CellFormatter, gate: SpreadGate) -> None:
+        self.values    = values
+        self.formatter = formatter
+        self.gate      = gate
+
+    def column_flags(self, runs: list, key: str, direction: str, decimals: int) -> dict:
+        displayed = {run: round(self.values[run][key][0], decimals) for run in runs}
+        best      = min(displayed.values()) if direction == "down" else max(displayed.values())
+        worst     = max(displayed.values()) if direction == "down" else min(displayed.values())
+
+        if not self.gate.clears(best, worst):
+            return {run: False for run in runs}
+
+        return {run: displayed[run] == best for run in runs}
+
+    def emit(self, rows: list, columns: list) -> str:
+        data_runs = [row[1] for row in rows if row[0] == "run"]
+        flags     = {key: self.column_flags(data_runs, key, direction, decimals) for _header, key, direction, decimals in columns}
+
+        lines = []
+        for row in rows:
+            if row[0] == "group":
+                lines.append(f"    \\multicolumn{{{len(columns) + 1}}}{{@{{}}l}}{{{row[1]}}} \\\\")
+            elif row[0] == "space":
+                lines.append("    \\addlinespace")
+            else:
+                run   = row[1]
+                cells = [self.formatter.cell(*self.values[run][key], decimals, flags[key][run]) for _header, key, direction, decimals in columns]
+                lines.append(f"    {row[2]} & {' & '.join(cells)} \\\\")
+        return "\n".join(lines)
+
+
 class DualRound2Tables:
 
     K5_RUNS    = [f"dual_resunet-set_pred-hungarian-K_5-hv-A-param_l1_1_di-{arm}" for arm in ["full-full", "full-ifg", "full-pass", "ifg-full", "ifg-pass", "pass-full", "pass-ifg"]]
     RATIO_RUNS = [f"dual_resunet-set_pred-hungarian-K_2-hv-A-param_l1_1_dr-{arm}" for arm in ["50-50", "60-40", "70-30", "80-20", "90-10"]]
     RATIO_K5_RUNS = [f"dual_resunet-set_pred-hungarian-K_5-hv-A-param_l1_1_dr-{arm}" for arm in ["50-50", "60-40", "70-30", "80-20", "90-10"]]
     SINGLE_RUN    = "unet_skip-set_pred-hungarian-K_2-hv-A__param_l1"
+
+    PAIR_WEIGHTS  = ["0.01", "0.05", "0.25", "0.5", "1"]
+    PAIR_FAMILIES = [("l1_curve", "L1 curve"), ("charbonnier_curve", "Charbonnier curve"), ("cosine_curve", "cosine curve")]
+    PAIR_FOCUS    = ["baseline", "l1_curve-w1", "charbonnier_curve-w1", "cosine_curve-w0.01", "cosine_curve-w0.5", "cosine_curve-w1"]
 
     def __init__(self, repo_root: Path) -> None:
         self.repo_root  = repo_root
@@ -267,12 +305,8 @@ class DualRound2Tables:
             "krD": emitter.emit(self.k5_stats_rows(), len(self.RATIO_K5_RUNS) + 2),
         }
 
-    def ratio_frames(self) -> dict:
-        values                  = ReportParser(self.repo_root / "results" / "K2" / "dual_k2_ratio").load()
-        values[self.SINGLE_RUN] = ReportParser(self.repo_root / "results" / "K2" / "Benchmark").load()[self.SINGLE_RUN]
-        emitter                 = TableEmitter(values, self.RATIO_RUNS + [self.SINGLE_RUN], self.formatter, self.gate)
-
-        headline = emitter.emit([
+    def k2_headline_rows(self) -> list:
+        return [
             ("group", r"\emph{training (validation)}"),
             (r"val loss $\downarrow$", "best_val_loss", "down", 3),
             ("space",),
@@ -294,9 +328,10 @@ class DualRound2Tables:
             (r"\quad over $\downarrow$", "count_over_frac", "down", 3),
             (r"peak err med $\downarrow$", "pixel_peak_err_units_median_gt", "down", 2),
             (r"peak err p95 $\downarrow$", "pixel_peak_err_units_p95_gt", "down", 1),
-        ], None)
+        ]
 
-        by_count = emitter.emit([
+    def k2_by_count_rows(self) -> list:
+        return [
             (r"precision $\uparrow$", "matched_precision", "up", 3),
             (r"\quad $k{=}1$", "matched_precision_gt1", "up", 3),
             (r"\quad $k{=}2$", "matched_precision_gt2", "up", 3),
@@ -320,9 +355,10 @@ class DualRound2Tables:
             (r"$a$ MAE $\downarrow$", "matched_amp_mae", "down", 3),
             (r"\quad $k{=}1$", "matched_amp_mae_gt1", "down", 3),
             (r"\quad $k{=}2$", "matched_amp_mae_gt2", "down", 3),
-        ], None)
+        ]
 
-        stats = emitter.emit([
+    def k2_stats_rows(self) -> list:
+        return [
             ("group", r"\textcolor{soft}{\emph{slot 0 --- strongest scatterer; GT-active on every pixel}}"),
             (r"\; active frac", "slot_0_active_pred_frac", "up", 3, "slot_0_active_gt_frac", 3),
             (r"\; $a$ --- active", "slot_0_amp_active_pred_mean", "up", 2, "slot_0_amp_active_gt_mean", 2),
@@ -345,9 +381,74 @@ class DualRound2Tables:
             (r"\; $a$ --- slot 1", "slot_1_amp_active_pred_std", "up", 2, "slot_1_amp_active_gt_std", 2),
             (r"\; $\mu$ --- slot 1", "slot_1_mu_active_pred_std", "up", 2, "slot_1_mu_active_gt_std", 2),
             (r"\; $\sigma$ --- slot 1", "slot_1_sig_active_pred_std", "up", 2, "slot_1_sig_active_gt_std", 2),
-        ], len(self.RATIO_RUNS) + 2)
+        ]
 
-        return {"drA": headline, "drB": by_count, "drC": stats}
+    def ratio_frames(self) -> dict:
+        values                  = ReportParser(self.repo_root / "results" / "K2" / "dual_k2_ratio").load()
+        values[self.SINGLE_RUN] = ReportParser(self.repo_root / "results" / "K2" / "Benchmark").load()[self.SINGLE_RUN]
+        emitter                 = TableEmitter(values, self.RATIO_RUNS + [self.SINGLE_RUN], self.formatter, self.gate)
+
+        return {
+            "drA": emitter.emit(self.k2_headline_rows(), None),
+            "drB": emitter.emit(self.k2_by_count_rows(), None),
+            "drC": emitter.emit(self.k2_stats_rows(), len(self.RATIO_RUNS) + 2),
+        }
+
+    def pair_run(self, k: str, arm: str) -> str:
+        base = f"dual_unet_skip-set_pred-hungarian-K_{k}-hv-A-full.full-param_l1_1"
+
+        if arm == "baseline":
+            return f"{base}_pair-baseline"
+
+        family, weight = arm.rsplit("-w", 1)
+        return f"{base}-{family}_{weight}_pair-{family}-w{weight}"
+
+    def pair_board_rows(self, k: str) -> list:
+        rows = [("run", self.pair_run(k, "baseline"), r"param-L1 alone")]
+
+        for family, label in self.PAIR_FAMILIES:
+            rows.append(("space",))
+            rows.append(("group", rf"\emph{{$+$ {label}}}"))
+            for weight in self.PAIR_WEIGHTS:
+                rows.append(("run", self.pair_run(k, f"{family}-w{weight}"), rf"\quad $w{{=}}{weight}$"))
+
+        return rows
+
+    def pair_board_columns(self) -> list:
+        return [
+            ("curve R2", "overall_r2_gt", "up", 3),
+            ("cos med", "pixel_cosine_gt_median", "up", 3),
+            ("precision", "matched_precision", "up", 3),
+            ("recall", "matched_recall", "up", 3),
+            ("F1", "matched_f1", "up", 3),
+            ("count exact", "count_exact_frac", "up", 3),
+            ("under", "count_under_frac", "down", 3),
+            ("over", "count_over_frac", "down", 3),
+            ("peak p95", "pixel_peak_err_units_p95_gt", "down", 1),
+        ]
+
+    def pair_k2_frames(self) -> dict:
+        values = ReportParser(self.repo_root / "results" / "K2" / "pair_k2").load()
+        board  = BoardEmitter(values, self.formatter, self.gate)
+        focus  = TableEmitter(values, [self.pair_run("2", arm) for arm in self.PAIR_FOCUS], self.formatter, self.gate)
+
+        return {
+            "plA": board.emit(self.pair_board_rows("2"), self.pair_board_columns()),
+            "plB": focus.emit(self.k2_by_count_rows(), None),
+            "plC": focus.emit(self.k2_stats_rows(), len(self.PAIR_FOCUS) + 2),
+        }
+
+    def pair_k5_frames(self) -> dict:
+        values = ReportParser(self.repo_root / "results" / "K5" / "pair_K5").load()
+        board  = BoardEmitter(values, self.formatter, self.gate)
+        focus  = TableEmitter(values, [self.pair_run("5", arm) for arm in self.PAIR_FOCUS], self.formatter, self.gate)
+
+        return {
+            "pkA": board.emit(self.pair_board_rows("5"), self.pair_board_columns()),
+            "pkB": focus.emit(self.k5_detection_rows(), None),
+            "pkC": focus.emit(self.k5_component_rows(), None),
+            "pkD": focus.emit(self.k5_stats_rows(), len(self.PAIR_FOCUS) + 2),
+        }
 
     def run(self) -> None:
         self.output_dir.mkdir(parents=True, exist_ok=True)
@@ -356,6 +457,8 @@ class DualRound2Tables:
         fragments.update(self.k5_frames())
         fragments.update(self.ratio_frames())
         fragments.update(self.ratio_k5_frames())
+        fragments.update(self.pair_k2_frames())
+        fragments.update(self.pair_k5_frames())
 
         for tag, body in fragments.items():
             path = self.output_dir / f"{tag}.tex"

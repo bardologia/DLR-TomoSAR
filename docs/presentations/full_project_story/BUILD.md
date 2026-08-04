@@ -4,7 +4,7 @@ Compile the full deck with tectonic:
 
     tectonic full_project_story.tex
 
-Produces `full_project_story.pdf` (146 rendered pages as of 2026-07-30 — the K=2/K=5 table grouping replaced twelve per-K frames with six merged ones, see design log; earlier chain: 109 content frames + 8 act dividers + 1 sub-divider + 3 backup, 16:9; 124 rendered pages incl. title and overlays — re-measured 2026-07-16 after the head-2x2 + presence-lever five-seed refreshes (each got the standing three-table treatment; the 12-run lever grid became the three presence frames, see the design log). 120 predated that (the input-ablation refresh recut the two amplitude-only frames into four). 118 predated that (the augmentation five-seed refresh added its by-scatterer-count + GT-statistics pair 20b2/20b3). 116 predated that (the normalization five-seed refresh added the same pair as 12c/12d). 114 predated that (the price-of-reach + operator-split pair went into the context section). 112 predated that (the exact ladder argument + its rung table frame), 109 predated that (the context-section theory chain had just been deleted — six frames + their three backup frames; it rested on a degenerate homogeneity premise). 109 also predated that chain going in; 107 predated that (manipulation-per-line expansion, eight frames became thirteen), 102 predated that (raw-derivation expansion, eight frames), 100 predated that (argument-line recut, six frames), 97 predated that (three-frame L1-vs-MSE section), 94 predated that (step-8 mechanism frame), 93 predated that (summed-up frame), 92 predated that (reduced-stack detection frame), 91 predated that, 90 predated the step-8/9 split, 89 predated the K-scatterer frame, 88 predated the convergence/gradient continuation frame, 87 predated the joint-error-landscape frame).
+Produces `full_project_story.pdf` (154 rendered pages as of 2026-08-04 — the pair-loss block added eight frames at the end of 12b_dual (intro + per-K board / by-count / components / stats), see design log; 146 as of 2026-07-30 — the K=2/K=5 table grouping replaced twelve per-K frames with six merged ones, see design log; earlier chain: 109 content frames + 8 act dividers + 1 sub-divider + 3 backup, 16:9; 124 rendered pages incl. title and overlays — re-measured 2026-07-16 after the head-2x2 + presence-lever five-seed refreshes (each got the standing three-table treatment; the 12-run lever grid became the three presence frames, see the design log). 120 predated that (the input-ablation refresh recut the two amplitude-only frames into four). 118 predated that (the augmentation five-seed refresh added its by-scatterer-count + GT-statistics pair 20b2/20b3). 116 predated that (the normalization five-seed refresh added the same pair as 12c/12d). 114 predated that (the price-of-reach + operator-split pair went into the context section). 112 predated that (the exact ladder argument + its rung table frame), 109 predated that (the context-section theory chain had just been deleted — six frames + their three backup frames; it rested on a degenerate homogeneity premise). 109 also predated that chain going in; 107 predated that (manipulation-per-line expansion, eight frames became thirteen), 102 predated that (raw-derivation expansion, eight frames), 100 predated that (argument-line recut, six frames), 97 predated that (three-frame L1-vs-MSE section), 94 predated that (step-8 mechanism frame), 93 predated that (summed-up frame), 92 predated that (reduced-stack detection frame), 91 predated that, 90 predated the step-8/9 split, 89 predated the K-scatterer frame, 88 predated the convergence/gradient continuation frame, 87 predated the joint-error-landscape frame).
 Pure Beamer + TikZ, no external fonts, so it builds offline once the CTAN cache is warm.
 
 # Structure (since 2026-07-12)
@@ -12,13 +12,53 @@ Pure Beamer + TikZ, no external fonts, so it builds offline once the CTAN cache 
 The slides live in shared section files; the full deck and the sub-presentations both read them, so an edit to a section propagates to both.
 
 - `preamble.tex` — theme, colours, packages, tikz styles, macros (`\act`, `\subact`, `\pending`, table tints). Input by the full deck and every sub-deck; never duplicated.
-- `sections/NN_theme.tex` — the frames, cut at *content-theme* boundaries (finer than the acts): 00_front (title/outline, full-only), 01_overview, 02_signal_model, 03_dataset_labels, 04_representation, 05_stability, 06_set_prediction, 07_augmentation, 08_context_information, 09_error_theory (the error-theory chain, seven frames ending at the recall paradox — de-stepped 2026-07-20; the mechanism/summed-up/gate tail and the reduced-stack verdict frame were deleted the same day), 10_benchmark_board, 11_loss_design (composition ambiguity), 11b_l1_vs_mse (why param-L1 beats param-MSE: label laws, mean/median optima, tail share + the Huber/gate checks + the limits frame, nine frames — de-stepped and trimmed 2026-07-20), 12_winner, 12b_dual (the dual-trunk block: idea + routing grid + K=2/K=5 routing results + arm-ratio intro, the K=2 trio and the K=5 quartet, closing on four qualitative 90-10 cube-slice frames; moved here from 08_context_information on 2026-07-26 because the dual experiments postdate the benchmark), 13_physics_losses, 14_unrolled, 15_jepa, 16_close, 17_backup. **Edit slides here**, never in the wrapper files.
+- `sections/NN_theme.tex` — the frames, cut at *content-theme* boundaries (finer than the acts): 00_front (title/outline, full-only), 01_overview, 02_signal_model, 03_dataset_labels, 04_representation, 05_stability, 06_set_prediction, 07_augmentation, 08_context_information, 09_error_theory (the error-theory chain, seven frames ending at the recall paradox — de-stepped 2026-07-20; the mechanism/summed-up/gate tail and the reduced-stack verdict frame were deleted the same day), 10_benchmark_board, 11_loss_design (composition ambiguity), 11b_l1_vs_mse (why param-L1 beats param-MSE: label laws, mean/median optima, tail share + the Huber/gate checks + the limits frame, nine frames — de-stepped and trimmed 2026-07-20), 12_winner, 12b_dual (the dual-trunk block: idea + routing grid + K=2/K=5 routing results + arm-ratio intro, the K=2 trio and the K=5 quartet, four qualitative 90-10 cube-slice frames, then the pair-loss block added 2026-08-04: intro + K=2 board/by-count/stats + K=5 board/by-count/components/stats; moved here from 08_context_information on 2026-07-26 because the dual experiments postdate the benchmark), 13_physics_losses, 14_unrolled, 15_jepa, 16_close, 17_backup. **Edit slides here**, never in the wrapper files.
 - `full_project_story.tex` — documentclass + `\input{preamble}` + title block, then the `\act`/`\subact` divider lines inline and the 19 section inputs in the original narrative order. Nothing else.
 - `sub_NN_theme.tex` — ten standalone thematic sub-presentations, each = own title page + `\input` of its section file(s). Themes regroup content across act boundaries: 01_problem (overview + signal model), 02_dataset_labels, 03_representation, 04_stability (stability + augmentation), 05_set_prediction (small-K through the 12-run imbalance grid), 06_context_information, 07_loss_theory (error theory + loss design + L1 vs MSE), 08_benchmark (board + winner + dual-trunk block), 09_physics (loss terms + unrolled solver), 10_jepa. Build the same way, e.g. `tectonic sub_07_loss_theory.tex`.
 
 All builds run inside this directory (images resolve via `../../results/...`).
 
 # Design log
+
+- PAIR-LOSS BLOCK ADDED 2026-08-04 (user: "the pair_k5 and pair_k2 results need
+  to go to the presentations"). EIGHT frames appended to 12b_dual after the
+  90-10 cube-slice frames (markers 25z-25ag, full-deck pages 123-130, deck 146
+  -> 154 pages, sub_08 33 -> 41). Data = results/K2/pair_k2 and
+  results/K5/pair_K5: on the dual UNet-skip full-full parity arm, the objective
+  is re-paired as (param-L1 + w * curve term)/(1+w) — the trainer divides by
+  the active weight sum, so validation losses change meaning with w and are
+  OMITTED from every table (each arm optimizes a different objective; same
+  honesty rule as sorted-vs-Hungarian). Three curve terms (L1, Charbonnier =
+  magnitude; cosine = shape-only, both curves normalized before the inner
+  product) x five weights {0.01, 0.05, 0.25, 0.5, 1} + a param-L1-only
+  baseline, five seeds, at K=2 and K=5 = 160 runs. Frame set: intro (objective
+  equation + family x weight grid tikz + bullets closing on "does the
+  conservative gate need a profile-level signal, not capacity"), then per K a
+  16-arm BOARD (arms as rows grouped by family, nine seedpm metric columns:
+  curve R2, cos med, precision, recall, F1, exact, under, over, peak p95;
+  column-wise 5% bold gate — a NEW table shape for many-arm sweeps, emitted by
+  the BoardEmitter class added to gen_dual_round2_tables.py) and the standing
+  focus tables on six arms {baseline, L1 w=1, Charb w=1, cos w=0.01, cos
+  w=0.5, cos w=1}: K=2 by-count + stats (drB/drC geometry, tags plB/plC), K=5
+  detection/components/stats (krB/krC/krD geometry, tags pkB/pkC/pkD; board
+  tags plA/pkA). Findings on-slide: at K=2 the pair term rides free (curve
+  MAE/PSNR/SSIM flat, only bolds = the cosine operating-point shift, under
+  0.049 -> 0.037 vs over 0.040 -> 0.064 at flat F1, green+red on one row);
+  at K=5 the cosine term at w=0.01 wakes the conservative gate (recall 0.669
+  -> 0.813, count exact 0.634 -> 0.810, under 0.33 -> 0.14, k=1 recall 0.759
+  -> 0.995, slot-0 fire 0.756 -> 0.948) while HOLDING the board's best
+  precision 0.918; magnitude terms need w=1 for a smaller wake-up; pushing
+  cosine to w=1 pays precision (0.867) and position (mu 1.21 -> 1.42, k=3
+  2.60 -> 3.69). pkC caption carries the matched-pool caveat (component MAEs
+  are over matched pairs; higher-recall arms match harder pools). Board
+  captions state the flat metrics with their ranges instead of showing the
+  columns. Act V divider + sub_08 subtitle gained "paired losses".
+  gen_dual_round2_tables.py: ratio_frames' inline K=2 row specs extracted to
+  k2_headline_rows/k2_by_count_rows/k2_stats_rows (regenerated dr*/kr*/kd*
+  fragments diffed byte-identical), pair_k2_frames/pair_k5_frames added.
+  Fit fixes: intro tikz row labels shortened to L1/Charbonnier/cosine (5.8pt
+  hbox), plB caption vspace 3pt -> 1pt (1.4pt vbox); warning set back to the
+  two pre-existing 25e/25f hboxes; pages 123-130 pdftoppm-verified.
 
 - K=2/K=5 TABLES GROUPED SIDE BY SIDE 2026-07-30 (user: "usually the results
   are in tables, it shows for K=2 and then everything again for K=5, but I
@@ -2523,8 +2563,8 @@ All builds run inside this directory (images resolve via `../../results/...`).
 
 - STEP 8 SHRINKAGE-TO-COLLAPSE CORRECTION 2026-07-10 (audit: the "pi·E < tau"
   bridge fails arithmetically — pi = 0.26 measured, amplitude scale O(0.1–1)
-  per the ablation table's a-MAE 0.33–0.72, tau = ACTIVE_AMP_THR = 1e-4, so
-  conditional-mean shrinkage lands at ~0.03–0.13, more than two orders ABOVE the
+  per the ablation table's a-MAE 0.33–0.72, tau = ACTIVE_AMP_THR = 1e-3, so
+  conditional-mean shrinkage lands at ~0.03–0.13, two orders ABOVE the
   threshold; a head that truly converged to the conditional mean would keep
   every second slot active and the paradox would not exist. The measured
   state is stronger than shrinkage: the trained conv head collapses slot 2
@@ -2543,7 +2583,7 @@ All builds run inside this directory (images resolve via `../../results/...`).
   both from the ablation table — recall inversions only bind at matched
   precision); the faint-pixel burial paragraph REPLACED by "Past the mean,
   onto the floor" — even total doubt stops the mean at 0.26·E, orders above
-  tau = 1e-4, shrinkage cannot bury a slot, yet the measured active counts
+  tau = 1e-3, shrinkage cannot bury a slot, yet the measured active counts
   (results/extra_tracks_exp/metrics_comparison(1).md: baseline
   active_count_pred_mean 1.01 vs GT 1.2605, count_under_frac 0.31438;
   phi-only 1.2965 / 0.052993) show the slot buried on ~every pair pixel:
@@ -2729,8 +2769,8 @@ All builds run inside this directory (images resolve via `../../results/...`).
   valley eps = e^{-delta^2/4 sigma^2} - 1 anchored at a "truth" dot on (0,0);
   colorbar labelled with the true norm expression; 300 dpi, serif/cm mathtext.
   Generated by joint_error_heatmap.py NEXT TO THE DECK (class JointErrorHeatmap,
-  Dune-env python, tools.monitoring.logger Logger, repo-root walk-up bootstrap
-  so it runs from a staging worktree or the real checkout; rerun: Dune python
+  Dune-env python, tools.logger Logger, vault-root walk-up bootstrap so it runs
+  from a staging worktree or the real checkout; rerun: Dune python
   joint_error_heatmap.py from the deck directory). VERIFY: warning set identical
   to the shipped 8 (the 0.55-column Leibniz lines fit), pages 50-51
   pdftoppm-verified, 88 pages.
@@ -3703,7 +3743,7 @@ All builds run inside this directory (images resolve via `../../results/...`).
   normalization slide never defines what an active pixel is, and the visualization is too
   vague). A definition strip now spans the top of the frame, above both columns: "Active
   slot = the GT placed a real scatterer in it: m_{p,k} = 1[a^GT_{p,k} > tau]", with a soft
-  subline giving tau = 1e-4 linear amplitude (ParamMatcher.ACTIVE_AMP_THR in
+  subline giving tau = 1e-3 linear amplitude (ParamMatcher.ACTIVE_AMP_THR in
   tools/loss/param_loss.py), "empty slots carry a=0", and the pixel-level corollary (a
   pixel is active when any of its K slots is). The left panel's old strip of 10
   undifferentiated boxes (2 filled, nothing saying what a box was) became a concrete batch:

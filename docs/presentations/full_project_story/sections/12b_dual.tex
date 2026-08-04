@@ -907,3 +907,345 @@
   \vspace{7pt}
   \parbox{0.90\textwidth}{\scriptsize\color{soft} Constant-range cut at $\mathrm{rg}=3466$, per-column normalised: the densest of the four. Vegetation from azimuth $0$ to ${\approx}580$ and again from ${\approx}950$ out to the swath edge, with a bare corridor between them where only the ground return near $-7$\,m survives; the tomogram carries the same corridor. The prediction puts both blocks and the corridor in place and holds the sharp canopy wall at azimuth ${\approx}580$. Two costs: it picks the canopy back up at azimuth ${\approx}985$ against the label's ${\approx}955$, and the ${\approx}60$\,m point return near azimuth $1145$, visible in the tomogram as well as in the label, is missing. Tomogram in elevation bins, the two mixture panels in metres.\par}
 \end{frame}
+
+% ---------------------------------------------------------------- 25z Pair losses: the question
+\begin{frame}{Pairing the objective --- param-L1 plus a curve term}
+  \begin{columns}[c]
+    \begin{column}{0.53\textwidth}
+      \centering
+      $\mathcal{L}(w) \;=\; \bigl(\mathcal{L}_{\text{param-L1}} \,+\, w\,\mathcal{L}_{\text{curve}}\bigr)\,/\,(1+w)$
+      \\[10pt]
+      \begin{tikzpicture}[font=\scriptsize, scale=0.94]
+        \node[font=\tiny,text=soft] at (3.5,2.42) {paired weight $w$};
+        \foreach \y/\fam/\col in {1.6/L1/argA, 0.8/Charbonnier/argA, 0.0/cosine/good}{
+          \node[font=\tiny,text=\col,anchor=east] at (0.98,\y+0.26) {\fam};
+        }
+        \foreach \x/\w in {1.5/0.01, 2.5/0.05, 3.5/0.25, 4.5/0.5, 5.5/1}{
+          \foreach \y/\col in {1.6/argA, 0.8/argA, 0.0/good}{
+            \draw[\col!70,thin,fill=\col!12] (\x-0.42,\y) rectangle (\x+0.42,\y+0.52);
+            \node[font=\tiny,text=\col] at (\x,\y+0.26) {\w};
+          }
+        }
+        \draw[decorate,decoration={brace,amplitude=4pt},soft] (6.02,2.12) -- (6.02,0.8);
+        \node[font=\tiny,text=soft,anchor=west] at (6.24,1.46) {magnitude};
+        \draw[decorate,decoration={brace,amplitude=4pt},soft] (6.02,0.52) -- (6.02,0.0);
+        \node[font=\tiny,text=soft,anchor=west] at (6.24,0.26) {shape only};
+        \draw[soft!70,thin,fill=soft!8] (1.08,-1.08) rectangle (5.92,-0.56);
+        \node[font=\tiny,text=soft] at (3.5,-0.82) {baseline --- param-L1 alone ($w{=}0$)};
+      \end{tikzpicture}
+      \\[7pt]
+      {\scriptsize\color{soft} 1 baseline $+$ 15 pair arms per $K$, five seeds each, at $K{=}2$ and $K{=}5$ $=$ 160 runs\par}
+    \end{column}
+    \begin{column}{0.43\textwidth}
+      \footnotesize
+      The ratio block left the $K{=}5$ gate under-firing at every split ---
+      more existence capacity did not wake it. This experiment changes the
+      objective instead: keep param-L1 and add a synthesized-curve term.
+      \par\smallskip
+      \begin{itemize}\setlength{\itemsep}{3pt}
+        \item \textbf{Two signals, one loss}: param-L1 reaches a slot only
+              through its matched pair; the curve term re-synthesizes the
+              profile from \emph{all} slots and is permutation-invariant ---
+              its gradient touches every slot, matched or not.
+        \item \textbf{Magnitude or shape}: L1 and Charbonnier price the
+              synthesized profile's magnitude; cosine normalizes both curves
+              first and prices shape alone.
+        \item \textbf{A normalized pair}: the two terms are averaged, so the
+              validation loss changes meaning with $w$ --- arms compare on
+              held-out metrics only, never on the loss.
+        \item \textbf{The question}: if the conservative gate is starved of a
+              profile-level error signal rather than capacity, a small $w$
+              should move detection at $K{=}5$ and leave $K{=}2$ alone.
+      \end{itemize}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% ---------------------------------------------------------------- 25aa Pair sweep at K=2: the board
+\begin{frame}{The pair sweep at $K{=}2$ --- the curve term rides free, cosine shifts the operating point}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{0.85}
+  \setlength{\tabcolsep}{2.5pt}
+  \renewcommand{\seedtag}{plA}
+  \begin{tabular}{@{}l ccccccccc@{}}
+    \toprule
+    & \multicolumn{2}{c}{reconstruction} & \multicolumn{7}{c@{}}{detection (matched)} \\
+    \cmidrule(lr){2-3}\cmidrule(l){4-10}
+    objective & curve $R^2$ $\uparrow$ & cos med $\uparrow$ & prec.\ $\uparrow$ & recall $\uparrow$ & F1 $\uparrow$ & exact $\uparrow$ & under $\downarrow$ & over $\downarrow$ & peak p95 $\downarrow$ \\
+    \midrule
+    param-L1 alone & \seedpm{0.748}{.010} & \seedpm{0.969}{.001} & \seedpm{0.905}{.003} & \seedpm{0.891}{.003} & \seedpm{0.898}{.002} & \seedpm{0.910}{.004} & \seedpm{0.049}{.002} & \seedpm{0.040}{.004} & \seedpm{5.4}{.0} \\
+    \addlinespace
+    \multicolumn{10}{@{}l}{\emph{$+$ L1 curve}} \\
+    \quad $w{=}0.01$ & \seedpm{0.743}{.011} & \seedpm{0.967}{.003} & \seedpm{0.905}{.001} & \seedpm{0.890}{.001} & \seedpm{0.898}{.001} & \seedpm{0.909}{.003} & \seedpm{0.050}{.002} & \seedpm{0.041}{.002} & \seedpm{5.4}{.0} \\
+    \quad $w{=}0.05$ & \seedpm{0.749}{.008} & \seedpm{0.968}{.002} & \seedpm{0.906}{.003} & \seedpm{0.889}{.001} & \seedpm{0.897}{.002} & \seedpm{0.910}{.004} & \seedpm{0.051}{.002} & \seedpm{0.040}{.004} & \seedpm{5.4}{.0} \\
+    \quad $w{=}0.25$ & \seedpm{0.745}{.012} & \seedpm{0.967}{.001} & \seedpm{0.905}{.004} & \seedpm{0.889}{.004} & \seedpm{0.897}{.003} & \seedpm{0.908}{.005} & \seedpm{0.051}{.004} & \seedpm{0.041}{.005} & \seedpm{5.6}{.4} \\
+    \quad $w{=}0.5$ & \seedpm{0.757}{.011} & \seedpm{0.969}{.003} & \seedpm{0.905}{.003} & \seedpm{0.890}{.003} & \seedpm{0.897}{.001} & \seedpm{0.910}{.003} & \seedpm{0.050}{.004} & \seedpm{0.040}{.002} & \seedpm{5.5}{.3} \\
+    \quad $w{=}1$ & \seedpm{0.753}{.010} & \seedpm{0.967}{.004} & \seedpm{0.905}{.004} & \seedpm{0.889}{.003} & \seedpm{0.897}{.003} & \seedpm{0.909}{.007} & \seedpm{0.051}{.004} & \seedpm{0.040}{.006} & \seedpm{5.6}{.4} \\
+    \addlinespace
+    \multicolumn{10}{@{}l}{\emph{$+$ Charbonnier curve}} \\
+    \quad $w{=}0.01$ & \seedpm{0.745}{.007} & \seedpm{0.967}{.003} & \seedpm{0.905}{.004} & \seedpm{0.889}{.002} & \seedpm{0.897}{.002} & \seedpm{0.909}{.005} & \seedpm{0.050}{.001} & \seedpm{0.040}{.005} & \seedpm{5.6}{.4} \\
+    \quad $w{=}0.05$ & \seedpm{0.752}{.008} & \seedpm{0.966}{.005} & \seedpm{0.906}{.002} & \seedpm{0.889}{.001} & \seedpm{0.897}{.001} & \seedpm{0.911}{.004} & \seedpm{0.050}{.001} & \seedpm{\textbf{0.038}}{.004} & \seedpm{5.4}{.0} \\
+    \quad $w{=}0.25$ & \seedpm{0.749}{.012} & \seedpm{0.968}{.003} & \seedpm{0.907}{.003} & \seedpm{0.889}{.003} & \seedpm{0.898}{.002} & \seedpm{0.909}{.006} & \seedpm{0.052}{.004} & \seedpm{0.039}{.004} & \seedpm{5.6}{.6} \\
+    \quad $w{=}0.5$ & \seedpm{0.749}{.014} & \seedpm{0.969}{.002} & \seedpm{0.906}{.008} & \seedpm{0.888}{.004} & \seedpm{0.897}{.005} & \seedpm{0.905}{.013} & \seedpm{0.053}{.005} & \seedpm{0.041}{.011} & \seedpm{5.6}{.4} \\
+    \quad $w{=}1$ & \seedpm{0.749}{.007} & \seedpm{0.966}{.007} & \seedpm{0.906}{.006} & \seedpm{0.888}{.002} & \seedpm{0.897}{.002} & \seedpm{0.909}{.005} & \seedpm{0.052}{.005} & \seedpm{0.039}{.006} & \seedpm{5.6}{.4} \\
+    \addlinespace
+    \multicolumn{10}{@{}l}{\emph{$+$ cosine curve}} \\
+    \quad $w{=}0.01$ & \seedpm{0.742}{.005} & \seedpm{0.968}{.002} & \seedpm{0.900}{.005} & \seedpm{0.898}{.002} & \seedpm{0.899}{.002} & \seedpm{0.913}{.005} & \seedpm{0.044}{.002} & \seedpm{0.043}{.005} & \seedpm{\textbf{4.7}}{.0} \\
+    \quad $w{=}0.05$ & \seedpm{0.745}{.010} & \seedpm{0.966}{.005} & \seedpm{0.900}{.005} & \seedpm{0.898}{.001} & \seedpm{0.899}{.002} & \seedpm{0.916}{.005} & \seedpm{0.043}{.004} & \seedpm{0.041}{.005} & \seedpm{\textbf{4.7}}{.0} \\
+    \quad $w{=}0.25$ & \seedpm{0.746}{.015} & \seedpm{0.966}{.004} & \seedpm{0.894}{.003} & \seedpm{0.900}{.002} & \seedpm{0.897}{.002} & \seedpm{0.909}{.006} & \seedpm{0.042}{.003} & \seedpm{0.049}{.004} & \seedpm{\textbf{4.7}}{.0} \\
+    \quad $w{=}0.5$ & \seedpm{0.754}{.008} & \seedpm{0.968}{.002} & \seedpm{0.891}{.008} & \seedpm{0.902}{.002} & \seedpm{0.897}{.004} & \seedpm{0.905}{.010} & \seedpm{0.040}{.002} & \seedpm{0.055}{.011} & \seedpm{\textbf{4.7}}{.0} \\
+    \quad $w{=}1$ & \seedpm{0.749}{.003} & \seedpm{0.966}{.002} & \seedpm{0.884}{.010} & \seedpm{0.902}{.002} & \seedpm{0.893}{.005} & \seedpm{0.900}{.011} & \seedpm{\hlval{good}{\textbf{0.037}}}{.003} & \seedpm{\hlval{accent}{0.064}}{.013} & \seedpm{\textbf{4.7}}{.0} \\
+    \bottomrule
+    \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.92\textwidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}2$ $\cdot$ presence A $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ $\cdot$ fixed routing (full stack $\to$ both trunks) $\cdot$ parity twin ladders (${\approx}31.19$\,M). Row $=$ objective $(\mathcal{L}_{\text{param-L1}}+w\,\mathcal{L}_{\text{curve}})/(1+w)$. Five seeded replicas per arm, cells mean $\pm$ seed std; held-out test, $5.0$\,M px. Validation losses are omitted --- every arm optimizes a different objective, so they do not compare. Curve MAE, PSNR and three-axis SSIM are flat over all sixteen arms (0.036--0.037, 52.6--52.8\,dB, elev/range/azim 0.967--0.968\,/\,0.951--0.952\,/\,0.961--0.962). \textbf{bold} $=$ best in column, marked only where best and worst differ by more than $5\%$. \textcolor{good}{Green} and \textcolor{accent}{red} sit on one row: full-weight cosine trades misses for false alarms (under 0.049 $\to$ 0.037, over 0.040 $\to$ 0.064) at flat F1 --- an operating-point shift, not extra detection. Every other column stays inside combined seed noise: at $K{=}2$ the pair term rides along free. cos med: median per-pixel cosine to the GT profile; peak p95: 95th percentile of the per-pixel peak error.\par}
+\end{frame}
+
+% ---------------------------------------------------------------- 25ab Pair at K=2 by scatterer count
+\begin{frame}{The $K{=}2$ pair by scatterer count --- wider firing buys the second scatterer, position pays}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{0.92}
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\seedtag}{plB}
+  \begin{tabular}{@{}l cccccc@{}}
+    \toprule
+    & \multicolumn{6}{c@{}}{paired curve term} \\
+    \cmidrule(l){2-7}
+    metric & none & L1 $w{=}1$ & Charb.\ $w{=}1$ & cos.\ $w{=}0.01$ & cos.\ $w{=}0.5$ & cos.\ $w{=}1$ \\
+    \midrule
+    precision $\uparrow$ & \seedpm{0.905}{.003} & \seedpm{0.905}{.004} & \seedpm{0.906}{.006} & \seedpm{0.900}{.005} & \seedpm{0.891}{.008} & \seedpm{0.884}{.010} \\
+    \quad $k{=}1$ & \seedpm{0.947}{.005} & \seedpm{0.948}{.007} & \seedpm{0.950}{.008} & \seedpm{0.944}{.006} & \seedpm{0.930}{.012} & \seedpm{0.920}{.015} \\
+    \quad $k{=}2$ & \seedpm{0.834}{.002} & \seedpm{0.833}{.002} & \seedpm{0.833}{.004} & \seedpm{0.828}{.003} & \seedpm{0.827}{.004} & \seedpm{0.823}{.003} \\
+    \addlinespace
+    recall $\uparrow$ & \seedpm{0.891}{.003} & \seedpm{0.889}{.003} & \seedpm{0.888}{.002} & \seedpm{0.898}{.002} & \seedpm{0.902}{.002} & \seedpm{0.902}{.002} \\
+    \quad $k{=}1$ & \seedpm{0.995}{.002} & \seedpm{0.995}{.001} & \seedpm{0.995}{.001} & \seedpm{0.998}{.000} & \seedpm{0.999}{.000} & \seedpm{0.999}{.000} \\
+    \quad $k{=}2$ & \seedpm{0.742}{.006} & \seedpm{0.737}{.005} & \seedpm{0.735}{.006} & \seedpm{0.755}{.003} & \seedpm{0.764}{.005} & \seedpm{\hlval{good}{0.765}}{.004} \\
+    \addlinespace
+    \multicolumn{7}{@{}l}{\emph{count acc $\mid$ pred $k$}} \\
+    \quad pred $k{=}1$ $\uparrow$ & \seedpm{0.952}{.003} & \seedpm{0.950}{.004} & \seedpm{0.950}{.005} & \seedpm{0.944}{.003} & \seedpm{0.945}{.002} & \seedpm{0.949}{.003} \\
+    \quad pred $k{=}2$ $\uparrow$ & \seedpm{0.841}{.013} & \seedpm{0.841}{.019} & \seedpm{\textbf{0.846}}{.020} & \seedpm{0.835}{.016} & \seedpm{0.802}{.029} & \seedpm{0.780}{.032} \\
+    \addlinespace
+    $\mu$ MAE $\downarrow$ & \seedpm{\textbf{1.59}}{.02} & \seedpm{1.61}{.01} & \seedpm{1.60}{.02} & \seedpm{1.68}{.04} & \seedpm{1.69}{.04} & \seedpm{\hlval{accent}{1.73}}{.04} \\
+    \quad $k{=}1$ & \seedpm{\textbf{0.31}}{.01} & \seedpm{0.33}{.01} & \seedpm{0.33}{.03} & \seedpm{0.34}{.01} & \seedpm{0.35}{.01} & \seedpm{0.36}{.01} \\
+    \quad $k{=}2$ & \seedpm{\textbf{3.63}}{.05} & \seedpm{3.66}{.03} & \seedpm{3.65}{.06} & \seedpm{3.77}{.07} & \seedpm{3.76}{.09} & \seedpm{3.84}{.09} \\
+    \addlinespace
+    $\sigma$ MAE $\downarrow$ & \seedpm{0.690}{.008} & \seedpm{0.690}{.008} & \seedpm{\textbf{0.686}}{.005} & \seedpm{0.749}{.024} & \seedpm{0.765}{.005} & \seedpm{\hlval{accent}{0.783}}{.013} \\
+    \quad $k{=}1$ & \seedpm{0.185}{.005} & \seedpm{\textbf{0.179}}{.006} & \seedpm{0.180}{.007} & \seedpm{0.199}{.005} & \seedpm{0.199}{.003} & \seedpm{0.200}{.004} \\
+    \quad $k{=}2$ & \seedpm{\textbf{1.494}}{.021} & \seedpm{1.506}{.014} & \seedpm{1.497}{.008} & \seedpm{1.605}{.048} & \seedpm{1.635}{.017} & \seedpm{1.675}{.026} \\
+    \addlinespace
+    $a$ MAE $\downarrow$ & \seedpm{0.177}{.002} & \seedpm{0.188}{.006} & \seedpm{0.190}{.007} & \seedpm{\textbf{0.176}}{.003} & \seedpm{0.182}{.003} & \seedpm{0.186}{.003} \\
+    \quad $k{=}1$ & \seedpm{\textbf{0.056}}{.003} & \seedpm{0.059}{.005} & \seedpm{0.060}{.005} & \seedpm{0.057}{.004} & \seedpm{0.059}{.002} & \seedpm{0.060}{.003} \\
+    \quad $k{=}2$ & \seedpm{0.371}{.002} & \seedpm{0.396}{.009} & \seedpm{0.399}{.010} & \seedpm{\textbf{0.363}}{.003} & \seedpm{0.372}{.004} & \seedpm{0.379}{.004} \\
+    \bottomrule
+    \end{tabular}
+  \par\vspace{1pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}2$ $\cdot$ presence A $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ $\cdot$ fixed routing (full stack $\to$ both trunks) $\cdot$ parity twins. Column $=$ paired curve term at its weight $w$; none $=$ param-L1 alone. All rows matched (Hungarian pairing); cells mean $\pm$ seed std over five seeded replicas; held-out test; $k$ $=$ true scatterer count of the pixel; component errors over matched pairs only. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$. \textcolor{good}{Green} $=$ the cosine arms' two-scatterer recall (0.742 $\to$ 0.765, ${\approx}3\times$ combined seed noise); \textcolor{accent}{red} $=$ what the wider gate costs: $\mu$ and $\sigma$ drift up with cosine weight ($\mu$ 1.59 $\to$ 1.73, $\sigma$ 0.690 $\to$ 0.783, both past noise) while $k{=}1$ precision slips inside the gate (0.947 $\to$ 0.920). The magnitude pairs move nothing anywhere. Precision rewards under-prediction --- rank on recall. count acc $\mid$ pred $k$: share of pixels claiming exactly $k$ scatterers whose true count is $k$. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
+\end{frame}
+
+% ---------------------------------------------------------------- 25ac Pair at K=2: predicted stats vs GT
+\begin{frame}{The $K{=}2$ pair, predicted statistics --- the gate fires wider, leakage thins}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{0.90}
+  \setlength{\tabcolsep}{4pt}
+  \renewcommand{\seedtag}{plC}
+  \begin{tabular}{@{}l !{\color{white}\vrule width 2pt} c !{\color{white}\vrule width 2pt} cccccc@{}}
+    \toprule
+    & & \multicolumn{6}{c@{}}{paired curve term} \\
+    \cmidrule(l){3-8}
+    mean & \textcolor{good}{GT} & none & L1 $w{=}1$ & Charb.\ $w{=}1$ & cos.\ $w{=}0.01$ & cos.\ $w{=}0.5$ & cos.\ $w{=}1$ \\
+    \midrule
+    \multicolumn{8}{@{}l}{\textcolor{soft}{\emph{slot 0 --- strongest scatterer; GT-active on every pixel}}} \\
+    \; active frac & 1.000 & \seedpm{0.972}{.003} & \seedpm{0.970}{.002} & \seedpm{0.970}{.002} & \seedpm{0.983}{.002} & \seedpm{0.988}{.001} & \seedpm{0.988}{.001} \\
+    \; $a$ --- active & 0.77 & \seedpm{0.74}{.01} & \seedpm{0.72}{.01} & \seedpm{0.72}{.01} & \seedpm{0.73}{.01} & \seedpm{0.71}{.01} & \seedpm{0.71}{.01} \\
+    \; $\mu$ --- active & $-4.89$ & \seedpm{$-4.58$}{.05} & \seedpm{$-4.58$}{.10} & \seedpm{$-4.57$}{.12} & \seedpm{$-4.61$}{.07} & \seedpm{$-4.61$}{.07} & \seedpm{$-4.63$}{.07} \\
+    \; $\sigma$ --- active & 1.76 & \seedpm{1.38}{.03} & \seedpm{1.37}{.02} & \seedpm{1.36}{.05} & \seedpm{1.40}{.01} & \seedpm{1.48}{.02} & \seedpm{\textbf{1.49}}{.01} \\
+    \addlinespace[1.5pt]
+    \multicolumn{8}{@{}l}{\textcolor{soft}{\emph{slot 1 --- second scatterer; GT-active on 26\% of pixels}}} \\
+    \; active frac & 0.260 & \seedpm{0.268}{.004} & \seedpm{0.267}{.006} & \seedpm{\textbf{0.265}}{.008} & \seedpm{0.274}{.006} & \seedpm{0.288}{.011} & \seedpm{0.299}{.015} \\
+    \; $a$ --- active & 1.43 & \seedpm{1.45}{.03} & \seedpm{1.36}{.03} & \seedpm{1.35}{.04} & \seedpm{\textbf{1.42}}{.03} & \seedpm{1.39}{.03} & \seedpm{1.40}{.02} \\
+    \; $a$ --- inact. & 0.00 & \seedpm{0.85}{.04} & \seedpm{0.74}{.10} & \seedpm{0.78}{.10} & \seedpm{0.84}{.04} & \seedpm{0.63}{.08} & \seedpm{\textbf{0.57}}{.07} \\
+    \; $\mu$ --- active & 11.34 & \seedpm{\textbf{7.78}}{.07} & \seedpm{7.44}{.36} & \seedpm{7.39}{.36} & \seedpm{7.75}{.28} & \seedpm{7.33}{.23} & \seedpm{7.30}{.19} \\
+    \; $\mu$ --- inact. & --- & \seedpm{0.21}{.29} & \seedpm{0.45}{.67} & \seedpm{0.22}{.95} & \seedpm{0.10}{.59} & \seedpm{$-0.80$}{.74} & \seedpm{$-1.08$}{1.08} \\
+    \; $\sigma$ --- active & 3.53 & \seedpm{3.28}{.09} & \seedpm{3.29}{.13} & \seedpm{3.24}{.13} & \seedpm{3.24}{.07} & \seedpm{3.33}{.05} & \seedpm{\textbf{3.47}}{.03} \\
+    \; $\sigma$ --- inact. & --- & \seedpm{1.84}{.06} & \seedpm{1.78}{.06} & \seedpm{1.79}{.05} & \seedpm{1.78}{.04} & \seedpm{1.79}{.07} & \seedpm{1.78}{.09} \\
+    \addlinespace[1.5pt]
+    \multicolumn{8}{@{}l}{\textcolor{soft}{\emph{distribution width --- std over GT-active pixels}}} \\
+    \; $a$ --- slot 0 & 1.48 & \seedpm{1.31}{.03} & \seedpm{1.31}{.03} & \seedpm{1.29}{.04} & \seedpm{1.29}{.02} & \seedpm{1.26}{.03} & \seedpm{1.26}{.03} \\
+    \; $\mu$ --- slot 0 & 3.30 & \seedpm{2.37}{.04} & \seedpm{2.39}{.06} & \seedpm{2.40}{.06} & \seedpm{2.44}{.05} & \seedpm{2.44}{.05} & \seedpm{2.44}{.08} \\
+    \; $\sigma$ --- slot 0 & 2.84 & \seedpm{1.20}{.02} & \seedpm{1.15}{.08} & \seedpm{1.16}{.08} & \seedpm{1.25}{.05} & \seedpm{\textbf{1.38}}{.06} & \seedpm{\textbf{1.38}}{.03} \\
+    \; $a$ --- slot 1 & 1.45 & \seedpm{1.27}{.04} & \seedpm{1.21}{.03} & \seedpm{1.21}{.04} & \seedpm{1.27}{.05} & \seedpm{1.29}{.03} & \seedpm{\textbf{1.33}}{.02} \\
+    \; $\mu$ --- slot 1 & 16.24 & \seedpm{8.96}{.25} & \seedpm{8.86}{.33} & \seedpm{8.83}{.30} & \seedpm{\textbf{9.33}}{.40} & \seedpm{8.99}{.43} & \seedpm{9.05}{.51} \\
+    \; $\sigma$ --- slot 1 & 4.01 & \seedpm{1.74}{.08} & \seedpm{1.81}{.12} & \seedpm{1.79}{.13} & \seedpm{1.74}{.07} & \seedpm{1.80}{.03} & \seedpm{\textbf{1.99}}{.13} \\
+    \bottomrule
+    \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}2$ $\cdot$ presence A $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ $\cdot$ fixed routing (full stack $\to$ both trunks) $\cdot$ parity twins. Column $=$ paired curve term at its weight $w$; none $=$ param-L1 alone. Five seeded replicas per arm, cells mean $\pm$ seed std; means conditioned on the slot's GT activity mask. \textbf{bold} $=$ closest to the \textcolor{good}{GT} column, marked only where best and worst differ by more than $5\%$. The cosine gate fires wider on both slots (slot 0: 0.972 $\to$ 0.988; slot 1: 0.268 $\to$ 0.299 against GT 0.260 --- past the GT into over-fire), thins the inactive-amplitude leakage (0.85 $\to$ 0.57) and re-widens the compressed $\sigma$ statistics toward the GT (slot-0 $\sigma$ width 1.20 $\to$ 1.38 vs 2.84) --- the shape term pushes the predicted distributions outward at $K{=}2$ too, it just finds nothing new to detect. Inactive GT slots define no $\mu$/$\sigma$ reference (---). Width rows: std of the prediction over GT-active pixels vs the GT's own std. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
+\end{frame}
+
+% ---------------------------------------------------------------- 25ad Pair sweep at K=5: the board
+\begin{frame}{The pair sweep at $K{=}5$ --- a shape term at trace weight wakes the gate}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{0.85}
+  \setlength{\tabcolsep}{2.5pt}
+  \renewcommand{\seedtag}{pkA}
+  \begin{tabular}{@{}l ccccccccc@{}}
+    \toprule
+    & \multicolumn{2}{c}{reconstruction} & \multicolumn{7}{c@{}}{detection (matched)} \\
+    \cmidrule(lr){2-3}\cmidrule(l){4-10}
+    objective & curve $R^2$ $\uparrow$ & cos med $\uparrow$ & prec.\ $\uparrow$ & recall $\uparrow$ & F1 $\uparrow$ & exact $\uparrow$ & under $\downarrow$ & over $\downarrow$ & peak p95 $\downarrow$ \\
+    \midrule
+    param-L1 alone & \seedpm{0.680}{.010} & \seedpm{0.924}{.006} & \seedpm{0.912}{.007} & \seedpm{0.669}{.013} & \seedpm{0.772}{.009} & \seedpm{0.634}{.018} & \seedpm{0.326}{.018} & \seedpm{0.040}{.003} & \seedpm{14.1}{.0} \\
+    \addlinespace
+    \multicolumn{10}{@{}l}{\emph{$+$ L1 curve}} \\
+    \quad $w{=}0.01$ & \seedpm{0.680}{.012} & \seedpm{0.919}{.008} & \seedpm{0.906}{.007} & \seedpm{0.660}{.019} & \seedpm{0.764}{.014} & \seedpm{0.618}{.026} & \seedpm{0.339}{.025} & \seedpm{0.043}{.002} & \seedpm{14.1}{.0} \\
+    \quad $w{=}0.05$ & \seedpm{0.684}{.006} & \seedpm{0.922}{.007} & \seedpm{0.913}{.005} & \seedpm{0.657}{.017} & \seedpm{0.764}{.013} & \seedpm{0.618}{.024} & \seedpm{0.342}{.022} & \seedpm{\textbf{0.039}}{.002} & \seedpm{14.1}{.0} \\
+    \quad $w{=}0.25$ & \seedpm{0.700}{.007} & \seedpm{0.928}{.005} & \seedpm{0.910}{.005} & \seedpm{0.680}{.009} & \seedpm{0.779}{.007} & \seedpm{0.644}{.010} & \seedpm{0.312}{.011} & \seedpm{0.044}{.002} & \seedpm{14.1}{.0} \\
+    \quad $w{=}0.5$ & \seedpm{0.702}{.008} & \seedpm{0.940}{.005} & \seedpm{0.914}{.004} & \seedpm{0.715}{.019} & \seedpm{0.802}{.013} & \seedpm{0.687}{.027} & \seedpm{0.268}{.027} & \seedpm{0.045}{.002} & \seedpm{14.0}{.3} \\
+    \quad $w{=}1$ & \seedpm{0.702}{.020} & \seedpm{0.950}{.005} & \seedpm{0.917}{.009} & \seedpm{0.801}{.006} & \seedpm{0.855}{.003} & \seedpm{0.793}{.008} & \seedpm{0.154}{.007} & \seedpm{0.053}{.010} & \seedpm{6.7}{.7} \\
+    \addlinespace
+    \multicolumn{10}{@{}l}{\emph{$+$ Charbonnier curve}} \\
+    \quad $w{=}0.01$ & \seedpm{0.682}{.014} & \seedpm{0.924}{.008} & \seedpm{0.912}{.004} & \seedpm{0.665}{.016} & \seedpm{0.769}{.011} & \seedpm{0.629}{.021} & \seedpm{0.331}{.021} & \seedpm{0.041}{.001} & \seedpm{14.1}{.0} \\
+    \quad $w{=}0.05$ & \seedpm{0.683}{.009} & \seedpm{0.925}{.007} & \seedpm{0.911}{.005} & \seedpm{0.664}{.011} & \seedpm{0.768}{.008} & \seedpm{0.626}{.015} & \seedpm{0.333}{.015} & \seedpm{0.041}{.002} & \seedpm{14.1}{.0} \\
+    \quad $w{=}0.25$ & \seedpm{0.699}{.005} & \seedpm{0.927}{.004} & \seedpm{0.910}{.005} & \seedpm{0.681}{.015} & \seedpm{0.779}{.010} & \seedpm{0.644}{.018} & \seedpm{0.312}{.020} & \seedpm{0.044}{.003} & \seedpm{14.1}{.0} \\
+    \quad $w{=}0.5$ & \seedpm{0.706}{.004} & \seedpm{0.937}{.008} & \seedpm{0.917}{.004} & \seedpm{0.713}{.022} & \seedpm{0.802}{.015} & \seedpm{0.685}{.033} & \seedpm{0.271}{.032} & \seedpm{0.044}{.002} & \seedpm{14.0}{.3} \\
+    \quad $w{=}1$ & \seedpm{0.712}{.010} & \seedpm{0.948}{.010} & \seedpm{0.915}{.012} & \seedpm{0.794}{.015} & \seedpm{0.850}{.013} & \seedpm{0.781}{.033} & \seedpm{0.165}{.021} & \seedpm{0.054}{.013} & \seedpm{8.3}{3.0} \\
+    \addlinespace
+    \multicolumn{10}{@{}l}{\emph{$+$ cosine curve}} \\
+    \quad $w{=}0.01$ & \seedpm{0.683}{.011} & \seedpm{0.949}{.005} & \seedpm{\textbf{0.918}}{.007} & \seedpm{\hlval{good}{0.813}}{.003} & \seedpm{\textbf{0.863}}{.002} & \seedpm{\hlval{good}{\textbf{0.810}}}{.003} & \seedpm{\hlval{good}{0.142}}{.004} & \seedpm{0.048}{.004} & \seedpm{5.1}{.4} \\
+    \quad $w{=}0.05$ & \seedpm{0.685}{.011} & \seedpm{0.952}{.004} & \seedpm{0.906}{.001} & \seedpm{0.820}{.004} & \seedpm{0.861}{.003} & \seedpm{0.805}{.007} & \seedpm{0.134}{.005} & \seedpm{0.061}{.004} & \seedpm{4.9}{.3} \\
+    \quad $w{=}0.25$ & \seedpm{0.700}{.006} & \seedpm{0.951}{.002} & \seedpm{0.895}{.005} & \seedpm{0.831}{.001} & \seedpm{0.862}{.002} & \seedpm{0.806}{.004} & \seedpm{0.121}{.001} & \seedpm{0.072}{.005} & \seedpm{\textbf{4.7}}{.0} \\
+    \quad $w{=}0.5$ & \seedpm{0.704}{.005} & \seedpm{0.953}{.002} & \seedpm{0.883}{.010} & \seedpm{0.837}{.003} & \seedpm{0.859}{.004} & \seedpm{0.802}{.007} & \seedpm{0.113}{.003} & \seedpm{0.085}{.010} & \seedpm{\textbf{4.7}}{.0} \\
+    \quad $w{=}1$ & \seedpm{0.700}{.005} & \seedpm{0.954}{.002} & \seedpm{\hlval{accent}{0.867}}{.009} & \seedpm{\textbf{0.843}}{.001} & \seedpm{0.855}{.004} & \seedpm{0.794}{.010} & \seedpm{\textbf{0.104}}{.002} & \seedpm{\hlval{accent}{0.102}}{.011} & \seedpm{\textbf{4.7}}{.0} \\
+    \bottomrule
+    \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.92\textwidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}5$ $\cdot$ presence A $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ $\cdot$ fixed routing (full stack $\to$ both trunks) $\cdot$ parity twin ladders. Row $=$ objective $(\mathcal{L}_{\text{param-L1}}+w\,\mathcal{L}_{\text{curve}})/(1+w)$. Five seeded replicas per arm, cells mean $\pm$ seed std; held-out test, $K_{\max}{=}5$ labels. Validation losses are omitted --- every arm optimizes a different objective, so they do not compare. Curve MAE, PSNR and three-axis SSIM barely move (0.044--0.046, 51.0--51.5\,dB, elev/range/azim 0.961--0.963\,/\,0.940--0.947\,/\,0.954--0.957); curve $R^2$ rises with any strong curve term (0.680 $\to$ 0.712, ${\approx}3\times$ seed noise, under the 5\% bold gate). \textbf{bold} $=$ best in column past $5\%$. \textcolor{good}{Green} $=$ the trace-weight cosine arm: recall $+0.14$, count exact $+0.18$, under-count 0.33 $\to$ 0.14 --- while holding the board's best precision. \textcolor{accent}{Red} $=$ the price of pushing $w$: full-weight cosine pays precision (0.867) and over-fires (0.102). The magnitude terms buy the same wake-up only at $w{=}1$, and less of it. cos med: median per-pixel cosine to the GT profile; peak p95: 95th percentile of the per-pixel peak error.\par}
+\end{frame}
+
+% ---------------------------------------------------------------- 25ae Pair at K=5 by scatterer count
+\begin{frame}{The $K{=}5$ pair by scatterer count --- the missing scatterers were single}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{1.0}
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\seedtag}{pkB}
+  \begin{tabular}{@{}l cccccc@{}}
+    \toprule
+    & \multicolumn{6}{c@{}}{paired curve term} \\
+    \cmidrule(l){2-7}
+    metric & none & L1 $w{=}1$ & Charb.\ $w{=}1$ & cos.\ $w{=}0.01$ & cos.\ $w{=}0.5$ & cos.\ $w{=}1$ \\
+    \midrule
+    precision $\uparrow$ & \seedpm{0.912}{.007} & \seedpm{0.917}{.009} & \seedpm{0.915}{.012} & \seedpm{\textbf{0.918}}{.007} & \seedpm{0.883}{.010} & \seedpm{\hlval{accent}{0.867}}{.009} \\
+    \quad $k{=}1$ & \seedpm{0.936}{.005} & \seedpm{0.934}{.013} & \seedpm{0.931}{.019} & \seedpm{\textbf{0.940}}{.005} & \seedpm{0.901}{.011} & \seedpm{0.883}{.012} \\
+    \quad $k{=}2$ & \seedpm{0.908}{.009} & \seedpm{0.912}{.006} & \seedpm{0.913}{.006} & \seedpm{0.910}{.008} & \seedpm{0.888}{.009} & \seedpm{0.877}{.006} \\
+    \quad $k{=}3$ & \seedpm{0.855}{.018} & \seedpm{0.863}{.008} & \seedpm{\textbf{0.866}}{.009} & \seedpm{0.860}{.017} & \seedpm{0.834}{.009} & \seedpm{0.824}{.002} \\
+    \quad $k{=}4$ & \seedpm{0.790}{.030} & \seedpm{0.808}{.014} & \seedpm{\textbf{0.812}}{.014} & \seedpm{0.792}{.027} & \seedpm{0.754}{.015} & \seedpm{0.742}{.005} \\
+    \quad $k{=}5$ & \seedpm{0.751}{.037} & \seedpm{0.779}{.018} & \seedpm{\textbf{0.781}}{.018} & \seedpm{0.743}{.034} & \seedpm{0.697}{.021} & \seedpm{0.679}{.018} \\
+    \addlinespace
+    recall $\uparrow$ & \seedpm{0.669}{.013} & \seedpm{0.801}{.006} & \seedpm{0.794}{.015} & \seedpm{0.813}{.003} & \seedpm{0.837}{.003} & \seedpm{\textbf{0.843}}{.001} \\
+    \quad $k{=}1$ & \seedpm{0.759}{.024} & \seedpm{0.975}{.006} & \seedpm{0.962}{.029} & \seedpm{\hlval{good}{0.995}}{.001} & \seedpm{\textbf{0.997}}{.000} & \seedpm{\textbf{0.997}}{.000} \\
+    \quad $k{=}2$ & \seedpm{0.708}{.008} & \seedpm{0.749}{.013} & \seedpm{0.748}{.009} & \seedpm{0.746}{.005} & \seedpm{0.813}{.007} & \seedpm{\textbf{0.832}}{.004} \\
+    \quad $k{=}3$ & \seedpm{0.511}{.004} & \seedpm{0.529}{.007} & \seedpm{0.530}{.003} & \seedpm{0.528}{.004} & \seedpm{0.565}{.004} & \seedpm{\textbf{0.576}}{.002} \\
+    \quad $k{=}4$ & \seedpm{0.362}{.010} & \seedpm{0.371}{.007} & \seedpm{0.373}{.005} & \seedpm{0.380}{.007} & \seedpm{0.406}{.005} & \seedpm{\textbf{0.413}}{.003} \\
+    \quad $k{=}5$ & \seedpm{0.246}{.015} & \seedpm{0.249}{.009} & \seedpm{0.251}{.008} & \seedpm{0.274}{.010} & \seedpm{0.306}{.010} & \seedpm{\textbf{0.308}}{.005} \\
+    \addlinespace
+    \multicolumn{7}{@{}l}{\emph{count acc $\mid$ pred $k$ $\uparrow$}} \\
+    \quad pred $k{=}1$ & \seedpm{0.884}{.004} & \seedpm{0.910}{.002} & \seedpm{0.906}{.008} & \seedpm{0.900}{.004} & \seedpm{0.937}{.005} & \seedpm{\textbf{0.950}}{.006} \\
+    \quad pred $k{=}2$ & \seedpm{\textbf{0.501}}{.004} & \seedpm{0.483}{.017} & \seedpm{0.480}{.023} & \seedpm{0.482}{.010} & \seedpm{0.460}{.010} & \seedpm{0.448}{.013} \\
+    \quad pred $k{=}3$ & \seedpm{0.243}{.007} & \seedpm{\textbf{0.253}}{.014} & \seedpm{0.250}{.034} & \seedpm{0.220}{.017} & \seedpm{0.211}{.028} & \seedpm{0.208}{.035} \\
+    \quad pred $k{=}4$ & \seedpm{0.196}{.012} & \seedpm{0.217}{.025} & \seedpm{\textbf{0.227}}{.034} & \seedpm{0.200}{.008} & \seedpm{0.201}{.013} & \seedpm{0.207}{.012} \\
+    \quad pred $k{=}5$ & \seedpm{0.216}{.020} & \seedpm{0.226}{.062} & \seedpm{0.192}{.036} & \seedpm{0.194}{.038} & \seedpm{0.204}{.033} & \seedpm{\textbf{0.259}}{.111} \\
+    \bottomrule
+    \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}5$ $\cdot$ presence A $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ $\cdot$ fixed routing (full stack $\to$ both trunks) $\cdot$ parity twins. Column $=$ paired curve term at its weight $w$; none $=$ param-L1 alone. All precision / recall rows matched (Hungarian pairing); cells mean $\pm$ seed std over five seeded replicas; held-out test; $k$ $=$ true scatterer count of the pixel. \textbf{bold} $=$ best in row past $5\%$. \textcolor{good}{Green}: the baseline's misses were mostly single scatterers --- $k{=}1$ recall 0.759 $\to$ 0.995 at trace-weight cosine (0.975/0.962 for the magnitude terms at $w{=}1$); the deep rungs move far less ($k{=}5$ 0.246 $\to$ 0.308, heavy cosine only). \textcolor{accent}{Red} $=$ the full-weight cosine precision price. Claimed counts $\geq 2$ stay unreliable in every arm (pred-2 accuracy $\leq$ 0.50). Precision rewards under-prediction --- rank on recall. count acc $\mid$ pred $k$: share of pixels claiming exactly $k$ scatterers whose true count is $k$.\par}
+\end{frame}
+
+% ---------------------------------------------------------------- 25af Pair at K=5: component errors
+\begin{frame}{The $K{=}5$ pair components --- magnitude pairs localise, heavy cosine pays position}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{1.0}
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\seedtag}{pkC}
+  \begin{tabular}{@{}l cccccc@{}}
+    \toprule
+    & \multicolumn{6}{c@{}}{paired curve term} \\
+    \cmidrule(l){2-7}
+    metric & none & L1 $w{=}1$ & Charb.\ $w{=}1$ & cos.\ $w{=}0.01$ & cos.\ $w{=}0.5$ & cos.\ $w{=}1$ \\
+    \midrule
+    $\mu$ MAE $\downarrow$ & \seedpm{1.21}{.07} & \seedpm{\hlval{good}{\textbf{1.10}}}{.04} & \seedpm{\hlval{good}{\textbf{1.10}}}{.04} & \seedpm{1.13}{.05} & \seedpm{1.33}{.06} & \seedpm{\hlval{accent}{1.42}}{.06} \\
+    \quad $k{=}1$ & \seedpm{0.47}{.02} & \seedpm{0.45}{.02} & \seedpm{0.46}{.03} & \seedpm{0.46}{.02} & \seedpm{0.46}{.01} & \seedpm{0.47}{.01} \\
+    \quad $k{=}2$ & \seedpm{1.83}{.05} & \seedpm{1.84}{.08} & \seedpm{\textbf{1.82}}{.03} & \seedpm{1.92}{.07} & \seedpm{2.07}{.11} & \seedpm{2.14}{.11} \\
+    \quad $k{=}3$ & \seedpm{\textbf{2.60}}{.13} & \seedpm{2.81}{.14} & \seedpm{2.71}{.08} & \seedpm{2.67}{.14} & \seedpm{3.33}{.21} & \seedpm{3.69}{.19} \\
+    \quad $k{=}4$ & \seedpm{3.56}{.40} & \seedpm{3.50}{.25} & \seedpm{\textbf{3.38}}{.16} & \seedpm{3.60}{.30} & \seedpm{4.42}{.27} & \seedpm{4.88}{.21} \\
+    \quad $k{=}5$ & \seedpm{4.11}{.56} & \seedpm{3.71}{.30} & \seedpm{\textbf{3.64}}{.30} & \seedpm{4.17}{.48} & \seedpm{4.96}{.33} & \seedpm{5.43}{.46} \\
+    \addlinespace
+    $\sigma$ MAE $\downarrow$ & \seedpm{0.61}{.02} & \seedpm{\textbf{0.57}}{.01} & \seedpm{\textbf{0.57}}{.01} & \seedpm{0.58}{.01} & \seedpm{0.62}{.01} & \seedpm{0.64}{.01} \\
+    \quad $k{=}1$ & \seedpm{0.27}{.01} & \seedpm{0.26}{.01} & \seedpm{0.26}{.01} & \seedpm{0.27}{.01} & \seedpm{\textbf{0.24}}{.00} & \seedpm{0.25}{.00} \\
+    \quad $k{=}2$ & \seedpm{\textbf{0.88}}{.01} & \seedpm{0.89}{.01} & \seedpm{0.90}{.01} & \seedpm{0.90}{.01} & \seedpm{0.94}{.01} & \seedpm{0.97}{.02} \\
+    \quad $k{=}3$ & \seedpm{\textbf{1.34}}{.03} & \seedpm{1.40}{.01} & \seedpm{1.40}{.01} & \seedpm{1.38}{.02} & \seedpm{1.49}{.01} & \seedpm{1.54}{.03} \\
+    \quad $k{=}4$ & \seedpm{\textbf{1.70}}{.05} & \seedpm{1.78}{.03} & \seedpm{1.78}{.03} & \seedpm{1.80}{.03} & \seedpm{1.95}{.03} & \seedpm{2.02}{.06} \\
+    \quad $k{=}5$ & \seedpm{\textbf{1.88}}{.08} & \seedpm{2.00}{.04} & \seedpm{2.00}{.06} & \seedpm{2.09}{.03} & \seedpm{2.28}{.05} & \seedpm{2.39}{.11} \\
+    \addlinespace
+    $a$ MAE $\downarrow$ & \seedpm{0.213}{.005} & \seedpm{0.204}{.006} & \seedpm{0.206}{.009} & \seedpm{\hlval{good}{\textbf{0.168}}}{.003} & \seedpm{0.190}{.007} & \seedpm{0.203}{.006} \\
+    \quad $k{=}1$ & \seedpm{0.079}{.004} & \seedpm{0.065}{.004} & \seedpm{0.067}{.005} & \seedpm{\textbf{0.057}}{.003} & \seedpm{0.064}{.006} & \seedpm{0.066}{.003} \\
+    \quad $k{=}2$ & \seedpm{0.387}{.011} & \seedpm{0.417}{.011} & \seedpm{0.417}{.017} & \seedpm{\textbf{0.351}}{.007} & \seedpm{0.372}{.010} & \seedpm{0.392}{.013} \\
+    \quad $k{=}3$ & \seedpm{0.455}{.011} & \seedpm{0.522}{.013} & \seedpm{0.524}{.022} & \seedpm{\textbf{0.421}}{.009} & \seedpm{0.459}{.010} & \seedpm{0.495}{.013} \\
+    \quad $k{=}4$ & \seedpm{0.479}{.012} & \seedpm{0.561}{.011} & \seedpm{0.566}{.023} & \seedpm{\textbf{0.432}}{.013} & \seedpm{0.472}{.013} & \seedpm{0.510}{.015} \\
+    \quad $k{=}5$ & \seedpm{0.465}{.016} & \seedpm{0.539}{.012} & \seedpm{0.540}{.039} & \seedpm{\textbf{0.379}}{.016} & \seedpm{0.391}{.018} & \seedpm{0.418}{.024} \\
+    \bottomrule
+    \end{tabular}
+  \par\vspace{3pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}5$ $\cdot$ presence A $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ $\cdot$ fixed routing (full stack $\to$ both trunks) $\cdot$ parity twins. Column $=$ paired curve term at its weight $w$; none $=$ param-L1 alone. Cells mean $\pm$ seed std over five seeded replicas; held-out test; $k$ $=$ true scatterer count of the pixel; component errors over matched pairs only --- an arm that recalls more matches a harder pool, so read this frame with the recall frame. \textbf{bold} $=$ best in row past $5\%$. \textcolor{good}{Green} $=$ the magnitude pairs cut $\mu$ despite matching far more pairs ($\mu$ 1.21 $\to$ 1.10, ${\approx}2\times$ noise), and trace-weight cosine takes amplitude on every rung ($a$ MAE 0.213 $\to$ 0.168). \textcolor{accent}{Red} $=$ heavy cosine pays position: $\mu$ 1.42 overall, 2.60 $\to$ 3.69 at $k{=}3$ --- the ladder steepens as $w$ grows. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
+\end{frame}
+
+% ---------------------------------------------------------------- 25ag Pair at K=5: predicted stats vs GT
+\begin{frame}{The $K{=}5$ pair, predicted statistics --- slot 0 comes back on}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{0.78}
+  \setlength{\tabcolsep}{4pt}
+  \renewcommand{\seedtag}{pkD}
+  \begin{tabular}{@{}l !{\color{white}\vrule width 2pt} c !{\color{white}\vrule width 2pt} cccccc@{}}
+    \toprule
+    & & \multicolumn{6}{c@{}}{paired curve term} \\
+    \cmidrule(l){3-8}
+    mean & \textcolor{good}{GT} & none & L1 $w{=}1$ & Charb.\ $w{=}1$ & cos.\ $w{=}0.01$ & cos.\ $w{=}0.5$ & cos.\ $w{=}1$ \\
+    \midrule
+    \multicolumn{8}{@{}l}{\textcolor{soft}{\emph{predicted active fraction --- share of pixels where the slot fires}}} \\
+    \; slot 0 & 1.000 & \seedpm{0.756}{.018} & \seedpm{0.930}{.011} & \seedpm{0.921}{.022} & \seedpm{\hlval{good}{0.948}}{.007} & \seedpm{0.964}{.003} & \seedpm{\textbf{0.967}}{.001} \\
+    \; slot 1 & 0.239 & \seedpm{0.177}{.010} & \seedpm{0.183}{.011} & \seedpm{0.184}{.012} & \seedpm{0.191}{.012} & \seedpm{\textbf{0.228}}{.021} & \seedpm{0.218}{.015} \\
+    \; slot 2 & 0.085 & \seedpm{0.043}{.009} & \seedpm{0.049}{.018} & \seedpm{0.048}{.016} & \seedpm{0.049}{.017} & \seedpm{0.073}{.024} & \seedpm{\textbf{0.084}}{.035} \\
+    \; slot 3 & 0.035 & \seedpm{0.020}{.014} & \seedpm{0.026}{.019} & \seedpm{0.024}{.020} & \seedpm{0.017}{.013} & \seedpm{0.019}{.009} & \seedpm{\textbf{0.037}}{.027} \\
+    \; slot 4 & 0.015 & \seedpm{0.012}{.010} & \seedpm{0.014}{.013} & \seedpm{\textbf{0.015}}{.013} & \seedpm{0.012}{.013} & \seedpm{0.019}{.018} & \seedpm{0.029}{.031} \\
+    \addlinespace[1.5pt]
+    \multicolumn{8}{@{}l}{\textcolor{soft}{\emph{$a$ --- predicted mean over GT-active pixels}}} \\
+    \; slot 0 & 0.84 & \seedpm{0.92}{.03} & \seedpm{0.76}{.02} & \seedpm{0.77}{.02} & \seedpm{0.77}{.01} & \seedpm{0.75}{.01} & \seedpm{0.76}{.01} \\
+    \; slot 1 & 1.67 & \seedpm{1.79}{.02} & \seedpm{1.59}{.05} & \seedpm{1.61}{.04} & \seedpm{\textbf{1.70}}{.05} & \seedpm{1.51}{.04} & \seedpm{1.43}{.07} \\
+    \; slot 2 & 1.40 & \seedpm{1.68}{.08} & \seedpm{1.50}{.06} & \seedpm{1.51}{.04} & \seedpm{1.70}{.11} & \seedpm{1.38}{.08} & \seedpm{\textbf{1.41}}{.09} \\
+    \; slot 3 & 0.96 & \seedpm{1.08}{.15} & \seedpm{1.09}{.09} & \seedpm{1.10}{.05} & \seedpm{1.10}{.17} & \seedpm{0.84}{.10} & \seedpm{\textbf{0.88}}{.12} \\
+    \; slot 4 & 0.65 & \seedpm{\textbf{0.59}}{.08} & \seedpm{0.45}{.07} & \seedpm{0.49}{.04} & \seedpm{0.47}{.10} & \seedpm{0.29}{.01} & \seedpm{0.25}{.06} \\
+    \addlinespace[1.5pt]
+    \multicolumn{8}{@{}l}{\textcolor{soft}{\emph{$a$ --- predicted mean over GT-inactive pixels (leakage)}}} \\
+    \; slot 1 & 0.00 & \seedpm{0.78}{.58} & \seedpm{0.43}{.50} & \seedpm{0.44}{.50} & \seedpm{0.86}{.71} & \seedpm{0.66}{.38} & \seedpm{\textbf{0.32}}{.35} \\
+    \; slot 2 & 0.00 & \seedpm{1.16}{.77} & \seedpm{0.87}{.67} & \seedpm{0.98}{.69} & \seedpm{0.90}{.62} & \seedpm{0.79}{.46} & \seedpm{\textbf{0.69}}{.42} \\
+    \; slot 3 & 0.00 & \seedpm{0.86}{.59} & \seedpm{0.70}{.67} & \seedpm{0.73}{.62} & \seedpm{0.52}{.66} & \seedpm{\textbf{0.51}}{.32} & \seedpm{0.59}{.39} \\
+    \; slot 4 & 0.00 & \seedpm{0.58}{.60} & \seedpm{0.58}{.62} & \seedpm{0.57}{.61} & \seedpm{0.42}{.55} & \seedpm{\textbf{0.34}}{.48} & \seedpm{0.43}{.45} \\
+    \addlinespace[1.5pt]
+    \multicolumn{8}{@{}l}{\textcolor{soft}{\emph{distribution width --- std over GT-active pixels}}} \\
+    \; $a$ --- slot 0 & 1.59 & \seedpm{\textbf{1.48}}{.04} & \seedpm{1.39}{.05} & \seedpm{1.39}{.03} & \seedpm{1.41}{.03} & \seedpm{1.36}{.04} & \seedpm{1.36}{.04} \\
+    \; $\mu$ --- slot 0 & 3.02 & \seedpm{2.52}{.03} & \seedpm{2.42}{.06} & \seedpm{2.44}{.05} & \seedpm{2.43}{.06} & \seedpm{2.53}{.05} & \seedpm{2.46}{.07} \\
+    \; $\sigma$ --- slot 0 & 1.72 & \seedpm{1.06}{.04} & \seedpm{1.05}{.04} & \seedpm{1.08}{.04} & \seedpm{1.06}{.06} & \seedpm{\textbf{1.16}}{.03} & \seedpm{\textbf{1.16}}{.06} \\
+    \; $a$ --- slot 1 & 1.60 & \seedpm{1.40}{.03} & \seedpm{1.35}{.02} & \seedpm{1.36}{.03} & \seedpm{\textbf{1.44}}{.04} & \seedpm{1.42}{.03} & \seedpm{1.39}{.06} \\
+    \; $\mu$ --- slot 1 & 11.08 & \seedpm{8.85}{.26} & \seedpm{8.58}{.18} & \seedpm{8.59}{.32} & \seedpm{8.81}{.27} & \seedpm{8.93}{.28} & \seedpm{8.76}{.20} \\
+    \; $\sigma$ --- slot 1 & 2.30 & \seedpm{1.44}{.04} & \seedpm{1.62}{.04} & \seedpm{1.60}{.04} & \seedpm{1.46}{.02} & \seedpm{1.62}{.02} & \seedpm{\textbf{1.71}}{.05} \\
+    \bottomrule
+    \end{tabular}
+  \par\vspace{2pt}
+  \parbox{0.82\textwidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}5$ $\cdot$ presence A $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ $\cdot$ fixed routing (full stack $\to$ both trunks) $\cdot$ parity twins. Column $=$ paired curve term at its weight $w$; none $=$ param-L1 alone. Five seeded replicas per arm, cells mean $\pm$ seed std; means conditioned on the slot's GT activity mask. \textbf{bold} $=$ closest to the \textcolor{good}{GT} column, marked only where best and worst differ by more than $5\%$. \textcolor{good}{Green} $=$ the wake-up: slot 0 fires on 0.756 of pixels under param-L1 alone and on 0.948 with the trace-weight cosine term (0.96--0.97 at heavier $w$, GT 1.000); slot-1 activity climbs toward the GT (0.177 $\to$ 0.218--0.228 vs 0.239) and the slot-0 amplitude bias clears (0.92 $\to$ 0.75--0.77 vs GT 0.84). Deep-slot activity stays under the GT in every arm --- the wake-up is a slot-0/1 story. Width rows: std of the prediction over GT-active pixels vs the GT's own std, shown for slots 0--1 (tail slots in the report). $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
+\end{frame}
