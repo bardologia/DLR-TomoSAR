@@ -719,6 +719,98 @@
   \end{columns}
 \end{frame}
 
+% pair-winner results table (short deck only)
+\begin{frame}{The pair winner, measured: param-L1 + 0.5 cosine}
+  \begin{columns}[c]
+    \begin{column}{0.42\textwidth}
+      \footnotesize
+      \begin{itemize}\setlength{\itemsep}{7pt}
+        \item[\textcolor{argA}{$\blacksquare$}] \textbf{Shape is what it buys}: profile cosine $+0.007$, all three SSIM axes up, peak error $1.29 \to 1.20$: the gains that make it \#1 of the 16 pair arms (grouped score 0.886; the param-L1 baseline ranks 9th).
+        \item[\textcolor{argC}{$\blacksquare$}] \textbf{Detection follows}: matched recall $+0.011$ overall, $+0.022$ on the hard two-scatterer pixels; the detector turns more liberal, so precision gives back $0.014$ and F1 ties.
+        \item[\textcolor{argB}{$\blacksquare$}] \textbf{The price sits in the components}: matched $\mu$, $\sigma$ and $a$ errors all worsen slightly: the curve term pulls capacity toward shape.
+        \item[\textcolor{soft}{$\blacksquare$}] $w$ changes what the training loss measures: arms compare on held-out metrics only, never on the loss.
+      \end{itemize}
+    \end{column}
+    \begin{column}{0.55\textwidth}
+      \centering
+      \scriptsize
+      \renewcommand{\arraystretch}{1.05}
+      \setlength{\tabcolsep}{3.5pt}
+      \renewcommand{\seedtag}{pw}
+      \begin{tabular}{@{}l c c r@{}}
+        \toprule
+        metric & param-L1 alone & $+\,0.5$ cosine & $\Delta$ \\
+        \midrule
+        curve $R^2$ $\uparrow$ & \seedpm{0.748}{.010} & \seedpm{0.754}{.008} & \textcolor{soft}{$+0.006$} \\
+        PSNR (dB) $\uparrow$ & \seedpm{52.65}{.17} & \seedpm{52.76}{.15} & \textcolor{soft}{$+0.11$} \\
+        \rowcolor{argA!14} cosine $\uparrow$ & \seedpm{0.930}{.003} & \seedpm{\textbf{0.937}}{.002} & \textcolor{good}{$+0.007$} \\
+        \rowcolor{argA!14} SSIM elev $\uparrow$ & \seedpm{0.9669}{.0001} & \seedpm{\textbf{0.9675}}{.0002} & \textcolor{good}{$+0.0006$} \\
+        \rowcolor{argA!14} SSIM range $\uparrow$ & \seedpm{0.9514}{.0004} & \seedpm{\textbf{0.9518}}{.0002} & \textcolor{good}{$+0.0005$} \\
+        \rowcolor{argA!14} SSIM azim $\uparrow$ & \seedpm{0.9609}{.0002} & \seedpm{\textbf{0.9616}}{.0002} & \textcolor{good}{$+0.0007$} \\
+        \rowcolor{argA!14} peak err $\downarrow$ & \seedpm{1.294}{.027} & \seedpm{\textbf{1.205}}{.005} & \textcolor{good}{$-0.089$} \\
+        \addlinespace[2pt]
+        \rowcolor{argC!14} matched recall $\uparrow$ & \seedpm{0.891}{.003} & \seedpm{\textbf{0.902}}{.002} & \textcolor{good}{$+0.011$} \\
+        \rowcolor{argC!14} \quad 2-scatterer $\uparrow$ & \seedpm{0.742}{.006} & \seedpm{\textbf{0.764}}{.005} & \textcolor{good}{$+0.022$} \\
+        \rowcolor{argC!14} matched precision $\uparrow$ & \seedpm{\textbf{0.905}}{.003} & \seedpm{0.891}{.008} & \textcolor{accent}{$-0.014$} \\
+        matched F1 $\uparrow$ & \seedpm{0.898}{.002} & \seedpm{0.897}{.004} & \textcolor{soft}{$-0.001$} \\
+        count exact $\uparrow$ & \seedpm{0.910}{.004} & \seedpm{0.906}{.010} & \textcolor{soft}{$-0.005$} \\
+        \addlinespace[2pt]
+        \rowcolor{argB!14} matched $\mu$ MAE $\downarrow$ & \seedpm{\textbf{1.594}}{.019} & \seedpm{1.691}{.036} & \textcolor{accent}{$+0.097$} \\
+        \rowcolor{argB!14} matched $\sigma$ MAE $\downarrow$ & \seedpm{\textbf{0.690}}{.008} & \seedpm{0.765}{.005} & \textcolor{accent}{$+0.075$} \\
+        \rowcolor{argB!14} matched $a$ MAE $\downarrow$ & \seedpm{\textbf{0.178}}{.002} & \seedpm{0.183}{.003} & \textcolor{accent}{$+0.005$} \\
+        \bottomrule
+      \end{tabular}
+      \par\vspace{3pt}
+      \parbox{0.95\linewidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}2$ $\cdot$ hv flips $\cdot$ presence A $\cdot$ full stack $\to$ both trunks $\cdot$ param-L1 ($+\,w\,$cosine curve $=$ column); five seeded replicas, held-out band, cells mean $\pm$ seed std. $\Delta$ coloured only past the combined seed noise $\sqrt{s_1^2+s_2^2}$ (grey $=$ within noise); \textbf{bold} $=$ better arm on such rows. SSIM at 4 decimals (spreads $\le 0.0004$); peak err, $\mu$, $\sigma$ in elevation units, $a$ in linear amplitude; shading keys each row to its like-coloured bullet.\par}
+    \end{column}
+  \end{columns}
+\end{frame}
+
+% qualitative slices (short deck only)
+\begin{frame}{What the network reconstructs: range cut 1232}
+  \centering
+  \makebox[\textwidth][c]{%
+    \begin{minipage}[t]{0.345\textwidth}
+      \centering
+      {\small\textbf{\textcolor{soft}{full-tomogram}}}\\[3pt]
+      \includegraphics[width=\linewidth]{../figures/K2/short_deck_slices/rg1232/range_full_normalized.png}
+    \end{minipage}\hspace{3pt}%
+    \begin{minipage}[t]{0.345\textwidth}
+      \centering
+      {\small\textbf{\textcolor{good}{GT (Gaussian)}}}\\[3pt]
+      \includegraphics[width=\linewidth]{../figures/K2/short_deck_slices/rg1232/range_gt_normalized.png}
+    \end{minipage}\hspace{3pt}%
+    \begin{minipage}[t]{0.345\textwidth}
+      \centering
+      {\small\textbf{\textcolor{accent}{prediction}}}\\[3pt]
+      \includegraphics[width=\linewidth]{../figures/K2/short_deck_slices/rg1232/range_pred_normalized.png}
+    \end{minipage}}
+  \vspace{7pt}
+  \parbox{0.90\textwidth}{\scriptsize\color{soft} Constant-range cut $\mathrm{rg}=1232$ through the cube: azimuth on the horizontal axis, elevation on the vertical, every azimuth column normalised to its own peak. \textbf{Left}: the raw full-stack Capon tomogram the labels are fitted from, elevation in inversion-grid bins. \textbf{Middle}: the Gaussian mixture re-synthesised from the GT parameters, $z\in[-20,80]$\,m. \textbf{Right}: the same mixture re-synthesised from the pair winner's predicted parameters (param-L1 $+\,0.5$ cosine).\par}
+\end{frame}
+
+\begin{frame}{What the network reconstructs: range cut 3377}
+  \centering
+  \makebox[\textwidth][c]{%
+    \begin{minipage}[t]{0.345\textwidth}
+      \centering
+      {\small\textbf{\textcolor{soft}{full-tomogram}}}\\[3pt]
+      \includegraphics[width=\linewidth]{../figures/K2/short_deck_slices/rg3377/range_full_normalized.png}
+    \end{minipage}\hspace{3pt}%
+    \begin{minipage}[t]{0.345\textwidth}
+      \centering
+      {\small\textbf{\textcolor{good}{GT (Gaussian)}}}\\[3pt]
+      \includegraphics[width=\linewidth]{../figures/K2/short_deck_slices/rg3377/range_gt_normalized.png}
+    \end{minipage}\hspace{3pt}%
+    \begin{minipage}[t]{0.345\textwidth}
+      \centering
+      {\small\textbf{\textcolor{accent}{prediction}}}\\[3pt]
+      \includegraphics[width=\linewidth]{../figures/K2/short_deck_slices/rg3377/range_pred_normalized.png}
+    \end{minipage}}
+  \vspace{7pt}
+  \parbox{0.90\textwidth}{\scriptsize\color{soft} The second cut, $\mathrm{rg}=3377$, same three panels: raw full-stack tomogram in inversion-grid bins, GT re-synthesis and prediction re-synthesis in $z\in[-20,80]$\,m, per-column peak normalisation.\par}
+\end{frame}
+
 % next-steps agenda (short deck only)
 \begin{frame}{Next steps}
   \begin{itemize}\setlength{\itemsep}{16pt}
