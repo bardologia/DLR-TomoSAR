@@ -518,6 +518,89 @@
 
 \end{frame}
 
+% encoder-block comparison (short deck only)
+\begin{frame}{One encoder block: UNet vs UNet-skip vs ResUNet}
+  \begin{columns}[T]
+    \begin{column}{0.32\textwidth}
+      \centering
+      \begin{tikzpicture}[font=\scriptsize]
+        \node[font=\small\bfseries] at (0.55,3.65) {UNet};
+        \node[font=\tiny,text=soft] at (0.55,3.30) {board, L1-curve: 0.760};
+        \node[font=\scriptsize] at (0.3,2.95) {$x$};
+        \node[gate,minimum width=17mm] (c1) at (0.3,2.45) {Conv $3{\times}3$};
+        \node[gate,minimum width=17mm,minimum height=3.5mm,font=\tiny] (n1) at (0.3,2.03) {Norm};
+        \node[gate,minimum width=17mm,minimum height=3.5mm,font=\tiny] (a1) at (0.3,1.61) {Act};
+        \node[gate,minimum width=17mm] (c2) at (0.3,1.19) {Conv $3{\times}3$};
+        \node[gate,minimum width=17mm,minimum height=3.5mm,font=\tiny] (n2) at (0.3,0.77) {Norm};
+        \node[gate,minimum width=17mm,minimum height=3.5mm,font=\tiny] (a2) at (0.3,0.35) {Act};
+        \node[gate,minimum width=17mm] (pool) at (0.3,-0.95) {MaxPool $2{\times}2$ $\downarrow 2$};
+        \draw[flow,soft] (0.3,2.82) -- (c1.north);
+        \draw[flow,soft] (c1.south) -- (n1.north);
+        \draw[flow,soft] (a1.south) -- (c2.north);
+        \draw[flow,soft] (c2.south) -- (n2.north);
+        \draw[flow,soft] (a2.south) -- (pool.north);
+        \draw[flow,soft] (pool.south) -- (0.3,-1.75);
+        \node[font=\tiny,text=soft,align=center] at (0.55,-2.15) {plain double conv, no shortcut;\\downsampling by max-pool};
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.32\textwidth}
+      \centering
+      \begin{tikzpicture}[font=\scriptsize]
+        \node[font=\small\bfseries] at (0.55,3.65) {UNet-skip};
+        \node[font=\tiny,text=soft] at (0.55,3.30) {board, L1-curve: 0.983};
+        \node[font=\scriptsize] at (0.3,2.95) {$x$};
+        \node[gate,draw=accent!70,minimum width=17mm,minimum height=3.5mm,font=\tiny] (n0) at (0.3,2.45) {Norm};
+        \node[gate,draw=accent!70,minimum width=17mm,minimum height=3.5mm,font=\tiny] (a0) at (0.3,2.10) {Act};
+        \node[gate,minimum width=17mm] (c1) at (0.3,1.61) {Conv $3{\times}3$};
+        \node[gate,minimum width=17mm,minimum height=3.5mm,font=\tiny] (n1) at (0.3,1.19) {Norm};
+        \node[gate,minimum width=17mm,minimum height=3.5mm,font=\tiny] (a1) at (0.3,0.77) {Act};
+        \node[gate,minimum width=17mm] (c2) at (0.3,0.35) {Conv $3{\times}3$};
+        \node[circle,draw=accent,inner sep=1.2pt,font=\scriptsize] (add) at (0.3,-0.25) {$+$};
+        \node[gate,minimum width=17mm] (pool) at (0.3,-0.95) {MaxPool $2{\times}2$ $\downarrow 2$};
+        \draw[flow,soft] (0.3,2.82) -- (n0.north);
+        \draw[flow,soft] (a0.south) -- (c1.north);
+        \draw[flow,soft] (c1.south) -- (n1.north);
+        \draw[flow,soft] (a1.south) -- (c2.north);
+        \draw[flow,soft] (c2.south) -- (add.north);
+        \draw[flow,soft] (add.south) -- (pool.north);
+        \draw[flow,soft] (pool.south) -- (0.3,-1.75);
+        \node[gate,draw=accent!70,text=accent,font=\tiny,minimum height=3.5mm] (sc) at (1.78,1.19) {$1{\times}1$ conv};
+        \draw[accent!80,thick,-{Stealth[length=1.8mm]}] (0.3,2.88) -| (1.78,1.45);
+        \draw[accent!80,thick,-{Stealth[length=1.8mm]}] (sc.south) |- (add.east);
+        \node[font=\tiny,text=soft,align=center] at (0.55,-2.15) {pre-activation + \textcolor{accent}{residual shortcut};\\max-pool kept};
+      \end{tikzpicture}
+    \end{column}
+    \begin{column}{0.32\textwidth}
+      \centering
+      \begin{tikzpicture}[font=\scriptsize]
+        \node[font=\small\bfseries] at (0.55,3.65) {ResUNet};
+        \node[font=\tiny,text=soft] at (0.55,3.30) {board, L1-curve: 0.930};
+        \node[font=\scriptsize] at (0.3,2.95) {$x$};
+        \node[gate,minimum width=17mm,minimum height=3.5mm,font=\tiny] (n0) at (0.3,2.45) {Norm};
+        \node[gate,minimum width=17mm,minimum height=3.5mm,font=\tiny] (a0) at (0.3,2.10) {Act};
+        \node[gate,draw=accent!70,minimum width=17mm] (c1) at (0.3,1.61) {Conv $3{\times}3$, \textcolor{accent}{stride 2}};
+        \node[gate,minimum width=17mm,minimum height=3.5mm,font=\tiny] (n1) at (0.3,1.19) {Norm};
+        \node[gate,minimum width=17mm,minimum height=3.5mm,font=\tiny] (a1) at (0.3,0.77) {Act};
+        \node[gate,minimum width=17mm] (c2) at (0.3,0.35) {Conv $3{\times}3$};
+        \node[circle,draw=accent,inner sep=1.2pt,font=\scriptsize] (add) at (0.3,-0.25) {$+$};
+        \node[gate,densely dashed,text=soft!70,minimum width=17mm] (ghost) at (1.78,-0.95) {MaxPool};
+        \draw[accent,semithick] (ghost.north west) -- (ghost.south east);
+        \draw[accent,semithick] (ghost.south west) -- (ghost.north east);
+        \draw[flow,soft] (0.3,2.82) -- (n0.north);
+        \draw[flow,soft] (a0.south) -- (c1.north);
+        \draw[flow,soft] (c1.south) -- (n1.north);
+        \draw[flow,soft] (a1.south) -- (c2.north);
+        \draw[flow,soft] (c2.south) -- (add.north);
+        \draw[flow,soft] (add.south) -- (0.3,-1.75);
+        \node[gate,draw=accent!70,text=accent,font=\tiny,minimum height=3.5mm] (sc) at (1.78,1.19) {$1{\times}1$, \textcolor{accent}{stride 2}};
+        \draw[accent!80,thick,-{Stealth[length=1.8mm]}] (0.3,2.88) -| (1.78,1.45);
+        \draw[accent!80,thick,-{Stealth[length=1.8mm]}] (sc.south) |- (add.east);
+        \node[font=\tiny,text=soft,align=center] at (0.55,-2.15) {downsampling inside the block:\\\textcolor{accent}{stride-2} conv and shortcut, no pooling\\(first stage keeps stride 1)};
+      \end{tikzpicture}
+    \end{column}
+  \end{columns}
+\end{frame}
+
 % full deck p.102 --- sections/12b_dual.tex
 \begin{frame}{The dual model --- two trunks, one head}
   \begin{columns}[c]
