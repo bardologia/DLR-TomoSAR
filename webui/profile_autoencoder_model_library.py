@@ -33,6 +33,23 @@ class ProfileAutoencoderModelLibrary(ModelDefaultsLibrary):
     FALLBACK_ACTIVATION    = "gelu"
     FALLBACK_NORMALIZATION = "none"
 
+    ARCH_EXCLUDED = ("profile_length", "encoder_lr", "decoder_lr", "encoder_wd", "decoder_wd")
+
+    ARCH_HINTS = {
+        "embedding_dim"   : "size of the latent embedding; a coupled JEPA backbone later predicts this vector per pixel",
+        "embedding_norm"  : "normalization applied to the embedding before the decoder and before JEPA matching",
+        "activation"      : "nonlinearity used throughout the encoder and decoder",
+        "init_mode"       : "weight initialization scheme; default keeps the PyTorch layer defaults",
+        "hidden_dim"      : "width of the hidden layers",
+        "depth"           : "number of stacked blocks or layers",
+        "dropout"         : "dropout probability inside the blocks",
+        "seq_channels"    : "channels of the 1D convolutional stack",
+        "seq_kernel_size" : "kernel size of the 1D convolutions along the profile",
+        "num_heads"       : "attention heads per transformer block",
+        "patch_size"      : "profile bins per token before the attention stack",
+        "bidirectional"   : "sweep the profile in both directions",
+    }
+
     def _families(self) -> list[dict]:
         return [
             {

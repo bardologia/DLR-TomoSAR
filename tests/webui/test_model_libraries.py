@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
+from dataclasses import fields as dataclass_fields
+from pathlib     import Path
 
 import pytest
 
@@ -113,6 +114,52 @@ def test_every_label_is_resolved_from_a_real_config(library_class, registry):
         for model in family["models"]:
             assert model["activation"],    f"{model['key']} has no activation label"
             assert model["normalization"], f"{model['key']} has no normalization label"
+
+
+@pytest.mark.parametrize("library_class,registry", REGISTERED)
+def test_arch_fields_cover_every_scalar_config_field(library_class, registry):
+    library = library_class()
+
+    for family in library.collect():
+        for model in family["models"]:
+            config_class = getattr(library.CONFIG_MODULE, library.CONFIG_CLASSES[model["key"]])
+            config       = config_class()
+            expected     = [spec.name for spec in dataclass_fields(config_class) if spec.name not in library.ARCH_EXCLUDED and isinstance(getattr(config, spec.name), (bool, int, float, str))]
+
+            assert [entry["name"] for entry in model["arch"]] == expected
+
+
+@pytest.mark.parametrize("library_class,registry", REGISTERED)
+def test_every_string_arch_option_list_contains_its_default(library_class, registry):
+    for family in library_class().collect():
+        for model in family["models"]:
+            for entry in model["arch"]:
+                if "options" in entry:
+                    assert str(entry["default"]) in entry["options"], f"{model['key']}.{entry['name']}"
+
+
+def test_the_profile_arch_exposes_the_embedding_and_hides_derived_and_lr_fields():
+    arch = {model["key"]: {entry["name"]: entry for entry in model["arch"]} for family in ProfileAutoencoderModelLibrary().collect() for model in family["models"]}
+    mlp  = profile_autoencoder.MlpAutoencoderConfig()
+
+    assert arch["mlp_ae"]["embedding_dim"]["default"] == mlp.embedding_dim
+    assert arch["mlp_ae"]["embedding_dim"]["presets"] == [16, 24, 32, 48]
+    assert arch["mlp_ae"]["embedding_norm"]["options"] == ["none", "l2", "layernorm"]
+    assert arch["mlp_ae"]["embedding_dim"]["hint"]
+
+    for key in arch:
+        assert "profile_length" not in arch[key]
+        assert "encoder_lr"     not in arch[key]
+        assert "decoder_wd"     not in arch[key]
+
+
+def test_the_image_arch_hides_only_the_dataset_derived_channels():
+    arch = {model["key"]: {entry["name"]: entry for entry in model["arch"]} for family in ImageAutoencoderModelLibrary().collect() for model in family["models"]}
+
+    for key in arch:
+        assert "in_channels" not in arch[key]
+        assert "encoder_lr"      in arch[key]
+        assert "embedding_dim"   in arch[key]
 
 
 class TempNoteLibrary(ModelNoteLibrary):

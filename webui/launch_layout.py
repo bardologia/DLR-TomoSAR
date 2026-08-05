@@ -489,23 +489,37 @@ class LaunchLayout:
         "ratio_trials.trials", "ratio_trials.match_tolerance",
     ]
 
-    JEPA_SECTION = {"key": "jepa", "title": "JEPA", "when": {"field": "training_type", "in": ["jepa"]}, "panels": [
-        {"kind": "fields", "title": "Autoencoder runs", "groups": [
-            {"title": "Profile autoencoder", "fields": [
-                "jepa.profile_autoencoder_logdir",
-                {"path": "jepa.profile_autoencoder_run", "widget": {"kind": "dataset", "mode": "runs", "baseFrom": "jepa.profile_autoencoder_logdir", "checkpointOnly": True}},
-                {"path": "jepa.profile_autoencoder_mode", "widget": CH_AE_MODE},
+    JEPA_COUPLING_NOTE  = "JEPA needs at least one autoencoder run. A profile autoencoder makes the backbone predict its embedding (embedding loss regime); without one the backbone predicts Gaussian parameters directly (param loss regime). An image autoencoder replaces the raw input stack with its encoded features in either regime. Embedding sizes and architecture come from the selected runs' saved configs."
+    JEPA_EMBEDDING_NOTE = "Shown because a profile autoencoder run is coupled: the backbone is trained to match the autoencoder's embedding of each ground-truth profile. The param loss is inactive in this regime."
+    JEPA_PARAM_NOTE     = "Shown because no profile autoencoder run is selected: the backbone predicts Gaussian parameters directly, exactly like backbone training. The embedding loss is inactive in this regime."
+
+    JEPA_SECTIONS = [
+        {"key": "jepa", "title": "JEPA", "when": {"field": "training_type", "in": ["jepa"]}, "panels": [
+            {"kind": "fields", "title": "Autoencoder runs", "note": JEPA_COUPLING_NOTE, "groups": [
+                {"title": "Profile autoencoder", "fields": [
+                    "jepa.profile_autoencoder_logdir",
+                    {"path": "jepa.profile_autoencoder_run", "widget": {"kind": "dataset", "mode": "runs", "baseFrom": "jepa.profile_autoencoder_logdir", "checkpointOnly": True}},
+                    {"gateOn": {"field": "jepa.profile_autoencoder_run", "set": True}, "fields": [
+                        {"path": "jepa.profile_autoencoder_mode", "widget": CH_AE_MODE},
+                        {"path": "jepa.target_provider", "widget": CH_PROVIDER},
+                    ]},
+                ]},
+                {"title": "Image autoencoder", "fields": [
+                    "jepa.image_autoencoder_logdir",
+                    {"path": "jepa.image_autoencoder_run", "widget": {"kind": "dataset", "mode": "runs", "baseFrom": "jepa.image_autoencoder_logdir", "checkpointOnly": True}},
+                    {"gateOn": {"field": "jepa.image_autoencoder_run", "set": True}, "fields": [
+                        {"path": "jepa.image_autoencoder_mode", "widget": CH_AE_MODE},
+                    ]},
+                ]},
             ]},
-            {"title": "Image autoencoder", "fields": [
-                "jepa.image_autoencoder_logdir",
-                {"path": "jepa.image_autoencoder_run", "widget": {"kind": "dataset", "mode": "runs", "baseFrom": "jepa.image_autoencoder_logdir", "checkpointOnly": True}},
-                {"path": "jepa.image_autoencoder_mode", "widget": CH_AE_MODE},
-            ]},
-            {"title": "Targets", "fields": [{"path": "jepa.target_provider", "widget": CH_PROVIDER}]},
         ]},
-        {"kind": "fields", "title": "Embedding loss", "template": "embedding_loss", "at": "jepa.embedding_loss"},
-        {"kind": "fields", "title": "Param loss", "template": "loss", "at": "jepa.param_loss"},
-    ]}
+        {"key": "jepa-embedding-loss", "title": "Embedding loss", "when": [{"field": "training_type", "in": ["jepa"]}, {"field": "jepa.profile_autoencoder_run", "set": True}], "panels": [
+            {"kind": "fields", "title": "Embedding loss", "note": JEPA_EMBEDDING_NOTE, "template": "embedding_loss", "at": "jepa.embedding_loss"},
+        ]},
+        {"key": "jepa-param-loss", "title": "Param loss", "when": [{"field": "training_type", "in": ["jepa"]}, {"field": "jepa.profile_autoencoder_run", "set": False}], "panels": [
+            {"kind": "fields", "title": "Param loss", "note": JEPA_PARAM_NOTE, "template": "loss", "at": "jepa.param_loss"},
+        ]},
+    ]
 
     INFER_BACKBONE_LAYOUT = {
         "essentials": INFER_ESSENTIALS,
@@ -684,6 +698,7 @@ class LaunchLayout:
             "sections": [
                 {"key": "model", "title": "Model", "panels": [
                     {"kind": "special", "panel": "model_card", "fields": ["ae_model_name"]},
+                    {"kind": "special", "panel": "arch_overrides", "modelFrom": "ae_model_name", "fields": ["model_overrides"]},
                     {"kind": "fields", "groups": [
                         {"title": "Learning rates", "fields": [
                             {"path": "encoder_lr", "widget": NUM_LR},
@@ -691,7 +706,6 @@ class LaunchLayout:
                             {"path": "encoder_wd", "widget": NUM_WD},
                             {"path": "decoder_wd", "widget": NUM_WD},
                         ]},
-                        {"title": "Architecture overrides", "fields": ["model_overrides"]},
                     ]},
                 ]},
                 {"key": "data", "title": "Data", "panels": [
@@ -725,7 +739,7 @@ class LaunchLayout:
             "sections": [
                 {"key": "model", "title": "Model", "panels": [
                     {"kind": "special", "panel": "model_card", "fields": ["ae_model_name"]},
-                    {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
+                    {"kind": "special", "panel": "arch_overrides", "modelFrom": "ae_model_name", "fields": ["model_overrides"]},
                 ]},
                 {"key": "data", "title": "Data", "panels": [
                     {"kind": "fields", "title": "Paths", "template": "paths_train", "at": "paths"},
@@ -753,21 +767,29 @@ class LaunchLayout:
                 {"key": "model", "title": "Model", "panels": [
                     {"kind": "special", "panel": "model_card", "fields": ["backbone_name", "backbone_head"]},
                     {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
-                    {"kind": "fields", "title": "Autoencoders", "groups": [
+                    {"kind": "fields", "title": "Autoencoders", "note": "JEPA needs at least one autoencoder run. A profile autoencoder makes the backbone predict its embedding (embedding loss regime); without one the backbone predicts Gaussian parameters directly (param loss regime). An image autoencoder replaces the raw input stack with its encoded features in either regime. Embedding sizes and architecture come from the selected runs' saved configs.", "groups": [
                         {"title": "Profile autoencoder", "fields": [
                             "profile_autoencoder_logdir",
                             {"path": "profile_autoencoder_run", "widget": {"kind": "dataset", "mode": "runs", "baseFrom": "profile_autoencoder_logdir", "checkpointOnly": True}},
-                            {"path": "profile_autoencoder_mode", "widget": CH_AE_MODE},
-                            {"path": "target_provider", "widget": CH_PROVIDER},
-                            "ae_finetune_lr",
-                            "ae_finetune_wd",
+                            {"gateOn": {"field": "profile_autoencoder_run", "set": True}, "fields": [
+                                {"path": "profile_autoencoder_mode", "widget": CH_AE_MODE},
+                                {"path": "target_provider", "widget": CH_PROVIDER},
+                                {"gateOn": {"field": "profile_autoencoder_mode", "in": ["finetune"]}, "fields": [
+                                    {"path": "ae_finetune_lr", "widget": NUM_LR},
+                                    {"path": "ae_finetune_wd", "widget": NUM_WD},
+                                ]},
+                            ]},
                         ]},
                         {"title": "Image autoencoder", "fields": [
                             "image_autoencoder_logdir",
                             {"path": "image_autoencoder_run", "widget": {"kind": "dataset", "mode": "runs", "baseFrom": "image_autoencoder_logdir", "checkpointOnly": True}},
-                            {"path": "image_autoencoder_mode", "widget": CH_AE_MODE},
-                            "image_ae_finetune_lr",
-                            "image_ae_finetune_wd",
+                            {"gateOn": {"field": "image_autoencoder_run", "set": True}, "fields": [
+                                {"path": "image_autoencoder_mode", "widget": CH_AE_MODE},
+                                {"gateOn": {"field": "image_autoencoder_mode", "in": ["finetune"]}, "fields": [
+                                    {"path": "image_ae_finetune_lr", "widget": NUM_LR},
+                                    {"path": "image_ae_finetune_wd", "widget": NUM_WD},
+                                ]},
+                            ]},
                         ]},
                     ]},
                 ]},
@@ -783,12 +805,14 @@ class LaunchLayout:
                     {"kind": "fields", "groups": [{"title": "Fan-out execution", "fields": ["poll_interval_s"]}]},
                     {"kind": "hidden", "fields": ["gpus_file"]},
                 ]},
-                {"key": "loss", "title": "Loss", "panels": [
-                    {"kind": "fields", "title": "Embedding loss", "template": "embedding_loss", "at": "embedding_loss"},
-                    {"kind": "fields", "title": "Param loss", "template": "loss", "at": "param_loss"},
+                {"key": "loss-embedding", "title": "Embedding loss", "when": {"field": "profile_autoencoder_run", "set": True}, "panels": [
+                    {"kind": "fields", "title": "Embedding loss", "note": JEPA_EMBEDDING_NOTE, "template": "embedding_loss", "at": "embedding_loss"},
+                ]},
+                {"key": "loss-param", "title": "Param loss", "when": {"field": "profile_autoencoder_run", "set": False}, "panels": [
+                    {"kind": "fields", "title": "Param loss", "note": JEPA_PARAM_NOTE, "template": "loss", "at": "param_loss"},
                 ]},
                 {"key": "geometry", "title": "Geometry", "panels": [
-                    {"kind": "fields", "title": "Physics geometry", "template": "geometry", "at": "geometry"},
+                    {"kind": "fields", "title": "Physics geometry", "note": "The height axis convention always shapes the dataset; the baselines and kz values only feed the physics loss terms, which JEPA uses in the param loss regime alone.", "template": "geometry", "at": "geometry"},
                 ]},
                 {"key": "inference", "title": "Inference", "panels": [
                     {"kind": "fields", "groups": [{"title": "After training", "fields": ["infer_after"]}]},
@@ -945,7 +969,7 @@ class LaunchLayout:
                         {"title": None, "fields": [{"path": "pixel_subsample", "widget": NUM_FRACTION}, {"path": "keep_empty_frac", "widget": NUM_FRACTION}]},
                     ]},
                 ]},
-                JEPA_SECTION,
+                *JEPA_SECTIONS,
                 {"key": "geometry", "title": "Geometry", "when": {"field": "training_type", "in": ["backbone", "jepa"]}, "panels": [
                     {"kind": "fields", "title": "Physics geometry", "template": "geometry", "at": "geometry"},
                 ]},
@@ -1002,7 +1026,7 @@ class LaunchLayout:
                         {"title": None, "fields": [{"path": "autoencoder.pixel_subsample", "widget": NUM_FRACTION}, {"path": "autoencoder.keep_empty_frac", "widget": NUM_FRACTION}]},
                     ]},
                 ]},
-                JEPA_SECTION,
+                *JEPA_SECTIONS,
                 {"key": "geometry", "title": "Geometry", "panels": [
                     {"kind": "fields", "title": "Physics geometry", "template": "geometry", "at": "geometry"},
                 ]},
@@ -1096,7 +1120,7 @@ class LaunchLayout:
                 {"key": "image-ae-loss", "title": "Image AE loss", "when": {"field": "training_type", "in": ["image_autoencoder"]}, "panels": [
                     {"kind": "fields", "title": "Image AE loss", "template": "ae_loss_image", "at": "image_ae_loss"},
                 ]},
-                JEPA_SECTION,
+                *JEPA_SECTIONS,
             ],
         },
         "tune_dataloader": {
@@ -1508,6 +1532,11 @@ class LaunchLayout:
             entry = {"gate": self._join(prefix, item["gate"]), "fields": [self._field_entry(sub, prefix, widgets) for sub in item["fields"]]}
             return entry
 
+        if "gateOn" in item:
+            condition          = copy.deepcopy(item["gateOn"])
+            condition["field"] = self._join(prefix, condition["field"])
+            return {"gateOn": condition, "fields": [self._field_entry(sub, prefix, widgets) for sub in item["fields"]]}
+
         path = self._join(prefix, item["path"])
         if "widget" in item:
             widgets[path] = item["widget"]
@@ -1530,7 +1559,10 @@ class LaunchLayout:
 
     def _expand_panel(self, panel, widgets):
         if panel["kind"] == "special":
-            return {"kind": "special", "panel": panel["panel"], "fields": list(panel["fields"])}
+            expanded = {"kind": "special", "panel": panel["panel"], "fields": list(panel["fields"])}
+            if "modelFrom" in panel:
+                expanded["modelFrom"] = panel["modelFrom"]
+            return expanded
 
         if panel["kind"] == "hidden":
             return {"kind": "hidden", "fields": list(panel["fields"])}
@@ -1541,10 +1573,10 @@ class LaunchLayout:
             for path, widget in base_widgets.items():
                 widgets[path] = widget
                 widgets[panel["override"] + path[len(panel["base"]):]] = widget
-            return {"kind": "pair", "title": panel.get("title"), "base": panel["base"], "override": panel["override"], "groups": groups}
+            return {"kind": "pair", "title": panel.get("title"), "note": panel.get("note"), "base": panel["base"], "override": panel["override"], "groups": groups}
 
         groups = self._panel_groups(panel, panel.get("at", ""), widgets)
-        return {"kind": "fields", "title": panel.get("title"), "groups": groups}
+        return {"kind": "fields", "title": panel.get("title"), "note": panel.get("note"), "groups": groups}
 
     def _expand(self, key):
         spec    = self.LAYOUTS[key]
@@ -1573,7 +1605,33 @@ class LaunchLayout:
             for sub in entry["fields"]:
                 self._entry_claims(sub, out)
             return
+        if "gateOn" in entry:
+            for sub in entry["fields"]:
+                self._entry_claims(sub, out)
+            return
         out.append(entry["path"])
+
+    def _entry_gate_conditions(self, entry, out):
+        if "gateOn" in entry:
+            out.append(entry["gateOn"])
+        for sub in entry.get("fields", []):
+            self._entry_gate_conditions(sub, out)
+
+    def _gate_conditions(self, layout):
+        conditions = []
+        for section in layout["sections"]:
+            for panel in section["panels"]:
+                if panel["kind"] in ("special", "hidden"):
+                    continue
+                for group in panel["groups"]:
+                    for entry in group["fields"]:
+                        self._entry_gate_conditions(entry, conditions)
+        return conditions
+
+    def _when_conditions(self, when):
+        if when is None:
+            return []
+        return list(when) if isinstance(when, list) else [when]
 
     def _claims(self, layout):
         claimed = []
@@ -1622,9 +1680,22 @@ class LaunchLayout:
             problems.append(f"layout for {key} leaves fields unclaimed: {', '.join(unclaimed)}")
 
         for section in layout["sections"]:
-            when = section.get("when")
-            if when and when["field"] not in known:
-                problems.append(f"section {section['key']} gates on unknown field {when['field']}")
+            for condition in self._when_conditions(section.get("when")):
+                if condition["field"] not in known:
+                    problems.append(f"section {section['key']} gates on unknown field {condition['field']}")
+                if ("in" in condition) == ("set" in condition):
+                    problems.append(f"section {section['key']} has a when condition that needs exactly one of 'in' or 'set'")
+
+        for condition in self._gate_conditions(layout):
+            if condition["field"] not in known:
+                problems.append(f"layout for {key} value-gates on unknown field {condition['field']}")
+            if ("in" in condition) == ("set" in condition):
+                problems.append(f"layout for {key} has a value gate that needs exactly one of 'in' or 'set'")
+
+        for section in layout["sections"]:
+            for panel in section["panels"]:
+                if panel["kind"] == "special" and panel.get("modelFrom") and panel["modelFrom"] not in known:
+                    problems.append(f"special panel {panel['panel']} reads unknown model field {panel['modelFrom']}")
 
         for path, widget in layout["widgets"].items():
             if widget.get("kind") == "number" and not ("min" in widget and "max" in widget):

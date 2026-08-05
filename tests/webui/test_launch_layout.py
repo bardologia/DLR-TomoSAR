@@ -239,3 +239,81 @@ def test_vram_reservation_gate_present_on_training_pages(key, flow_config):
 
     assert "training.reserve_vram"      in claims
     assert "training.vram_keep_free_gb" in claims
+
+
+def _section(layout, key):
+    return next(section for section in layout["sections"] if section["key"] == key)
+
+
+def test_jepa_loss_sections_swap_on_the_profile_autoencoder_run():
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(JepaEntryConfig())]
+    layout = LaunchLayout().build("train_jepa", leaves)
+
+    assert _section(layout, "loss-embedding")["when"] == {"field": "profile_autoencoder_run", "set": True}
+    assert _section(layout, "loss-param")["when"]     == {"field": "profile_autoencoder_run", "set": False}
+
+
+@pytest.mark.parametrize("key, flow_config", [("benchmark", BenchmarkConfig), ("cross_validate", CrossValidationConfig), ("tune", TuningEntryConfig)])
+def test_shared_jepa_loss_sections_gate_on_type_and_profile_run(key, flow_config):
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(flow_config())]
+    layout = LaunchLayout().build(key, leaves)
+
+    assert _section(layout, "jepa-embedding-loss")["when"] == [{"field": "training_type", "in": ["jepa"]}, {"field": "jepa.profile_autoencoder_run", "set": True}]
+    assert _section(layout, "jepa-param-loss")["when"]     == [{"field": "training_type", "in": ["jepa"]}, {"field": "jepa.profile_autoencoder_run", "set": False}]
+
+
+def test_jepa_finetune_rates_are_value_gated_on_the_mode():
+    engine = LaunchLayout()
+    layout = engine._expand("train_jepa")
+
+    conditions = engine._gate_conditions(layout)
+
+    assert {"field": "profile_autoencoder_run", "set": True} in conditions
+    assert {"field": "profile_autoencoder_mode", "in": ["finetune"]} in conditions
+    assert {"field": "image_autoencoder_mode", "in": ["finetune"]} in conditions
+
+
+def test_a_when_condition_with_both_in_and_set_is_rejected():
+    engine = LaunchLayout()
+    layout = engine._expand("train_jepa")
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(JepaEntryConfig())]
+
+    _section(layout, "loss-embedding")["when"] = {"field": "profile_autoencoder_run", "set": True, "in": ["x"]}
+
+    with pytest.raises(LayoutError):
+        engine._validate("train_jepa", layout, leaves)
+
+
+def test_a_value_gate_on_an_unknown_field_is_rejected():
+    engine = LaunchLayout()
+    layout = engine._expand("train_jepa")
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(JepaEntryConfig())]
+
+    panel = next(panel for panel in _section(layout, "model")["panels"] if panel.get("title") == "Autoencoders")
+    gate  = next(entry for group in panel["groups"] for entry in group["fields"] if "gateOn" in entry)
+    gate["gateOn"]["field"] = "no_such_field"
+
+    with pytest.raises(LayoutError):
+        engine._validate("train_jepa", layout, leaves)
+
+
+@pytest.mark.parametrize("key, flow_config", [("train_profile_autoencoder", ProfileAeEntryConfig), ("train_image_autoencoder", ImageAeEntryConfig)])
+def test_the_ae_pages_carry_an_arch_panel_reading_the_model_field(key, flow_config):
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(flow_config())]
+    layout = LaunchLayout().build(key, leaves)
+
+    panels = [panel for section in layout["sections"] for panel in section["panels"] if panel.get("panel") == "arch_overrides"]
+
+    assert panels == [{"kind": "special", "panel": "arch_overrides", "fields": ["model_overrides"], "modelFrom": "ae_model_name"}]
+
+
+def test_an_arch_panel_reading_an_unknown_model_field_is_rejected():
+    engine = LaunchLayout()
+    layout = engine._expand("train_profile_autoencoder")
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(ProfileAeEntryConfig())]
+
+    panel = next(panel for section in layout["sections"] for panel in section["panels"] if panel.get("panel") == "arch_overrides")
+    panel["modelFrom"] = "no_such_field"
+
+    with pytest.raises(LayoutError):
+        engine._validate("train_profile_autoencoder", layout, leaves)

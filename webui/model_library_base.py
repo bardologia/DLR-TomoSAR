@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import re
-from pathlib import Path
+from dataclasses import fields
+from pathlib     import Path
 
 
 class ModelNoteLibrary:
@@ -68,6 +69,16 @@ class ModelDefaultsLibrary(ModelNoteLibrary):
 
     DISPLAY_DEFAULTS   = {}
     NORMALIZATION_ATTR = "normalization"
+    ARCH_EXCLUDED      = ()
+    ARCH_HINTS         = {}
+
+    STRING_CHOICES = {
+        "activation"     : ("relu", "leaky_relu", "gelu", "elu", "silu"),
+        "embedding_norm" : ("none", "l2", "layernorm"),
+        "init_mode"      : ("default", "kaiming", "xavier"),
+        "normalization"  : ("batch", "instance", "group", "none"),
+        "upsample_mode"  : ("convtranspose", "bilinear"),
+    }
 
     def collect(self) -> list[dict]:
         families = self._families()
@@ -78,8 +89,39 @@ class ModelDefaultsLibrary(ModelNoteLibrary):
                 activation, normalization = defaults[model["key"]]
                 model["activation"]    = activation
                 model["normalization"] = normalization
+                model["arch"]          = self._arch_fields(model["key"])
 
         return families
+
+    def _arch_fields(self, key: str) -> list[dict]:
+        config_class = getattr(self.CONFIG_MODULE, self.CONFIG_CLASSES[key])
+        config       = config_class()
+        tunable      = config_class.tunable_arch_params()
+
+        entries = []
+        for spec in fields(config_class):
+            if spec.name in self.ARCH_EXCLUDED:
+                continue
+
+            value = getattr(config, spec.name)
+            if not isinstance(value, (bool, int, float, str)):
+                continue
+
+            entry = {"name": spec.name, "default": value, "kind": type(value).__name__, "hint": self.ARCH_HINTS.get(spec.name, "")}
+
+            grid = tunable.get(spec.name, {})
+            if isinstance(value, bool):
+                pass
+            elif isinstance(value, str):
+                options = grid["choices"] if grid.get("type") == "categorical" else self.STRING_CHOICES.get(spec.name, ())
+                if value in options:
+                    entry["options"] = [str(option) for option in options]
+            elif grid.get("type") == "categorical":
+                entry["presets"] = list(grid["choices"])
+
+            entries.append(entry)
+
+        return entries
 
     def _resolve_defaults(self) -> dict[str, tuple[str, str]]:
         resolved = {}

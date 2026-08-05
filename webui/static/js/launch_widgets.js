@@ -332,6 +332,7 @@ class ModelCardPanel {
 
   _select(key) {
     this.view._setValue(this.leaf, key);
+    this.view._fireDependents(this.leaf.path, key);
     this._paint();
   }
 
@@ -361,6 +362,279 @@ class ModelCardPanel {
     }
 
     this.currentEl.textContent = label;
+  }
+}
+
+
+class ArchOverridesPanel {
+  constructor(view, leaf, modelLeaf) {
+    this.view      = view;
+    this.leaf      = leaf;
+    this.modelLeaf = modelLeaf;
+    this.bodyEl    = null;
+    this.countEl   = null;
+  }
+
+  build() {
+    const root     = document.createElement("section");
+    root.className = "model-panel arch-panel";
+
+    const head     = document.createElement("header");
+    head.className = "special-head";
+    head.innerHTML = `<h3 class="special-head__name">Architecture</h3><span class="special-head__hint">fields of the selected model; untouched fields train at their defaults</span>`;
+
+    const count     = document.createElement("span");
+    count.className = "model-panel__count";
+    this.countEl    = count;
+    head.appendChild(count);
+    root.appendChild(head);
+
+    const body     = document.createElement("div");
+    body.className = "arch-panel__grid";
+    this.bodyEl    = body;
+    root.appendChild(body);
+
+    this.view.controls[this.leaf.path] = { leaf: this.leaf, reset: () => this._paint() };
+    this.view._onDependency(this.modelLeaf.path, () => this._paint());
+
+    this._paint();
+    return root;
+  }
+
+  _model() {
+    const key = String(this.view._effective(this.modelLeaf));
+    for (const family of this.view.modelFamilies || []) {
+      for (const model of family.models || []) {
+        if (model.key === key) return model;
+      }
+    }
+    return null;
+  }
+
+  _overrides() {
+    try {
+      const parsed = window.PythonLiteral.parse(this.view._effective(this.leaf));
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+    } catch (e) {}
+    return {};
+  }
+
+  _has(name) {
+    return Object.prototype.hasOwnProperty.call(this._overrides(), name);
+  }
+
+  _set(name, value, defaultValue) {
+    const overrides = this._overrides();
+    if (value === undefined || value === defaultValue) delete overrides[name];
+    else overrides[name] = value;
+
+    this.view._setValue(this.leaf, window.PythonLiteral.render(overrides));
+    this._refreshCount();
+  }
+
+  _label(value) {
+    return typeof value === "string" ? value : window.PythonLiteral.render(value);
+  }
+
+  _refreshCount() {
+    const n = Object.keys(this._overrides()).length;
+    this.countEl.textContent = n ? `${n} overridden` : "all defaults";
+  }
+
+  _paint() {
+    this.bodyEl.innerHTML = "";
+    const model = this._model();
+
+    if (!model || !Array.isArray(model.arch) || !model.arch.length) {
+      const empty = document.createElement("p");
+      empty.className = "cfg-note";
+      empty.textContent = "no architecture fields published for this model";
+      this.bodyEl.appendChild(empty);
+      this._refreshCount();
+      return;
+    }
+
+    const overrides = this._overrides();
+    model.arch.forEach((field) => this.bodyEl.appendChild(this._row(field, overrides)));
+
+    const known  = new Set(model.arch.map((field) => field.name));
+    const strays = Object.keys(overrides).filter((name) => !known.has(name));
+    if (strays.length) this.bodyEl.appendChild(this._strayBlock(strays, overrides));
+
+    this._refreshCount();
+  }
+
+  _row(field, overrides) {
+    const row     = document.createElement("div");
+    row.className = "cfg-edit__row arch-row";
+    row.title     = `${field.hint ? field.hint + " · " : ""}model_overrides['${field.name}']`;
+
+    const label       = document.createElement("div");
+    label.className   = "cfg-edit__name";
+    label.innerHTML   = `${field.name}<span class="arch-row__default">default ${this._label(field.default)}</span>`;
+    row.appendChild(label);
+
+    const overridden = Object.prototype.hasOwnProperty.call(overrides, field.name);
+    row.classList.toggle("is-overridden", overridden);
+
+    if (field.kind === "bool")     row.appendChild(this._boolControl(field, row));
+    else if (field.options)        row.appendChild(this._optionsControl(field, row, overrides, overridden));
+    else if (field.kind === "str") row.appendChild(this._textControl(field, row, overrides, overridden));
+    else                           row.appendChild(this._numberControl(field, row, overrides, overridden));
+
+    return row;
+  }
+
+  _boolControl(field, row) {
+    const toggle     = document.createElement("button");
+    toggle.type      = "button";
+    toggle.className = "switch";
+    toggle.setAttribute("role", "switch");
+    toggle.innerHTML = `<span class="switch__knob"></span>`;
+
+    const paint = () => {
+      const has = this._has(field.name);
+      const on  = has ? Boolean(this._overrides()[field.name]) : Boolean(field.default);
+      toggle.classList.toggle("is-on", on);
+      toggle.classList.toggle("is-dirty", has);
+      toggle.setAttribute("aria-checked", String(on));
+      row.classList.toggle("is-overridden", has);
+    };
+
+    toggle.addEventListener("click", () => {
+      const has = this._has(field.name);
+      const on  = has ? Boolean(this._overrides()[field.name]) : Boolean(field.default);
+      this._set(field.name, !on, field.default);
+      paint();
+    });
+
+    paint();
+    return toggle;
+  }
+
+  _optionsControl(field, row, overrides, overridden) {
+    const select     = document.createElement("select");
+    select.className = "cfg-edit__input picker__select";
+
+    const current = String(overridden ? overrides[field.name] : field.default);
+    const values  = field.options.includes(current) ? [...field.options] : [current, ...field.options];
+    values.forEach((value) => {
+      const option       = document.createElement("option");
+      option.value       = value;
+      option.textContent = value === String(field.default) ? `${value} (default)` : value;
+      select.appendChild(option);
+    });
+
+    select.value = current;
+    select.classList.toggle("is-dirty", overridden);
+
+    select.addEventListener("change", () => {
+      this._set(field.name, select.value, field.default);
+      const has = select.value !== String(field.default);
+      select.classList.toggle("is-dirty", has);
+      row.classList.toggle("is-overridden", has);
+    });
+
+    return select;
+  }
+
+  _textControl(field, row, overrides, overridden) {
+    const input       = document.createElement("input");
+    input.className   = "cfg-edit__input";
+    input.spellcheck  = false;
+    input.placeholder = String(field.default);
+    if (overridden) input.value = String(overrides[field.name]);
+    input.classList.toggle("is-dirty", overridden);
+
+    input.addEventListener("input", () => {
+      const raw = input.value.trim();
+      this._set(field.name, raw === "" ? undefined : raw, field.default);
+      const has = raw !== "" && raw !== String(field.default);
+      input.classList.toggle("is-dirty", has);
+      row.classList.toggle("is-overridden", has);
+    });
+
+    return input;
+  }
+
+  _numberControl(field, row, overrides, overridden) {
+    const wrap     = document.createElement("div");
+    wrap.className = "arch-row__num";
+
+    const input       = document.createElement("input");
+    input.className   = "cfg-edit__input";
+    input.type        = "number";
+    input.step        = field.kind === "int" ? "1" : "any";
+    input.spellcheck  = false;
+    input.placeholder = String(field.default);
+    if (overridden) input.value = String(overrides[field.name]);
+    input.classList.toggle("is-dirty", overridden);
+
+    const apply = (raw) => {
+      if (raw === "") {
+        this._set(field.name, undefined, field.default);
+        input.classList.remove("is-dirty", "is-invalid");
+        row.classList.remove("is-overridden");
+        return;
+      }
+
+      const invalid = field.kind === "int" ? !/^-?\d+$/.test(raw) : Number.isNaN(Number(raw));
+      input.classList.toggle("is-invalid", invalid);
+      if (invalid) return;
+
+      const value = Number(raw);
+      this._set(field.name, value, field.default);
+      const has = value !== field.default;
+      input.classList.toggle("is-dirty", has);
+      row.classList.toggle("is-overridden", has);
+    };
+
+    input.addEventListener("input", () => apply(input.value.trim()));
+    wrap.appendChild(input);
+
+    if (Array.isArray(field.presets) && field.presets.length) {
+      const chips     = document.createElement("div");
+      chips.className = "arch-row__presets";
+      field.presets.forEach((preset) => {
+        const chip       = document.createElement("button");
+        chip.type        = "button";
+        chip.className   = "arch-chip";
+        chip.textContent = String(preset);
+        chip.addEventListener("click", () => {
+          input.value = preset === field.default ? "" : String(preset);
+          apply(input.value);
+        });
+        chips.appendChild(chip);
+      });
+      wrap.appendChild(chips);
+    }
+
+    return wrap;
+  }
+
+  _strayBlock(strays, overrides) {
+    const block     = document.createElement("div");
+    block.className = "arch-panel__stray";
+
+    const label       = document.createElement("span");
+    label.className   = "arch-panel__stray-label";
+    label.textContent = "overrides outside this model's field list (kept):";
+    block.appendChild(label);
+
+    strays.forEach((name) => {
+      const chip     = document.createElement("button");
+      chip.type      = "button";
+      chip.className = "arch-chip arch-chip--stray";
+      chip.title     = "click to drop this override";
+      chip.innerHTML = `${name}: ${this._label(overrides[name])}<span aria-hidden="true"> ×</span>`;
+      chip.addEventListener("click", () => {
+        this._set(name, undefined, undefined);
+        this._paint();
+      });
+      block.appendChild(chip);
+    });
+
+    return block;
   }
 }
 
@@ -4372,6 +4646,13 @@ class ConfigForm {
       return new window.ModelCardPanel(this, leaf, headLeaf).build();
     }
 
+    if (panel.panel === "arch_overrides") {
+      const leaf      = this.byPath.get(panel.fields[0]);
+      const modelLeaf = panel.modelFrom ? this.byPath.get(panel.modelFrom) : null;
+      if (!leaf || !modelLeaf || !this.modelFamilies || !this.modelFamilies.length) return this._buildPathsPanel("Architecture overrides", panel.fields);
+      return new window.ArchOverridesPanel(this, leaf, modelLeaf).build();
+    }
+
     if (panel.panel === "model_toggle") {
       const leaf = this.byPath.get(panel.fields[0]);
       if (!leaf || !this.modelFamilies || !this.modelFamilies.length) return this._buildPathsPanel("Models in run", panel.fields);
@@ -4405,8 +4686,17 @@ class ConfigForm {
       el.appendChild(head);
     }
 
+    if (panel.note) el.appendChild(this._buildPanelNote(panel.note));
+
     el.appendChild(this._buildGroups(panel.groups));
     return el;
+  }
+
+  _buildPanelNote(text) {
+    const note = document.createElement("p");
+    note.className = "cfg-panel__note";
+    note.textContent = text;
+    return note;
   }
 
   _buildGroups(groups, pathMap = null) {
@@ -4437,6 +4727,11 @@ class ConfigForm {
   }
 
   _buildEntry(entry, host, pathMap) {
+    if (entry.gateOn) {
+      this._buildValueGate(entry, host, pathMap);
+      return;
+    }
+
     if (!entry.gate) {
       host.appendChild(this._buildRow(this.byPath.get(this._mapPath(entry.path, pathMap)), this._section));
       return;
@@ -4462,6 +4757,19 @@ class ConfigForm {
     host.appendChild(cell);
   }
 
+  _buildValueGate(entry, host, pathMap) {
+    const condition = { ...entry.gateOn, field: this._mapPath(entry.gateOn.field, pathMap) };
+    const lead      = this.byPath.get(condition.field);
+
+    const start = this.states.length;
+    entry.fields.forEach((sub) => this._buildEntry(sub, host, pathMap));
+
+    const states = this.states.slice(start);
+    states.forEach(({ row }) => row.classList.add("cfg-edit__row--dependent"));
+
+    this.gates.push({ leaf: lead, states, test: () => !this._conditionFails(condition) });
+  }
+
   _gateLabel(short) {
     if (short.startsWith("use_")) return short.slice(4);
     if (short !== "enabled" && short.endsWith("_enabled")) return short.slice(0, -"_enabled".length);
@@ -4480,6 +4788,8 @@ class ConfigForm {
     head.className = "cfg-panel__head";
     head.innerHTML = `<h4 class="cfg-panel__name">${panel.title}</h4><span class="cfg-panel__hint">${panel.base} · overridden per-field by ${panel.override}</span>`;
     el.appendChild(head);
+
+    if (panel.note) el.appendChild(this._buildPanelNote(panel.note));
 
     el.appendChild(this._buildGroups(panel.groups));
 
@@ -4776,10 +5086,21 @@ class ConfigForm {
     this._setActiveSection(key);
   }
 
+  _conditionFails(condition) {
+    const leaf = this.byPath.get(condition.field);
+    if (!leaf) return false;
+
+    const value = String(this._effective(leaf));
+    if (condition.in) return !condition.in.includes(value);
+
+    const isSet = value !== "" && value !== "None";
+    return isSet !== condition.set;
+  }
+
   _sectionHidden(section) {
     if (!section.when) return false;
-    const leaf = this.byPath.get(section.when.field);
-    return leaf ? !section.when.in.includes(this._effective(leaf)) : false;
+    const conditions = Array.isArray(section.when) ? section.when : [section.when];
+    return conditions.some((condition) => this._conditionFails(condition));
   }
 
   _setActiveSection(key) {
@@ -4824,7 +5145,7 @@ class ConfigForm {
     });
 
     this.gates.forEach((gate) => {
-      const open = this._effective(gate.leaf) === "True";
+      const open = gate.test ? gate.test() : this._effective(gate.leaf) === "True";
       if (!open) gate.states.forEach(({ row }) => (row.dataset.gated = "1"));
     });
 
@@ -4926,14 +5247,15 @@ class ConfigForm {
   }
 }
 
-window.PythonLiteral     = PythonLiteral;
-window.GpuCardSelect     = GpuCardSelect;
-window.GpuPicker         = GpuPicker;
-window.NumberField       = NumberField;
-window.MultiValueField   = MultiValueField;
-window.LaunchWidgetDom   = LaunchWidgetDom;
-window.ModelTogglePanel  = ModelTogglePanel;
-window.ModelCardPanel    = ModelCardPanel;
-window.ExperimentBuilder = ExperimentBuilder;
-window.AblationBuilder   = AblationBuilder;
+window.PythonLiteral      = PythonLiteral;
+window.GpuCardSelect      = GpuCardSelect;
+window.GpuPicker          = GpuPicker;
+window.NumberField        = NumberField;
+window.MultiValueField    = MultiValueField;
+window.LaunchWidgetDom    = LaunchWidgetDom;
+window.ModelTogglePanel   = ModelTogglePanel;
+window.ModelCardPanel     = ModelCardPanel;
+window.ArchOverridesPanel = ArchOverridesPanel;
+window.ExperimentBuilder  = ExperimentBuilder;
+window.AblationBuilder    = AblationBuilder;
 window.ConfigForm        = ConfigForm;
