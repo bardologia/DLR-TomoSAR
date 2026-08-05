@@ -252,9 +252,9 @@ class ModelCardPanel {
     const body     = document.createElement("div");
     body.className = "model-panel__families";
     this.families.forEach((family) => body.appendChild(this._family(family)));
-    root.appendChild(body);
 
-    if (this.headLeaf && this.heads.length) root.appendChild(this._headPicker());
+    if (this.headLeaf && this.heads.length) body.appendChild(this._headPicker());
+    root.appendChild(body);
 
     this.view.controls[this.leaf.path] = { leaf: this.leaf, reset: () => this._paint() };
     if (this.headLeaf) this.view.controls[this.headLeaf.path] = { leaf: this.headLeaf, reset: () => this._paint() };
