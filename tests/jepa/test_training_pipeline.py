@@ -25,6 +25,17 @@ def test_resolve_ae_run_returns_existing_directory(tmp_path):
     assert resolved == run_dir
 
 
+def test_a_profile_coupled_jepa_rejects_parameter_structured_heads():
+    for head in ("multihead", "per_gaussian", "set_pred"):
+        with pytest.raises(ValueError, match="only the 'conv' head"):
+            TrainingPipeline._validate_head(head, profile_coupled=True)
+
+
+def test_head_validation_allows_conv_and_the_param_regime():
+    TrainingPipeline._validate_head("conv", profile_coupled=True)
+    TrainingPipeline._validate_head("set_pred", profile_coupled=False)
+
+
 def test_validate_checkpoint_raises_when_missing(tmp_path):
     with pytest.raises(FileNotFoundError):
         TrainingPipeline.validate_checkpoint(tmp_path / "best_model.pt", "profile")

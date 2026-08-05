@@ -219,15 +219,17 @@ class ModelTogglePanel {
 
 
 class ModelCardPanel {
-  constructor(view, leaf, headLeaf = null) {
+  constructor(view, leaf, headLeaf = null, headGate = null) {
     this.view      = view;
     this.leaf      = leaf;
     this.headLeaf  = headLeaf;
+    this.headGate  = headGate;
     this.families  = view.modelFamilies || [];
     this.heads     = view.modelHeads || [];
     this.cards     = new Map();
     this.headChips = new Map();
     this.currentEl = null;
+    this.headHint  = null;
   }
 
   build() {
@@ -256,6 +258,7 @@ class ModelCardPanel {
 
     this.view.controls[this.leaf.path] = { leaf: this.leaf, reset: () => this._paint() };
     if (this.headLeaf) this.view.controls[this.headLeaf.path] = { leaf: this.headLeaf, reset: () => this._paint() };
+    if (this.headLeaf && this.headGate) this.view.repainters.push(() => this._paint());
     this._paint();
     return root;
   }
@@ -274,6 +277,16 @@ class ModelCardPanel {
 
     block.appendChild(name);
     block.appendChild(grid);
+
+    if (this.headGate) {
+      const hint       = document.createElement("p");
+      hint.className   = "model-family__hint";
+      hint.textContent = this.headGate.hint;
+      hint.hidden      = true;
+      this.headHint    = hint;
+      block.appendChild(hint);
+    }
+
     return block;
   }
 
@@ -349,16 +362,24 @@ class ModelCardPanel {
 
     if (this.headLeaf && this.headChips.size) {
       const currentHead = this.view._effective(this.headLeaf);
+      const locked      = Boolean(this.headGate) && this.view._whenHolds(this.headGate.when);
       let headLabel     = currentHead;
 
       this.headChips.forEach((chip, key) => {
-        const on = key === currentHead;
+        const on      = key === currentHead;
+        const allowed = !locked || this.headGate.only.includes(key);
         chip.classList.toggle("is-on", on);
+        chip.classList.toggle("is-locked", !allowed);
+        chip.disabled = !allowed;
         chip.setAttribute("aria-pressed", String(on));
         if (on) headLabel = chip.querySelector(".model-chip__name").textContent;
       });
 
-      label = `${label} · ${headLabel} head`;
+      if (this.headHint) this.headHint.hidden = !locked;
+
+      const invalid = locked && !this.headGate.only.includes(currentHead);
+      this.currentEl.classList.toggle("model-panel__count--warn", invalid);
+      label = `${label} · ${headLabel} head${invalid ? " (invalid with a profile AE)" : ""}`;
     }
 
     this.currentEl.textContent = label;
@@ -4451,6 +4472,7 @@ class ConfigForm {
     this.dependents    = {};
     this.states        = [];
     this.gates         = [];
+    this.repainters    = [];
     this.sections      = [];
     this.pairs         = [];
     this.pairBase      = new Map();
@@ -4643,7 +4665,7 @@ class ConfigForm {
       const leaf     = this.byPath.get(panel.fields[0]);
       const headLeaf = panel.fields.length > 1 ? this.byPath.get(panel.fields[1]) : null;
       if (!leaf || !this.modelFamilies || !this.modelFamilies.length) return this._buildPathsPanel("Model", panel.fields);
-      return new window.ModelCardPanel(this, leaf, headLeaf).build();
+      return new window.ModelCardPanel(this, leaf, headLeaf, panel.headGate || null).build();
     }
 
     if (panel.panel === "arch_overrides") {
@@ -5097,10 +5119,14 @@ class ConfigForm {
     return isSet !== condition.set;
   }
 
+  _whenHolds(when) {
+    const conditions = Array.isArray(when) ? when : [when];
+    return conditions.every((condition) => !this._conditionFails(condition));
+  }
+
   _sectionHidden(section) {
     if (!section.when) return false;
-    const conditions = Array.isArray(section.when) ? section.when : [section.when];
-    return conditions.some((condition) => this._conditionFails(condition));
+    return !this._whenHolds(section.when);
   }
 
   _setActiveSection(key) {
@@ -5148,6 +5174,8 @@ class ConfigForm {
       const open = gate.test ? gate.test() : this._effective(gate.leaf) === "True";
       if (!open) gate.states.forEach(({ row }) => (row.dataset.gated = "1"));
     });
+
+    this.repainters.forEach((paint) => paint());
 
     if (this.activeSection) {
       const active = this.sections.find((section) => section.key === this.activeSection);

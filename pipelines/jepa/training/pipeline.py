@@ -39,6 +39,8 @@ class TrainingPipeline:
         if profile_dir is None and image_dir is None:
             raise ValueError("JEPA requires at least one of profile_autoencoder_run or image_autoencoder_run; with neither, train the plain backbone via main/training/train_backbone.py.")
 
+        self._validate_head(entry_config.backbone_head, profile_coupled=profile_dir is not None)
+
         self.profile_autoencoder_meta = None
         self.autoencoder_cfg          = None
         self.ae_model_name            = None
@@ -90,6 +92,11 @@ class TrainingPipeline:
         if not directory.is_dir():
             raise FileNotFoundError(f"{label} autoencoder run '{run}' not found under {logdir}")
         return directory
+
+    @staticmethod
+    def _validate_head(backbone_head: str, profile_coupled: bool) -> None:
+        if profile_coupled and backbone_head != "conv":
+            raise ValueError(f"backbone_head '{backbone_head}' arranges the backbone output as Gaussian parameter slots, but a coupled profile autoencoder makes the backbone predict its embedding; only the 'conv' head projects to the embedding. Set backbone_head='conv' or drop profile_autoencoder_run.")
 
     def _physics_geometry_active(self) -> bool:
         if self.autoencoder_cfg is not None:

@@ -76,6 +76,7 @@ class AblationView extends ConfigForm {
     this.dependents    = {};
     this.states        = [];
     this.gates         = [];
+    this.repainters    = [];
     this.sections      = [];
     this.pairs         = [];
     this.activeSection = null;

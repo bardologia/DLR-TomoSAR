@@ -317,3 +317,37 @@ def test_an_arch_panel_reading_an_unknown_model_field_is_rejected():
 
     with pytest.raises(LayoutError):
         engine._validate("train_profile_autoencoder", layout, leaves)
+
+
+def _model_card(layout):
+    return next(panel for section in layout["sections"] for panel in section["panels"] if panel.get("panel") == "model_card")
+
+
+def test_the_jepa_model_card_locks_the_head_to_conv_with_a_profile_ae():
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(JepaEntryConfig())]
+    layout = LaunchLayout().build("train_jepa", leaves)
+    gate   = _model_card(layout)["headGate"]
+
+    assert gate["when"] == {"field": "profile_autoencoder_run", "set": True}
+    assert gate["only"] == ["conv"]
+    assert gate["hint"]
+
+
+def test_the_cross_validation_model_card_locks_the_head_only_on_the_jepa_type():
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(CrossValidationConfig())]
+    layout = LaunchLayout().build("cross_validate", leaves)
+    gate   = _model_card(layout)["headGate"]
+
+    assert gate["when"] == [{"field": "training_type", "in": ["jepa"]}, {"field": "jepa.profile_autoencoder_run", "set": True}]
+    assert gate["only"] == ["conv"]
+
+
+def test_a_head_gate_on_an_unknown_field_is_rejected():
+    engine = LaunchLayout()
+    layout = engine._expand("train_jepa")
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(JepaEntryConfig())]
+
+    _model_card(layout)["headGate"]["when"] = {"field": "no_such_field", "set": True}
+
+    with pytest.raises(LayoutError):
+        engine._validate("train_jepa", layout, leaves)

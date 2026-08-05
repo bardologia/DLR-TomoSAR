@@ -765,7 +765,7 @@ class LaunchLayout:
             "essentials": TRAIN_ESSENTIALS,
             "sections": [
                 {"key": "model", "title": "Model", "panels": [
-                    {"kind": "special", "panel": "model_card", "fields": ["backbone_name", "backbone_head"]},
+                    {"kind": "special", "panel": "model_card", "fields": ["backbone_name", "backbone_head"], "headGate": {"when": {"field": "profile_autoencoder_run", "set": True}, "only": ["conv"], "hint": "a coupled profile autoencoder makes the backbone predict its embedding; only the conv head projects to it"}},
                     {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
                     {"kind": "fields", "title": "Autoencoders", "note": "JEPA needs at least one autoencoder run. A profile autoencoder makes the backbone predict its embedding (embedding loss regime); without one the backbone predicts Gaussian parameters directly (param loss regime). An image autoencoder replaces the raw input stack with its encoded features in either regime. Embedding sizes and architecture come from the selected runs' saved configs.", "groups": [
                         {"title": "Profile autoencoder", "fields": [
@@ -994,7 +994,7 @@ class LaunchLayout:
             ],
             "sections": [
                 {"key": "model", "title": "Model", "when": {"field": "training_type", "in": ["backbone", "jepa"]}, "panels": [
-                    {"kind": "special", "panel": "model_card", "fields": ["backbone_name", "backbone_head"]},
+                    {"kind": "special", "panel": "model_card", "fields": ["backbone_name", "backbone_head"], "headGate": {"when": [{"field": "training_type", "in": ["jepa"]}, {"field": "jepa.profile_autoencoder_run", "set": True}], "only": ["conv"], "hint": "a coupled profile autoencoder makes the backbone predict its embedding; only the conv head projects to it"}},
                 ]},
                 {"key": "overrides", "title": "Architecture overrides", "panels": [
                     {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
@@ -1562,6 +1562,8 @@ class LaunchLayout:
             expanded = {"kind": "special", "panel": panel["panel"], "fields": list(panel["fields"])}
             if "modelFrom" in panel:
                 expanded["modelFrom"] = panel["modelFrom"]
+            if "headGate" in panel:
+                expanded["headGate"] = copy.deepcopy(panel["headGate"])
             return expanded
 
         if panel["kind"] == "hidden":
@@ -1694,8 +1696,19 @@ class LaunchLayout:
 
         for section in layout["sections"]:
             for panel in section["panels"]:
-                if panel["kind"] == "special" and panel.get("modelFrom") and panel["modelFrom"] not in known:
+                if panel["kind"] != "special":
+                    continue
+                if panel.get("modelFrom") and panel["modelFrom"] not in known:
                     problems.append(f"special panel {panel['panel']} reads unknown model field {panel['modelFrom']}")
+                gate = panel.get("headGate")
+                if gate:
+                    if not gate.get("only"):
+                        problems.append(f"head gate on panel {panel['panel']} names no allowed heads")
+                    for condition in self._when_conditions(gate["when"]):
+                        if condition["field"] not in known:
+                            problems.append(f"head gate on panel {panel['panel']} reads unknown field {condition['field']}")
+                        if ("in" in condition) == ("set" in condition):
+                            problems.append(f"head gate on panel {panel['panel']} has a condition that needs exactly one of 'in' or 'set'")
 
         for path, widget in layout["widgets"].items():
             if widget.get("kind") == "number" and not ("min" in widget and "max" in widget):
