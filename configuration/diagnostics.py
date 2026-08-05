@@ -269,8 +269,10 @@ class AttentionCaptureConfig:
     checkpoint_name : str = "best_model.pt"
     output_subdir   : str = "attention_capture"
 
-    batch_size       : int = 4
-    max_gate_figures : int = 8
+    batch_size            : int = 4
+    max_batches           : int = 2
+    max_gate_figures      : int = 8
+    max_attention_figures : int = 8
 
     figure_style : str = "report"
 

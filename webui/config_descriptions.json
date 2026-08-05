@@ -2502,7 +2502,9 @@
         "output_subdir": "Name of the output directory created inside each run directory for the JSON, gate figures and markdown report",
         "batch_size": "Number of real patches in the single capture batch",
         "max_gate_figures": "Maximum number of attention-gate maps rendered as individual figures",
-        "figure_style": "PlotBase figure style the figures are rendered with (report or paper)"
+        "figure_style": "PlotBase figure style the figures are rendered with (report or paper)",
+        "max_batches": "Number of batches pooled into the attention statistics; more batches steady the entropy and distance estimates at linear cost",
+        "max_attention_figures": "Maximum number of attention layers (most focused first) that get a mean-attention-map figure"
       }
     },
     "diagnostics::LayerProbeConfig": {

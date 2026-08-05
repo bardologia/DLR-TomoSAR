@@ -1401,9 +1401,10 @@ class LaunchLayout:
                         {"title": "Capture", "fields": [
                             "split",
                             "device",
-                            {"path": "batch_size", "widget": {"kind": "number", "min": 1, "max": 64, "step": 1}},
+                            {"path": "batch_size",  "widget": {"kind": "number", "min": 1, "max": 64, "step": 1}},
+                            {"path": "max_batches", "widget": {"kind": "number", "min": 1, "max": 32, "step": 1}},
                         ]},
-                        {"title": "Figures", "fields": ["max_gate_figures", {"path": "figure_style", "widget": CH_FIGSTYLE}]},
+                        {"title": "Figures", "fields": ["max_gate_figures", "max_attention_figures", {"path": "figure_style", "widget": CH_FIGSTYLE}]},
                     ]},
                 ]},
             ],

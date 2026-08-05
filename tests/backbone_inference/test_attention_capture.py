@@ -122,9 +122,72 @@ def test_entropy_bounds():
     onehot  = torch.zeros(1, 2, 4, 8)
     onehot[..., 0] = 1.0
 
-    assert AttentionSummary.entropy(uniform) == pytest.approx(1.0, abs=1e-6)
-    assert AttentionSummary.entropy(onehot)  == pytest.approx(0.0, abs=1e-6)
-    assert AttentionSummary.peak(onehot)     == pytest.approx(1.0)
+    assert AttentionSummary.entropy_values(uniform).mean() == pytest.approx(1.0, abs=1e-6)
+    assert AttentionSummary.entropy_values(onehot).mean()  == pytest.approx(0.0, abs=1e-6)
+    assert AttentionSummary.peak(onehot)                   == pytest.approx(1.0)
+
+
+def test_entropy_values_cover_every_query():
+    weights = torch.full((2, 3, 4, 8), 1.0 / 8.0)
+
+    assert AttentionSummary.entropy_values(weights).shape == (2 * 3 * 4,)
+
+
+def test_stack_calls_rejects_mismatched_shapes():
+    with pytest.raises(ValueError):
+        AttentionSummary.stack_calls([torch.rand(1, 2, 4, 4), torch.rand(1, 2, 8, 8)])
+
+    with pytest.raises(ValueError):
+        AttentionSummary.stack_calls([torch.rand(1, 4, 4)])
+
+
+def test_head_redundancy_separates_identical_from_distinct_heads():
+    base      = torch.rand(1, 1, 6, 6).softmax(dim=-1)
+    identical = base.expand(1, 3, 6, 6).clone()
+
+    distinct         = torch.rand(2, 3, 6, 6).softmax(dim=-1)
+    single_head      = torch.rand(1, 1, 6, 6).softmax(dim=-1)
+
+    assert AttentionSummary.head_redundancy(identical) == pytest.approx(1.0, abs=1e-6)
+    assert AttentionSummary.head_redundancy(distinct)  < 0.9
+    assert AttentionSummary.head_redundancy(single_head) is None
+
+
+def test_head_entropies_are_per_head():
+    weights          = torch.zeros(1, 2, 4, 4)
+    weights[:, 0]    = 1.0 / 4.0
+    weights[:, 1, :, 0] = 1.0
+
+    entropies = AttentionSummary.head_entropies(weights)
+
+    assert entropies[0] == pytest.approx(1.0, abs=1e-6)
+    assert entropies[1] == pytest.approx(0.0, abs=1e-6)
+
+
+def test_attention_distance_zero_for_self_and_uniform_reference():
+    self_attention = torch.eye(16).reshape(1, 1, 16, 16)
+    uniform        = torch.full((1, 1, 16, 16), 1.0 / 16.0)
+
+    self_distance    = AttentionSummary.attention_distance(self_attention)
+    uniform_distance = AttentionSummary.attention_distance(uniform)
+
+    assert self_distance["tokens"]      == pytest.approx(0.0, abs=1e-9)
+    assert uniform_distance["tokens"]   == pytest.approx(uniform_distance["uniform_tokens"])
+    assert uniform_distance["relative"] == pytest.approx(uniform_distance["tokens"] / 4.0)
+
+
+def test_attention_distance_undefined_off_square_grids():
+    assert AttentionSummary.attention_distance(torch.rand(1, 1, 8, 8).softmax(dim=-1)) is None
+    assert AttentionSummary.attention_distance(torch.rand(1, 1, 4, 16).softmax(dim=-1)) is None
+
+
+def test_mean_attention_map_reshapes_to_the_token_grid():
+    weights = torch.full((2, 2, 16, 16), 1.0 / 16.0)
+
+    mean_map = AttentionSummary.mean_attention_map(weights)
+
+    assert mean_map.shape == (4, 4)
+    assert np.allclose(mean_map, 1.0 / 16.0)
 
 
 def test_gate_stats_report_mean_and_active_fraction():
