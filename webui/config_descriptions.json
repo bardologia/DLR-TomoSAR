@@ -2577,7 +2577,10 @@
         "draws_per_count": "Number of random track subsets averaged for each dropped-track count",
         "render_amp_floor": "Amplitude floor below which predicted Gaussians are dropped before rendering the comparison curves, matching the inference render floor",
         "seed": "Seed of the noise draws and dropped-track subsets",
-        "figure_style": "PlotBase figure style the severity curves are rendered with (report or paper)"
+        "figure_style": "PlotBase figure style the severity curves are rendered with (report or paper)",
+        "noise_draws": "Number of independent noise draws averaged per sigma and channel scope; more draws tighten the error bars at linear cost",
+        "gain_factors": "Global input gain factors of the calibration-error sweep; 1.0 is always included as the reference",
+        "shift_pixels": "Azimuth shifts in pixels of the shift-equivariance stress; each must stay below the patch height"
       }
     },
     "diagnostics::TrainingEvolutionConfig": {
