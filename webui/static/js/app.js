@@ -370,6 +370,7 @@ class App {
         exagg     : document.getElementById("cube-globe-exagg"),
         lift      : document.getElementById("cube-globe-lift"),
         clamp     : document.getElementById("cube-globe-clamp"),
+        points    : document.getElementById("cube-globe-points"),
         reframe   : document.getElementById("cube-globe-reframe"),
         at        : document.getElementById("cube-globe-at"),
         container : document.getElementById("cube-globe-container"),

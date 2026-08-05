@@ -1242,6 +1242,7 @@ class TomogramView {
 
   constructor(refs) {
     this.strip = refs.strip;
+    this.pickEl = refs.strip ? refs.strip.closest(".cube-pick") : null;
     this.stage = refs.stage;
     this.deck = refs.deck;
     this.topdown = refs.topdown;
@@ -1720,6 +1721,7 @@ class TomogramView {
 
     this.modeBtns.forEach((btn) => btn.classList.toggle("is-active", btn.dataset.view === view));
     this.viewEls.forEach((el) => { el.hidden = el.dataset.view !== view; });
+    this._syncGlobeChrome();
 
     if (view === "params" && this.params && this.meta) {
       this.params.render();
@@ -1744,6 +1746,12 @@ class TomogramView {
 
     const sweep = this._sweepFor(view);
     if (sweep && this.meta) sweep.play();
+  }
+
+  _syncGlobeChrome() {
+    const collapsed = this.view === "globe";
+    if (this.pickEl) this.pickEl.hidden = collapsed;
+    this.stage.classList.toggle("is-globe", collapsed);
   }
 
   _sweepFor(view) {

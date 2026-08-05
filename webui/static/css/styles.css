@@ -3897,6 +3897,7 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 
 .cube-globe__stage { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; background: #10151a; }
 #cube-globe-container { width: 100%; height: max(62vh, calc(100vh - 315px)); }
+.cube-stage.is-globe #cube-globe-container { height: max(70vh, calc(100vh - 175px)); }
 #cube-globe-container .cesium-viewer-bottom { font-size: 10px; }
 
 /* ==== Leaderboard curves ==== */

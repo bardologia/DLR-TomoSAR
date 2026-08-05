@@ -16,6 +16,7 @@ class TomogramGlobe {
     this.exaggEl = refs.exagg;
     this.liftEl = refs.lift;
     this.clampEl = refs.clamp;
+    this.pointsEl = refs.points;
     this.reframeEl = refs.reframe;
     this.atEl = refs.at;
     this.container = refs.container;
@@ -44,6 +45,7 @@ class TomogramGlobe {
     this.exaggEl.addEventListener("change", () => this._redraw());
     this.liftEl.addEventListener("change", () => this._redraw());
     this.clampEl.addEventListener("change", () => this._redraw());
+    this.pointsEl.addEventListener("change", () => this._onPointsToggle());
     this.reframeEl.addEventListener("click", () => this._flyToScene(true));
   }
 
@@ -170,6 +172,13 @@ class TomogramGlobe {
 
     this.viewer.scene.globe.baseColor = Cesium.Color.fromCssColorString("#10151a");
     this.collection = this.viewer.scene.primitives.add(new Cesium.PointPrimitiveCollection());
+    this.collection.show = this.pointsEl.checked;
+  }
+
+  _onPointsToggle() {
+    if (!this.collection) return;
+    this.collection.show = this.pointsEl.checked;
+    this.viewer.scene.requestRender();
   }
 
   async _fetch() {
