@@ -276,6 +276,16 @@ def test_profile_ae_entry_training_overrides():
     assert cfg.ae_model_name            == "mlp_ae"
 
 
+def test_profile_ae_entry_lr_defaults_mirror_the_architecture_config():
+    from configuration.architectures.profile_autoencoder import ProfileAutoencoderBaseConfig
+
+    cfg = ProfileAeEntryConfig()
+    assert cfg.encoder_lr == ProfileAutoencoderBaseConfig.encoder_lr
+    assert cfg.decoder_lr == ProfileAutoencoderBaseConfig.decoder_lr
+    assert cfg.encoder_wd == ProfileAutoencoderBaseConfig.encoder_wd
+    assert cfg.decoder_wd == ProfileAutoencoderBaseConfig.decoder_wd
+
+
 def test_every_seeded_entry_defaults_to_the_standard_five_seeds():
     from configuration.benchmark.general        import BenchmarkConfig
     from configuration.cross_validation.general import CrossValidationConfig

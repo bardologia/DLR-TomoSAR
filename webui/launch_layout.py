@@ -25,6 +25,8 @@ class LaunchLayout:
     NUM_SEED     = {"kind": "number", "int": True, "min": 0, "max": 9999, "presets": [0, 1, 42, 123, 2024]}
     NUM_FREQ     = {"kind": "number", "int": True, "min": 1, "max": 50, "presets": [1, 2, 5, 10]}
     NUM_ETA_MIN  = {"kind": "number", "log": True, "min": 1e-9, "max": 1e-2, "presets": [0, 1e-7, 1e-6, 1e-5]}
+    NUM_LR       = {"kind": "number", "log": True, "min": 1e-5, "max": 1e-2, "presets": [1e-5, 1e-4, 3e-4, 1e-3, 1e-2]}
+    NUM_WD       = {"kind": "number", "log": True, "min": 1e-6, "max": 1e-1, "presets": [1e-6, 1e-5, 1e-4, 1e-3, 1e-2]}
     NUM_WEIGHT   = {"kind": "number", "min": 0, "max": 10, "step": 0.05, "presets": [0, 0.05, 0.1, 0.5, 1, 2]}
     NUM_FRACTION = {"kind": "number", "min": 0, "max": 1, "step": 0.01, "presets": [0.05, 0.1, 0.25, 0.5, 1.0]}
     NUM_PROB     = {"kind": "number", "min": 0, "max": 1, "step": 0.05, "presets": [0, 0.25, 0.5, 0.75, 1.0]}
@@ -682,7 +684,15 @@ class LaunchLayout:
             "sections": [
                 {"key": "model", "title": "Model", "panels": [
                     {"kind": "special", "panel": "model_card", "fields": ["ae_model_name"]},
-                    {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
+                    {"kind": "fields", "groups": [
+                        {"title": "Learning rates", "fields": [
+                            {"path": "encoder_lr", "widget": NUM_LR},
+                            {"path": "decoder_lr", "widget": NUM_LR},
+                            {"path": "encoder_wd", "widget": NUM_WD},
+                            {"path": "decoder_wd", "widget": NUM_WD},
+                        ]},
+                        {"title": "Architecture overrides", "fields": ["model_overrides"]},
+                    ]},
                 ]},
                 {"key": "data", "title": "Data", "panels": [
                     {"kind": "fields", "title": "Paths", "template": "paths_train", "at": "paths"},

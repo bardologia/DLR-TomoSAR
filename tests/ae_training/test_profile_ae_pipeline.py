@@ -127,6 +127,23 @@ def test_autoencoder_config_follows_ae_model_name():
         assert type(cfg) is type(PROFILE_AE_CONFIG_REGISTRY[name]())
 
 
+def test_autoencoder_config_applies_entry_learning_rates():
+    entry = ProfileAeEntryConfig(encoder_lr=1e-4, decoder_lr=2e-4, encoder_wd=1e-5, decoder_wd=2e-5)
+    cfg   = TrainingPipeline._autoencoder_config(TrainingPipeline.__new__(TrainingPipeline), entry)
+
+    assert cfg.encoder_lr == 1e-4
+    assert cfg.decoder_lr == 2e-4
+    assert cfg.encoder_wd == 1e-5
+    assert cfg.decoder_wd == 2e-5
+
+
+def test_model_overrides_win_over_entry_learning_rates():
+    entry = ProfileAeEntryConfig(encoder_lr=1e-4, model_overrides={"encoder_lr": 5e-3})
+    cfg   = TrainingPipeline._autoencoder_config(TrainingPipeline.__new__(TrainingPipeline), entry)
+
+    assert cfg.encoder_lr == 5e-3
+
+
 class _CurveDataset(torch.utils.data.Dataset):
     def __init__(self, n=8):
         g = torch.Generator().manual_seed(0)

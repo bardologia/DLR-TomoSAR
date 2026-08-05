@@ -59,6 +59,11 @@ class ProfileAeEntryConfig:
     ae_loss         : ProfileAeLossConfig = field(default_factory=ProfileAeLossConfig)
     geometry        : GeometryConfig      = field(default_factory=GeometryConfig)
 
+    encoder_lr : float = ProfileAutoencoderBaseConfig.encoder_lr
+    decoder_lr : float = ProfileAutoencoderBaseConfig.decoder_lr
+    encoder_wd : float = ProfileAutoencoderBaseConfig.encoder_wd
+    decoder_wd : float = ProfileAutoencoderBaseConfig.decoder_wd
+
     paths         : TrainingPathsConfig = field(default_factory=TrainingPathsConfig)
     training      : TrainingQueueConfig = field(default_factory=lambda: TrainingQueueConfig(batch_size=8192, num_workers=14, prefetch_factor=4))
     pretrain      : PretrainConfig      = field(default_factory=PretrainConfig)

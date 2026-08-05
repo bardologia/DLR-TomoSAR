@@ -17,7 +17,13 @@ class TrainingPipeline(AutoencoderTrainingPipeline):
     model_dim_label = "Profile Length"
 
     def _autoencoder_config(self, entry_config):
-        return ModelBuilder.config_from_registry(entry_config.ae_model_name, entry_config.model_overrides, registry=PROFILE_AE_CONFIG_REGISTRY)
+        optimization = {
+            "encoder_lr" : entry_config.encoder_lr,
+            "decoder_lr" : entry_config.decoder_lr,
+            "encoder_wd" : entry_config.encoder_wd,
+            "decoder_wd" : entry_config.decoder_wd,
+        }
+        return ModelBuilder.config_from_registry(entry_config.ae_model_name, {**optimization, **entry_config.model_overrides}, registry=PROFILE_AE_CONFIG_REGISTRY)
 
     def _build_trainer_config(self, base, entry_config):
         trainer_config = ProfileAeTrainerConfig(
