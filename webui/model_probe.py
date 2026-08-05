@@ -16,6 +16,8 @@ from catalog_roots            import CatalogRoots, RunScanner
 from tools.reporting.plotting import PlotBase
 from web_logger               import WebLogger
 
+from pipelines.shared.inference.run_classifier import RunArtifacts
+
 
 class ModelProbe:
 
@@ -24,7 +26,7 @@ class ModelProbe:
     CONTAINER_TYPES = ("ModuleList", "ModuleDict", "Sequential")
     LOADER_NAME     = "model_probe"
     CHECKPOINT      = "best_model.pt"
-    CONFIG_NAME     = "model_config.json"
+    CONFIG_NAMES    = (RunArtifacts.BACKBONE_CONFIG, RunArtifacts.DUAL_CONFIG)
 
     def __init__(self, logger: WebLogger) -> None:
         self.logger  = logger
@@ -35,7 +37,7 @@ class ModelProbe:
         self.status = {"state": "idle", "path": "", "progress": 0.0, "stage": "", "error": "", "info": None}
 
     def runs(self, base: str) -> dict:
-        scanned = self.scanner.checkpoint_runs(base, self.CHECKPOINT, self.CONFIG_NAME)
+        scanned = self.scanner.checkpoint_runs(base, self.CHECKPOINT, self.CONFIG_NAMES)
         if not scanned["ok"]:
             return {"ok": False, "error": scanned["error"], "runs": []}
 
@@ -48,8 +50,8 @@ class ModelProbe:
             return f"'{run_path}' is not a directory; pick a training run from the list"
         if not (run_dir / self.CHECKPOINT).is_file():
             return f"'{run_dir.name}' holds no {self.CHECKPOINT}; it is not a finished training run (did you point at a runs root or an inference stamp?)"
-        if not (run_dir / "meta" / self.CONFIG_NAME).is_file():
-            return f"'{run_dir.name}' holds no meta/{self.CONFIG_NAME}; the microscope probes backbone runs only, and this run is another family or predates config persistence"
+        if not any((run_dir / "meta" / name).is_file() for name in self.CONFIG_NAMES):
+            return f"'{run_dir.name}' holds no meta/{' or meta/'.join(self.CONFIG_NAMES)}; the microscope probes backbone and dual runs only, and this run is another family or predates config persistence"
 
         return ""
 
@@ -79,16 +81,30 @@ class ModelProbe:
         modules = dict(model.named_modules())
         return [name for name in ActivationRecorder(model).leaf_names() if type(modules[name]).__name__ not in self.CONTAINER_TYPES]
 
+    def _loader_class(self, is_dual: bool):
+        from pipelines.backbone.inference.loader import RunLoader
+        from pipelines.dual.inference.loader     import DualRunLoader
+
+        return DualRunLoader if is_dual else RunLoader
+
+    def _model_label(self, run, is_dual: bool) -> str:
+        if not is_dual:
+            return run.backbone_name
+
+        config = run.model.module.config
+        return f"{run.backbone_name} ({config.params_backbone} + {config.existence_backbone})"
+
     def _load_worker(self, run_path: str, split: str, device: str) -> None:
         try:
             from pipelines.backbone.inference.analysis.input_attribution import ChannelLabeler
-            from pipelines.backbone.inference.loader            import RunLoader
             from pipelines.backbone.inference.probes            import PredictionCurves
             from tools.monitoring.logger                        import Logger
 
             self._set_load(0.1, "loading checkpoint and dataset")
 
-            run = RunLoader(Path(run_path), logger=Logger(log_dir="", name=self.LOADER_NAME)).load(
+            is_dual = (Path(run_path) / "meta" / RunArtifacts.DUAL_CONFIG).is_file()
+
+            run = self._loader_class(is_dual)(Path(run_path), logger=Logger(log_dir="", name=self.LOADER_NAME)).load(
                 split           = split,
                 batch_size      = 1,
                 num_workers     = 0,
@@ -105,7 +121,7 @@ class ModelProbe:
 
             info = {
                 "run"          : run_path,
-                "backbone"     : run.backbone_name,
+                "backbone"     : self._model_label(run, is_dual),
                 "split"        : split,
                 "in_channels"  : run.in_channels,
                 "n_gaussians"  : run.n_gaussians,
@@ -130,7 +146,7 @@ class ModelProbe:
                 }
                 self.status = {"state": "ready", "path": run_path, "progress": 1.0, "stage": "ready", "error": "", "info": info}
 
-            self.logger.info(f"model probe loaded {run.backbone_name} from {run_path} ({len(layers)} layers)")
+            self.logger.info(f"model probe loaded {info['backbone']} from {run_path} ({len(layers)} layers)")
 
         except Exception as error:
             with self.lock:

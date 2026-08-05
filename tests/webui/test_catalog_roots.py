@@ -125,14 +125,14 @@ def _fake_stamp(root: Path, group: str, run: str, stamp: str, extras: tuple = ()
     return stamp_dir
 
 
-def _fake_checkpoint_run(root: Path, group: str, run: str, with_config: bool = True) -> Path:
+def _fake_checkpoint_run(root: Path, group: str, run: str, config_name: str = "model_config.json") -> Path:
     run_dir = root / group / run
     run_dir.mkdir(parents=True)
     (run_dir / "best_model.pt").write_bytes(b"x")
 
-    if with_config:
+    if config_name:
         (run_dir / "meta").mkdir()
-        (run_dir / "meta" / "model_config.json").write_text("{}")
+        (run_dir / "meta" / config_name).write_text("{}")
 
     return run_dir
 
@@ -168,11 +168,22 @@ def test_stamp_scan_reports_root_errors(tmp_path):
 
 def test_checkpoint_scan_requires_the_persisted_config(tmp_path):
     good = _fake_checkpoint_run(tmp_path, "backbone", "run_ok")
-    _fake_checkpoint_run(tmp_path, "backbone", "run_bare", with_config=False)
+    _fake_checkpoint_run(tmp_path, "backbone", "run_bare", config_name="")
 
-    out = RunScanner(CatalogRoots()).checkpoint_runs(str(tmp_path), "best_model.pt", "model_config.json")
+    out = RunScanner(CatalogRoots()).checkpoint_runs(str(tmp_path), "best_model.pt", ("model_config.json",))
 
     assert out["ok"] is True
     assert [entry["id"] for entry in out["entries"]] == [str(good)]
     assert out["entries"][0]["group"] == "backbone"
     assert out["entries"][0]["stamp"] == ""
+
+
+def test_checkpoint_scan_accepts_any_of_the_config_names(tmp_path):
+    backbone = _fake_checkpoint_run(tmp_path, "backbone", "run_ok")
+    dual     = _fake_checkpoint_run(tmp_path, "dual", "run_dual", config_name="dual_model_config.json")
+    _fake_checkpoint_run(tmp_path, "profile_ae", "run_ae", config_name="profile_autoencoder_config.json")
+
+    out = RunScanner(CatalogRoots()).checkpoint_runs(str(tmp_path), "best_model.pt", ("model_config.json", "dual_model_config.json"))
+
+    assert out["ok"] is True
+    assert [entry["id"] for entry in out["entries"]] == sorted([str(backbone), str(dual)], reverse=True)

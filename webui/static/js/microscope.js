@@ -40,8 +40,8 @@ class MicroscopeView {
   _build() {
     this.root.innerHTML = `
       <div class="cube-pick">
-        <div class="run-strip" id="probe-strip" aria-label="Trained backbone runs"></div>
-        <p class="cube-hint" id="probe-hint">Scanning the runs directory for loadable backbone runs&hellip;</p>
+        <div class="run-strip" id="probe-strip" aria-label="Trained backbone and dual runs"></div>
+        <p class="cube-hint" id="probe-hint">Scanning the runs directory for loadable backbone and dual runs&hellip;</p>
         <div class="cube-progress" id="probe-progress" hidden>
           <div class="cube-progress__track"><i class="cube-progress__fill" id="probe-progress-fill"></i></div>
           <p class="cube-progress__label" id="probe-progress-label">loading&hellip;</p>
@@ -246,11 +246,11 @@ class MicroscopeView {
     this._renderStrip();
 
     if (!this.runs.length) {
-      this.refs.hint.textContent = `No loadable backbone runs under ${data.root} (a loadable run holds best_model.pt and meta/model_config.json). Train a backbone run, or point the runs directory in the Results tab at the right place.`;
+      this.refs.hint.textContent = `No loadable runs under ${data.root} (a loadable run holds best_model.pt and meta/model_config.json or meta/dual_model_config.json). Train a backbone or dual run, or point the runs directory in the Results tab at the right place.`;
       return;
     }
 
-    if (!this.info) this.refs.hint.textContent = "Pick a trained backbone run to put under the microscope.";
+    if (!this.info) this.refs.hint.textContent = "Pick a trained backbone or dual run to put under the microscope.";
   }
 
   _renderStrip() {

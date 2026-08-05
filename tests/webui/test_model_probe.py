@@ -179,32 +179,29 @@ def test_map_png_renders_for_a_loaded_run():
     assert png[:8] == b"\x89PNG\r\n\x1a\n"
 
 
-def _loadable_run(tmp_path):
-    run_dir = tmp_path / "backbone" / "run_ok"
+def _loadable_run(tmp_path, group: str = "backbone", name: str = "run_ok", config_name: str = "model_config.json"):
+    run_dir = tmp_path / group / name
     run_dir.mkdir(parents=True)
     (run_dir / "best_model.pt").write_bytes(b"x")
     (run_dir / "meta").mkdir()
-    (run_dir / "meta" / "model_config.json").write_text("{}")
+    (run_dir / "meta" / config_name).write_text("{}")
     return run_dir
 
 
-def test_runs_lists_only_loadable_backbone_runs(tmp_path):
-    run_dir = _loadable_run(tmp_path)
+def test_runs_lists_loadable_backbone_and_dual_runs(tmp_path):
+    backbone = _loadable_run(tmp_path)
+    dual     = _loadable_run(tmp_path, group="dual", name="run_dual", config_name="dual_model_config.json")
 
     bare = tmp_path / "backbone" / "run_bare"
     bare.mkdir(parents=True)
     (bare / "best_model.pt").write_bytes(b"x")
 
-    dual = tmp_path / "dual" / "run_dual"
-    dual.mkdir(parents=True)
-    (dual / "best_model.pt").write_bytes(b"x")
-    (dual / "meta").mkdir()
-    (dual / "meta" / "dual_model_config.json").write_text("{}")
+    _loadable_run(tmp_path, group="profile_ae", name="run_ae", config_name="profile_autoencoder_config.json")
 
     out = ModelProbe(SilentLogger()).runs(str(tmp_path))
 
     assert out["ok"] is True
-    assert [run["id"] for run in out["runs"]] == [str(run_dir)]
+    assert [run["id"] for run in out["runs"]] == sorted([str(backbone), str(dual)], reverse=True)
 
 
 def test_runs_reports_root_errors(tmp_path):
@@ -236,4 +233,24 @@ def test_load_refuses_a_run_without_the_persisted_config(tmp_path):
 
     assert out["ok"] is False
     assert "meta/model_config.json" in out["error"]
-    assert "backbone" in out["error"]
+    assert "meta/dual_model_config.json" in out["error"]
+    assert "backbone and dual" in out["error"]
+
+
+def test_loader_class_picks_the_dual_loader_for_dual_runs():
+    from pipelines.backbone.inference.loader import RunLoader
+    from pipelines.dual.inference.loader     import DualRunLoader
+
+    probe = ModelProbe(SilentLogger())
+
+    assert probe._loader_class(False) is RunLoader
+    assert probe._loader_class(True)  is DualRunLoader
+
+
+def test_model_label_names_the_dual_trunks():
+    probe  = ModelProbe(SilentLogger())
+    config = SimpleNamespace(params_backbone="unet_skip", existence_backbone="resunet")
+    run    = SimpleNamespace(backbone_name="dual_resunet", model=SimpleNamespace(module=SimpleNamespace(config=config)))
+
+    assert probe._model_label(run, False) == "dual_resunet"
+    assert probe._model_label(run, True)  == "dual_resunet (unet_skip + resunet)"
