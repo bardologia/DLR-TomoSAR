@@ -38,6 +38,32 @@ def test_cka_rejects_mismatched_samples():
         CkaComputation.linear_cka(_features(n=100), _features(n=50))
 
 
+def test_debiasing_stays_low_for_independent_high_dimensional_features():
+    value = CkaComputation.linear_cka(_features(n=64, d=32, seed=7), _features(n=64, d=32, seed=8))
+
+    assert value < 0.15
+
+
+def test_constant_features_score_zero():
+    assert CkaComputation.linear_cka(np.ones((50, 4)), _features(n=50)) == 0.0
+
+
+def test_best_match_profiles_and_divergence_depth():
+    matrix = np.array([
+        [0.9, 0.2, 0.1],
+        [0.3, 0.8, 0.2],
+        [0.1, 0.2, 0.3],
+    ])
+
+    forward, backward = CkaComputation.best_match_profiles(matrix)
+
+    assert np.allclose(forward, [0.9, 0.8, 0.3])
+    assert np.allclose(backward, [0.9, 0.8, 0.3])
+    assert CkaComputation.divergence_depth(forward)              == pytest.approx(1.0)
+    assert CkaComputation.divergence_depth(np.array([0.9, 0.8])) is None
+    assert CkaComputation.divergence_depth(np.array([0.2, 0.8])) == pytest.approx(0.0)
+
+
 def test_cross_matrix_and_alignment_score():
     shared = _features(seed=4)
 

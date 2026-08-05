@@ -21,27 +21,45 @@ from tools.runtime.run_tag                              import RunTag
 
 class CkaComputation:
 
+    DIVERGENCE_THRESHOLD = 0.5
+
     @staticmethod
-    def linear_cka(features_a: np.ndarray, features_b: np.ndarray) -> float:
+    def _unbiased_hsic(X: np.ndarray, Y: np.ndarray) -> float:
+        n = X.shape[0]
+
+        cross      = X.T @ Y
+        norm_x     = (X * X).sum(axis=1)
+        norm_y     = (Y * Y).sum(axis=1)
+        sum_x      = X.sum(axis=0)
+        sum_y      = Y.sum(axis=0)
+        row_kx     = X @ sum_x
+        row_ly     = Y @ sum_y
+
+        trace_term = float((cross * cross).sum()) - float((norm_x * norm_y).sum())
+        ones_kx    = float(sum_x @ sum_x) - float(norm_x.sum())
+        ones_ly    = float(sum_y @ sum_y) - float(norm_y.sum())
+        mixed_term = float((row_kx * row_ly).sum()) - float((row_kx * norm_y).sum()) - float((norm_x * row_ly).sum()) + float((norm_x * norm_y).sum())
+
+        return (trace_term + ones_kx * ones_ly / ((n - 1.0) * (n - 2.0)) - 2.0 * mixed_term / (n - 2.0)) / (n * (n - 3.0))
+
+    @classmethod
+    def linear_cka(cls, features_a: np.ndarray, features_b: np.ndarray) -> float:
         X = np.asarray(features_a, dtype=np.float64)
         Y = np.asarray(features_b, dtype=np.float64)
 
         if X.shape[0] != Y.shape[0]:
             raise ValueError(f"CKA needs matched samples, got {X.shape[0]} and {Y.shape[0]}")
         if X.shape[0] < 4:
-            raise ValueError(f"CKA needs at least 4 samples, got {X.shape[0]}")
+            raise ValueError(f"Debiased CKA needs at least 4 samples, got {X.shape[0]}")
 
-        X = X - X.mean(axis=0)
-        Y = Y - Y.mean(axis=0)
+        hsic_xy = cls._unbiased_hsic(X, Y)
+        hsic_xx = cls._unbiased_hsic(X, X)
+        hsic_yy = cls._unbiased_hsic(Y, Y)
 
-        cross  = float(np.linalg.norm(Y.T @ X, ord="fro") ** 2)
-        norm_x = float(np.linalg.norm(X.T @ X, ord="fro"))
-        norm_y = float(np.linalg.norm(Y.T @ Y, ord="fro"))
-
-        if norm_x <= 0.0 or norm_y <= 0.0:
+        if hsic_xx <= 0.0 or hsic_yy <= 0.0:
             return 0.0
 
-        return cross / (norm_x * norm_y)
+        return max(0.0, hsic_xy / np.sqrt(hsic_xx * hsic_yy))
 
     @classmethod
     def cross_matrix(cls, layers_a: dict[str, np.ndarray], layers_b: dict[str, np.ndarray]) -> np.ndarray:
@@ -59,21 +77,71 @@ class CkaComputation:
     def alignment_score(matrix: np.ndarray) -> float:
         return float((matrix.max(axis=1).mean() + matrix.max(axis=0).mean()) / 2.0)
 
+    @staticmethod
+    def best_match_profiles(matrix: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+        return matrix.max(axis=1), matrix.max(axis=0)
+
+    @classmethod
+    def divergence_depth(cls, profile: np.ndarray) -> float | None:
+        below = np.where(profile < cls.DIVERGENCE_THRESHOLD)[0]
+        if below.size == 0:
+            return None
+        if profile.size == 1:
+            return 0.0
+
+        return float(below[0] / (profile.size - 1))
+
 
 class CkaPlots(PlotBase):
 
-    def pair_heatmap(self, matrix: np.ndarray, name_a: str, name_b: str, path: Path) -> Path:
+    def pair_heatmap(self, matrix: np.ndarray, name_a: str, name_b: str, score: float, path: Path) -> Path:
         return self._imshow_figure(
             matrix,
             x_label        = f"{name_b} layers (forward order)",
             y_label        = f"{name_a} layers (forward order)",
-            title          = f"Linear CKA: {name_a} vs {name_b}",
+            title          = f"Debiased linear CKA: {name_a} vs {name_b}",
+            cmap           = self._cmap_with_bad("magma"),
+            vmin           = 0.0,
+            vmax           = 1.0,
+            colorbar_label = "CKA",
+            text_overlay   = f"alignment = {score:.3f}",
+            path           = path,
+        )
+
+    def self_heatmap(self, matrix: np.ndarray, name: str, path: Path) -> Path:
+        return self._imshow_figure(
+            matrix,
+            x_label        = "Layers (forward order)",
+            y_label        = "Layers (forward order)",
+            title          = f"Within-run layer similarity: {name}",
             cmap           = self._cmap_with_bad("magma"),
             vmin           = 0.0,
             vmax           = 1.0,
             colorbar_label = "CKA",
             path           = path,
         )
+
+    def best_match_profile(self, forward: np.ndarray, backward: np.ndarray, name_a: str, name_b: str, path: Path) -> Path:
+        self._apply_style()
+
+        fig, ax = plt.subplots(figsize=self.figsize(self.FULL_WIDTH))
+
+        depth_a = np.linspace(0.0, 1.0, forward.size) if forward.size > 1 else np.array([0.0])
+        depth_b = np.linspace(0.0, 1.0, backward.size) if backward.size > 1 else np.array([0.0])
+
+        ax.plot(depth_a, forward, marker="o", color=self.OKABE_ITO[0], linewidth=1.4, label=f"{name_a} → best match in {name_b}")
+        ax.plot(depth_b, backward, marker="s", color=self.OKABE_ITO[1], linewidth=1.4, label=f"{name_b} → best match in {name_a}")
+        ax.axhline(CkaComputation.DIVERGENCE_THRESHOLD, color="0.45", linestyle="--", linewidth=1.0, label=f"divergence threshold ({CkaComputation.DIVERGENCE_THRESHOLD})")
+
+        ax.set_xlabel("Relative depth")
+        ax.set_ylabel("Best-match CKA")
+        ax.set_ylim(-0.02, 1.05)
+        ax.set_title(f"Where representations diverge: {name_a} vs {name_b}")
+        ax.grid(True, alpha=0.3)
+        ax.legend(loc="lower left", fontsize=8, framealpha=0.9)
+        fig.tight_layout()
+
+        return self._save(fig, path)
 
     def summary_heatmap(self, matrix: np.ndarray, names: list[str], path: Path) -> Path:
         self._apply_style()
@@ -86,7 +154,7 @@ class CkaPlots(PlotBase):
         ax.set_xticklabels(names, rotation=60, ha="right", fontsize=7)
         ax.set_yticklabels(names, fontsize=7)
         ax.set_title("Representation alignment across runs")
-        fig.colorbar(im, ax=ax, fraction=0.045, pad=0.02).set_label("Mean best-match CKA")
+        fig.colorbar(im, ax=ax, fraction=0.045, pad=0.02).set_label("Mean best-match CKA (debiased)")
 
         for i in range(len(names)):
             for j in range(len(names)):
@@ -179,12 +247,14 @@ class CkaComparison:
 
         return {layer: np.concatenate(parts, axis=0) for layer, parts in chunks.items()}
 
-    def _write_report(self, names: list[str], summary: np.ndarray, pair_figures: dict, summary_figure: Path) -> Path:
-        doc = MarkdownDoc(title="Representation similarity (linear CKA)")
+    def _write_report(self, names: list[str], summary: np.ndarray, pairs: dict, figures: dict[str, Path]) -> Path:
+        doc = MarkdownDoc(title="Representation similarity (debiased linear CKA)")
         doc.paragraph(
-            f"Linear CKA between {len(names)} runs on identical sampled pixels of the '{self.config.split}' split. "
-            "The summary cell is the mean best-match CKA across layers (1 = every layer of one run has a near-identical "
-            "counterpart in the other); per-pair heatmaps show the full cross-layer structure."
+            f"Debiased linear CKA (unbiased HSIC estimator) between {len(names)} runs on identical sampled pixels of the '{self.config.split}' split. "
+            "The summary cell is the mean best-match CKA across layers (1 = every layer of one run has a near-identical counterpart in the other). "
+            "Per-pair heatmaps show the full cross-layer structure; the divergence profiles track each layer's best match by relative depth, and the "
+            f"divergence depth is the first relative depth whose best match falls below {CkaComputation.DIVERGENCE_THRESHOLD}. "
+            "Within-run self-similarity heatmaps expose the block structure of each network's stages."
         )
 
         table = MarkdownTable(("Run", *[name for name in names]))
@@ -192,9 +262,17 @@ class CkaComparison:
             table.add_row(f"`{name}`", *[f"{summary[i, j]:.3f}" for j in range(len(names))])
         doc.table(table)
 
-        doc.image("alignment", str(summary_figure.relative_to(self.output_dir)))
-        for (name_a, name_b), path in pair_figures.items():
-            doc.image(f"{name_a} vs {name_b}", str(path.relative_to(self.output_dir)))
+        doc.heading("Pair diagnostics", level=2)
+        pair_table = MarkdownTable(("Pair", "Alignment", "Divergence depth →", "Divergence depth ←"))
+        for (name_a, name_b), entry in pairs.items():
+            forward  = f"{entry['divergence_forward']:.2f}" if entry["divergence_forward"] is not None else "never"
+            backward = f"{entry['divergence_backward']:.2f}" if entry["divergence_backward"] is not None else "never"
+            pair_table.add_row(f"`{name_a}` vs `{name_b}`", f"{entry['score']:.3f}", forward, backward)
+        doc.table(pair_table)
+
+        doc.heading("Figures", level=2)
+        for name, path in figures.items():
+            doc.image(name, str(path.relative_to(self.output_dir)))
 
         return doc.save(self.output_dir / "cka_report.md")
 
@@ -216,25 +294,43 @@ class CkaComparison:
             features.append(self._collect(run))
             del run
 
-        plots        = CkaPlots()
-        summary      = np.eye(len(names))
-        pair_figures = {}
-        pair_scores  = {}
+        plots   = CkaPlots()
+        figures = {}
+
+        for i, name in enumerate(names):
+            safe = name.replace("/", "_")
+            figures[f"self_{safe}"] = plots.self_heatmap(CkaComputation.cross_matrix(features[i], features[i]), name, self.output_dir / "self" / f"{i}.png")
+
+        summary = np.eye(len(names))
+        pairs   = {}
 
         for (i, j) in combinations(range(len(names)), 2):
-            matrix = CkaComputation.cross_matrix(features[i], features[j])
-            score  = CkaComputation.alignment_score(matrix)
+            matrix            = CkaComputation.cross_matrix(features[i], features[j])
+            score             = CkaComputation.alignment_score(matrix)
+            forward, backward = CkaComputation.best_match_profiles(matrix)
 
             summary[i, j] = summary[j, i] = score
-            pair_scores[f"{names[i]}|{names[j]}"] = score
-            pair_figures[(names[i], names[j])]    = plots.pair_heatmap(matrix, names[i], names[j], self.output_dir / "pairs" / f"{i}_{j}.png")
+            pairs[(names[i], names[j])]   = {
+                "score"               : score,
+                "divergence_forward"  : CkaComputation.divergence_depth(forward),
+                "divergence_backward" : CkaComputation.divergence_depth(backward),
+            }
 
-        summary_figure = plots.summary_heatmap(summary, names, self.output_dir / "alignment.png")
+            figures[f"pair_{i}_{j}"]    = plots.pair_heatmap(matrix, names[i], names[j], score, self.output_dir / "pairs" / f"{i}_{j}.png")
+            figures[f"profile_{i}_{j}"] = plots.best_match_profile(forward, backward, names[i], names[j], self.output_dir / "pairs" / f"{i}_{j}_profile.png")
 
-        payload = {"runs": names, "split": self.config.split, "alignment": summary.tolist(), "pair_scores": pair_scores}
+        figures["alignment"] = plots.summary_heatmap(summary, names, self.output_dir / "alignment.png")
+
+        payload = {
+            "runs"        : names,
+            "split"       : self.config.split,
+            "alignment"   : summary.tolist(),
+            "pair_scores" : {f"{name_a}|{name_b}": entry["score"] for (name_a, name_b), entry in pairs.items()},
+            "divergence"  : {f"{name_a}|{name_b}": {"forward": entry["divergence_forward"], "backward": entry["divergence_backward"]} for (name_a, name_b), entry in pairs.items()},
+        }
         FileIO.save_json(payload, self.output_dir / "cka.json")
 
-        report_path = self._write_report(names, summary, pair_figures, summary_figure)
+        report_path = self._write_report(names, summary, pairs, figures)
         self.logger.ok(f"CKA over {len(names)} runs -> {report_path}")
 
         return payload
