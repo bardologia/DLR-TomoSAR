@@ -367,6 +367,7 @@ class App {
         thrLabel  : document.getElementById("cube-globe-thr-label"),
         thrVal    : document.getElementById("cube-globe-thr-val"),
         max       : document.getElementById("cube-globe-max"),
+        exagg     : document.getElementById("cube-globe-exagg"),
         lift      : document.getElementById("cube-globe-lift"),
         clamp     : document.getElementById("cube-globe-clamp"),
         reframe   : document.getElementById("cube-globe-reframe"),

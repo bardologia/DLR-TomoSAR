@@ -13,6 +13,7 @@ class TomogramGlobe {
     this.thrLabel = refs.thrLabel;
     this.thrValEl = refs.thrVal;
     this.maxEl = refs.max;
+    this.exaggEl = refs.exagg;
     this.liftEl = refs.lift;
     this.clampEl = refs.clamp;
     this.reframeEl = refs.reframe;
@@ -40,6 +41,7 @@ class TomogramGlobe {
 
     this.thrEl.addEventListener("input", () => this._onThreshold());
     this.maxEl.addEventListener("change", () => this._fetch());
+    this.exaggEl.addEventListener("change", () => this._redraw());
     this.liftEl.addEventListener("change", () => this._redraw());
     this.clampEl.addEventListener("change", () => this._redraw());
     this.reframeEl.addEventListener("click", () => this._flyToScene(true));
@@ -194,12 +196,21 @@ class TomogramGlobe {
   _flyToScene(animate) {
     if (!this.viewer || !this.host.meta || !this.host.meta.globe) return;
 
-    const [west, south, east, north] = this.host.meta.globe.bbox;
-    const padLon = Math.max(0.25 * (east - west), 1e-4);
-    const padLat = Math.max(0.25 * (north - south), 1e-4);
+    const globe = this.host.meta.globe;
+    const [west, south, east, north] = globe.bbox;
+    const midLat = (south + north) / 2;
 
-    this.viewer.camera.flyTo({
-      destination: Cesium.Rectangle.fromDegrees(west - padLon, south - padLat, east + padLon, north + padLat),
+    const extentEast = (east - west) * 111320.0 * Math.cos(midLat * Math.PI / 180);
+    const extentNorth = (north - south) * 110574.0;
+    const radius = Math.max(0.5 * Math.max(extentEast, extentNorth), 100.0);
+
+    const anchor = new Cesium.Cartesian3(globe.anchor_ecef[0], globe.anchor_ecef[1], globe.anchor_ecef[2]);
+    const up = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(anchor, new Cesium.Cartesian3());
+    const lift = Number(this.liftEl.value || 0) - (this.clampEl.checked ? globe.base_height : 0);
+    const center = new Cesium.Cartesian3(anchor.x + up.x * lift, anchor.y + up.y * lift, anchor.z + up.z * lift);
+
+    this.viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(center, radius), {
+      offset: new Cesium.HeadingPitchRange(0, Cesium.Math.toRadians(-32), radius * 3.4),
       duration: animate ? 1.2 : 0,
     });
   }
@@ -214,6 +225,7 @@ class TomogramGlobe {
     const anchor = new Cesium.Cartesian3(globe.anchor_ecef[0], globe.anchor_ecef[1], globe.anchor_ecef[2]);
     const up = Cesium.Ellipsoid.WGS84.geodeticSurfaceNormal(anchor, new Cesium.Cartesian3());
     const lift = Number(this.liftEl.value || 0) - (this.clampEl.checked ? globe.base_height : 0);
+    const exagg = Number(this.exaggEl.value || 1);
 
     const [muLo, muHi] = this.muRange || [meta.x_min, meta.x_max];
     const muSpan = (muHi - muLo) || 1;
@@ -237,11 +249,14 @@ class TomogramGlobe {
         : (mu - muLo) / muSpan;
       const rgb = TomogramCloud.palette(t);
 
+      const upComp = rows[i] * up.x + rows[i + 1] * up.y + rows[i + 2] * up.z;
+      const rise = upComp * (exagg - 1) + lift;
+
       this.collection.add({
         position: new Cesium.Cartesian3(
-          anchor.x + rows[i] + up.x * lift,
-          anchor.y + rows[i + 1] + up.y * lift,
-          anchor.z + rows[i + 2] + up.z * lift,
+          anchor.x + rows[i] + up.x * rise,
+          anchor.y + rows[i + 1] + up.y * rise,
+          anchor.z + rows[i + 2] + up.z * rise,
         ),
         color: Cesium.Color.fromBytes(rgb[0], rgb[1], rgb[2], 255),
         pixelSize: 2.5,
@@ -254,7 +269,8 @@ class TomogramGlobe {
     }
 
     const shown = rows.length / 5;
-    this.atEl.textContent = `${shown.toLocaleString()} of ${Math.round(this.total).toLocaleString()} scatterers · corner fit ±${globe.residual_rms_m.toFixed(1)} m · Esri World Imagery`;
+    const exaggNote = exagg > 1 ? ` · height ${exagg}×` : "";
+    this.atEl.textContent = `${shown.toLocaleString()} of ${Math.round(this.total).toLocaleString()} scatterers${exaggNote} · corner fit ±${globe.residual_rms_m.toFixed(1)} m · ctrl+drag tilts · Esri World Imagery`;
     this.viewer.scene.requestRender();
   }
 
