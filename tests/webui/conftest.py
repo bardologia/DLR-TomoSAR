@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import math
 import sys
 import time
 from pathlib import Path
 
 import numpy as np
 import pytest
+
+from tools.sar.geocoding import Wgs84
 
 REPO_ROOT  = Path(__file__).resolve().parents[2]
 WEBUI_ROOT = REPO_ROOT / "webui"
@@ -73,7 +76,41 @@ def wait_until_finished(manager: ProcessManager, job_id: str, timeout: float = 1
     return False
 
 
-def make_preproc(base: Path, rng: np.random.Generator | None = None, with_spacing: bool = False) -> Path:
+def make_geo_fields() -> dict:
+    heading, squint, h0, height = 43.0, -1.35, 3700.0, 680.0
+
+    corner_rg = np.array([0.0, N_RG, N_RG, 0.0])
+    corner_az = np.array([0.0, 0.0, N_AZ, N_AZ])
+
+    slant  = 3300.0 + corner_rg * 0.6
+    along  = corner_az * 0.4 + slant * math.sin(math.radians(squint))
+    ground = np.sqrt(slant * slant - (h0 - height) ** 2)
+
+    head_e = math.sin(math.radians(heading))
+    head_n = math.cos(math.radians(heading))
+    east   = along * head_e + ground * head_n
+    north  = along * head_n - ground * head_e
+
+    origin_x, origin_y, origin_z = Wgs84.geodetic_to_ecef(12.65, 47.85, 0.0)
+    east_axis, north_axis, _     = Wgs84.enu_axes(12.65, 47.85)
+
+    ecef        = np.array([float(origin_x), float(origin_y), float(origin_z)])[None, :] + np.outer(east, east_axis) + np.outer(north, north_axis)
+    lon, lat, _ = Wgs84.ecef_to_geodetic(ecef[:, 0], ecef[:, 1], ecef[:, 2])
+
+    return {
+        "h0"       : h0,
+        "heading"  : heading,
+        "squint"   : squint,
+        "antdir"   : 1,
+        "r"        : [3300.0 + 0.6 * i for i in range(N_RG)],
+        "geo_poly" : {
+            "pixels" : np.stack([corner_rg, corner_az], axis=1).ravel().tolist(),
+            "lonlat" : np.stack([lon, lat, np.full(4, height)], axis=1).ravel().tolist(),
+        },
+    }
+
+
+def make_preproc(base: Path, rng: np.random.Generator | None = None, with_spacing: bool = False, with_geo: bool = False) -> Path:
     rng     = np.random.default_rng(0) if rng is None else rng
     preproc = base / "preproc"
     (preproc / "data").mkdir(parents=True)
@@ -81,15 +118,30 @@ def make_preproc(base: Path, rng: np.random.Generator | None = None, with_spacin
     primary = rng.normal(size=(N_AZ, N_RG)) + 1j * rng.normal(size=(N_AZ, N_RG))
     np.save(preproc / "data" / "primary.npy", primary)
 
-    layout = {"global_crop": [0, N_AZ, 0, N_RG], "artifacts": {"primary": "primary.npy"}}
+    artifacts = {"primary": "primary.npy"}
+
+    if with_geo:
+        dem       = np.full((N_AZ, N_RG), 680.0, dtype=np.float32)
+        dem[2, 3] = np.nan
+        np.save(preproc / "data" / "dem_full.npy", dem)
+        artifacts["dem_full"] = "dem_full.npy"
+
+    layout = {"global_crop": [0, N_AZ, 0, N_RG], "artifacts": artifacts}
     (preproc / "data" / "dataset.json").write_text(json.dumps(layout))
 
-    if with_spacing:
+    if with_spacing or with_geo:
+        per_track = {"T01": {"ps_az": 0.4}, "T02": {"ps_az": 0.41}}
+
+        if with_geo:
+            fields = make_geo_fields()
+            per_track["T01"].update(fields)
+            per_track["T02"].update(fields)
+
         payload = {
             "labels"      : ["T01", "T02"],
             "reference"   : "T01",
             "shared"      : {"ps_rg": 0.6},
-            "per_track"   : {"T01": {"ps_az": 0.4}, "T02": {"ps_az": 0.41}},
+            "per_track"   : per_track,
             "track_files" : [],
         }
         (preproc / "meta").mkdir()
@@ -112,9 +164,9 @@ def make_stamp(run: Path, preproc: Path, rng: np.random.Generator, sources: tupl
     return stamp
 
 
-def make_cube_run(base: Path, sources: tuple = ("pred", "gt"), with_spacing: bool = False, with_reduced: bool = False, with_params: tuple = (), with_metrics: bool = False) -> Path:
+def make_cube_run(base: Path, sources: tuple = ("pred", "gt"), with_spacing: bool = False, with_reduced: bool = False, with_params: tuple = (), with_metrics: bool = False, with_geo: bool = False) -> Path:
     rng     = np.random.default_rng(0)
-    preproc = make_preproc(base, rng, with_spacing)
+    preproc = make_preproc(base, rng, with_spacing, with_geo)
     stamp   = make_stamp(base / "group" / "run_a", preproc, rng, sources)
 
     if with_reduced:

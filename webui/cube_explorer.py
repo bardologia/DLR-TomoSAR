@@ -18,6 +18,7 @@ from skimage.metrics import structural_similarity as ssim
 from catalog_roots              import CatalogRoots, RunScanner
 from tools.loss.param_loss      import ParamMatcher
 from tools.reporting.plotting   import PlotBase
+from tools.sar.geocoding        import SceneGeocoder
 from tools.sar.track_parameters import TrackParameters
 from web_logger                 import WebLogger
 
@@ -91,6 +92,7 @@ class CubeExplorer:
     SOURCES             = ("pred", "predb", "diff", "gt", "reduced", "full")
     PARAM_SOURCES       = ("pred", "gt")
     CLOUD_CURVE_SOURCES = ("reduced", "full")
+    GLOBE_SOURCES       = ("pred", "gt", "reduced")
     PARAM_FIELDS        = {"amp": 0, "mu": 1, "sigma": 2}
     PARAM_BAD           = "#10151a"
 
@@ -489,14 +491,22 @@ class CubeExplorer:
         return None
 
     def points_bin(self, cube_id: str, source: str, amp_min: float, max_points: int) -> bytes | None:
+        resolved = self._point_rows(cube_id, source, amp_min, max_points)
+        if resolved is None:
+            return None
+
+        rows, total = resolved
+        return self._points_blob(rows, total)
+
+    def _point_rows(self, cube_id: str, source: str, amp_min: float, max_points: int) -> tuple[np.ndarray, int] | None:
         if source in self.PARAM_SOURCES:
-            return self._param_points(cube_id, source, amp_min, max_points)
+            return self._param_rows(cube_id, source, amp_min, max_points)
         if source in self.CLOUD_CURVE_SOURCES:
             entry = self._entry(cube_id, source)
-            return None if entry is None else self._curve_points(entry, amp_min, max_points)
+            return None if entry is None else self._curve_rows(entry, amp_min, max_points)
         return None
 
-    def _param_points(self, cube_id: str, source: str, amp_min: float, max_points: int) -> bytes | None:
+    def _param_rows(self, cube_id: str, source: str, amp_min: float, max_points: int) -> tuple[np.ndarray, int] | None:
         resolved = self._param_state(cube_id)
         if resolved is None:
             return None
@@ -526,10 +536,10 @@ class CubeExplorer:
             amps[k_idx, az_idx, rg_idx].astype(np.float32),
         ], axis=1)
 
-        return self._points_blob(rows, total)
+        return rows, total
 
     @classmethod
-    def _curve_points(cls, entry: dict, amp_min: float, max_points: int) -> bytes:
+    def _curve_rows(cls, entry: dict, amp_min: float, max_points: int) -> tuple[np.ndarray, int]:
         cube   = entry["cube"]
         x_axis = np.asarray(entry["x_axis"], dtype=np.float32)
         n_rg   = cube.shape[2]
@@ -558,7 +568,7 @@ class CubeExplorer:
             ], axis=1))
 
         rows = np.concatenate(chunks, axis=0) if chunks else np.zeros((0, 4), dtype=np.float32)
-        return cls._points_blob(rows, total)
+        return rows, total
 
     @staticmethod
     def _points_blob(rows: np.ndarray, total: int) -> bytes:
@@ -580,6 +590,38 @@ class CubeExplorer:
 
         header = np.array([dem.shape[0], dem.shape[1], median, 0.0], dtype=np.float32)
         return header.tobytes() + np.ascontiguousarray(grid).tobytes()
+
+    def globe_points_bin(self, cube_id: str, source: str, amp_min: float, max_points: int) -> bytes | None:
+        with self.lock:
+            if self.loaded is None or self.loaded["id"] != cube_id:
+                return None
+            geo = self.loaded["geo"]
+
+        if geo is None or source not in self.GLOBE_SOURCES:
+            return None
+
+        resolved = self._point_rows(cube_id, source, amp_min, max_points)
+        if resolved is None:
+            return None
+
+        rows, total = resolved
+        az_idx      = rows[:, 0].astype(np.int64)
+        rg_idx      = rows[:, 1].astype(np.int64)
+
+        terrain = geo["dem"][az_idx, rg_idx]
+        keep    = np.isfinite(terrain)
+
+        az_idx  = az_idx[keep]
+        rg_idx  = rg_idx[keep]
+        rows    = rows[keep]
+        heights = terrain[keep].astype(np.float64) + rows[:, 2].astype(np.float64)
+
+        _, _, ecef = geo["geocoder"].geocode(az_idx + geo["az0"], rg_idx + geo["rg0"], heights)
+        offsets    = (ecef - geo["anchor_ecef"][None, :]).astype(np.float32)
+
+        globe_rows = np.concatenate([offsets, rows[:, 2:3], rows[:, 3:4]], axis=1)
+        header     = np.array([globe_rows.shape[0], total, 0.0, 0.0], dtype=np.float32)
+        return header.tobytes() + np.ascontiguousarray(globe_rows).tobytes()
 
     def metric_overlay_png(self, cube_id: str, key: str, vmin: float, vmax: float, keep_min: float, keep_max: float, alpha: float) -> bytes | None:
         resolved = self._metric_state(cube_id, key)
@@ -826,10 +868,10 @@ class CubeExplorer:
 
     def _load_worker(self, cube_id: str, stamp_dir: Path) -> None:
         try:
-            entries, meta, primary, params, metric_maps, dem = self._load_all(stamp_dir)
+            entries, meta, primary, params, metric_maps, dem, geo = self._load_all(stamp_dir)
 
             with self.lock:
-                self.loaded = {"id": cube_id, "entries": entries, "meta": meta, "primary": primary, "params": params, "metric_maps": metric_maps, "dem": dem}
+                self.loaded = {"id": cube_id, "entries": entries, "meta": meta, "primary": primary, "params": params, "metric_maps": metric_maps, "dem": dem, "geo": geo}
                 self.status = {"state": "ready", "id": cube_id, "progress": 1.0, "stage": "ready", "error": ""}
 
             self.logger.muted(f"cube ready: {cube_id} sources={meta['sources']}")
@@ -840,7 +882,7 @@ class CubeExplorer:
 
             self.logger.error(f"cube load failed: {cube_id}: {exc}")
 
-    def _load_all(self, stamp_dir: Path) -> tuple[dict, dict, np.ndarray, dict, dict, np.ndarray | None]:
+    def _load_all(self, stamp_dir: Path) -> tuple[dict, dict, np.ndarray, dict, dict, np.ndarray | None, dict | None]:
         cubes_dir = stamp_dir / "cubes"
         pred_raw  = np.load(cubes_dir / "pred_curves.npy", mmap_mode="r")
         if pred_raw.ndim != 3:
@@ -878,6 +920,7 @@ class CubeExplorer:
         params      = self._load_params(cubes_dir, n_az, n_rg)
         metric_maps = self._load_metric_maps(cubes_dir, n_az, n_rg)
         dem         = self._load_dem(stamp_dir, n_az, n_rg)
+        geo         = self._load_geo(stamp_dir, dem, n_az, n_rg)
 
         meta = {
             "sources"     : [s for s in self.SOURCES if s in entries],
@@ -892,8 +935,9 @@ class CubeExplorer:
             "attached"    : None,
             "dem"         : dem is not None,
             "spacing"     : self._load_spacing(stamp_dir),
+            "globe"       : self._globe_meta(geo),
         }
-        return entries, meta, primary, params, metric_maps, dem
+        return entries, meta, primary, params, metric_maps, dem, geo
 
     def _load_spacing(self, stamp_dir: Path) -> dict | None:
         resolved = self._preproc_layout(stamp_dir)
@@ -931,6 +975,61 @@ class CubeExplorer:
             raise ValueError(f"dem_full shape {raw.shape} does not cover the cube region az[{az_lo}:{az_hi}] rg[{rg_lo}:{rg_hi}]")
 
         return np.asarray(raw[az_lo:az_hi, rg_lo:rg_hi], dtype=np.float32)
+
+    def _load_geo(self, stamp_dir: Path, dem: np.ndarray | None, n_az: int, n_rg: int) -> dict | None:
+        if dem is None:
+            return None
+
+        resolved = self._preproc_layout(stamp_dir)
+        if resolved is None:
+            return None
+
+        preproc_dir, _ = resolved
+
+        params_path = preproc_dir / "meta" / TrackParameters.FILENAME
+        if not params_path.is_file():
+            return None
+
+        reference = TrackParameters.load(params_path).parameters[0]
+        if any(key not in reference for key in SceneGeocoder.REQUIRED_KEYS):
+            return None
+
+        finite = np.isfinite(dem)
+        if not finite.any():
+            return None
+
+        geocoder    = SceneGeocoder(reference)
+        base_height = float(np.median(dem[finite]))
+
+        metrics                  = self._metrics(stamp_dir)
+        az_start, _, rg_start, _ = (int(v) for v in metrics["split_region"])
+
+        _, _, anchor = geocoder.geocode([az_start + n_az / 2], [rg_start + n_rg / 2], [base_height])
+
+        corner_az   = np.array([az_start, az_start, az_start + n_az, az_start + n_az], dtype=np.float64)
+        corner_rg   = np.array([rg_start, rg_start + n_rg, rg_start, rg_start + n_rg], dtype=np.float64)
+        lon, lat, _ = geocoder.geocode(corner_az, corner_rg, np.full(4, base_height))
+
+        return {
+            "geocoder"    : geocoder,
+            "az0"         : az_start,
+            "rg0"         : rg_start,
+            "dem"         : dem,
+            "base_height" : base_height,
+            "anchor_ecef" : anchor[0],
+            "bbox"        : [float(lon.min()), float(lat.min()), float(lon.max()), float(lat.max())],
+        }
+
+    def _globe_meta(self, geo: dict | None) -> dict | None:
+        if geo is None:
+            return None
+
+        return {
+            "anchor_ecef"    : [float(value) for value in geo["anchor_ecef"]],
+            "bbox"           : geo["bbox"],
+            "base_height"    : geo["base_height"],
+            "residual_rms_m" : geo["geocoder"].residual_rms_m,
+        }
 
     def _load_metric_maps(self, cubes_dir: Path, n_az: int, n_rg: int) -> dict:
         maps = {}
