@@ -5,88 +5,25 @@ import json
 import numpy as np
 import pytest
 
-from configuration.dataset                     import DatasetConfig, InputConfig, PatchConfig, Representation, SplitRegions
 from configuration.inference                   import InferenceConfig
-from configuration.sar.gaussian_config         import GaussianConfig
 from configuration.training                    import OverfitCheckConfig
-from configuration.training.backbone           import BackboneTrainerConfig
-from models.dual                               import DUAL_CONFIG_REGISTRY
 from pipelines.backbone.inference.pipeline     import InferencePipeline
 from pipelines.dual.inference.pipeline         import DUAL_INFERENCE_COMPONENTS
 from pipelines.dual.training.pipeline          import DualTrainingPipeline
 from pipelines.shared.inference.run_classifier import RunClassifier, RunType
-from tools.data.regions                        import CropRegion
 
-from tests.backbone_training._helpers import geometry_config
+from tests.dual_training._helpers import N_GAUSSIANS, dual_dataset_config, dual_model_config, dual_trainer_config
 
 
 pytestmark = [pytest.mark.real_data, pytest.mark.slow, pytest.mark.usefixtures("force_cpu")]
 
-N_GAUSSIANS      = 5
-SECONDARY_LABELS = ("FL01_PS04", "FL01_PS06")
-
-
-def _dataset_config(test_data_dir, params_dir) -> DatasetConfig:
-    input_config = InputConfig(
-        use_primary        = True, primary_representation        = Representation.MAG_ONLY,
-        use_secondaries    = True, secondaries_representation    = Representation.MAG_ONLY,
-        use_interferograms = True, interferograms_representation = Representation.ANGLE_ONLY,
-    )
-
-    splits = SplitRegions(
-        train = CropRegion(1000, 1064, 500, 564),
-        val   = CropRegion(1064, 1128, 500, 564),
-        test  = CropRegion(1128, 1192, 500, 564),
-    )
-
-    return DatasetConfig(
-        preprocessing_run_directory = test_data_dir,
-        parameters_path             = params_dir / "parameters.npy",
-        split_regions               = splits,
-        secondary_labels            = SECONDARY_LABELS,
-        patch                       = PatchConfig(size=(32, 32), stride=(32, 32)),
-        input_config                = input_config,
-        batch_size                  = 4,
-        num_workers                 = 0,
-        n_gaussians                 = N_GAUSSIANS,
-    )
-
-
-def _trainer_config(test_data_dir, params_dir, tmp_path) -> BackboneTrainerConfig:
-    gaussian = GaussianConfig.from_dataset(test_data_dir, params_dir / "parameters.npy")
-    config   = BackboneTrainerConfig(gaussian=gaussian)
-
-    config.io.logdir                     = str(tmp_path)
-    config.io.writer                     = None
-    config.training.epochs               = 1
-    config.training.validation_frequency = 1
-    config.resources.enabled             = False
-    config.geometry                      = geometry_config()
-
-    config.curriculum.complete.use_param_l1    = True
-    config.curriculum.complete.weight_param_l1 = 1.0
-
-    return config
-
-
-def _model_config():
-    config = DUAL_CONFIG_REGISTRY["dual_resunet"]()
-
-    config.params_features     = [8, 16]
-    config.existence_features  = [8]
-    config.existence_input     = ("ifg",)
-    config.params_overrides    = {"bottleneck_factor": 1, "dropout": 0.0}
-    config.existence_overrides = {"bottleneck_factor": 1, "dropout": 0.0}
-
-    return config
-
 
 def test_dual_train_then_infer_end_to_end(test_data_dir, params_dir, tmp_path):
     pipeline = DualTrainingPipeline(
-        trainer_config = _trainer_config(test_data_dir, params_dir, tmp_path),
-        dataset_config = _dataset_config(test_data_dir, params_dir),
+        trainer_config = dual_trainer_config(test_data_dir, params_dir, tmp_path),
+        dataset_config = dual_dataset_config(test_data_dir, params_dir),
         backbone_name  = "dual_resunet",
-        model_config   = _model_config(),
+        model_config   = dual_model_config(),
         seed           = 0,
         run_name       = "e2e_dual",
         overfit_check  = OverfitCheckConfig(enabled=False),
@@ -144,15 +81,15 @@ def test_dual_train_then_infer_end_to_end(test_data_dir, params_dir, tmp_path):
 
 
 def test_dual_training_rejects_a_dem_bearing_input_stack(test_data_dir, params_dir, tmp_path):
-    dataset_config                      = _dataset_config(test_data_dir, params_dir)
+    dataset_config                      = dual_dataset_config(test_data_dir, params_dir)
     dataset_config.input_config.use_dem = True
 
     with pytest.raises(ValueError, match="never uses the DEM"):
         DualTrainingPipeline(
-            trainer_config = _trainer_config(test_data_dir, params_dir, tmp_path),
+            trainer_config = dual_trainer_config(test_data_dir, params_dir, tmp_path),
             dataset_config = dataset_config,
             backbone_name  = "dual_resunet",
-            model_config   = _model_config(),
+            model_config   = dual_model_config(),
             seed           = 0,
             run_name       = "e2e_dual_dem",
             overfit_check  = OverfitCheckConfig(enabled=False),
