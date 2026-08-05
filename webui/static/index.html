@@ -11,7 +11,7 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css" />
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css" />
-<link rel="stylesheet" href="/static/css/styles.css?v=20260804d" />
+<link rel="stylesheet" href="/static/css/styles.css?v=20260805a" />
 </head>
 <body>
 
@@ -284,6 +284,7 @@
         <button type="button" class="cube-mode" data-view="metrics">Metric maps</button>
         <button type="button" class="cube-mode" data-view="transect">Transect</button>
         <button type="button" class="cube-mode" data-view="cloud">Point cloud</button>
+        <button type="button" class="cube-mode" data-view="globe">Globe</button>
         <select id="cube-cmap" class="cube-mselect cube-modes__cmap" aria-label="Tomogram colormap">
           <option value="jet" selected>jet</option>
           <option value="viridis">viridis</option>
@@ -523,6 +524,45 @@
           </div>
           <div class="cube-cloud__stage">
             <canvas id="cube-cloud-canvas"></canvas>
+          </div>
+        </div>
+      </div>
+
+      <div class="cube-view" data-view="globe" hidden>
+        <div class="cube-pview">
+          <div class="cube-pview__bar">
+            <div class="cube-spaces" id="cube-globe-source" role="group" aria-label="Globe point source">
+              <button type="button" class="cube-space is-active" data-source="pred">pred</button>
+              <button type="button" class="cube-space" data-source="gt">gt</button>
+              <button type="button" class="cube-space" data-source="reduced" title="Capon reduced tomogram (metric elevation axis)">capon</button>
+            </div>
+            <div class="cube-spaces" id="cube-globe-color" role="group" aria-label="Colour by">
+              <button type="button" class="cube-space is-active" data-color="mu">colour: elevation</button>
+              <button type="button" class="cube-space" data-color="amp">colour: amplitude</button>
+            </div>
+            <div class="cube-mctl" role="group" aria-label="Amplitude threshold">
+              <label for="cube-globe-thr" id="cube-globe-thr-label">amp &ge;</label>
+              <input type="range" id="cube-globe-thr" min="0" max="100" value="0" />
+              <span class="cube-mctl__val" id="cube-globe-thr-val"></span>
+            </div>
+            <div class="cube-mctl" role="group" aria-label="Point budget">
+              <label for="cube-globe-max">points</label>
+              <select id="cube-globe-max" class="cube-mselect">
+                <option value="20000">20k</option>
+                <option value="60000" selected>60k</option>
+                <option value="150000">150k</option>
+              </select>
+            </div>
+            <div class="cube-mctl" role="group" aria-label="Vertical lift">
+              <label for="cube-globe-lift" title="Extra vertical offset applied to every point, in metres">lift [m]</label>
+              <input type="number" id="cube-globe-lift" class="cube-jump__input" step="10" value="0" />
+            </div>
+            <label class="lb-check" id="cube-globe-clamp-wrap" title="Subtract the median DEM height so the terrain rests on the imagery; untick to place points at their absolute heights above the ellipsoid"><input type="checkbox" id="cube-globe-clamp" checked /> rest on imagery</label>
+            <button type="button" class="btn btn--mini" id="cube-globe-reframe" title="Fly the camera back to the scene">Reframe</button>
+            <span class="cube-elev__at" id="cube-globe-at"></span>
+          </div>
+          <div class="cube-globe__stage">
+            <div id="cube-globe-container"></div>
           </div>
         </div>
       </div>
@@ -1142,7 +1182,8 @@
 <script src="/static/js/results.js?v=20260714a"></script>
 <script src="/static/js/leaderboard.js?v=20260716"></script>
 <script src="/static/js/run_strip.js?v=20260804b"></script>
-<script src="/static/js/tomogram.js?v=20260804a"></script>
+<script src="/static/js/tomogram.js?v=20260805a"></script>
+<script src="/static/js/globe.js?v=20260805a"></script>
 <script src="/static/js/slice_collector.js?v=20260804a"></script>
 <script src="/static/js/fit_lab.js?v=20260721a"></script>
 <script src="/static/js/microscope.js?v=20260805"></script>
@@ -1150,6 +1191,6 @@
 <script src="/static/js/autopsy.js?v=20260804a"></script>
 <script src="/static/js/tensorboard.js?v=20260702r"></script>
 <script src="/static/js/feed_tuner.js?v=20260624a"></script>
-<script src="/static/js/app.js?v=20260802a"></script>
+<script src="/static/js/app.js?v=20260805a"></script>
 </body>
 </html>

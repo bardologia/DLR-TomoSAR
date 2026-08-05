@@ -3895,6 +3895,10 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .cube-cloud__stage canvas:active { cursor: grabbing; }
 #cube-cloud-dem-wrap[hidden] { display: none; }
 
+.cube-globe__stage { border: 1px solid var(--line); border-radius: var(--r-card); overflow: hidden; background: #10151a; }
+#cube-globe-container { width: 100%; height: 62vh; }
+#cube-globe-container .cesium-viewer-bottom { font-size: 10px; }
+
 /* ==== Leaderboard curves ==== */
 .lb-curves { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 16px; align-items: start; }
 .lb-curves__list {

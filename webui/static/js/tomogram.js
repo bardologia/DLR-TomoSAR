@@ -1014,17 +1014,31 @@ class TomogramCloud {
     this._draw();
   }
 
-  _ampMin() {
-    const frac = Number(this.thrEl.value) / 100;
-
-    if (this._isParam()) {
-      const params = this.host.meta.params;
+  static ampFloor(meta, source, frac) {
+    if (source === "pred" || source === "gt") {
+      const params = meta.params;
       const top = Math.max(params.ranges.amp[1], params.threshold * 10);
       return params.threshold * Math.pow(top / params.threshold, frac);
     }
 
-    const [lo, hi] = this.host.meta.intensity[this.source];
+    const [lo, hi] = meta.intensity[source];
     return lo + frac * (hi - lo);
+  }
+
+  static sampleRange(rows, offset, width) {
+    const values = [];
+    const stride = Math.max(1, Math.floor(rows.length / width / 4096)) * width;
+    for (let i = offset; i < rows.length; i += stride) values.push(rows[i]);
+    if (!values.length) return [0, 1];
+
+    values.sort((a, b) => a - b);
+    const lo = values[Math.floor(values.length * 0.02)];
+    const hi = values[Math.floor(values.length * 0.98)];
+    return hi > lo ? [lo, hi] : [lo, lo + 1];
+  }
+
+  _ampMin() {
+    return TomogramCloud.ampFloor(this.host.meta, this.source, Number(this.thrEl.value) / 100);
   }
 
   _syncThresholdLabel() {
@@ -1078,15 +1092,7 @@ class TomogramCloud {
   }
 
   _sampleRange(rows, offset) {
-    const values = [];
-    const stride = Math.max(1, Math.floor(rows.length / 4 / 4096)) * 4;
-    for (let i = offset; i < rows.length; i += stride) values.push(rows[i]);
-    if (!values.length) return [0, 1];
-
-    values.sort((a, b) => a - b);
-    const lo = values[Math.floor(values.length * 0.02)];
-    const hi = values[Math.floor(values.length * 0.98)];
-    return hi > lo ? [lo, hi] : [lo, lo + 1];
+    return TomogramCloud.sampleRange(rows, offset, 4);
   }
 
   _resetView(draw = true) {
@@ -1110,7 +1116,7 @@ class TomogramCloud {
     this._draw();
   }
 
-  _palette(t) {
+  static palette(t) {
     const stops = TomogramCloud.VIRIDIS;
     const x = Math.min(0.9999, Math.max(0, t)) * (stops.length - 1);
     const i = Math.floor(x);
@@ -1120,6 +1126,10 @@ class TomogramCloud {
       Math.round(stops[i][1] + (stops[i + 1][1] - stops[i][1]) * f),
       Math.round(stops[i][2] + (stops[i + 1][2] - stops[i][2]) * f),
     ];
+  }
+
+  _palette(t) {
+    return TomogramCloud.palette(t);
   }
 
   _draw() {
@@ -1299,6 +1309,7 @@ class TomogramView {
     this.metrics = refs.metrics ? new TomogramMetrics(refs.metrics, this) : null;
     this.transect = refs.transect ? new TomogramTransect(refs.transect, this) : null;
     this.cloud = refs.cloud ? new TomogramCloud(refs.cloud, this) : null;
+    this.globe = refs.globe ? new TomogramGlobe(refs.globe, this) : null;
 
     this.mapWrap = this.topdown.closest(".cube-map__wrap");
 
@@ -1586,6 +1597,13 @@ class TomogramView {
       if (!this.cloud.available && this.view === "cloud") this._setView("explorer");
     }
 
+    if (this.globe) {
+      this.globe.configure(meta);
+      const globeBtn = this.modeBtns.find((btn) => btn.dataset.view === "globe");
+      if (globeBtn) globeBtn.hidden = !this.globe.available;
+      if (!this.globe.available && this.view === "globe") this._setView("explorer");
+    }
+
     this._follow({ az: Math.floor(meta.n_az / 2), rg: Math.floor(meta.n_rg / 2), fx: 0.5, fy: 0.5 }, true);
     this._consumeFocus();
 
@@ -1695,7 +1713,7 @@ class TomogramView {
   }
 
   _setView(view) {
-    if (!["explorer", "elevation", "azimuth", "range", "params", "metrics", "transect", "cloud"].includes(view) || view === this.view) return;
+    if (!["explorer", "elevation", "azimuth", "range", "params", "metrics", "transect", "cloud", "globe"].includes(view) || view === this.view) return;
 
     this._stopSweeps();
     this.view = view;
@@ -1717,6 +1735,10 @@ class TomogramView {
     }
     if (view === "cloud" && this.cloud && this.meta) {
       this.cloud.render();
+      return;
+    }
+    if (view === "globe" && this.globe && this.meta) {
+      this.globe.render();
       return;
     }
 
