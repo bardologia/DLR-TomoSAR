@@ -292,7 +292,7 @@ class LayerProbeConfig:
     max_layers        : int   = 24
     samples_per_batch : int   = 512
     ridge_lambda      : float = 1.0
-    test_fraction     : float = 0.5
+    n_folds           : int   = 4
     seed              : int   = 0
 
     figure_style : str = "report"

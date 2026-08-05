@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from pipelines.backbone.inference.analysis.layer_probes import FeatureSampler, LayerProbeCore, RidgeProbe
+from pipelines.backbone.inference.analysis.layer_probes import FeatureGeometry, FeatureSampler, LayerProbeCore, RidgeProbe
 
 
 H, W = 16, 12
@@ -15,7 +15,10 @@ def test_ridge_probe_recovers_a_linear_signal():
     X   = rng.normal(size=(400, 8))
     y   = X @ rng.normal(size=8) + 0.01 * rng.normal(size=400)
 
-    assert RidgeProbe(ridge_lambda=1e-3).score(X, y) > 0.95
+    score = RidgeProbe(ridge_lambda=1e-3).score(X, y)
+
+    assert score["mean"] > 0.95
+    assert score["std"]  < 0.05
 
 
 def test_ridge_probe_scores_noise_near_zero():
@@ -23,12 +26,26 @@ def test_ridge_probe_scores_noise_near_zero():
     X   = rng.normal(size=(400, 8))
     y   = rng.normal(size=400)
 
-    assert abs(RidgeProbe().score(X, y)) < 0.2
+    assert abs(RidgeProbe().score(X, y)["mean"]) < 0.2
 
 
 def test_ridge_probe_needs_enough_samples():
     with pytest.raises(ValueError):
         RidgeProbe().score(np.zeros((5, 3)), np.zeros(5))
+
+
+def test_ridge_probe_needs_two_folds():
+    with pytest.raises(ValueError):
+        RidgeProbe(n_folds=1)
+
+
+def test_participation_ratio_separates_isotropic_from_collapsed():
+    rng       = np.random.default_rng(2)
+    isotropic = rng.normal(size=(2000, 8))
+    collapsed = np.outer(rng.normal(size=2000), rng.normal(size=8))
+
+    assert FeatureGeometry.participation_ratio(isotropic) > 7.0
+    assert FeatureGeometry.participation_ratio(collapsed) == pytest.approx(1.0, abs=0.05)
 
 
 class _TwoLayerNet(torch.nn.Module):
@@ -56,27 +73,58 @@ def _batches(n: int = 3):
         gt[:, 3] = (counts >= 2).astype(np.float32)
         gt[:, 1] = 20.0
         gt[:, 4] = 40.0
+        gt[:, 2] = 2.0
+        gt[:, 5] = 3.0
 
         batches.append((images, gt))
 
     return batches
 
 
-def test_probe_core_finds_the_informative_layer():
-    core = LayerProbeCore(
-        model             = _TwoLayerNet(),
-        layers            = ["useful", "useless"],
+def _core(model, layers, samples: int = 256, seed: int = 0) -> LayerProbeCore:
+    return LayerProbeCore(
+        model             = model,
+        layers            = layers,
         ppg               = 3,
         amp_thr           = 1e-3,
-        samples_per_batch = 256,
-        probe             = RidgeProbe(ridge_lambda=1e-3),
+        samples_per_batch = samples,
+        probe             = RidgeProbe(ridge_lambda=1e-3, seed=seed),
+        seed              = seed,
     )
 
-    results = core.collect(_batches())
 
-    assert results["useful"]["k_r2"]  > 0.9
-    assert results["useless"]["k_r2"] < 0.2
-    assert results["useful"]["n_channels"] == 2
+def test_probe_core_finds_the_informative_layer():
+    results = _core(_TwoLayerNet(), ["useful", "useless"]).collect(_batches())
+
+    assert results["layers"]["useful"]["scores"]["count"]["mean"]  > 0.9
+    assert results["layers"]["useless"]["scores"]["count"]["mean"] < 0.2
+    assert results["layers"]["useful"]["n_channels"] == 2
+
+
+def test_probe_core_scores_all_five_targets():
+    results = _core(_TwoLayerNet(), ["useful"]).collect(_batches())
+    scores  = results["layers"]["useful"]["scores"]
+
+    assert set(scores) == {target for target, _label in LayerProbeCore.TARGETS}
+    assert scores["second_presence"]["mean"] == pytest.approx(0.75, abs=0.05)
+    assert scores["total_amp"]["mean"]       > 0.9
+
+
+def test_input_baseline_decodes_what_the_input_carries():
+    results  = _core(_TwoLayerNet(), ["useful"]).collect(_batches())
+    baseline = results["input_baseline"]
+
+    assert baseline["n_channels"] == 2
+    assert baseline["scores"]["count"]["mean"] > 0.9
+
+
+def test_shuffled_controls_sit_near_zero():
+    results = _core(_TwoLayerNet(), ["useful", "useless"]).collect(_batches())
+
+    control = results["shuffled_controls"]["count"]
+
+    assert control["layer"] == "useful"
+    assert abs(control["score"]) < 0.2
 
 
 def test_feature_map_layouts_are_accepted_and_rejected():
@@ -111,34 +159,17 @@ def test_probe_core_drops_channels_last_activations():
             _ = self.channel_last(x.permute(0, 2, 3, 1))
             return a
 
-    core = LayerProbeCore(
-        model             = _ChannelsLastNet(),
-        layers            = ["spatial", "channel_last"],
-        ppg               = 3,
-        amp_thr           = 1e-3,
-        samples_per_batch = 256,
-        probe             = RidgeProbe(ridge_lambda=1e-3),
-    )
+    results = _core(_ChannelsLastNet(), ["spatial", "channel_last"]).collect(_batches())
 
-    results = core.collect(_batches())
-
-    assert set(results) == {"spatial"}
+    assert set(results["layers"]) == {"spatial"}
 
 
 def test_probe_core_seed_changes_the_sampled_pixels():
-    def features(seed: int) -> np.ndarray:
-        core = LayerProbeCore(
-            model             = _TwoLayerNet(),
-            layers            = ["useful"],
-            ppg               = 3,
-            amp_thr           = 1e-3,
-            samples_per_batch = 32,
-            probe             = RidgeProbe(ridge_lambda=1e-3, seed=seed),
-            seed              = seed,
-        )
-        return core.collect(_batches(1))["useful"]["k_r2"]
+    def score(seed: int) -> float:
+        results = _core(_TwoLayerNet(), ["useful"], samples=32, seed=seed).collect(_batches(1))
+        return results["layers"]["useful"]["scores"]["count"]["mean"]
 
-    assert features(0) != features(3)
+    assert score(0) != score(3)
 
 
 def test_probe_core_without_feature_layers_raises():
@@ -151,14 +182,5 @@ def test_probe_core_without_feature_layers_raises():
             _ = self.flat(x.mean())
             return x
 
-    core = LayerProbeCore(
-        model             = _ScalarNet(),
-        layers            = ["flat"],
-        ppg               = 3,
-        amp_thr           = 1e-3,
-        samples_per_batch = 128,
-        probe             = RidgeProbe(),
-    )
-
     with pytest.raises(ValueError):
-        core.collect(_batches(1))
+        _core(_ScalarNet(), ["flat"], samples=128).collect(_batches(1))

@@ -1380,7 +1380,7 @@ class LaunchLayout:
                             {"path": "max_layers",        "widget": {"kind": "number", "min": 2, "max": 128, "step": 1}},
                             {"path": "samples_per_batch", "widget": {"kind": "number", "min": 64, "max": 8192, "step": 64}},
                             "ridge_lambda",
-                            "test_fraction",
+                            {"path": "n_folds", "widget": {"kind": "number", "min": 2, "max": 10, "step": 1}},
                             "seed",
                         ]},
                         {"title": "Figures", "fields": [{"path": "figure_style", "widget": CH_FIGSTYLE}]},

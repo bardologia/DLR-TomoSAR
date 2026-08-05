@@ -2521,9 +2521,9 @@
         "max_layers": "Maximum number of leaf layers probed, spread evenly across the network depth",
         "samples_per_batch": "Number of pixels sampled per batch as probe examples; features are read at each pixel's location scaled into every layer's spatial grid",
         "ridge_lambda": "Ridge regularization strength of the linear probes",
-        "test_fraction": "Fraction of probe samples held out for the reported R²",
         "seed": "Seed of the sampled probe pixels and of the held-out probe split; vary it to check how sensitive the reported R² is to the sample",
-        "figure_style": "PlotBase figure style the decodability curves are rendered with (report or paper)"
+        "figure_style": "PlotBase figure style the decodability curves are rendered with (report or paper)",
+        "n_folds": "Number of cross-validation folds the ridge probe averages its held-out R² over"
       }
     },
     "diagnostics::CkaConfig": {
