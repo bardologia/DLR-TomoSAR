@@ -57,6 +57,10 @@ class TuningScheduler:
         if unknown:
             sys.exit(f"ERROR: unknown head(s) {unknown}; valid: {', '.join(BACKBONE_HEADS)}")
 
+        structured = [head for head in self.config.heads if head != "conv"]
+        if self.config.training_type == "jepa" and self.config.jepa.profile_autoencoder_run and structured:
+            sys.exit(f"ERROR: head(s) {structured} are invalid for JEPA tuning with a coupled profile autoencoder; the backbone predicts the embedding and only the conv head projects to it. Set heads=['conv'] or drop jepa.profile_autoencoder_run.")
+
         return [ModelBuilder.model_key(name, head) for name in self._registry() for head in self.config.heads]
 
     def _search_space(self, model_name: str) -> dict:

@@ -490,6 +490,7 @@ class LaunchLayout:
     ]
 
     JEPA_COUPLING_NOTE  = "JEPA needs at least one autoencoder run. A profile autoencoder makes the backbone predict its embedding (embedding loss regime); without one the backbone predicts Gaussian parameters directly (param loss regime). An image autoencoder replaces the raw input stack with its encoded features in either regime. Embedding sizes and architecture come from the selected runs' saved configs."
+    JEPA_HEAD_HINT      = "a coupled profile autoencoder makes the backbone predict its embedding; only the conv head projects to it"
     JEPA_EMBEDDING_NOTE = "Shown because a profile autoencoder run is coupled: the backbone is trained to match the autoencoder's embedding of each ground-truth profile. The param loss is inactive in this regime."
     JEPA_PARAM_NOTE     = "Shown because no profile autoencoder run is selected: the backbone predicts Gaussian parameters directly, exactly like backbone training. The embedding loss is inactive in this regime."
 
@@ -765,7 +766,7 @@ class LaunchLayout:
             "essentials": TRAIN_ESSENTIALS,
             "sections": [
                 {"key": "model", "title": "Model", "panels": [
-                    {"kind": "special", "panel": "model_card", "fields": ["backbone_name", "backbone_head"], "headGate": {"when": {"field": "profile_autoencoder_run", "set": True}, "only": ["conv"], "hint": "a coupled profile autoencoder makes the backbone predict its embedding; only the conv head projects to it"}},
+                    {"kind": "special", "panel": "model_card", "fields": ["backbone_name", "backbone_head"], "headGate": {"when": {"field": "profile_autoencoder_run", "set": True}, "only": ["conv"], "hint": JEPA_HEAD_HINT}},
                     {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
                     {"kind": "fields", "title": "Autoencoders", "note": "JEPA needs at least one autoencoder run. A profile autoencoder makes the backbone predict its embedding (embedding loss regime); without one the backbone predicts Gaussian parameters directly (param loss regime). An image autoencoder replaces the raw input stack with its encoded features in either regime. Embedding sizes and architecture come from the selected runs' saved configs.", "groups": [
                         {"title": "Profile autoencoder", "fields": [
@@ -931,9 +932,9 @@ class LaunchLayout:
                 {"key": "sweep", "title": "Sweep", "panels": [
                     {"kind": "hidden", "fields": ["gpus_file"]},
                     {"kind": "special", "panel": "model_toggle", "fields": ["skip_models"]},
-                    {"kind": "fields", "groups": [
-                        {"title": "Output heads",    "fields": [{"path": "heads", "widget": MULTI_HEADS}]},
-                        {"title": "Loss components", "fields": [{"path": "sweep_loss_components", "widget": MULTI_SWEEP_LOSSES}]},
+                    {"kind": "fields", "note": "Output heads and loss components shape backbone sweeps only; JEPA and profile AE arms ignore both, and every JEPA arm trains the conv head.", "groups": [
+                        {"title": "Output heads",    "fields": [{"gateOn": {"field": "training_type", "in": ["backbone"]}, "fields": [{"path": "heads", "widget": MULTI_HEADS}]}]},
+                        {"title": "Loss components", "fields": [{"gateOn": {"field": "training_type", "in": ["backbone"]}, "fields": [{"path": "sweep_loss_components", "widget": MULTI_SWEEP_LOSSES}]}]},
                     ]},
                 ]},
                 {"key": "size-match", "title": "Size match", "when": {"field": "training_type", "in": ["backbone"]}, "panels": [
@@ -994,7 +995,7 @@ class LaunchLayout:
             ],
             "sections": [
                 {"key": "model", "title": "Model", "when": {"field": "training_type", "in": ["backbone", "jepa"]}, "panels": [
-                    {"kind": "special", "panel": "model_card", "fields": ["backbone_name", "backbone_head"], "headGate": {"when": [{"field": "training_type", "in": ["jepa"]}, {"field": "jepa.profile_autoencoder_run", "set": True}], "only": ["conv"], "hint": "a coupled profile autoencoder makes the backbone predict its embedding; only the conv head projects to it"}},
+                    {"kind": "special", "panel": "model_card", "fields": ["backbone_name", "backbone_head"], "headGate": {"when": [{"field": "training_type", "in": ["jepa"]}, {"field": "jepa.profile_autoencoder_run", "set": True}], "only": ["conv"], "hint": JEPA_HEAD_HINT}},
                 ]},
                 {"key": "overrides", "title": "Architecture overrides", "panels": [
                     {"kind": "fields", "groups": [{"title": "Architecture overrides", "fields": ["model_overrides"]}]},
@@ -1091,7 +1092,11 @@ class LaunchLayout:
                     {"kind": "hidden", "fields": ["gpus_file"]},
                     {"kind": "special", "panel": "model_toggle", "fields": ["skip_models"]},
                     {"kind": "fields", "title": "Optuna search", "groups": [
-                        {"title": "Output heads", "fields": [{"path": "heads", "widget": MULTI_HEADS}]},
+                        {"title": "Output heads", "fields": [
+                            {"gateOn": {"field": "training_type", "in": ["backbone", "jepa"]}, "fields": [
+                                {"path": "heads", "widget": {**MULTI_HEADS, "choiceGate": {"when": [{"field": "training_type", "in": ["jepa"]}, {"field": "jepa.profile_autoencoder_run", "set": True}], "only": ["conv"], "hint": JEPA_HEAD_HINT}}},
+                            ]},
+                        ]},
                         {"title": "Trials", "fields": ["tuning.n_trials", {"path": "tuning.n_epochs", "widget": NUM_EPOCHS}, {"path": "tuning.base_seed", "widget": NUM_SEED}, {"path": "tuning.early_stop_patience", "widget": NUM_PATIENCE}]},
                         {"title": "Pruner", "fields": ["tuning.pruner_n_startup_trials", "tuning.pruner_n_warmup_steps"]},
                         {"title": "Outputs", "fields": ["tuning.emit_trial_docs", "tuning.emit_study_plots"]},
@@ -1713,6 +1718,17 @@ class LaunchLayout:
         for path, widget in layout["widgets"].items():
             if widget.get("kind") == "number" and not ("min" in widget and "max" in widget):
                 problems.append(f"number widget for {path} lacks min/max bounds")
+
+            gate = widget.get("choiceGate")
+            if not gate:
+                continue
+            if not gate.get("only"):
+                problems.append(f"choice gate on widget {path} names no allowed values")
+            for condition in self._when_conditions(gate["when"]):
+                if condition["field"] not in known:
+                    problems.append(f"choice gate on widget {path} reads unknown field {condition['field']}")
+                if ("in" in condition) == ("set" in condition):
+                    problems.append(f"choice gate on widget {path} has a condition that needs exactly one of 'in' or 'set'")
 
         legacy = layout.get("legacy")
         if legacy:

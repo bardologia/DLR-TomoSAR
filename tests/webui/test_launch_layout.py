@@ -351,3 +351,35 @@ def test_a_head_gate_on_an_unknown_field_is_rejected():
 
     with pytest.raises(LayoutError):
         engine._validate("train_jepa", layout, leaves)
+
+
+def test_the_benchmark_sweep_axes_only_show_for_the_backbone_type():
+    engine = LaunchLayout()
+    layout = engine._expand("benchmark")
+
+    conditions = engine._gate_conditions(layout)
+
+    assert conditions.count({"field": "training_type", "in": ["backbone"]}) == 2
+    for path in ("heads", "sweep_loss_components"):
+        assert path in engine._claims(layout)
+
+
+def test_the_tune_heads_widget_locks_to_conv_with_a_profile_ae():
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(TuningEntryConfig())]
+    layout = LaunchLayout().build("tune", leaves)
+    gate   = layout["widgets"]["heads"]["choiceGate"]
+
+    assert gate["when"] == [{"field": "training_type", "in": ["jepa"]}, {"field": "jepa.profile_autoencoder_run", "set": True}]
+    assert gate["only"] == ["conv"]
+    assert gate["hint"]
+
+
+def test_a_choice_gate_on_an_unknown_field_is_rejected():
+    engine = LaunchLayout()
+    layout = engine._expand("tune")
+    leaves = [{"path": path} for path, _value in ConfigCli._leaves(TuningEntryConfig())]
+
+    layout["widgets"]["heads"]["choiceGate"] = {"when": {"field": "no_such_field", "set": True}, "only": ["conv"], "hint": "x"}
+
+    with pytest.raises(LayoutError):
+        engine._validate("tune", layout, leaves)

@@ -80,6 +80,28 @@ def test_search_space_matches_config_union(tmp_path):
     assert space == expected
 
 
+def test_model_keys_reject_structured_heads_for_profile_coupled_jepa(tmp_path):
+    orch = _orchestrator(tmp_path)
+    orch.config.training_type = "jepa"
+    orch.config.heads         = ["conv", "set_pred"]
+    orch.config.jepa          = SimpleNamespace(profile_autoencoder_run="mlp_ae_run")
+
+    with pytest.raises(SystemExit, match="only the conv head"):
+        orch._model_keys()
+
+
+def test_model_keys_allow_structured_heads_without_a_profile_ae(tmp_path):
+    orch = _orchestrator(tmp_path)
+    orch.config.training_type = "jepa"
+    orch.config.heads         = ["conv", "set_pred"]
+    orch.config.jepa          = SimpleNamespace(profile_autoencoder_run=None)
+
+    keys = orch._model_keys()
+
+    assert "unet" in keys
+    assert "unet-set_pred" in keys
+
+
 def test_storage_and_paths_derived_from_tag(tmp_path):
     orch = _orchestrator(tmp_path)
 
