@@ -815,7 +815,7 @@ class LaunchLayout:
                     {"kind": "fields", "title": "Physics geometry", "note": "The height axis convention always shapes the dataset; the baselines and kz values only feed the physics loss terms, which JEPA uses in the param loss regime alone.", "template": "geometry", "at": "geometry"},
                 ]},
                 {"key": "inference", "title": "Inference", "panels": [
-                    {"kind": "fields", "groups": [{"title": "After training", "fields": ["infer_after"]}]},
+                    {"kind": "fields", "groups": [{"title": "After training", "fields": ["infer_after", "infer_at_end"]}]},
                     {"kind": "fields", "title": "Inference run", "template": "inference_full", "at": "inference"},
                 ]},
             ],

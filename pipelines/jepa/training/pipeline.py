@@ -340,7 +340,7 @@ class SingleTrainRunner(EntryConfigTrainRunner):
     def run(self):
         results, run_directory = super().run()
 
-        if self.config.infer_after and not self.unit_resume.skip_inference(self.config.inference.split):
+        if (self.config.infer_after or self.config.infer_at_end) and not self.unit_resume.skip_inference(self.config.inference.split):
             self._run_inference(run_directory)
 
         return results

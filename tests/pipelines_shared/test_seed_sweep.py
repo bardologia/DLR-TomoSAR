@@ -6,6 +6,7 @@ from pathlib     import Path
 import pytest
 
 import pipelines.shared.training.seed_sweep as mod
+import pipelines.shared.training.training_launcher as launcher_mod
 from pipelines.shared.training.seed_sweep import SeedFanoutScheduler, SeedSet, SeedSweepRunner
 
 
@@ -220,3 +221,53 @@ def test_run_raises_when_a_seed_fails(tmp_path):
 
     with pytest.raises(SystemExit, match="3 of 3 seed runs failed"):
         scheduler.run()
+
+
+@dataclass
+class _LauncherConfig:
+    run_name        : str | None = None
+    seed            : int        = 0
+    seeds           : list[int]  = field(default_factory=list)
+    logdir          : Path       = Path("/logs")
+    gpus            : list[int]  = field(default_factory=lambda: [0, 1])
+    gpus_file       : str        = ""
+    poll_interval_s : float      = 5.0
+    infer_after     : bool       = False
+    infer_at_end    : bool       = False
+
+
+class _FakeScheduler:
+    captured = {}
+
+    @classmethod
+    def for_runner(cls, config, cli_overrides, entry_script, runner_factory, base_label=None, infer_at_end=False):
+        cls.captured = {"infer_at_end": infer_at_end}
+        return cls()
+
+    def run(self):
+        pass
+
+
+def _launcher(supports_infer_at_end: bool):
+    return launcher_mod.SeedSweepLauncher(_LauncherConfig(seeds=[0, 1]), _factory([]), "test sweep", entry_script=Path("/entry/train.py"), supports_infer_at_end=supports_infer_at_end)
+
+
+def test_launcher_rejects_infer_after_together_with_infer_at_end():
+    with pytest.raises(SystemExit, match="mutually exclusive"):
+        _launcher(True).run(argv=["--infer_after", "True", "--infer_at_end", "True"])
+
+
+def test_launcher_forwards_infer_at_end_to_the_fanout(monkeypatch):
+    monkeypatch.setattr(launcher_mod, "SeedFanoutScheduler", _FakeScheduler)
+
+    _launcher(True).run(argv=["--infer_at_end", "True"])
+
+    assert _FakeScheduler.captured == {"infer_at_end": True}
+
+
+def test_launcher_without_support_never_batches_inference(monkeypatch):
+    monkeypatch.setattr(launcher_mod, "SeedFanoutScheduler", _FakeScheduler)
+
+    _launcher(False).run(argv=["--infer_at_end", "True"])
+
+    assert _FakeScheduler.captured == {"infer_at_end": False}

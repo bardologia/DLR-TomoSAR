@@ -19,7 +19,7 @@ def main() -> None:
     from pipelines.jepa.training.pipeline   import SingleTrainRunner
     from pipelines.shared.training.training_launcher import SeedSweepLauncher
 
-    SeedSweepLauncher(JepaEntryConfig(), SingleTrainRunner, "JEPA predictor training", entry_script=pathlib.Path(__file__).resolve()).run()
+    SeedSweepLauncher(JepaEntryConfig(), SingleTrainRunner, "JEPA predictor training", entry_script=pathlib.Path(__file__).resolve(), supports_infer_at_end=True).run()
 
 
 if __name__ == "__main__":

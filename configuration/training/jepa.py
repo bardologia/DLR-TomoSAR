@@ -131,5 +131,6 @@ class JepaEntryConfig:
     augmentation  : AugmentationConfig  = field(default_factory=AugmentationConfig)
     overfit_check : OverfitCheckConfig  = field(default_factory=OverfitCheckConfig)
 
-    infer_after : bool            = False
-    inference   : InferenceConfig = field(default_factory=JepaDefaults.inference)
+    infer_after  : bool            = False
+    infer_at_end : bool            = False
+    inference    : InferenceConfig = field(default_factory=JepaDefaults.inference)

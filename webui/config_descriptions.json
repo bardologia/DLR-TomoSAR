@@ -1582,7 +1582,8 @@
         "augmentation": "AugmentationConfig sub-config setting horizontal/vertical flip, rot90, and additive-noise probabilities applied to training patches",
         "overfit_check": "OverfitCheckConfig sanity gate that memorizes a few examples before full training and aborts if the model cannot overfit them",
         "infer_after": "Whether to run inference automatically after training completes",
-        "inference": "InferenceConfig sub-config used to run inference automatically after training when infer_after is set, defaulting to save_cubes on and compute_reduced off for JEPA"
+        "infer_at_end": "Hold all inference until every training job of the seed fan-out has finished, then run one inference job per completed run through the same GPU queue; keeps the GPUs saturated with training first, mutually exclusive with infer_after",
+        "inference": "InferenceConfig sub-config used to run inference automatically after training when infer_after or infer_at_end is set, defaulting to save_cubes on and compute_reduced off for JEPA"
       }
     },
     "training/profile_autoencoder::ProfileAeLossConfig": {

@@ -62,7 +62,7 @@ def test_seed_sweep_launcher_fans_multi_seed_runs_across_the_pool(monkeypatch):
 
     class FakeScheduler:
         @classmethod
-        def for_runner(cls, config, cli_overrides, entry_script, runner_factory, base_label=None):
+        def for_runner(cls, config, cli_overrides, entry_script, runner_factory, base_label=None, infer_at_end=False):
             captured["for_runner"] = (config, cli_overrides, entry_script, runner_factory, base_label)
             return cls()
         def run(self):
