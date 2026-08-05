@@ -330,6 +330,7 @@ class LossLandscapeConfig:
     batch_size     : int   = 4
     max_batches    : int   = 2
     span           : float = 0.5
+    n_directions   : int   = 4
     n_points_1d    : int   = 21
     n_points_2d    : int   = 11
     direction_seed : int   = 0

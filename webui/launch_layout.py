@@ -1329,6 +1329,7 @@ class LaunchLayout:
                             {"path": "batch_size",  "widget": {"kind": "number", "min": 1, "max": 64, "step": 1}},
                             {"path": "max_batches", "widget": {"kind": "number", "min": 1, "max": 16, "step": 1}},
                             "span",
+                            {"path": "n_directions", "widget": {"kind": "number", "min": 2, "max": 16, "step": 1}},
                             {"path": "n_points_1d", "widget": {"kind": "number", "min": 5, "max": 101, "step": 2}},
                             {"path": "n_points_2d", "widget": {"kind": "number", "min": 5, "max": 41, "step": 2}},
                             {"path": "direction_seed", "widget": NUM_SEED},

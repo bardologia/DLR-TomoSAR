@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from pipelines.backbone.inference.analysis.loss_landscape import FilterNormalizedDirection, LandscapeEvaluator, LossLandscapePlots
+from pipelines.backbone.inference.analysis.loss_landscape import CutDiagnostics, FilterNormalizedDirection, LandscapeEvaluator, LossLandscapePlots
 
 
 class _TinyConv(torch.nn.Module):
@@ -78,6 +78,48 @@ def test_direction_lives_on_the_parameter_device():
 
     for name, param in model.named_parameters():
         assert direction[name].device == param.device
+
+
+def test_curvature_recovers_a_quadratic_bowl():
+    alphas = np.linspace(-0.5, 0.5, 21)
+    cut    = 1.0 + 3.0 * alphas ** 2
+
+    assert CutDiagnostics.curvature(alphas, cut) == pytest.approx(3.0, rel=1e-6)
+
+
+def test_flatness_radius_interpolates_the_doubling_step():
+    alphas = np.linspace(-0.5, 0.5, 21)
+    cut    = 1.0 + 10.0 * np.abs(alphas)
+
+    radius = CutDiagnostics.flatness_radius(alphas, cut)
+
+    assert radius["radius"]   == pytest.approx(0.1, abs=1e-9)
+    assert radius["censored"] is False
+
+
+def test_flatness_radius_censors_a_flat_cut():
+    alphas = np.linspace(-0.5, 0.5, 21)
+    cut    = np.full(21, 1.0)
+    cut[10] = 0.999
+
+    radius = CutDiagnostics.flatness_radius(alphas, cut)
+
+    assert radius["radius"]   == pytest.approx(0.5)
+    assert radius["censored"] is True
+
+
+def test_min_offset_flags_a_shifted_minimum():
+    alphas = np.linspace(-0.5, 0.5, 21)
+    cut    = (alphas - 0.2) ** 2
+
+    assert CutDiagnostics.min_offset(alphas, cut) == pytest.approx(0.2, abs=0.05)
+
+
+def test_sharpness_measures_the_near_field_increase():
+    alphas = np.linspace(-0.5, 0.5, 21)
+    cut    = 1.0 + 4.0 * np.abs(alphas)
+
+    assert CutDiagnostics.sharpness(alphas, cut) == pytest.approx(0.4, rel=1e-6)
 
 
 def test_flat_landscape_contour_raises(tmp_path):

@@ -2558,7 +2558,8 @@
         "n_points_1d": "Number of grid points of each 1D cut",
         "n_points_2d": "Number of grid points per axis of the 2D contour; the grid costs n_points_2d squared evaluations",
         "direction_seed": "Seed of the two random directions (seed and seed+1); fixed seeds make landscapes comparable across runs",
-        "figure_style": "PlotBase figure style the cuts and contour are rendered with (report or paper)"
+        "figure_style": "PlotBase figure style the cuts and contour are rendered with (report or paper)",
+        "n_directions": "Number of filter-normalized random directions the 1-D cuts and sharpness statistics average over; the first two also span the 2-D grid"
       }
     },
     "diagnostics::RobustnessConfig": {
