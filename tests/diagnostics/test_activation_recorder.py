@@ -99,24 +99,23 @@ def test_store_mode_unknown_module_raises():
         recorder.attach_store(["missing_layer"])
 
 
+def _layer_stats(name: str, **overrides) -> dict:
+    stats = {
+        "name": name, "module_type": "Conv2d", "shape": [4, 8, 8], "n_batches": 1, "n_elements": 100,
+        "nonfinite_frac": 0.0, "zero_frac": 0.3, "mean": 0.5, "std": 1.0, "max_abs": 4.0,
+        "abs_p50": 0.5, "abs_p99": 3.0, "dynamic_range": 6.0, "n_channels": 4, "dead_channels": 0,
+        "dead_channel_frac": 0.0, "effective_channel_frac": 0.9, "channel_gini": 0.1, "hist_counts": [0] * 24,
+    }
+    stats.update(overrides)
+    return stats
+
+
 def test_issue_detector_flags_dead_and_exploding_layers():
     config = ActivationXrayConfig()
     stats  = {
-        "dead": {
-            "name": "dead", "module_type": "ReLU", "shape": [4, 8, 8], "n_batches": 1, "n_elements": 100,
-            "nonfinite_frac": 0.0, "zero_frac": 0.995, "mean": 0.0, "std": 0.001, "max_abs": 0.01,
-            "abs_p99": 0.01, "n_channels": 4, "dead_channels": 4, "dead_channel_frac": 1.0, "hist_counts": [0] * 24,
-        },
-        "explode": {
-            "name": "explode", "module_type": "Conv2d", "shape": [4, 8, 8], "n_batches": 1, "n_elements": 100,
-            "nonfinite_frac": 0.0, "zero_frac": 0.0, "mean": 1.0, "std": 5.0, "max_abs": 1e6,
-            "abs_p99": 1e5, "n_channels": 4, "dead_channels": 0, "dead_channel_frac": 0.0, "hist_counts": [0] * 24,
-        },
-        "clean": {
-            "name": "clean", "module_type": "Conv2d", "shape": [4, 8, 8], "n_batches": 1, "n_elements": 100,
-            "nonfinite_frac": 0.0, "zero_frac": 0.3, "mean": 0.5, "std": 1.0, "max_abs": 4.0,
-            "abs_p99": 3.0, "n_channels": 4, "dead_channels": 0, "dead_channel_frac": 0.0, "hist_counts": [0] * 24,
-        },
+        "dead"    : _layer_stats("dead", module_type="ReLU", zero_frac=0.995, mean=0.0, std=0.001, max_abs=0.01, abs_p50=0.001, abs_p99=0.01, dead_channels=4, dead_channel_frac=1.0, effective_channel_frac=0.0, channel_gini=None),
+        "explode" : _layer_stats("explode", mean=1.0, std=5.0, max_abs=1e6, abs_p99=1e5, zero_frac=0.0),
+        "clean"   : _layer_stats("clean"),
     }
 
     reports  = ActivationIssueDetector(config).run(stats)
@@ -132,18 +131,42 @@ def test_issue_detector_flags_dead_and_exploding_layers():
 
 def test_nonfinite_activations_are_critical():
     config = ActivationXrayConfig()
-    stats  = {
-        "naninf": {
-            "name": "naninf", "module_type": "Conv2d", "shape": [4], "n_batches": 1, "n_elements": 100,
-            "nonfinite_frac": 0.02, "zero_frac": 0.0, "mean": 0.5, "std": 1.0, "max_abs": 2.0,
-            "abs_p99": 1.5, "n_channels": 4, "dead_channels": 0, "dead_channel_frac": 0.0, "hist_counts": [0] * 24,
-        },
-    }
+    stats  = {"naninf": _layer_stats("naninf", shape=[4], nonfinite_frac=0.02, zero_frac=0.0, max_abs=2.0, abs_p99=1.5)}
 
     reports = ActivationIssueDetector(config).run(stats)
 
     assert reports[0].severity == "critical"
     assert any(issue.code == "nonfinite_activations" for issue in reports[0].issues)
+
+
+def test_channel_collapse_is_flagged_only_on_live_layers():
+    config = ActivationXrayConfig()
+    stats  = {
+        "collapsed" : _layer_stats("collapsed", n_channels=64, effective_channel_frac=0.05, channel_gini=0.9),
+        "dead"      : _layer_stats("dead", zero_frac=0.995, n_channels=64, effective_channel_frac=0.05, channel_gini=0.9, dead_channels=60, dead_channel_frac=0.9375),
+        "healthy"   : _layer_stats("healthy", n_channels=64, effective_channel_frac=0.6, channel_gini=0.2),
+    }
+
+    reports = ActivationIssueDetector(config).run(stats)
+    by_name = {report.name: report for report in reports}
+
+    assert any(issue.code == "channel_collapse" for issue in by_name["collapsed"].issues)
+    assert not any(issue.code == "channel_collapse" for issue in by_name["dead"].issues)
+    assert not any(issue.code == "channel_collapse" for issue in by_name["healthy"].issues)
+
+
+def test_summary_ranks_worst_layers_by_severity():
+    config = ActivationXrayConfig()
+    stats  = {
+        "warned"   : _layer_stats("warned", max_abs=1e6),
+        "critical" : _layer_stats("critical", zero_frac=0.995, effective_channel_frac=0.0, channel_gini=None),
+    }
+
+    reports = ActivationIssueDetector(config).run(stats)
+    summary = ActivationXraySummarizer().build(reports, "/tmp/run", n_batches=1)
+
+    assert summary["worst_layers"][0] == "critical"
+    assert "warned" in summary["worst_layers"]
 
 
 def test_store_mode_survives_inplace_activations():
@@ -180,3 +203,41 @@ def test_abs_percentile_reports_overflow_via_max_abs():
     stats = _record(_TinyNet(), [torch.randn(2, 2, 8, 8) * 1e6])
 
     assert stats["conv"]["abs_p99"] == stats["conv"]["max_abs"]
+
+
+class _PassThrough(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        self.layer = torch.nn.Identity()
+
+    def forward(self, x):
+        return self.layer(x)
+
+
+def test_channel_concentration_separates_uniform_from_collapsed():
+    uniform   = torch.ones(1, 4, 4, 4)
+    collapsed = torch.zeros(1, 4, 4, 4)
+    collapsed[:, 0] = 1000.0
+    collapsed[:, 1:] = 0.001
+
+    uniform_stats   = _record(_PassThrough(), [uniform])["layer"]
+    collapsed_stats = _record(_PassThrough(), [collapsed])["layer"]
+
+    assert uniform_stats["effective_channel_frac"] == pytest.approx(1.0)
+    assert uniform_stats["channel_gini"]           == pytest.approx(0.0, abs=1e-9)
+    assert collapsed_stats["effective_channel_frac"] < 0.3
+    assert collapsed_stats["channel_gini"]           > 0.7
+
+
+def test_all_dead_channels_report_zero_effective_fraction():
+    stats = _record(_PassThrough(), [torch.zeros(1, 4, 4, 4)])["layer"]
+
+    assert stats["effective_channel_frac"] == 0.0
+    assert stats["channel_gini"] is None
+
+
+def test_constant_activations_have_unit_dynamic_range():
+    stats = _record(_PassThrough(), [torch.full((1, 4, 4, 4), 2.0)])["layer"]
+
+    assert stats["dynamic_range"] == pytest.approx(1.0)
+    assert stats["abs_p50"] == stats["abs_p99"]

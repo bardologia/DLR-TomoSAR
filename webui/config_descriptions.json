@@ -2468,7 +2468,8 @@
         "constant_std_threshold": "Activation standard deviation at or below which a non-dead layer is flagged as constant (warning)",
         "make_plots": "Render the depth-profile figures and per-layer histograms for flagged layers",
         "max_layer_histograms": "Maximum number of flagged layers that get an individual activation histogram figure",
-        "figure_style": "PlotBase figure style the plots are rendered with (report or paper)"
+        "figure_style": "PlotBase figure style the plots are rendered with (report or paper)",
+        "channel_collapse_frac_warn": "Effective channel fraction (entropy-effective channels over channel count) below which a layer is flagged as channel-collapsed (warning)"
       }
     },
     "diagnostics::InputAttributionConfig": {

@@ -24,6 +24,7 @@ class LayerActivationStats:
         self.value_sumsq     = 0.0
         self.max_abs         = 0.0
         self.channel_max_abs = None
+        self.channel_abs_sum = None
         self.hist_counts     = np.zeros(self.COUNT_EDGES.size - 1, dtype=np.int64)
 
     def update(self, tensor: torch.Tensor, order: int) -> None:
@@ -49,12 +50,39 @@ class LayerActivationStats:
             self.hist_counts  += np.histogram(finite.abs().cpu().numpy(), bins=self.COUNT_EDGES)[0]
 
         if t.ndim == 4:
-            channel_max = t.float().abs().nan_to_num(0.0).amax(dim=(0, 2, 3)).cpu().numpy()
+            channel_abs = t.float().abs().nan_to_num(0.0)
+            channel_max = channel_abs.amax(dim=(0, 2, 3)).cpu().numpy()
+            channel_sum = channel_abs.sum(dim=(0, 2, 3)).cpu().numpy().astype(np.float64)
 
             if self.channel_max_abs is None:
                 self.channel_max_abs = channel_max
+                self.channel_abs_sum = channel_sum
             else:
                 self.channel_max_abs = np.maximum(self.channel_max_abs, channel_max)
+                self.channel_abs_sum = self.channel_abs_sum + channel_sum
+
+    @staticmethod
+    def _gini(values: np.ndarray) -> float | None:
+        total = float(values.sum())
+        if total <= 0.0:
+            return None
+
+        ordered = np.sort(values)
+        ranks   = np.arange(1, ordered.size + 1, dtype=np.float64)
+
+        return float(2.0 * (ranks * ordered).sum() / (ordered.size * total) - (ordered.size + 1.0) / ordered.size)
+
+    @staticmethod
+    def _effective_channel_frac(channel_abs_sum: np.ndarray) -> float:
+        total = float(channel_abs_sum.sum())
+        if total <= 0.0:
+            return 0.0
+
+        share   = channel_abs_sum / total
+        nonzero = share[share > 0.0]
+        entropy = float(-(nonzero * np.log(nonzero)).sum())
+
+        return float(np.exp(entropy) / channel_abs_sum.size)
 
     def _abs_percentile(self, q: float) -> float:
         total = int(self.hist_counts.sum())
@@ -66,7 +94,7 @@ class LayerActivationStats:
         idx        = min(idx, self.hist_counts.size - 1)
 
         upper = self.COUNT_EDGES[idx + 1]
-        return self.max_abs if not np.isfinite(upper) else float(upper)
+        return self.max_abs if not np.isfinite(upper) else float(min(upper, self.max_abs))
 
     def finalize(self) -> dict:
         if self.n_elements == 0:
@@ -80,23 +108,34 @@ class LayerActivationStats:
         dead_channels      = int((self.channel_max_abs < self.DEAD_CHANNEL_ABS).sum()) if self.channel_max_abs is not None else None
         dead_channel_frac  = dead_channels / self.channel_max_abs.size if self.channel_max_abs is not None else None
 
+        abs_p50       = self._abs_percentile(0.50)
+        abs_p99       = self._abs_percentile(0.99)
+        dynamic_range = abs_p99 / abs_p50 if abs_p50 > 0.0 else None
+
+        effective_channel_frac = self._effective_channel_frac(self.channel_abs_sum) if self.channel_abs_sum is not None else None
+        channel_gini           = self._gini(self.channel_abs_sum) if self.channel_abs_sum is not None else None
+
         return {
-            "name"              : self.name,
-            "module_type"       : self.module_type,
-            "shape"             : list(self.shape) if self.shape is not None else None,
-            "first_seen"        : self.first_seen,
-            "n_batches"         : self.n_batches,
-            "n_elements"        : self.n_elements,
-            "nonfinite_frac"    : self.n_nonfinite / self.n_elements,
-            "zero_frac"         : self.n_zero / self.n_elements,
-            "mean"              : mean,
-            "std"               : std,
-            "max_abs"           : self.max_abs,
-            "abs_p99"           : self._abs_percentile(0.99),
-            "n_channels"        : int(self.channel_max_abs.size) if self.channel_max_abs is not None else None,
-            "dead_channels"     : dead_channels,
-            "dead_channel_frac" : dead_channel_frac,
-            "hist_counts"       : self.hist_counts.tolist(),
+            "name"                   : self.name,
+            "module_type"            : self.module_type,
+            "shape"                  : list(self.shape) if self.shape is not None else None,
+            "first_seen"             : self.first_seen,
+            "n_batches"              : self.n_batches,
+            "n_elements"             : self.n_elements,
+            "nonfinite_frac"         : self.n_nonfinite / self.n_elements,
+            "zero_frac"              : self.n_zero / self.n_elements,
+            "mean"                   : mean,
+            "std"                    : std,
+            "max_abs"                : self.max_abs,
+            "abs_p50"                : abs_p50,
+            "abs_p99"                : abs_p99,
+            "dynamic_range"          : dynamic_range,
+            "n_channels"             : int(self.channel_max_abs.size) if self.channel_max_abs is not None else None,
+            "dead_channels"          : dead_channels,
+            "dead_channel_frac"      : dead_channel_frac,
+            "effective_channel_frac" : effective_channel_frac,
+            "channel_gini"           : channel_gini,
+            "hist_counts"            : self.hist_counts.tolist(),
         }
 
 

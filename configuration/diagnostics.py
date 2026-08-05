@@ -225,11 +225,12 @@ class ActivationXrayConfig:
     batch_size  : int = 8
     max_batches : int = 8
 
-    dead_zero_frac_warn     : float = 0.90
-    dead_zero_frac_critical : float = 0.99
-    dead_channel_frac_warn  : float = 0.25
-    explode_abs_threshold   : float = 1e4
-    constant_std_threshold  : float = 1e-7
+    dead_zero_frac_warn        : float = 0.90
+    dead_zero_frac_critical    : float = 0.99
+    dead_channel_frac_warn     : float = 0.25
+    explode_abs_threshold      : float = 1e4
+    constant_std_threshold     : float = 1e-7
+    channel_collapse_frac_warn : float = 0.10
 
     make_plots           : bool = True
     max_layer_histograms : int  = 12

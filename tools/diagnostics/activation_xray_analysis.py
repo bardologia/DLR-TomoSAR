@@ -57,12 +57,26 @@ class ActivationIssueDetector:
             return [Issue("warning", "constant_output", f"activation std {report.stats['std']:.3g} is effectively constant")]
         return []
 
+    def _check_channel_collapse(self, report: ActivationLayerReport) -> list[Issue]:
+        frac = report.stats["effective_channel_frac"]
+        n_ch = report.stats["n_channels"]
+
+        if frac is None or n_ch is None:
+            return []
+        if report.stats["zero_frac"] >= self.config.dead_zero_frac_warn:
+            return []
+
+        if frac < self.config.channel_collapse_frac_warn:
+            return [Issue("warning", "channel_collapse", f"activation mass concentrates on ~{frac * n_ch:.1f} of {n_ch} channels (effective fraction {frac * 100.0:.1f}%)")]
+        return []
+
     def detect(self, report: ActivationLayerReport) -> None:
         report.issues += self._check_finite(report)
         report.issues += self._check_dead_layer(report)
         report.issues += self._check_dead_channels(report)
         report.issues += self._check_explode(report)
         report.issues += self._check_constant(report)
+        report.issues += self._check_channel_collapse(report)
 
     def run(self, all_stats: dict[str, dict]) -> list[ActivationLayerReport]:
         reports = [ActivationLayerReport(stats) for stats in all_stats.values()]
@@ -85,6 +99,8 @@ class ActivationXraySummarizer:
         for issue in issues:
             code_counts[issue.code] = code_counts.get(issue.code, 0) + 1
 
+        worst = sorted(flagged, key=lambda report: (-SEVERITY_RANK[report.severity], -report.stats["zero_frac"]))
+
         return {
             "run_directory"   : str(run_dir),
             "layers"          : len(reports),
@@ -93,6 +109,7 @@ class ActivationXraySummarizer:
             "issues"          : len(issues),
             "severity_counts" : severity_counts,
             "issue_codes"     : dict(sorted(code_counts.items(), key=lambda item: item[1], reverse=True)),
+            "worst_layers"    : [report.name for report in worst[:5]],
             "verdict"         : self._verdict(severity_counts),
         }
 

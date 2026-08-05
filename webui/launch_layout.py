@@ -1236,7 +1236,7 @@ class LaunchLayout:
                             {"path": "batch_size",  "widget": {"kind": "number", "min": 1, "max": 128, "step": 1}},
                             {"path": "max_batches", "widget": {"kind": "number", "min": 1, "max": 128, "step": 1}},
                         ]},
-                        {"title": "Detection thresholds", "fields": ["dead_zero_frac_warn", "dead_zero_frac_critical", "dead_channel_frac_warn", "explode_abs_threshold", "constant_std_threshold"]},
+                        {"title": "Detection thresholds", "fields": ["dead_zero_frac_warn", "dead_zero_frac_critical", "dead_channel_frac_warn", "explode_abs_threshold", "constant_std_threshold", "channel_collapse_frac_warn"]},
                         {"title": "Report", "fields": ["make_plots", "max_layer_histograms", {"path": "figure_style", "widget": CH_FIGSTYLE}]},
                     ]},
                 ]},

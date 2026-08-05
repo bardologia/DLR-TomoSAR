@@ -33,12 +33,16 @@ class ActivationXrayRun(AnalysisRun):
         return recorder.stats()
 
     def _render_figures(self, ordered_stats: list[dict], flagged: list) -> dict[str, Path]:
-        plots   = ActivationXrayPlots()
+        plots    = ActivationXrayPlots(self.config)
+        severity = {report.name: report.severity for report in flagged}
+
         figures = {
-            "zero_frac_by_depth"     : plots.zero_frac_by_depth(ordered_stats, self.output_dir / "plots" / "zero_frac_by_depth.png"),
-            "std_by_depth"           : plots.std_by_depth(ordered_stats, self.output_dir / "plots" / "std_by_depth.png"),
-            "dead_channels_by_depth" : plots.dead_channels_by_depth(ordered_stats, self.output_dir / "plots" / "dead_channels_by_depth.png"),
-            "max_abs_by_depth"       : plots.max_abs_by_depth(ordered_stats, self.output_dir / "plots" / "max_abs_by_depth.png"),
+            "zero_frac_by_depth"          : plots.zero_frac_by_depth(ordered_stats, severity, self.output_dir / "plots" / "zero_frac_by_depth.png"),
+            "std_by_depth"                : plots.std_by_depth(ordered_stats, severity, self.output_dir / "plots" / "std_by_depth.png"),
+            "dead_channels_by_depth"      : plots.dead_channels_by_depth(ordered_stats, severity, self.output_dir / "plots" / "dead_channels_by_depth.png"),
+            "max_abs_by_depth"            : plots.max_abs_by_depth(ordered_stats, severity, self.output_dir / "plots" / "max_abs_by_depth.png"),
+            "effective_channels_by_depth" : plots.effective_channels_by_depth(ordered_stats, severity, self.output_dir / "plots" / "effective_channels_by_depth.png"),
+            "dynamic_range_by_depth"      : plots.dynamic_range_by_depth(ordered_stats, severity, self.output_dir / "plots" / "dynamic_range_by_depth.png"),
         }
 
         by_severity = sorted(flagged, key=lambda report: -SEVERITY_RANK[report.severity])
@@ -51,7 +55,13 @@ class ActivationXrayRun(AnalysisRun):
 
     def _write_report(self, run, reports: list, summary: dict, figures: dict[str, Path]) -> Path:
         doc = MarkdownDoc(title=f"Activation x-ray: {run.backbone_name}")
-        doc.paragraph(f"Per-layer activation statistics on {summary['batches']} real '{self.config.split}' batches. Verdict: **{summary['verdict']}**.")
+        doc.paragraph(
+            f"Per-layer activation statistics on {summary['batches']} real '{self.config.split}' batches. Verdict: **{summary['verdict']}**. "
+            "Depth profiles are ordered by first forward call and coloured by module family; flagged layers carry a severity ring. "
+            "Channel utilisation is the entropy-effective number of channels (by mean |activation| share) over the channel count: "
+            "1.0 means all channels carry equal mass, low values mean the layer routes its signal through a few channels. "
+            "Dynamic range is the p99/p50 ratio of |activation|; large values indicate heavy-tailed activations."
+        )
 
         doc.kv_table({
             "Layers"         : summary["layers"],
@@ -59,6 +69,7 @@ class ActivationXrayRun(AnalysisRun):
             "Issues"         : summary["issues"],
             "Critical"       : summary["severity_counts"]["critical"],
             "Warnings"       : summary["severity_counts"]["warning"],
+            "Worst layers"   : ", ".join(summary["worst_layers"]) if summary["worst_layers"] else "none",
         })
 
         issue_table = MarkdownTable(("Layer", "Severity", "Code", "Message"))
@@ -70,11 +81,15 @@ class ActivationXrayRun(AnalysisRun):
             doc.table(issue_table)
 
         doc.heading("Layer statistics", level=2)
-        stats_table = MarkdownTable(("#", "Layer", "Type", "zero%", "dead ch", "std", "max|a|"))
+        stats_table = MarkdownTable(("#", "Layer", "Type", "zero%", "dead ch", "eff ch%", "std", "p99|a|", "max|a|", "p99/p50"))
         for index, report in enumerate(reports):
             s = report.stats
-            dead = f"{s['dead_channels']}/{s['n_channels']}" if s["n_channels"] is not None else "—"
-            stats_table.add_row(str(index), f"`{s['name']}`", s["module_type"], f"{s['zero_frac'] * 100.0:.1f}", dead, f"{s['std']:.3g}", f"{s['max_abs']:.3g}")
+
+            dead    = f"{s['dead_channels']}/{s['n_channels']}" if s["n_channels"] is not None else "—"
+            eff     = f"{s['effective_channel_frac'] * 100.0:.0f}" if s["effective_channel_frac"] is not None else "—"
+            dynamic = f"{s['dynamic_range']:.3g}" if s["dynamic_range"] is not None else "—"
+
+            stats_table.add_row(str(index), f"`{s['name']}`", s["module_type"], f"{s['zero_frac'] * 100.0:.1f}", dead, eff, f"{s['std']:.3g}", f"{s['abs_p99']:.3g}", f"{s['max_abs']:.3g}", dynamic)
         doc.table(stats_table)
 
         doc.heading("Figures", level=2)
