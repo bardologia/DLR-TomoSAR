@@ -270,8 +270,10 @@ def test_image_ae_entry_training_overrides():
 
 def test_profile_ae_entry_training_overrides():
     cfg = ProfileAeEntryConfig()
-    assert cfg.training.batch_size == 1024
-    assert cfg.ae_model_name       == "mlp_ae"
+    assert cfg.training.batch_size      == 8192
+    assert cfg.training.num_workers     == 14
+    assert cfg.training.prefetch_factor == 4
+    assert cfg.ae_model_name            == "mlp_ae"
 
 
 def test_every_seeded_entry_defaults_to_the_standard_five_seeds():

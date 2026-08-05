@@ -60,6 +60,6 @@ class ProfileAeEntryConfig:
     geometry        : GeometryConfig      = field(default_factory=GeometryConfig)
 
     paths         : TrainingPathsConfig = field(default_factory=TrainingPathsConfig)
-    training      : TrainingQueueConfig = field(default_factory=lambda: TrainingQueueConfig(batch_size=1024, num_workers=32, prefetch_factor=2))
+    training      : TrainingQueueConfig = field(default_factory=lambda: TrainingQueueConfig(batch_size=8192, num_workers=14, prefetch_factor=4))
     pretrain      : PretrainConfig      = field(default_factory=PretrainConfig)
     overfit_check : OverfitCheckConfig  = field(default_factory=OverfitCheckConfig)

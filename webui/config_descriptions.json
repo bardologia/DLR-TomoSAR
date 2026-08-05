@@ -1631,7 +1631,7 @@
         "ae_loss": "ProfileAeLossConfig sub-config setting the curve reconstruction loss kind and its huber/charbonnier robustness parameters",
         "geometry": "GeometryConfig sub-config supplying SAR acquisition geometry (wavelength, look angle, baselines/kz), resolved against the dataset and copied into the trainer config though not consumed by the plain profile-autoencoder loss",
         "paths": "TrainingPathsConfig sub-config holding the preprocessed dataset directory, extracted Gaussian-parameters file, and secondary track labels",
-        "training": "TrainingQueueConfig sub-config bundling epoch count, dataloader batch size/workers/prefetch, AMP/EMA/resume, and scheduler/warmup/clip settings, defaulting to batch_size=1024 and num_workers=32 for per-pixel training",
+        "training": "TrainingQueueConfig sub-config bundling epoch count, dataloader batch size/workers/prefetch, AMP/EMA/resume, and scheduler/warmup/clip settings, defaulting to batch_size=8192, num_workers=14, and prefetch_factor=4 for per-pixel training",
         "pretrain": "PretrainConfig sub-config for optional pre-training preflight (batch-size search, dataloader tuning, VRAM budget)",
         "overfit_check": "OverfitCheckConfig sanity gate that memorizes a few examples before full training and aborts if the model cannot overfit them"
       }
