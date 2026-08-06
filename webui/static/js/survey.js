@@ -2,6 +2,12 @@
 
 class SurveyView {
   static FLIP_LABELS = { azimuth: "azimuth flip", range: "range flip", both: "both flips" };
+  static PAGES = [
+    { key: "prediction",  title: "Prediction" },
+    { key: "attribution", title: "Attribution" },
+    { key: "robustness",  title: "Robustness" },
+    { key: "vitals",      title: "Layer vitals" },
+  ];
 
   constructor(root) {
     this.root         = root;
@@ -13,6 +19,7 @@ class SurveyView {
     this.renderedPath = null;
     this.resultData   = null;
     this.gridChannel  = -1;
+    this.pager        = null;
     this.cfg          = { split: "test", device: "cpu", tiles: 64, erf: 24, threads: 64 };
   }
 
@@ -79,8 +86,8 @@ class SurveyView {
       </section>
 
       <div class="ms-main">
-        <div class="ms-cards" id="survey-cards" hidden>
-          <section class="ms-card ms-card--wide">
+        <div class="sv-results" id="survey-cards" hidden>
+          <section class="ms-card">
             <div class="ms-card__head">
               <h3 class="cube-panel-title">Surveyed model</h3>
               <span class="ms-badge" id="survey-badge"></span>
@@ -88,83 +95,99 @@ class SurveyView {
             <div class="ms-meta" id="survey-meta"></div>
           </section>
 
-          <section class="ms-card">
-            <div class="ms-card__head">
-              <h3 class="cube-panel-title">Prediction fit</h3>
-              <span class="ms-card__note">per-pixel curve errors over the whole surveyed region</span>
-            </div>
-            <table class="ms-slots" id="survey-fit"></table>
-            <p class="ms-wifacts" id="survey-detection"></p>
-            <p class="ms-card__note ms-witablenote" id="survey-match-note" hidden>hungarian-matched per-parameter mean absolute error over every active ground-truth scatterer</p>
-            <table class="ms-slots" id="survey-match"></table>
-          </section>
+          <div class="ms-layout">
+            <div class="ms-pages">
 
-          <section class="ms-card">
-            <div class="ms-card__head">
-              <h3 class="cube-panel-title">Input attribution</h3>
-              <span class="ms-card__note">share of |&part;output/&part;input| per input channel, gradients of the summed outputs over every pixel</span>
-            </div>
-            <div class="ms-bars" id="survey-bars"></div>
-            <div class="ms-legend" id="survey-bars-legend"></div>
-            <div class="ms-subhead">
-              <h4 class="cube-panel-title">Mean spatial gradients</h4>
-              <span class="ms-card__note" id="survey-grid-note"></span>
-            </div>
-            <div class="ms-ctlrow" id="survey-grid-ctl">
-              <span class="ms-ctlrow__label">channel</span>
-              <div class="ms-chiprow" id="survey-grid-channels"></div>
-            </div>
-            <div class="ms-gridwrap"><div class="ms-grid" id="survey-grid"></div></div>
-            <div class="ms-subhead">
-              <h4 class="cube-panel-title">Effective receptive field</h4>
-              <span class="ms-card__note" id="survey-erf-note"></span>
-            </div>
-            <canvas id="survey-erf" width="640" height="180" hidden></canvas>
-            <p class="ms-wifacts" id="survey-erf-facts"></p>
-          </section>
+            <section class="ms-page" data-page="prediction">
+            <section class="ms-card ms-card--snug">
+              <div class="ms-card__head">
+                <h3 class="cube-panel-title">Prediction fit</h3>
+                <span class="ms-card__note">per-pixel curve errors over the whole surveyed region</span>
+              </div>
+              <table class="ms-slots" id="survey-fit"></table>
+              <p class="ms-wifacts" id="survey-detection"></p>
+              <p class="ms-card__note ms-witablenote" id="survey-match-note" hidden>hungarian-matched per-parameter mean absolute error over every active ground-truth scatterer</p>
+              <table class="ms-slots" id="survey-match"></table>
+            </section>
+            </section>
 
-          <section class="ms-card">
-            <div class="ms-card__head">
-              <h3 class="cube-panel-title">Channel ablation</h3>
-              <span class="ms-card__note">zero one input channel at a time and re-run &mdash; mean causal damage over every pixel</span>
-            </div>
-            <div class="ms-abl" id="survey-ablation"></div>
-          </section>
+            <section class="ms-page" data-page="attribution" hidden>
+            <section class="ms-card">
+              <div class="ms-card__head">
+                <h3 class="cube-panel-title">Input attribution</h3>
+                <span class="ms-card__note">share of |&part;output/&part;input| per input channel, gradients of the summed outputs over every pixel</span>
+              </div>
+              <div class="ms-bars" id="survey-bars"></div>
+              <div class="ms-legend" id="survey-bars-legend"></div>
+              <div class="ms-subhead">
+                <h4 class="cube-panel-title">Mean spatial gradients</h4>
+                <span class="ms-card__note" id="survey-grid-note"></span>
+              </div>
+              <div class="ms-ctlrow" id="survey-grid-ctl">
+                <span class="ms-ctlrow__label">channel</span>
+                <div class="ms-chiprow" id="survey-grid-channels"></div>
+              </div>
+              <div class="ms-gridwrap"><div class="ms-grid" id="survey-grid"></div></div>
+              <div class="ms-subhead">
+                <h4 class="cube-panel-title">Effective receptive field</h4>
+                <span class="ms-card__note" id="survey-erf-note"></span>
+              </div>
+              <canvas id="survey-erf" width="640" height="180" hidden></canvas>
+              <p class="ms-wifacts" id="survey-erf-facts"></p>
+            </section>
+            </section>
 
-          <section class="ms-card">
-            <div class="ms-card__head">
-              <h3 class="cube-panel-title">Symmetry</h3>
-              <span class="ms-card__note">mean disagreement between the model and its flipped self over every pixel</span>
-            </div>
-            <table class="ms-slots" id="survey-flips"></table>
-          </section>
+            <section class="ms-page" data-page="robustness" hidden>
+            <section class="ms-card">
+              <div class="ms-card__head">
+                <h3 class="cube-panel-title">Channel ablation</h3>
+                <span class="ms-card__note">zero one input channel at a time and re-run &mdash; mean causal damage over every pixel</span>
+              </div>
+              <div class="ms-abl" id="survey-ablation"></div>
+            </section>
 
-          <section class="ms-card">
-            <div class="ms-card__head">
-              <h3 class="cube-panel-title">Noise robustness</h3>
-              <span class="ms-card__note">Gaussian noise added to every channel, one fresh draw per tile &mdash; mean damage vs &sigma;</span>
-            </div>
-            <canvas id="survey-noise" width="640" height="200"></canvas>
-            <p class="ms-wifacts" id="survey-noise-facts"></p>
-          </section>
+            <section class="ms-card ms-card--third">
+              <div class="ms-card__head">
+                <h3 class="cube-panel-title">Symmetry</h3>
+                <span class="ms-card__note">mean disagreement between the model and its flipped self over every pixel</span>
+              </div>
+              <table class="ms-slots" id="survey-flips"></table>
+            </section>
 
-          <section class="ms-card">
-            <div class="ms-card__head">
-              <h3 class="cube-panel-title">Occlusion distance profile</h3>
-              <span class="ms-card__note">mean damage to a pixel when a zero-patch lands at a given distance from it</span>
-            </div>
-            <canvas id="survey-occl" width="640" height="200"></canvas>
-            <p class="ms-wifacts" id="survey-occl-facts"></p>
-          </section>
+            <section class="ms-card ms-card--twothird">
+              <div class="ms-card__head">
+                <h3 class="cube-panel-title">Noise robustness</h3>
+                <span class="ms-card__note">Gaussian noise added to every channel, one fresh draw per tile &mdash; mean damage vs &sigma;</span>
+              </div>
+              <canvas id="survey-noise" width="640" height="200"></canvas>
+              <p class="ms-wifacts" id="survey-noise-facts"></p>
+            </section>
 
-          <section class="ms-card ms-card--wide">
-            <div class="ms-card__head">
-              <h3 class="cube-panel-title">Layer vitals</h3>
-              <span class="ms-card__note">activation statistics accumulated over every surveyed tile</span>
+            <section class="ms-card ms-card--snug">
+              <div class="ms-card__head">
+                <h3 class="cube-panel-title">Occlusion distance profile</h3>
+                <span class="ms-card__note">mean damage to a pixel when a zero-patch lands at a given distance from it</span>
+              </div>
+              <canvas id="survey-occl" width="640" height="200"></canvas>
+              <p class="ms-wifacts" id="survey-occl-facts"></p>
+            </section>
+            </section>
+
+            <section class="ms-page" data-page="vitals" hidden>
+            <section class="ms-card">
+              <div class="ms-card__head">
+                <h3 class="cube-panel-title">Layer vitals</h3>
+                <span class="ms-card__note">activation statistics accumulated over every surveyed tile</span>
+              </div>
+              <p class="ms-wifacts" id="survey-vitals-summary"></p>
+              <div class="ms-vitals"><table class="ms-slots ms-vitals__table" id="survey-vitals"></table></div>
+            </section>
+            </section>
+
             </div>
-            <p class="ms-wifacts" id="survey-vitals-summary"></p>
-            <div class="ms-vitals"><table class="ms-slots ms-vitals__table" id="survey-vitals"></table></div>
-          </section>
+
+            <nav class="secnav" id="survey-nav" aria-label="Survey analyses"></nav>
+          </div>
         </div>
       </div>`;
 
@@ -184,6 +207,8 @@ class SurveyView {
       thrInput   : this.root.querySelector("#survey-threads"),
       startBtn   : this.root.querySelector("#survey-start-btn"),
       cards      : this.root.querySelector("#survey-cards"),
+      nav        : this.root.querySelector("#survey-nav"),
+      pages      : [...this.root.querySelectorAll(".ms-page")],
       badge      : this.root.querySelector("#survey-badge"),
       meta       : this.root.querySelector("#survey-meta"),
       fit        : this.root.querySelector("#survey-fit"),
@@ -216,6 +241,17 @@ class SurveyView {
     this._bindChips(this.refs.splitBtns, "split");
     this._bindChips(this.refs.deviceBtns, "device");
     this.refs.startBtn.addEventListener("click", () => this._startSurvey());
+
+    this.pager = new SectionPager(this.refs.nav, this.refs.pages, SurveyView.PAGES, (key) => this._repaintPage(key));
+  }
+
+  _repaintPage(key) {
+    if (!this.resultData) return;
+    if (key === "attribution") this._renderAttribution(this.resultData);
+    if (key === "robustness") {
+      this._renderNoise(this.resultData);
+      this._renderOcclusion(this.resultData);
+    }
   }
 
   _bindChips(group, key) {
