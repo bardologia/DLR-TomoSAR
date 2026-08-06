@@ -51,7 +51,7 @@ class MicroscopeView {
     this.vitalsToken = 0;
     this.flipsData   = null;
     this.wiData      = null;
-    this.page        = "prediction";
+    this.pager       = null;
     this.wi          = { kind: "drop_channel", channel: 0, factor: 0.5, sigma: 0.5, seed: 0 };
     this.wiTimer     = null;
   }
@@ -375,28 +375,7 @@ class MicroscopeView {
     });
 
     this._syncWhatIfControls();
-    this._renderNav();
-    this._setPage(this.page);
-  }
-
-  _renderNav() {
-    this.refs.nav.innerHTML = "";
-    MicroscopeView.PAGES.forEach((page) => {
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "secnav__item";
-      btn.dataset.page = page.key;
-      btn.innerHTML = `<span class="secnav__name">${page.title}</span>`;
-      btn.addEventListener("click", () => this._setPage(page.key));
-      this.refs.nav.appendChild(btn);
-    });
-  }
-
-  _setPage(key) {
-    this.page = key;
-    this.refs.nav.querySelectorAll(".secnav__item").forEach((btn) => btn.classList.toggle("is-active", btn.dataset.page === key));
-    this.refs.pages.forEach((el) => { el.hidden = el.dataset.page !== key; });
-    this._repaintPage(key);
+    this.pager = new SectionPager(this.refs.nav, this.refs.pages, MicroscopeView.PAGES, (key) => this._repaintPage(key));
   }
 
   _repaintPage(key) {
@@ -1251,6 +1230,34 @@ class MicroscopeView {
   }
 }
 
+class SectionPager {
+  constructor(nav, pages, defs, onShow) {
+    this.nav    = nav;
+    this.pages  = pages;
+    this.onShow = onShow;
+    this.page   = defs[0].key;
+
+    defs.forEach((def) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "secnav__item";
+      btn.dataset.page = def.key;
+      btn.innerHTML = `<span class="secnav__name">${def.title}</span>`;
+      btn.addEventListener("click", () => this.show(def.key));
+      nav.appendChild(btn);
+    });
+
+    this.show(this.page);
+  }
+
+  show(key) {
+    this.page = key;
+    this.nav.querySelectorAll(".secnav__item").forEach((btn) => btn.classList.toggle("is-active", btn.dataset.page === key));
+    this.pages.forEach((el) => { el.hidden = el.dataset.page !== key; });
+    this.onShow(key);
+  }
+}
+
 window.msEsc = (text) =>
   String(text).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 
@@ -1514,3 +1521,4 @@ window.drawLineChart = (canvas, xAxis, series, opts = {}) => {
 };
 
 window.MicroscopeView = MicroscopeView;
+window.SectionPager   = SectionPager;
