@@ -4228,6 +4228,7 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .ms-fieldrow:empty { display: none; }
 .ms-field { margin: 0; flex: 0 1 220px; min-width: 150px; }
 .ms-field figcaption { font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); text-align: center; margin-top: 5px; }
+.ms-field--wide { flex: 0 1 320px; }
 .ms-fieldrow .ms-ctlrow__na { align-self: center; max-width: 320px; }
 
 .ms-abl { display: flex; flex-direction: column; gap: 7px; padding-top: 6px; }

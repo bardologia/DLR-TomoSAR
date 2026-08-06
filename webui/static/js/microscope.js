@@ -18,6 +18,7 @@ class MicroscopeView {
     this.pollToken   = 0;
     this.attribToken = 0;
     this.ablToken    = 0;
+    this.occlToken   = 0;
     this.wiToken     = 0;
     this.runs        = [];
     this.selectedId  = null;
@@ -140,6 +141,12 @@ class MicroscopeView {
                 <span class="ms-card__note">zero one input channel at a time and re-run &mdash; causal damage to the prediction, unlike the local gradients above</span>
               </div>
               <div class="ms-abl" id="probe-ablation"></div>
+              <div class="ms-subhead">
+                <h4 class="cube-panel-title">Occlusion sensitivity</h4>
+                <span class="ms-card__note">slide a zero-patch across the window and re-run &mdash; where the model's evidence for this pixel actually sits</span>
+              </div>
+              <div class="ms-fieldrow" id="probe-occlusion"></div>
+              <p class="ms-wifacts" id="probe-occl-facts"></p>
             </section>
 
             <section class="ms-card">
@@ -221,6 +228,8 @@ class MicroscopeView {
       gridChips  : this.root.querySelector("#probe-grid-channels"),
       grid       : this.root.querySelector("#probe-grid"),
       ablation   : this.root.querySelector("#probe-ablation"),
+      occlusion  : this.root.querySelector("#probe-occlusion"),
+      occlFacts  : this.root.querySelector("#probe-occl-facts"),
       arch       : this.root.querySelector("#probe-arch"),
       archLayers : this.root.querySelector("#probe-arch-layers"),
       features   : this.root.querySelector("#probe-features"),
@@ -560,6 +569,7 @@ class MicroscopeView {
     this._renderAttribSlotChips();
     this._loadAttribution();
     this._loadAblation();
+    this._loadOcclusion();
     this._loadFields();
     this._loadFeatures();
     this._runWhatIf();
@@ -803,6 +813,37 @@ class MicroscopeView {
     if (v === 0) return "0";
     const abs = Math.abs(v);
     return abs >= 1e4 || abs < 1e-2 ? v.toExponential(1) : Number(v.toPrecision(3)).toString();
+  }
+
+  async _loadOcclusion() {
+    const token = ++this.occlToken;
+
+    this.refs.occlFacts.innerHTML = "";
+    this.refs.occlusion.innerHTML = `<p class="cube-hint is-loading">sliding an occluder across the window&hellip;</p>`;
+
+    const out = await window.apiPost("/api/probe/occlusion", { az: this.pixel.az, rg: this.pixel.rg });
+    if (token !== this.occlToken) return;
+
+    if (!out.ok) {
+      this.refs.occlusion.innerHTML = `<p class="cube-hint">${this._esc(out.error)}</p>`;
+      return;
+    }
+
+    this.refs.occlusion.innerHTML = `
+      <figure class="ms-field ms-field--wide">
+        <span class="ms-cell__frame">
+          <img src="data:image/png;base64,${out.map.png}" alt="Occlusion sensitivity map" />
+          ${this._dot(out.center_cell, out.grid)}
+        </span>
+        <figcaption>&Delta; curve MSE per occluded cell &middot; ${this._fmtVal(out.map.min)} &rarr; ${this._fmtVal(out.map.max)}</figcaption>
+      </figure>`;
+
+    const dAz  = (out.worst.row + 0.5) * out.occluder[0] - out.center[0];
+    const dRg  = (out.worst.col + 0.5) * out.occluder[1] - out.center[1];
+    const dist = Math.hypot(dAz, dRg);
+    const rel  = out.base_power > 0 ? ` (${((out.worst.delta_mse / out.base_power) * 100).toFixed(2)}% of the base curve's power)` : "";
+
+    this.refs.occlFacts.innerHTML = `occluder ${out.occluder[0]}&times;${out.occluder[1]} px &middot; peak damage <b>${out.worst.delta_mse.toExponential(2)}</b>${rel} about ${dist.toFixed(0)} px from the probed pixel`;
   }
 
   async _loadFields() {

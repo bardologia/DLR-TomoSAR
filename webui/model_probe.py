@@ -488,6 +488,48 @@ class ModelProbe:
             except (ValueError, KeyError) as error:
                 return {"ok": False, "error": str(error)}
 
+    def occlusion(self, body: dict) -> dict:
+        with self.lock:
+            if self.loaded is None:
+                return {"ok": False, "error": "no model loaded"}
+
+            try:
+                az, rg         = int(body["az"]), int(body["rg"])
+                window, cy, cx = self._window(az, rg)
+
+                run      = self.loaded["run"]
+                renderer = self.loaded["renderer"]
+                ph, pw   = window.shape[2], window.shape[3]
+                oh, ow   = max(2, ph // 8), max(2, pw // 8)
+                rows     = int(np.ceil(ph / oh))
+                cols     = int(np.ceil(pw / ow))
+
+                batch = np.repeat(window, rows * cols + 1, axis=0)
+                for row in range(rows):
+                    for col in range(cols):
+                        cell = 1 + row * cols + col
+                        batch[cell, :, row * oh:min(ph, (row + 1) * oh), col * ow:min(pw, (col + 1) * ow)] = 0.0
+
+                curves     = renderer.render(run.model(batch))[:, :, cy, cx]
+                base_curve = curves[0]
+                deltas     = ((curves[1:] - base_curve[None]) ** 2).mean(axis=1).reshape(rows, cols)
+
+                worst = np.unravel_index(int(np.argmax(deltas)), deltas.shape)
+
+                return {
+                    "ok"          : True,
+                    "center"      : [cy, cx],
+                    "patch"       : [ph, pw],
+                    "occluder"    : [oh, ow],
+                    "grid"        : [rows, cols],
+                    "center_cell" : [cy // oh, cx // ow],
+                    "base_power"  : float((base_curve ** 2).mean()),
+                    "worst"       : {"row": int(worst[0]), "col": int(worst[1]), "delta_mse": float(deltas[worst])},
+                    "map"         : self._field_payload(deltas, "magma"),
+                }
+            except (ValueError, KeyError) as error:
+                return {"ok": False, "error": str(error)}
+
     def _perturb(self, window: np.ndarray, perturbation: dict) -> np.ndarray:
         kind      = perturbation.get("kind")
         perturbed = window.copy()

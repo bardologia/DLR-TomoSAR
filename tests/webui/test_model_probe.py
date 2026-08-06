@@ -278,6 +278,25 @@ def test_ablation_without_loaded_model_fails():
     assert ModelProbe(SilentLogger()).ablation({"az": 0, "rg": 0})["ok"] is False
 
 
+def test_occlusion_peaks_on_the_cell_holding_the_probed_pixel():
+    result = _probe().occlusion({"az": 10, "rg": 8})
+
+    assert result["ok"]          is True
+    assert result["patch"]       == [PH, PW]
+    assert result["occluder"]    == [2, 2]
+    assert result["grid"]        == [4, 4]
+    assert result["center_cell"] == [2, 2]
+
+    assert result["worst"]["row"] == 2
+    assert result["worst"]["col"] == 2
+    assert result["worst"]["delta_mse"] > 1e-6
+    assert base64.b64decode(result["map"]["png"])[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_occlusion_without_loaded_model_fails():
+    assert ModelProbe(SilentLogger()).occlusion({"az": 0, "rg": 0})["ok"] is False
+
+
 def test_whatif_drop_of_used_channel_shifts_the_prediction():
     probe = _probe()
 
