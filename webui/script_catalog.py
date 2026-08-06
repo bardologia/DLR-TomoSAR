@@ -204,6 +204,29 @@ class ScriptCatalog:
         },
     }
 
+    TOPICS = {
+        "analyze_preprocessing"           : "trials",
+        "analyze_param_extraction"        : "trials",
+        "compare_trials"                  : "trials",
+        "compare_preprocessing_trials"    : "trials",
+        "compare_param_extraction_trials" : "trials",
+        "compare_runs"                    : "trials",
+        "compare_seeds"                   : "trials",
+        "xray_weights"                    : "diagnostics",
+        "xray_activations"                : "diagnostics",
+        "measure_receptive_field"         : "diagnostics",
+        "attribute_inputs"                : "diagnostics",
+        "capture_attention"               : "diagnostics",
+        "probe_layers"                    : "diagnostics",
+        "compare_representations"         : "diagnostics",
+        "map_loss_landscape"              : "diagnostics",
+        "stress_inputs"                   : "diagnostics",
+        "animate_training"                : "diagnostics",
+        "export_tensorboard_plots"        : "exports",
+        "export_paper_figures"            : "exports",
+        "collect_reports"                 : "exports",
+    }
+
     GROUPS = {
         "train": {
             "title"    : "Train",
@@ -290,6 +313,7 @@ class ScriptCatalog:
                 "category"       : meta["category"],
                 "purpose"        : meta["purpose"],
                 "config_class"   : entry["class"] if entry else None,
+                "topic"          : self.TOPICS.get(key),
                 "group"          : group_key,
                 "variant"        : label,
                 "group_title"    : group["title"] if group else None,
