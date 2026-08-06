@@ -3,6 +3,7 @@ from __future__ import annotations
 from ab_autopsy       import AbAutopsy
 from fit_lab          import FitLab
 from model_probe      import ModelProbe
+from model_survey     import ModelSurvey
 from routers.dispatch import HttpExchange, RouteTable, SubRouter
 from triage_board     import TriageBoard
 
@@ -114,6 +115,36 @@ class ProbeRouter(SubRouter):
 
     def vitals(self, exchange: HttpExchange) -> None:
         exchange.send_result(self.probe.vitals(exchange.body))
+
+
+class SurveyRouter(SubRouter):
+
+    def __init__(self, survey: ModelSurvey) -> None:
+        self.survey = survey
+
+        super().__init__(("/api/survey",))
+
+    def declare(self, table: RouteTable) -> None:
+        table.add("GET",  "/api/survey/runs",   self.runs)
+        table.add("GET",  "/api/survey/status", self.status)
+        table.add("GET",  "/api/survey/result", self.result)
+        table.add("POST", "/api/survey/start",  self.start)
+        table.add("POST", "/api/survey/cancel", self.cancel)
+
+    def runs(self, exchange: HttpExchange) -> None:
+        exchange.send_result(self.survey.runs(exchange.text("base")))
+
+    def status(self, exchange: HttpExchange) -> None:
+        exchange.send_json(self.survey.survey_status())
+
+    def result(self, exchange: HttpExchange) -> None:
+        exchange.send_result(self.survey.survey_result(), 404)
+
+    def start(self, exchange: HttpExchange) -> None:
+        exchange.send_result(self.survey.start(exchange.body))
+
+    def cancel(self, exchange: HttpExchange) -> None:
+        exchange.send_result(self.survey.cancel())
 
 
 class TriageRouter(SubRouter):

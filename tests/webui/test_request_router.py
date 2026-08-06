@@ -6,7 +6,7 @@ import json
 import pytest
 
 from request_router             import RequestRouter
-from routers.analysis_routers   import AutopsyRouter, FitLabRouter, ProbeRouter, TriageRouter
+from routers.analysis_routers   import AutopsyRouter, FitLabRouter, ProbeRouter, SurveyRouter, TriageRouter
 from routers.cube_routers       import CubeRouter, SliceRouter
 from routers.dispatch           import HttpExchange, RouteConflict, RouteTable, SubRouter
 from routers.launch_routers     import CatalogRouter, JobRouter, SavedRunRouter
@@ -16,8 +16,8 @@ from routers.static_router      import StaticRouter
 from routers.system_router      import SystemRouter
 from routers.tensorboard_router import TensorboardRouter
 
-ROUTE_COUNT   = 114
-SECTION_COUNT = 34
+ROUTE_COUNT   = 119
+SECTION_COUNT = 35
 
 RESOLUTIONS = [
     ("GET",  "/",                                  StaticRouter),
@@ -34,6 +34,8 @@ RESOLUTIONS = [
     ("GET",  "/api/fitlab/map",                    FitLabRouter),
     ("POST", "/api/probe/predict",                 ProbeRouter),
     ("GET",  "/api/probe/runs",                    ProbeRouter),
+    ("GET",  "/api/survey/runs",                   SurveyRouter),
+    ("POST", "/api/survey/start",                  SurveyRouter),
     ("GET",  "/api/triage/cases",                  TriageRouter),
     ("GET",  "/api/triage/thumb",                  TriageRouter),
     ("GET",  "/api/triage/profile",                TriageRouter),
@@ -109,6 +111,7 @@ def build_routers() -> list:
         SliceRouter(None),
         FitLabRouter(None),
         ProbeRouter(None),
+        SurveyRouter(None),
         TriageRouter(None),
         AutopsyRouter(None),
         ContentLibraryRouter("/api/equations",    None, "groups"),

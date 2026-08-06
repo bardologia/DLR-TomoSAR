@@ -107,5 +107,6 @@ def fake_run(n_slots: int = 1, with_gt: bool = True):
         full_curves    = np.ones((N_ELEV, N_AZ, N_RG), dtype=np.float32),
         x_axis         = np.linspace(-10.0, 40.0, N_ELEV).astype(np.float32),
         n_gaussians    = n_slots,
+        in_channels    = 2,
         split_region   = SimpleNamespace(azimuth_size=N_AZ, range_size=N_RG, azimuth_start=0, range_start=0),
     )

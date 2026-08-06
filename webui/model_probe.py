@@ -181,9 +181,9 @@ class ModelProbe:
         plt.imsave(buf, primary, cmap="gray", vmin=float(vmin), vmax=float(vmax), format="png")
         return buf.getvalue()
 
-    def _window(self, az: int, rg: int) -> tuple[np.ndarray, int, int]:
-        run    = self.loaded["run"]
-        ph, pw = self.loaded["patch"]
+    @classmethod
+    def _window_at(cls, run, patch: tuple, az: int, rg: int) -> tuple[np.ndarray, int, int]:
+        ph, pw = patch
         n_az   = run.split_region.azimuth_size
         n_rg   = run.split_region.range_size
 
@@ -199,6 +199,9 @@ class ModelProbe:
 
         window = run.dataset.assemble_window(complex_window, dem_window)
         return window[None].astype(np.float32), az - top, rg - left
+
+    def _window(self, az: int, rg: int) -> tuple[np.ndarray, int, int]:
+        return self._window_at(self.loaded["run"], self.loaded["patch"], az, rg)
 
     def _slots(self, params_center: np.ndarray) -> list[dict]:
         from tools.loss.param_loss import ParamMatcher
@@ -380,27 +383,32 @@ class ModelProbe:
             except (ValueError, KeyError) as error:
                 return {"ok": False, "error": str(error)}
 
-    def _family_gradients(self, window: np.ndarray, cy: int, cx: int, slot: int) -> list[tuple[str, np.ndarray]]:
+    @classmethod
+    def _family_gradients_at(cls, run, device: str, window: np.ndarray, cy: int, cx: int, slot: int) -> list[tuple[str, np.ndarray]]:
         import torch
 
-        x = torch.from_numpy(window).to(self.loaded["device"]).requires_grad_(True)
-        y = self.loaded["run"].model.module(x)
+        x = torch.from_numpy(window).to(device).requires_grad_(True)
+        y = run.model.module(x)
 
         gradients = []
-        for offset, family in enumerate(self.FAMILIES):
+        for offset, family in enumerate(cls.FAMILIES):
             target = y[0, offset::3, cy, cx].abs().sum() if slot < 0 else y[0, 3 * slot + offset, cy, cx].abs()
-            keep   = offset < len(self.FAMILIES) - 1
+            keep   = offset < len(cls.FAMILIES) - 1
             grad   = torch.autograd.grad(target, x, retain_graph=keep)[0].abs()[0].cpu().numpy()
             gradients.append((family, grad))
 
         return gradients
+
+    def _family_gradients(self, window: np.ndarray, cy: int, cx: int, slot: int) -> list[tuple[str, np.ndarray]]:
+        return self._family_gradients_at(self.loaded["run"], self.loaded["device"], window, cy, cx, slot)
 
     def _cell_png(self, cell: np.ndarray) -> str:
         buf = io.BytesIO()
         plt.imsave(buf, cell, cmap="magma", vmin=0.0, vmax=1.0, format="png")
         return base64.b64encode(buf.getvalue()).decode("ascii")
 
-    def _radial_profile(self, grad: np.ndarray, cy: int, cx: int) -> dict:
+    @classmethod
+    def _radial_profile(cls, grad: np.ndarray, cy: int, cx: int) -> dict:
         total_map = grad.sum(axis=0)
         total     = float(total_map.sum())
 
@@ -595,7 +603,8 @@ class ModelProbe:
             except (ValueError, KeyError) as error:
                 return {"ok": False, "error": str(error)}
 
-    def _perturb(self, window: np.ndarray, perturbation: dict) -> np.ndarray:
+    @classmethod
+    def _perturb(cls, window: np.ndarray, perturbation: dict) -> np.ndarray:
         kind      = perturbation.get("kind")
         perturbed = window.copy()
 
@@ -610,7 +619,7 @@ class ModelProbe:
             rng   = np.random.default_rng(int(perturbation.get("seed", 0)))
             perturbed += rng.normal(0.0, sigma, size=perturbed.shape).astype(np.float32)
         else:
-            raise ValueError(f"unknown perturbation '{kind}', expected one of {self.PERTURBATIONS}")
+            raise ValueError(f"unknown perturbation '{kind}', expected one of {cls.PERTURBATIONS}")
 
         return perturbed
 
@@ -710,7 +719,8 @@ class ModelProbe:
             except (ValueError, KeyError) as error:
                 return {"ok": False, "error": str(error)}
 
-    def _vital_flags(self, stat: dict) -> list[str]:
+    @classmethod
+    def _vital_flags(cls, stat: dict) -> list[str]:
         flags = []
         if stat["nonfinite_frac"] > 0.0:
             flags.append("nonfinite")
@@ -719,6 +729,32 @@ class ModelProbe:
         if stat["dead_channel_frac"] is not None and stat["dead_channel_frac"] > 0.25:
             flags.append("dead channels")
         return flags
+
+    @classmethod
+    def _vitals_payload(cls, model, stats: dict) -> dict:
+        modules = dict(model.named_modules())
+        entries = []
+        for name, stat in sorted(stats.items(), key=lambda kv: kv[1]["first_seen"]):
+            entries.append({
+                "name"      : name,
+                "type"      : stat["module_type"],
+                "shape"     : stat["shape"],
+                "params"    : int(sum(p.numel() for p in modules[name].parameters())),
+                "zero_frac" : stat["zero_frac"],
+                "dead"      : stat["dead_channels"],
+                "channels"  : stat["n_channels"],
+                "eff_frac"  : stat["effective_channel_frac"],
+                "max_abs"   : stat["max_abs"],
+                "flags"     : cls._vital_flags(stat),
+            })
+
+        summary = {
+            "n_layers"     : len(entries),
+            "total_params" : int(sum(p.numel() for p in model.parameters())),
+            "flagged"      : sum(1 for entry in entries if entry["flags"]),
+        }
+
+        return {"entries": entries, "summary": summary}
 
     def vitals(self, body: dict) -> dict:
         import torch
@@ -743,29 +779,7 @@ class ModelProbe:
                 finally:
                     recorder.detach()
 
-                modules = dict(model.named_modules())
-                entries = []
-                for name, stat in sorted(recorder.stats().items(), key=lambda kv: kv[1]["first_seen"]):
-                    entries.append({
-                        "name"      : name,
-                        "type"      : stat["module_type"],
-                        "shape"     : stat["shape"],
-                        "params"    : int(sum(p.numel() for p in modules[name].parameters())),
-                        "zero_frac" : stat["zero_frac"],
-                        "dead"      : stat["dead_channels"],
-                        "channels"  : stat["n_channels"],
-                        "eff_frac"  : stat["effective_channel_frac"],
-                        "max_abs"   : stat["max_abs"],
-                        "flags"     : self._vital_flags(stat),
-                    })
-
-                summary = {
-                    "n_layers"     : len(entries),
-                    "total_params" : int(sum(p.numel() for p in model.parameters())),
-                    "flagged"      : sum(1 for entry in entries if entry["flags"]),
-                }
-
-                return {"ok": True, "entries": entries, "summary": summary}
+                return {"ok": True, **self._vitals_payload(model, recorder.stats())}
             except (ValueError, KeyError) as error:
                 return {"ok": False, "error": str(error)}
 

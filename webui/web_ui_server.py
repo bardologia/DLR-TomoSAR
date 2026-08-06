@@ -10,6 +10,7 @@ from equation_library                  import EquationLibrary
 from ab_autopsy                        import AbAutopsy
 from fit_lab                           import FitLab
 from model_probe                       import ModelProbe
+from model_survey                      import ModelSurvey
 from triage_board                      import TriageBoard
 from flow_library                      import FlowLibrary
 from gpu_schedule                      import GpuSchedule
@@ -40,7 +41,7 @@ from tensorboard_manager               import TensorboardManager
 from training_curves                   import TrainingCurves
 from web_logger                        import WebLogger
 
-from routers.analysis_routers   import AutopsyRouter, FitLabRouter, ProbeRouter, TriageRouter
+from routers.analysis_routers   import AutopsyRouter, FitLabRouter, ProbeRouter, SurveyRouter, TriageRouter
 from routers.cube_routers       import CubeRouter, SliceRouter
 from routers.launch_routers     import CatalogRouter, JobRouter, SavedRunRouter
 from routers.library_routers    import BackboneRouter, ContentLibraryRouter, ModelLibraryRouter
@@ -112,6 +113,7 @@ class WebUIServer:
         self.curves            = TrainingCurves(self.logger)
         self.fitlab            = FitLab(self.logger)
         self.probe             = ModelProbe(self.logger)
+        self.survey            = ModelSurvey(self.logger)
         self.triage            = TriageBoard(self.paths, self.logger)
         self.autopsy           = AbAutopsy(self.logger)
         self.launcher          = RunLauncher(self.paths, self.logger, self.resolver, self.processes, self.tensorboard)
@@ -126,6 +128,7 @@ class WebUIServer:
             SliceRouter(self.slices),
             FitLabRouter(self.fitlab),
             ProbeRouter(self.probe),
+            SurveyRouter(self.survey),
             TriageRouter(self.triage),
             AutopsyRouter(self.autopsy),
             ContentLibraryRouter("/api/equations",    self.equations,    "groups"),
