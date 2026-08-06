@@ -5,6 +5,20 @@ class MicroscopeView {
   static FAMILY_COLORS = { amp: "#1d4fd8", mu: "#0f766e", sigma: "#a16207" };
   static FAMILY_LABELS = { amp: "amplitude", mu: "mean height", sigma: "width" };
   static SERIES_COLORS = { pred: "#1d4fd8", gt: "#16191b", raw: "#9ca3af", perturbed: "#b91c1c" };
+  static FLIP_STYLES   = {
+    none    : { color: this.SERIES_COLORS.pred,      width: 1.8, label: "original" },
+    azimuth : { color: this.FAMILY_COLORS.mu,        width: 1.2, label: "az flip" },
+    range   : { color: this.FAMILY_COLORS.sigma,     width: 1.2, label: "rg flip" },
+    both    : { color: this.SERIES_COLORS.perturbed, width: 1.2, label: "both" },
+  };
+  static PAGES = [
+    { key: "prediction",  title: "Prediction" },
+    { key: "fields",      title: "Parameter fields" },
+    { key: "attribution", title: "Attribution" },
+    { key: "robustness",  title: "Robustness" },
+    { key: "whatif",      title: "What-if" },
+    { key: "features",    title: "Feature maps" },
+  ];
 
   constructor(root) {
     this.root        = root;
@@ -35,6 +49,9 @@ class MicroscopeView {
     this.sweepToken  = 0;
     this.vitalsData  = null;
     this.vitalsToken = 0;
+    this.flipsData   = null;
+    this.wiData      = null;
+    this.page        = "prediction";
     this.wi          = { kind: "drop_channel", channel: 0, factor: 0.5, sigma: 0.5, seed: 0 };
     this.wiTimer     = null;
   }
@@ -95,8 +112,11 @@ class MicroscopeView {
         <div class="ms-main">
           <div class="ms-idle" id="probe-idle">Click a pixel on the scene map, or type az / rg indices, to put it under the microscope.</div>
 
-          <div class="ms-cards" id="probe-cards" hidden>
-            <section class="ms-card">
+          <div class="ms-layout" id="probe-cards" hidden>
+            <div class="ms-pages">
+
+            <section class="ms-page" data-page="prediction">
+            <section class="ms-card ms-card--snug">
               <div class="ms-card__head">
                 <h3 class="cube-panel-title">Predicted profile</h3>
                 <span class="ms-card__note">reflectivity vs height at the probed pixel</span>
@@ -107,7 +127,9 @@ class MicroscopeView {
               <p class="ms-card__note ms-witablenote" id="probe-match-note" hidden>ground-truth scatterers and their hungarian-matched predictions &mdash; red marks a miss beyond 0.1 amp or 0.5 m</p>
               <table class="ms-slots" id="probe-match"></table>
             </section>
+            </section>
 
+            <section class="ms-page" data-page="fields" hidden>
             <section class="ms-card">
               <div class="ms-card__head">
                 <h3 class="cube-panel-title">Local parameter fields</h3>
@@ -120,8 +142,10 @@ class MicroscopeView {
               <div class="ms-fieldrow" id="probe-fields-maps"></div>
               <div class="ms-fieldrow" id="probe-fields-overview"></div>
             </section>
+            </section>
 
-            <section class="ms-card ms-card--wide">
+            <section class="ms-page" data-page="attribution" hidden>
+            <section class="ms-card">
               <div class="ms-card__head">
                 <h3 class="cube-panel-title">Input attribution</h3>
                 <span class="ms-card__note" id="probe-attrib-note">share of |&part;output/&part;input| per input channel, all three outputs side by side</span>
@@ -147,20 +171,28 @@ class MicroscopeView {
               </div>
               <canvas id="probe-erf" width="640" height="180" hidden></canvas>
               <p class="ms-wifacts" id="probe-erf-facts"></p>
-              <div class="ms-subhead">
-                <h4 class="cube-panel-title">Channel ablation</h4>
-                <span class="ms-card__note">zero one input channel at a time and re-run &mdash; causal damage to the prediction, unlike the local gradients above</span>
+            </section>
+            </section>
+
+            <section class="ms-page" data-page="robustness" hidden>
+            <section class="ms-card">
+              <div class="ms-card__head">
+                <h3 class="cube-panel-title">Channel ablation</h3>
+                <span class="ms-card__note">zero one input channel at a time and re-run &mdash; causal damage to the prediction, unlike the attribution page's local gradients</span>
               </div>
               <div class="ms-abl" id="probe-ablation"></div>
-              <div class="ms-subhead">
-                <h4 class="cube-panel-title">Occlusion sensitivity</h4>
+            </section>
+
+            <section class="ms-card ms-card--third">
+              <div class="ms-card__head">
+                <h3 class="cube-panel-title">Occlusion sensitivity</h3>
                 <span class="ms-card__note">slide a zero-patch across the window and re-run &mdash; where the model's evidence for this pixel actually sits</span>
               </div>
               <div class="ms-fieldrow" id="probe-occlusion"></div>
               <p class="ms-wifacts" id="probe-occl-facts"></p>
             </section>
 
-            <section class="ms-card">
+            <section class="ms-card ms-card--twothird">
               <div class="ms-card__head">
                 <h3 class="cube-panel-title">Symmetry</h3>
                 <span class="ms-card__note">re-run the model on flipped windows and flip the outputs back &mdash; a flip-equivariant model repeats itself exactly</span>
@@ -168,8 +200,10 @@ class MicroscopeView {
               <canvas id="probe-flips" width="640" height="240"></canvas>
               <p class="ms-wifacts" id="probe-flips-facts"></p>
             </section>
+            </section>
 
-            <section class="ms-card">
+            <section class="ms-page" data-page="whatif" hidden>
+            <section class="ms-card ms-card--snug">
               <div class="ms-card__head">
                 <h3 class="cube-panel-title">What-if</h3>
                 <span class="ms-card__note">perturb the input window, re-run the model, compare the predictions</span>
@@ -208,8 +242,10 @@ class MicroscopeView {
               <canvas id="probe-sweep" width="640" height="200" hidden></canvas>
               <p class="ms-wifacts" id="probe-sweep-facts"></p>
             </section>
+            </section>
 
-            <section class="ms-card ms-card--wide">
+            <section class="ms-page" data-page="features" hidden>
+            <section class="ms-card">
               <div class="ms-card__head">
                 <h3 class="cube-panel-title">Feature maps</h3>
                 <span class="ms-card__note" id="probe-feat-note"></span>
@@ -224,7 +260,11 @@ class MicroscopeView {
               <p class="ms-wifacts" id="probe-vitals-summary"></p>
               <div class="ms-vitals"><table class="ms-slots ms-vitals__table" id="probe-vitals"></table></div>
             </section>
+            </section>
 
+            </div>
+
+            <nav class="secnav" id="probe-nav" aria-label="Microscope analyses"></nav>
           </div>
         </div>
       </div>`;
@@ -246,6 +286,8 @@ class MicroscopeView {
       goBtn      : this.root.querySelector("#probe-go"),
       idle       : this.root.querySelector("#probe-idle"),
       cards      : this.root.querySelector("#probe-cards"),
+      nav        : this.root.querySelector("#probe-nav"),
+      pages      : [...this.root.querySelectorAll(".ms-page")],
       profile    : this.root.querySelector("#probe-profile"),
       slots      : this.root.querySelector("#probe-slots"),
       fit        : this.root.querySelector("#probe-fit"),
@@ -333,6 +375,38 @@ class MicroscopeView {
     });
 
     this._syncWhatIfControls();
+    this._renderNav();
+    this._setPage(this.page);
+  }
+
+  _renderNav() {
+    this.refs.nav.innerHTML = "";
+    MicroscopeView.PAGES.forEach((page) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "secnav__item";
+      btn.dataset.page = page.key;
+      btn.innerHTML = `<span class="secnav__name">${page.title}</span>`;
+      btn.addEventListener("click", () => this._setPage(page.key));
+      this.refs.nav.appendChild(btn);
+    });
+  }
+
+  _setPage(key) {
+    this.page = key;
+    this.refs.nav.querySelectorAll(".secnav__item").forEach((btn) => btn.classList.toggle("is-active", btn.dataset.page === key));
+    this.refs.pages.forEach((el) => { el.hidden = el.dataset.page !== key; });
+    this._repaintPage(key);
+  }
+
+  _repaintPage(key) {
+    if (key === "prediction" && this.lastPredict) this._renderProfile(this.lastPredict);
+    if (key === "attribution" && this.attrib) this._renderErf(this.attrib);
+    if (key === "robustness" && this.flipsData) this._renderFlipsChart(this.flipsData);
+    if (key === "whatif" && this.wiData) {
+      this._renderWhatIfChart(this.wiData);
+      this._renderSweepChart();
+    }
   }
 
   _runsBase() {
@@ -432,6 +506,8 @@ class MicroscopeView {
     this.fieldsSlot  = 0;
     this.sweepData   = null;
     this.vitalsData  = null;
+    this.flipsData   = null;
+    this.wiData      = null;
     this.wi.channel  = 0;
     this.wi.seed     = 0;
 
@@ -973,6 +1049,7 @@ class MicroscopeView {
   async _loadFlips() {
     const token = ++this.flipToken;
 
+    this.flipsData = null;
     this.refs.flipsFacts.innerHTML = `<span class="cube-hint is-loading">re-running the model on flipped windows&hellip;</span>`;
 
     const out = await window.apiPost("/api/probe/flips", { az: this.pixel.az, rg: this.pixel.rg });
@@ -983,20 +1060,20 @@ class MicroscopeView {
       return;
     }
 
-    const styles = {
-      none    : { color: MicroscopeView.SERIES_COLORS.pred,      width: 1.8, label: "original" },
-      azimuth : { color: "#0f766e",                              width: 1.2, label: "az flip" },
-      range   : { color: "#a16207",                              width: 1.2, label: "rg flip" },
-      both    : { color: MicroscopeView.SERIES_COLORS.perturbed, width: 1.2, label: "both" },
-    };
+    this.flipsData = out;
+    this._renderFlipsChart(out);
 
-    window.drawLineChart(this.refs.flips, out.x_axis, out.entries.map((e) => ({ values: e.curve, ...styles[e.flip] })));
-
-    const worst = Math.max(...out.entries.map((e) => e.delta_mse));
-    const parts = out.entries.filter((e) => e.flip !== "none").map((e) => `${styles[e.flip].label} &Delta; <b>${e.delta_mse.toExponential(2)}</b>`);
-    const rel   = out.base_power > 0 ? ` &mdash; worst is ${((worst / out.base_power) * 100).toFixed(2)}% of the base curve's power` : "";
+    const styles = MicroscopeView.FLIP_STYLES;
+    const worst  = Math.max(...out.entries.map((e) => e.delta_mse));
+    const parts  = out.entries.filter((e) => e.flip !== "none").map((e) => `${styles[e.flip].label} &Delta; <b>${e.delta_mse.toExponential(2)}</b>`);
+    const rel    = out.base_power > 0 ? ` &mdash; worst is ${((worst / out.base_power) * 100).toFixed(2)}% of the base curve's power` : "";
 
     this.refs.flipsFacts.innerHTML = `${parts.join(" &middot; ")}${rel}`;
+  }
+
+  _renderFlipsChart(out) {
+    const styles = MicroscopeView.FLIP_STYLES;
+    window.drawLineChart(this.refs.flips, out.x_axis, out.entries.map((e) => ({ values: e.curve, ...styles[e.flip] })));
   }
 
   _loadFeatures() {
@@ -1111,20 +1188,15 @@ class MicroscopeView {
     if (token !== this.wiToken) return;
 
     if (!out.ok) {
+      this.wiData                   = null;
       this.refs.wDelta.textContent  = out.error;
       this.refs.wSlots.innerHTML    = "";
       this.refs.wTableNote.hidden   = true;
       return;
     }
 
-    const series = [];
-    if (this.lastPredict && Array.isArray(this.lastPredict.gt_curve)) {
-      series.push({ values: this.lastPredict.gt_curve, color: MicroscopeView.SERIES_COLORS.raw, width: 1.0, label: "GT" });
-    }
-    series.push({ values: out.base_curve,      color: MicroscopeView.SERIES_COLORS.pred,      width: 1.6, label: "base" });
-    series.push({ values: out.perturbed_curve, color: MicroscopeView.SERIES_COLORS.perturbed, width: 1.6, label: "perturbed" });
-
-    window.drawLineChart(this.refs.wCanvas, out.x_axis, series);
+    this.wiData = out;
+    this._renderWhatIfChart(out);
 
     const power = out.base_curve.reduce((acc, v) => acc + v * v, 0) / out.base_curve.length;
     const rel   = power > 0 ? ` &mdash; ${((out.delta_mse / power) * 100).toFixed(2)}% of the base curve's power` : "";
@@ -1133,6 +1205,17 @@ class MicroscopeView {
     this.refs.wTableNote.hidden = false;
     this._renderWhatIfSlots(out.base_slots, out.perturbed_slots);
     this._ensureSweep();
+  }
+
+  _renderWhatIfChart(out) {
+    const series = [];
+    if (this.lastPredict && Array.isArray(this.lastPredict.gt_curve)) {
+      series.push({ values: this.lastPredict.gt_curve, color: MicroscopeView.SERIES_COLORS.raw, width: 1.0, label: "GT" });
+    }
+    series.push({ values: out.base_curve,      color: MicroscopeView.SERIES_COLORS.pred,      width: 1.6, label: "base" });
+    series.push({ values: out.perturbed_curve, color: MicroscopeView.SERIES_COLORS.perturbed, width: 1.6, label: "perturbed" });
+
+    window.drawLineChart(this.refs.wCanvas, out.x_axis, series);
   }
 
   async _ensureSweep() {

@@ -4136,6 +4136,17 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .ms-card canvas { max-width: 860px; }
 @media (max-width: 1240px) { .ms-main .ms-cards { grid-template-columns: minmax(0, 1fr); } }
 
+.ms-layout { display: grid; grid-template-columns: minmax(0, 1fr) 190px; gap: 20px; align-items: start; }
+.ms-layout[hidden] { display: none; }
+.ms-pages { display: flex; flex-direction: column; min-width: 0; }
+.ms-page { display: flex; flex-flow: row wrap; gap: 16px; align-items: flex-start; min-width: 0; }
+.ms-page[hidden] { display: none; }
+.ms-page > .ms-card { flex: 1 1 100%; min-width: 0; }
+.ms-page > .ms-card--snug { flex: 0 1 920px; }
+.ms-page > .ms-card--third { flex: 1 1 340px; }
+.ms-page > .ms-card--twothird { flex: 2 1 560px; }
+@media (max-width: 980px) { .ms-layout { grid-template-columns: minmax(0, 1fr); } }
+
 .ms-card {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card);
   box-shadow: 0 1px 3px rgba(22, 25, 27, 0.06); padding: 16px;
@@ -4162,7 +4173,7 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 }
 .ms-chip b { color: var(--ink-faint); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; font-size: 10px; margin-right: 3px; }
 
-.ms-slots { width: 100%; border-collapse: collapse; margin-top: 12px; font-family: var(--mono); font-size: 12px; }
+.ms-slots { width: 100%; max-width: 860px; border-collapse: collapse; margin-top: 12px; font-family: var(--mono); font-size: 12px; }
 .ms-slots:empty { display: none; }
 .ms-slots th {
   text-align: right; font-weight: 500; font-size: 10.5px; letter-spacing: 0.05em;
@@ -4247,7 +4258,7 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 
 .ms-vitals { max-height: 340px; overflow: auto; margin-top: 8px; border: 1px solid var(--line); }
 .ms-vitals:has(.ms-vitals__table:empty) { display: none; }
-.ms-vitals__table { margin-top: 0; font-size: 11px; }
+.ms-vitals__table { margin-top: 0; max-width: none; font-size: 11px; }
 .ms-vitals__table th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
 .ms-vitals__table th.ms-vitals__type, .ms-vitals__table td.ms-vitals__type,
 .ms-vitals__table th.ms-vitals__flags, .ms-vitals__table td.ms-vitals__flags { text-align: left; }
