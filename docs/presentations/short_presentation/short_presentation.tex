@@ -851,7 +851,7 @@
 % next-steps agenda (short deck only)
 \begin{frame}{Next steps}
   \begin{itemize}\setlength{\itemsep}{16pt}
-    \item \textbf{Physical loss terms}: the five ranked terms and the first single-term $K{=}2$ sweep results on the next five frames; the Capon-cycle arm is still queued.
+    \item \textbf{Physical loss terms}: the five ranked terms and the first single-term $K{=}2$ sweep results on the next six frames; the Capon-cycle arm is still queued.
     \item \textbf{$\gamma$-net adaptation}: adapting the $\gamma$-net architecture to this pipeline.
     \item \textbf{JEPA pretraining}: predicting in representation space, the closing frame.
   \end{itemize}
@@ -1068,129 +1068,181 @@
 \end{frame}
 
 % full deck p.141 --- sections/13_physics_losses.tex
-\begin{frame}{The single-term sweep --- every family helps low, two collapse high}
-  \small
-  \begin{columns}[T]
-    \begin{column}{0.44\textwidth}
-      \begin{itemize}\setlength{\itemsep}{7pt}
-        \item[\textcolor{argA}{$\blacksquare$}] At $w \le 0.05$ \textbf{every family
-              beats the no-physics baseline} (0.620) --- adding a physics term at
-              gentle weight essentially never hurts.
-        \item[\textcolor{argB}{$\blacksquare$}] \textbf{Coherence re-synthesis peaks
-              at $w{=}0.25$} (0.944, the sweep's best arm) --- the theory-ranked \#1
-              term is also the empirical \#1.
-        \item[\textcolor{argC}{$\blacksquare$}] \textbf{Moments is the robust family}:
-              above baseline at every weight, no collapse anywhere on the grid.
-        \item[\textcolor{accent}{$\blacksquare$}] \textbf{Covariance matching and total
-              power collapse past $w{=}0.25$} --- the two absolute-scale terms overpower
-              the parameter loss (curve $R^2$ drops to $0.72$ at $w{=}1$).
-        \item[\textcolor{soft}{$\blacksquare$}] The Capon-cycle arm is not in this
-              sweep --- queued, costliest term.
-      \end{itemize}
-    \end{column}
-    \begin{column}{0.54\textwidth}
-      \centering
-      {\footnotesize
-      \setlength{\tabcolsep}{5pt}
-      \renewcommand{\arraystretch}{1.5}
-      \begin{tabular}{@{}lccccc@{}}
-        \toprule
-        term $\backslash$ $w$ & 0.01 & 0.05 & 0.25 & 0.5 & 1 \\
-        \midrule
-        \rowcolor{argB!16}
-        coherence resyn.\ & 0.819 & 0.779 & \cellcolor{good!25}\textbf{0.944} & 0.609 & 0.739 \\
-        \rowcolor{argC!14}
-        moments           & 0.855 & \textbf{0.876} & 0.792 & 0.861 & 0.767 \\
-        covariance match  & 0.834 & \textbf{0.871} & \cellcolor{accent!18}0.578 & \cellcolor{accent!18}0.306 & \cellcolor{accent!18}0.187 \\
-        total power       & 0.789 & \textbf{0.817} & 0.689 & \cellcolor{accent!18}0.491 & \cellcolor{accent!18}0.144 \\
-        \midrule
-        no-physics baseline & \multicolumn{5}{c}{0.620} \\
-        \bottomrule
-      \end{tabular}}
-      \par\vspace{6pt}
-      \parbox{0.95\linewidth}{\scriptsize\color{soft} \textbf{runs}: dual UNet-skip
-      trunks $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}2$ $\cdot$ presence A
-      $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ $\cdot$
-      full stack $\to$ both trunks; loss $=$ param-L1 $+\,0.5\,$cosine curve $+$ one
-      physics term at weight $w$; five seeded replicas per arm, held-out test. Cell
-      $=$ grouped score: equal-weight mean of the five metric-group scores (curve
-      error / variance explained / structural similarity / shape / peak location),
-      min-max scaled \emph{within this 21-arm comparison} --- a rank statistic, no
-      seed spread. \textbf{bold} $=$ best in row, marked only where best and worst
-      differ by more than $5\%$ (every row clears it);
-      \colorbox{accent!18}{\strut below baseline}; \colorbox{good!25}{\strut sweep
-      best}. Val losses are not comparable across arms (each optimises a different
-      composite).\par}
-    \end{column}
-  \end{columns}
+\begin{frame}{The physics sweep at $K{=}2$ --- every term rides low, the scale terms collapse high}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{0.70}
+  \setlength{\tabcolsep}{2.2pt}
+  \renewcommand{\seedtag}{phyA}
+  \begin{tabular}{@{}l ccccccccc@{}}
+    \toprule
+    & \multicolumn{2}{c}{reconstruction} & \multicolumn{7}{c@{}}{detection (matched)} \\
+    \cmidrule(lr){2-3}\cmidrule(l){4-10}
+    objective & curve $R^2$ $\uparrow$ & cos med $\uparrow$ & prec.\ $\uparrow$ & recall $\uparrow$ & F1 $\uparrow$ & exact $\uparrow$ & under $\downarrow$ & over $\downarrow$ & peak p95 $\downarrow$ \\
+    \midrule
+    param-L1 $+$ cos & \seedpm{0.747}{.006} & \seedpm{0.965}{.004} & \seedpm{0.895}{.008} & \seedpm{0.901}{.001} & \seedpm{0.898}{.004} & \seedpm{0.908}{.007} & \seedpm{0.041}{.003} & \seedpm{0.051}{.009} & \seedpm{4.7}{.0} \\
+    \addlinespace
+    \multicolumn{10}{@{}l}{\emph{$+$ coherence re-synthesis}} \\
+    \quad $w{=}0.01$ & \seedpm{0.752}{.004} & \seedpm{0.966}{.002} & \seedpm{0.895}{.006} & \seedpm{0.902}{.001} & \seedpm{0.898}{.003} & \seedpm{0.910}{.002} & \seedpm{0.040}{.004} & \seedpm{0.050}{.005} & \seedpm{4.7}{.0} \\
+    \quad $w{=}0.05$ & \seedpm{0.752}{.006} & \seedpm{0.966}{.001} & \seedpm{0.893}{.005} & \seedpm{0.902}{.001} & \seedpm{0.898}{.002} & \seedpm{0.911}{.003} & \seedpm{0.039}{.003} & \seedpm{0.051}{.004} & \seedpm{4.7}{.0} \\
+    \quad $w{=}0.25$ & \seedpm{\hlval{good}{0.755}}{.007} & \seedpm{0.966}{.002} & \seedpm{0.892}{.009} & \seedpm{0.903}{.002} & \seedpm{0.897}{.004} & \seedpm{0.909}{.005} & \seedpm{0.038}{.005} & \seedpm{0.053}{.010} & \seedpm{4.7}{.0} \\
+    \quad $w{=}0.5$ & \seedpm{0.748}{.009} & \seedpm{0.965}{.003} & \seedpm{0.886}{.013} & \seedpm{0.903}{.001} & \seedpm{0.895}{.007} & \seedpm{0.911}{.010} & \seedpm{0.032}{.006} & \seedpm{0.057}{.014} & \seedpm{4.7}{.0} \\
+    \quad $w{=}1$ & \seedpm{0.751}{.008} & \seedpm{0.966}{.002} & \seedpm{0.870}{.045} & \seedpm{0.903}{.001} & \seedpm{0.886}{.024} & \seedpm{0.885}{.063} & \seedpm{\hlval{good}{\textbf{0.032}}}{.005} & \seedpm{\hlval{accent}{0.083}}{.068} & \seedpm{4.7}{.0} \\
+    \addlinespace
+    \multicolumn{10}{@{}l}{\emph{$+$ covariance matching}} \\
+    \quad $w{=}0.01$ & \seedpm{0.752}{.001} & \seedpm{0.965}{.002} & \seedpm{0.896}{.005} & \seedpm{0.901}{.001} & \seedpm{0.898}{.003} & \seedpm{0.906}{.004} & \seedpm{0.043}{.001} & \seedpm{0.051}{.005} & \seedpm{4.7}{.0} \\
+    \quad $w{=}0.05$ & \seedpm{0.748}{.001} & \seedpm{0.966}{.002} & \seedpm{0.899}{.005} & \seedpm{0.902}{.001} & \seedpm{0.900}{.002} & \seedpm{0.909}{.004} & \seedpm{0.043}{.002} & \seedpm{0.048}{.005} & \seedpm{4.7}{.0} \\
+    \quad $w{=}0.25$ & \seedpm{0.738}{.004} & \seedpm{0.966}{.002} & \seedpm{0.896}{.006} & \seedpm{0.899}{.002} & \seedpm{0.898}{.003} & \seedpm{0.902}{.008} & \seedpm{0.045}{.002} & \seedpm{0.053}{.008} & \seedpm{4.7}{.0} \\
+    \quad $w{=}0.5$ & \seedpm{\hlval{accent}{0.727}}{.011} & \seedpm{0.965}{.002} & \seedpm{0.900}{.001} & \seedpm{0.898}{.002} & \seedpm{0.899}{.001} & \seedpm{0.907}{.003} & \seedpm{0.046}{.003} & \seedpm{0.047}{.001} & \seedpm{4.7}{.0} \\
+    \quad $w{=}1$ & \seedpm{\hlval{accent}{0.723}}{.006} & \seedpm{0.965}{.001} & \seedpm{0.899}{.005} & \seedpm{0.899}{.002} & \seedpm{0.899}{.002} & \seedpm{0.903}{.003} & \seedpm{0.047}{.004} & \seedpm{0.050}{.006} & \seedpm{4.7}{.0} \\
+    \addlinespace
+    \multicolumn{10}{@{}l}{\emph{$+$ moments}} \\
+    \quad $w{=}0.01$ & \seedpm{0.753}{.003} & \seedpm{0.966}{.002} & \seedpm{0.895}{.006} & \seedpm{0.902}{.001} & \seedpm{0.898}{.003} & \seedpm{0.910}{.004} & \seedpm{0.040}{.005} & \seedpm{0.050}{.006} & \seedpm{4.7}{.0} \\
+    \quad $w{=}0.05$ & \seedpm{0.755}{.002} & \seedpm{0.966}{.002} & \seedpm{0.896}{.005} & \seedpm{0.902}{.001} & \seedpm{0.899}{.002} & \seedpm{0.910}{.004} & \seedpm{0.041}{.004} & \seedpm{0.049}{.005} & \seedpm{4.7}{.0} \\
+    \quad $w{=}0.25$ & \seedpm{0.751}{.002} & \seedpm{0.965}{.002} & \seedpm{0.897}{.004} & \seedpm{0.901}{.001} & \seedpm{0.899}{.002} & \seedpm{0.908}{.003} & \seedpm{0.044}{.000} & \seedpm{0.049}{.004} & \seedpm{4.7}{.0} \\
+    \quad $w{=}0.5$ & \seedpm{0.750}{.004} & \seedpm{0.966}{.002} & \seedpm{0.898}{.003} & \seedpm{0.900}{.001} & \seedpm{0.899}{.001} & \seedpm{0.909}{.001} & \seedpm{0.044}{.002} & \seedpm{0.047}{.003} & \seedpm{4.7}{.0} \\
+    \quad $w{=}1$ & \seedpm{0.746}{.005} & \seedpm{0.966}{.001} & \seedpm{0.897}{.003} & \seedpm{0.901}{.001} & \seedpm{0.899}{.002} & \seedpm{0.908}{.003} & \seedpm{0.043}{.001} & \seedpm{0.049}{.003} & \seedpm{4.7}{.0} \\
+    \addlinespace
+    \multicolumn{10}{@{}l}{\emph{$+$ total power}} \\
+    \quad $w{=}0.01$ & \seedpm{0.752}{.003} & \seedpm{0.965}{.002} & \seedpm{0.896}{.005} & \seedpm{0.902}{.001} & \seedpm{0.899}{.002} & \seedpm{0.910}{.004} & \seedpm{0.041}{.004} & \seedpm{0.049}{.005} & \seedpm{4.7}{.0} \\
+    \quad $w{=}0.05$ & \seedpm{0.751}{.005} & \seedpm{0.966}{.001} & \seedpm{0.897}{.003} & \seedpm{0.900}{.001} & \seedpm{0.899}{.002} & \seedpm{0.908}{.002} & \seedpm{0.044}{.001} & \seedpm{0.048}{.002} & \seedpm{4.7}{.0} \\
+    \quad $w{=}0.25$ & \seedpm{0.747}{.003} & \seedpm{0.965}{.001} & \seedpm{0.898}{.003} & \seedpm{0.900}{.001} & \seedpm{0.899}{.001} & \seedpm{0.908}{.004} & \seedpm{0.044}{.003} & \seedpm{0.049}{.004} & \seedpm{4.7}{.0} \\
+    \quad $w{=}0.5$ & \seedpm{\hlval{accent}{0.737}}{.015} & \seedpm{0.965}{.002} & \seedpm{0.900}{.005} & \seedpm{0.899}{.002} & \seedpm{0.899}{.003} & \seedpm{0.905}{.006} & \seedpm{0.048}{.004} & \seedpm{0.047}{.006} & \seedpm{4.7}{.0} \\
+    \quad $w{=}1$ & \seedpm{\hlval{accent}{0.724}}{.020} & \seedpm{0.963}{.005} & \seedpm{0.902}{.003} & \seedpm{0.898}{.005} & \seedpm{0.900}{.001} & \seedpm{0.907}{.003} & \seedpm{0.049}{.007} & \seedpm{\textbf{0.044}}{.004} & \seedpm{4.8}{.3} \\
+    \bottomrule
+    \end{tabular}
+  \par\vspace{1pt}
+  \parbox{0.97\textwidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks $\cdot$ set-pred $\cdot$ Hungarian
+   $\cdot$ $K{=}2$ $\cdot$ presence A $\cdot$ full norm ladder $\cdot$ hv flips
+   $\cdot$ patch $64{\times}32$ $\cdot$ fixed routing (full stack $\to$ both
+   trunks) $\cdot$ parity twins. Row $=$ loss $(\text{param-L1}+0.5\,\text{cos}+w\,\text{phys})/(1.5+w)$,
+   one physics term per arm; param-L1 $+$ cos $=$ the no-physics reference. Five
+   seeded replicas per arm, cells mean $\pm$ seed std; held-out test, $5.0$\,M px.
+   Val losses do not compare across arms (different composites); curve MAE / PSNR /
+   SSIM stay flat outside the collapse arms (next frames); peak p95 is pinned at
+   4.7. \textbf{bold} $=$ best in column, marked only where best and worst differ
+   by more than $5\%$. \textcolor{good}{Green}: coherence
+   $w{=}0.25$ takes the best curve $R^2$; at $w{=}1$ its gate trades misses for
+   false alarms (under 0.041 $\to$ 0.032, over 0.051 $\to$ 0.083; seed lottery:
+   precision $\pm$.045, exact $\pm$.063). \textcolor{accent}{Red} $=$
+   absolute-scale collapse past $w{=}0.25$ (covariance, total power). cos med: median per-pixel cosine to GT; peak p95: 95th pct of
+   the per-pixel peak error.\par}
 \end{frame}
 
 % full deck p.142 --- sections/13_physics_losses.tex
-\begin{frame}{The verdict --- physics terms buy tail insurance, not headline gains}
-  \small
-  \begin{columns}[T]
-    \begin{column}{0.33\textwidth}
-      \begin{itemize}\setlength{\itemsep}{6pt}
-        \item[\textcolor{argA}{$\blacksquare$}] \textbf{Headline gains are small}:
-              curve $R^2$ $0.747 \to 0.755$ at the best arm --- at the edge of
-              combined seed noise; SSIM moves in the fourth decimal on all three axes.
-        \item[\textcolor{argB}{$\blacksquare$}] \textbf{The real effect is the
-              per-pixel tail}: the baseline's mean pixel $R^2$ is $-1.17$, wrecked by
-              catastrophic pixels ($p_1 = -14.9$). The descriptor and covariance terms
-              cap the blow-ups and pull the mean positive.
-        \item[\textcolor{argB}{$\blacksquare$}] Physics arms also \textbf{stabilise
-              seeds}: covariance $w{=}0.05$ runs at a fifth of the baseline's
-              curve-metric seed spread.
-        \item[\textcolor{soft}{$\blacksquare$}] Detection and localisation sit
-              \textbf{within seed noise} everywhere --- the terms shape the profile,
-              not the scatterer set.
-      \end{itemize}
-    \end{column}
-    \begin{column}{0.65\textwidth}
-      \centering
-      \scriptsize
-      \renewcommand{\arraystretch}{0.92}
-      \setlength{\tabcolsep}{2pt}
-      \renewcommand{\seedtag}{phyV}
-      \begin{tabular}{@{}l ccccc@{}}
-        \toprule
-        metric & baseline & coh.\ 0.25 & mom.\ 0.05 & cov.\ 0.05 & pow.\ 0.05 \\
-        \midrule
-        \rowcolor{argA!14} curve $R^2$ $\uparrow$ & \seedpm{0.747}{.006} & \seedpm{0.755}{.007} & \seedpm{0.755}{.002} & \seedpm{0.748}{.001} & \seedpm{0.751}{.005} \\
-        \rowcolor{argA!14} PSNR [dB] $\uparrow$   & \seedpm{52.63}{.10} & \seedpm{52.78}{.13} & \seedpm{52.76}{.04} & \seedpm{52.65}{.02} & \seedpm{52.70}{.08} \\
-        \addlinespace[2pt]
-        \rowcolor{argB!16} pixel $R^2$ mean $\uparrow$ & \seedpm{$-1.17$}{.79} & \seedpm{$-0.88$}{.53} & \seedpm{$+0.53$}{.19} & \seedpm{$\mathbf{+0.77}$}{.01} & \seedpm{$+0.73$}{.05} \\
-        \rowcolor{argB!16} pixel $R^2$ $p_1$ $\uparrow$ & \seedpm{$-14.9$}{11.4} & \seedpm{$-12.4$}{4.0} & \seedpm{$-2.2$}{1.1} & \seedpm{$\mathbf{-0.5}$}{0.1} & \seedpm{$-0.9$}{0.4} \\
-        \rowcolor{argB!16} pixel $R^2$ min $\uparrow$ & \seedpm{$-13.2$k}{3.3k} & \seedpm{$-12.2$k}{4.8k} & \seedpm{$-4.4$k}{1.2k} & \seedpm{$-4.2$k}{0.2k} & \seedpm{$\mathbf{-4.1}$k}{0.1k} \\
-        \rowcolor{argB!16} cos med $\uparrow$ & \seedpm{0.965}{.004} & \seedpm{0.966}{.002} & \seedpm{0.966}{.002} & \seedpm{0.966}{.002} & \seedpm{0.966}{.001} \\
-        \addlinespace[2pt]
-        recall $\uparrow$      & \seedpm{0.901}{.001} & \seedpm{0.903}{.002} & \seedpm{0.902}{.001} & \seedpm{0.902}{.001} & \seedpm{0.900}{.001} \\
-        precision $\uparrow$   & \seedpm{0.895}{.008} & \seedpm{0.892}{.009} & \seedpm{0.896}{.005} & \seedpm{0.899}{.005} & \seedpm{0.898}{.003} \\
-        count exact $\uparrow$ & \seedpm{0.908}{.007} & \seedpm{0.909}{.005} & \seedpm{0.910}{.004} & \seedpm{0.909}{.004} & \seedpm{0.908}{.002} \\
-        \addlinespace[2pt]
-        $\mu$ MAE $\downarrow$    & \seedpm{1.71}{.07} & \seedpm{1.72}{.06} & \seedpm{1.69}{.04} & \seedpm{1.65}{.02} & \seedpm{1.67}{.03} \\
-        $\sigma$ MAE $\downarrow$ & \seedpm{0.774}{.011} & \seedpm{0.778}{.011} & \seedpm{0.771}{.018} & \seedpm{0.754}{.007} & \seedpm{0.761}{.005} \\
-        $a$ MAE $\downarrow$      & \seedpm{0.182}{.004} & \seedpm{0.182}{.005} & \seedpm{0.182}{.003} & \seedpm{0.187}{.005} & \seedpm{0.184}{.004} \\
-        peak err mean $\downarrow$ & \seedpm{1.231}{.016} & \seedpm{1.216}{.008} & \seedpm{1.221}{.010} & \seedpm{1.213}{.007} & \seedpm{1.221}{.010} \\
-        \bottomrule
-      \end{tabular}
-      \par\vspace{3pt}
-      \parbox{0.97\linewidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks
-      $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}2$ $\cdot$ presence A $\cdot$
-      full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$; loss $=$
-      param-L1 $+\,0.5\,$cosine curve $+$ term at $w$ (column $=$ each family's
-      best-scoring weight); five seeded replicas per arm, cells mean $\pm$ seed std;
-      held-out test, $5.0$\,M px. Curve MAE and three-axis SSIM are flat across the
-      five arms (MAE 0.0365--0.0370; SSIM elev/range/azim 0.9671--0.9675 /
-      0.9510--0.9521 / 0.9610--0.9616). \textbf{bold} $=$ best in row, marked only
-      where best and worst differ by more than $5\%$ --- only the pixel-$R^2$ tail
-      rows clear it; every other row sits inside combined seed noise. Shading keys
-      each block to its like-coloured bullet. recall / precision / count matched
-      (Hungarian pairing); pixel $R^2$ min in thousands (k); $\mu$, $\sigma$ and peak
-      err in elevation units, $a$ in linear amplitude; cos med: median per-pixel
-      cosine to the GT profile.\par}
-    \end{column}
-  \end{columns}
+\begin{frame}{The $K{=}2$ physics by scatterer count --- the scatterer set is untouched}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{0.92}
+  \setlength{\tabcolsep}{6pt}
+  \renewcommand{\seedtag}{phyB}
+  \begin{tabular}{@{}l cccccc@{}}
+    \toprule
+    & \multicolumn{6}{c@{}}{physics term at its weight} \\
+    \cmidrule(l){2-7}
+    metric & none & coh.\ $w{=}0.25$ & coh.\ $w{=}1$ & mom.\ $w{=}0.05$ & cov.\ $w{=}0.05$ & pow.\ $w{=}0.05$ \\
+    \midrule
+    precision $\uparrow$ & \seedpm{0.895}{.008} & \seedpm{0.892}{.009} & \seedpm{0.870}{.045} & \seedpm{0.896}{.005} & \seedpm{0.899}{.005} & \seedpm{0.897}{.003} \\
+    \quad $k{=}1$ & \seedpm{0.935}{.010} & \seedpm{0.932}{.011} & \seedpm{0.902}{.067} & \seedpm{0.937}{.006} & \seedpm{0.938}{.006} & \seedpm{0.938}{.003} \\
+    \quad $k{=}2$ & \seedpm{0.828}{.006} & \seedpm{0.826}{.006} & \seedpm{0.818}{.009} & \seedpm{0.828}{.006} & \seedpm{0.834}{.003} & \seedpm{0.831}{.004} \\
+    \addlinespace
+    recall $\uparrow$ & \seedpm{0.901}{.001} & \seedpm{0.903}{.002} & \seedpm{0.903}{.001} & \seedpm{0.902}{.001} & \seedpm{0.902}{.001} & \seedpm{0.900}{.001} \\
+    \quad $k{=}1$ & \seedpm{0.999}{.000} & \seedpm{0.999}{.000} & \seedpm{0.999}{.000} & \seedpm{0.999}{.000} & \seedpm{0.999}{.000} & \seedpm{0.999}{.000} \\
+    \quad $k{=}2$ & \seedpm{0.763}{.002} & \seedpm{0.766}{.004} & \seedpm{0.768}{.001} & \seedpm{0.764}{.003} & \seedpm{0.763}{.003} & \seedpm{0.761}{.003} \\
+    \addlinespace
+    \multicolumn{7}{@{}l}{\emph{count acc $\mid$ pred $k$}} \\
+    \quad pred $k{=}1$ $\uparrow$ & \seedpm{0.944}{.004} & \seedpm{0.948}{.006} & \seedpm{0.954}{.002} & \seedpm{0.944}{.005} & \seedpm{0.943}{.002} & \seedpm{0.941}{.001} \\
+    \quad pred $k{=}2$ $\uparrow$ & \seedpm{0.814}{.024} & \seedpm{0.808}{.023} & \seedpm{0.755}{.122} & \seedpm{0.817}{.015} & \seedpm{\textbf{0.819}}{.015} & \seedpm{0.819}{.007} \\
+    \addlinespace
+    $\mu$ MAE $\downarrow$ & \seedpm{1.71}{.07} & \seedpm{1.72}{.06} & \seedpm{1.81}{.12} & \seedpm{1.69}{.04} & \seedpm{\textbf{1.65}}{.02} & \seedpm{1.67}{.03} \\
+    \quad $k{=}1$ & \seedpm{0.36}{.01} & \seedpm{0.35}{.00} & \seedpm{0.35}{.00} & \seedpm{0.35}{.01} & \seedpm{0.35}{.01} & \seedpm{0.35}{.00} \\
+    \quad $k{=}2$ & \seedpm{3.78}{.14} & \seedpm{3.82}{.13} & \seedpm{4.02}{.26} & \seedpm{3.75}{.09} & \seedpm{\textbf{3.66}}{.05} & \seedpm{3.72}{.08} \\
+    \addlinespace
+    $\sigma$ MAE $\downarrow$ & \seedpm{0.774}{.011} & \seedpm{0.778}{.011} & \seedpm{0.809}{.020} & \seedpm{0.771}{.018} & \seedpm{\textbf{0.754}}{.007} & \seedpm{0.761}{.005} \\
+    \quad $k{=}1$ & \seedpm{0.193}{.002} & \seedpm{0.192}{.003} & \seedpm{0.194}{.006} & \seedpm{0.195}{.003} & \seedpm{0.194}{.002} & \seedpm{0.194}{.003} \\
+    \quad $k{=}2$ & \seedpm{1.668}{.023} & \seedpm{1.675}{.016} & \seedpm{1.737}{.035} & \seedpm{1.657}{.043} & \seedpm{\textbf{1.620}}{.017} & \seedpm{1.639}{.015} \\
+    \addlinespace
+    $a$ MAE $\downarrow$ & \seedpm{0.182}{.004} & \seedpm{0.182}{.005} & \seedpm{0.185}{.006} & \seedpm{0.182}{.003} & \seedpm{0.187}{.005} & \seedpm{0.184}{.004} \\
+    \quad $k{=}1$ & \seedpm{\textbf{0.058}}{.003} & \seedpm{0.058}{.004} & \seedpm{0.061}{.008} & \seedpm{0.058}{.003} & \seedpm{0.061}{.004} & \seedpm{0.059}{.004} \\
+    \quad $k{=}2$ & \seedpm{0.373}{.006} & \seedpm{0.373}{.005} & \seedpm{0.373}{.004} & \seedpm{0.372}{.002} & \seedpm{0.381}{.007} & \seedpm{0.377}{.004} \\
+    \bottomrule
+    \end{tabular}
+  \par\vspace{2pt}
+  \parbox{0.86\textwidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks $\cdot$ set-pred $\cdot$ Hungarian
+   $\cdot$ $K{=}2$ $\cdot$ presence A $\cdot$ full norm ladder $\cdot$ hv flips
+   $\cdot$ patch $64{\times}32$ $\cdot$ fixed routing (full stack $\to$ both
+   trunks) $\cdot$ parity twins. Column $=$ physics
+   term at its best-scoring weight, plus the $w{=}1$ coherence arm; none $=$ the
+   no-physics reference. All rows matched (Hungarian pairing); cells mean $\pm$ seed
+   std over five seeded replicas; held-out test; $k$ $=$ true scatterer count of the
+   pixel; component errors over matched pairs only. \textbf{bold} $=$ best in row,
+   marked only where best and worst differ by more than $5\%$ --- almost nothing
+   clears it: detection, count calibration and component errors all sit inside
+   combined seed noise, so the physics terms shape the profile, not the scatterer
+   set. The one exception is full-weight coherence: its wider gate pays $\mu$/$\sigma$
+   ($\mu$ 1.71 $\to$ 1.81, $\sigma$ 0.774 $\to$ 0.809) and destabilises the claimed
+   pairs (pred $k{=}2$ acc $\pm$.122). Precision rewards under-prediction --- rank on
+   recall. count acc $\mid$ pred $k$: share of pixels claiming exactly $k$ scatterers
+   whose true count is $k$. $\mu$, $\sigma$ in elevation units; $a$ in linear
+   amplitude.\par}
+\end{frame}
+
+% full deck p.143 --- sections/13_physics_losses.tex
+\begin{frame}{The $K{=}2$ physics per-pixel tail --- descriptor and covariance terms cap the blow-ups}
+    \centering
+  \scriptsize
+  \renewcommand{\arraystretch}{0.90}
+  \setlength{\tabcolsep}{4.5pt}
+  \renewcommand{\seedtag}{phyC}
+  \begin{tabular}{@{}l cccccc@{}}
+    \toprule
+    & \multicolumn{6}{c@{}}{physics term at its weight} \\
+    \cmidrule(l){2-7}
+    metric & none & coh.\ $w{=}0.25$ & coh.\ $w{=}1$ & mom.\ $w{=}0.05$ & cov.\ $w{=}0.05$ & pow.\ $w{=}0.05$ \\
+    \midrule
+    \multicolumn{7}{@{}l}{\emph{curve level}} \\
+    \quad curve $R^2$ $\uparrow$ & \seedpm{0.747}{.006} & \seedpm{0.755}{.007} & \seedpm{0.751}{.008} & \seedpm{0.755}{.002} & \seedpm{0.748}{.001} & \seedpm{0.751}{.005} \\
+    \quad curve MAE $\downarrow$ & \seedpm{0.0370}{.0005} & \seedpm{0.0366}{.0003} & \seedpm{0.0371}{.0007} & \seedpm{0.0365}{.0002} & \seedpm{0.0365}{.0002} & \seedpm{0.0366}{.0001} \\
+    \quad RMSE $\downarrow$ & \seedpm{0.217}{.002} & \seedpm{0.213}{.003} & \seedpm{0.215}{.003} & \seedpm{0.214}{.001} & \seedpm{0.217}{.000} & \seedpm{0.215}{.002} \\
+    \quad PSNR [dB] $\uparrow$ & \seedpm{52.63}{.10} & \seedpm{52.78}{.13} & \seedpm{52.70}{.14} & \seedpm{52.76}{.04} & \seedpm{52.65}{.02} & \seedpm{52.70}{.08} \\
+    \addlinespace
+    \multicolumn{7}{@{}l}{\emph{SSIM vs GT}} \\
+    \quad elev $\uparrow$ & \seedpm{0.9671}{.0004} & \seedpm{0.9674}{.0002} & \seedpm{0.9670}{.0006} & \seedpm{0.9674}{.0002} & \seedpm{0.9675}{.0002} & \seedpm{0.9674}{.0001} \\
+    \quad range $\uparrow$ & \seedpm{0.9510}{.0008} & \seedpm{0.9516}{.0004} & \seedpm{0.9499}{.0027} & \seedpm{0.9519}{.0004} & \seedpm{0.9521}{.0004} & \seedpm{0.9519}{.0004} \\
+    \quad azim $\uparrow$ & \seedpm{0.9610}{.0006} & \seedpm{0.9615}{.0003} & \seedpm{0.9606}{.0014} & \seedpm{0.9615}{.0003} & \seedpm{0.9616}{.0002} & \seedpm{0.9615}{.0003} \\
+    \addlinespace
+    \multicolumn{7}{@{}l}{\emph{per-pixel $R^2$ --- the tail}} \\
+    \quad median $\uparrow$ & \seedpm{0.888}{.007} & \seedpm{0.891}{.006} & \seedpm{0.870}{.049} & \seedpm{0.888}{.009} & \seedpm{0.889}{.009} & \seedpm{0.889}{.007} \\
+    \quad mean $\uparrow$ & \seedpm{$-1.17$}{.79} & \seedpm{$-0.88$}{.53} & \seedpm{$-3.71$}{4.34} & \seedpm{$+0.53$}{.19} & \seedpm{$\mathbf{+0.77}$}{.01} & \seedpm{$+0.73$}{.05} \\
+    \quad $p_5$ $\uparrow$ & \seedpm{0.275}{.065} & \seedpm{0.284}{.021} & \seedpm{$-0.912$}{2.630} & \seedpm{0.355}{.008} & \seedpm{\textbf{0.394}}{.003} & \seedpm{0.377}{.012} \\
+    \quad $p_1$ $\uparrow$ & \seedpm{$-14.88$}{11.38} & \seedpm{$-12.37$}{4.01} & \seedpm{$-50.17$}{70.98} & \seedpm{$-2.16$}{1.08} & \seedpm{$\mathbf{-0.45}$}{.06} & \seedpm{$-0.87$}{.35} \\
+    \quad min $\uparrow$ & \seedpm{$-13.2$k}{3.3k} & \seedpm{$-12.2$k}{4.8k} & \seedpm{$-22.5$k}{11.5k} & \seedpm{$-4.4$k}{1.2k} & \seedpm{$-4.2$k}{0.2k} & \seedpm{$\mathbf{-4.1}$k}{0.1k} \\
+    \addlinespace
+    \multicolumn{7}{@{}l}{\emph{per-pixel cosine}} \\
+    \quad median $\uparrow$ & \seedpm{0.965}{.004} & \seedpm{0.966}{.002} & \seedpm{0.966}{.002} & \seedpm{0.966}{.002} & \seedpm{0.966}{.002} & \seedpm{0.966}{.001} \\
+    \quad mean $\uparrow$ & \seedpm{0.934}{.003} & \seedpm{0.936}{.001} & \seedpm{0.936}{.001} & \seedpm{0.935}{.001} & \seedpm{0.934}{.001} & \seedpm{0.934}{.001} \\
+    \quad $p_1$ $\uparrow$ & \seedpm{0.588}{.011} & \seedpm{0.599}{.009} & \seedpm{0.601}{.007} & \seedpm{0.584}{.006} & \seedpm{0.574}{.007} & \seedpm{0.579}{.008} \\
+    \bottomrule
+    \end{tabular}
+  \par\vspace{2pt}
+  \parbox{0.90\textwidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks $\cdot$ set-pred $\cdot$ Hungarian
+   $\cdot$ $K{=}2$ $\cdot$ presence A $\cdot$ full norm ladder $\cdot$ hv flips
+   $\cdot$ patch $64{\times}32$ $\cdot$ fixed routing (full stack $\to$ both
+   trunks) $\cdot$ parity twins. Column $=$ physics
+   term at its best-scoring weight, plus the $w{=}1$ coherence arm; none $=$ the
+   no-physics reference. Five seeded replicas per arm, cells mean $\pm$ seed std;
+   held-out test, $5.0$\,M px; pixel $R^2$ min and its spread in thousands (k).
+   \textbf{bold} $=$ best in row, marked only where best and worst differ by more
+   than $5\%$. The typical pixel never moves (pixel $R^2$ median 0.888--0.891, cos
+   med 0.965--0.966, SSIM in the fourth decimal on all three axes) --- the story is
+   the tail: a handful of catastrophic pixels wreck the no-physics mean ($-1.17$,
+   $p_1$ $-14.9$, min $-13.2$k), and the descriptor and covariance terms cap the
+   blow-ups (covariance $w{=}0.05$: mean $+0.77$, $p_1$ $-0.45$, min $-4.2$k) while
+   cutting the curve-metric seed spread up to ${\sim}5\times$. Coherence is NOT tail
+   insurance --- at $w{=}1$ its tail is worse than the baseline (mean $-3.71$, min
+   $-22.5$k): the Fourier-domain term shapes coherences, not pixel-domain outliers.
+   The curve-level and SSIM blocks carry the headline claim: the gains that exist
+   sit at the edge of combined seed noise.\par}
 \end{frame}
 
 % full deck p.140 --- sections/14_unrolled.tex
