@@ -45,15 +45,16 @@ class ModelProbe:
 
         return {"ok": True, "root": scanned["root"], "runs": scanned["entries"]}
 
-    def _reject_unloadable(self, run_path: str) -> str:
+    @classmethod
+    def _reject_unloadable(cls, run_path: str) -> str:
         run_dir = Path(run_path)
 
         if not run_dir.is_dir():
             return f"'{run_path}' is not a directory; pick a training run from the list"
-        if not (run_dir / self.CHECKPOINT).is_file():
-            return f"'{run_dir.name}' holds no {self.CHECKPOINT}; it is not a finished training run (did you point at a runs root or an inference stamp?)"
-        if not any((run_dir / "meta" / name).is_file() for name in self.CONFIG_NAMES):
-            return f"'{run_dir.name}' holds no meta/{' or meta/'.join(self.CONFIG_NAMES)}; the microscope probes backbone and dual runs only, and this run is another family or predates config persistence"
+        if not (run_dir / cls.CHECKPOINT).is_file():
+            return f"'{run_dir.name}' holds no {cls.CHECKPOINT}; it is not a finished training run (did you point at a runs root or an inference stamp?)"
+        if not any((run_dir / "meta" / name).is_file() for name in cls.CONFIG_NAMES):
+            return f"'{run_dir.name}' holds no meta/{' or meta/'.join(cls.CONFIG_NAMES)}; the microscope probes backbone and dual runs only, and this run is another family or predates config persistence"
 
         return ""
 
@@ -83,13 +84,15 @@ class ModelProbe:
         modules = dict(model.named_modules())
         return [name for name in ActivationRecorder(model).leaf_names() if type(modules[name]).__name__ not in self.CONTAINER_TYPES]
 
-    def _loader_class(self, is_dual: bool):
+    @classmethod
+    def _loader_class(cls, is_dual: bool):
         from pipelines.backbone.inference.loader import RunLoader
         from pipelines.dual.inference.loader     import DualRunLoader
 
         return DualRunLoader if is_dual else RunLoader
 
-    def _model_label(self, run, is_dual: bool) -> str:
+    @classmethod
+    def _model_label(cls, run, is_dual: bool) -> str:
         if not is_dual:
             return run.backbone_name
 

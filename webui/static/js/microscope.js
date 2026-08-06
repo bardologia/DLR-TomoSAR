@@ -775,21 +775,7 @@ class MicroscopeView {
   }
 
   _renderBars(out) {
-    const peak = Math.max(1e-9, ...out.families.filter((f) => !f.dead).flatMap((f) => f.shares));
-
-    this.refs.bars.innerHTML = out.channels.map((label, index) => {
-      const cols = out.families.map((f) => {
-        const share  = f.shares[index];
-        const height = f.dead ? 0 : Math.max(2, (share / peak) * 100);
-        const title  = `${MicroscopeView.FAMILY_LABELS[f.family]} · ${label}: ${(share * 100).toFixed(1)}%`;
-        return `<i style="height:${height.toFixed(1)}%;background:${MicroscopeView.FAMILY_COLORS[f.family]}" title="${this._esc(title)}"></i>`;
-      }).join("");
-      return `<div class="ms-bars__group"><div class="ms-bars__cols">${cols}</div><span class="ms-bars__label">${this._esc(label)}</span></div>`;
-    }).join("");
-
-    this.refs.barsLegend.innerHTML = out.families.map((f) =>
-      `<span><i style="background:${MicroscopeView.FAMILY_COLORS[f.family]}"></i>${f.family} — ${MicroscopeView.FAMILY_LABELS[f.family]}${f.dead ? " (no dependence at this pixel)" : ""}</span>`
-    ).join("");
+    window.renderFamilyBars(this.refs.bars, this.refs.barsLegend, out.channels, out.families, "no dependence at this pixel");
   }
 
   _renderGridChips() {
@@ -870,19 +856,11 @@ class MicroscopeView {
       return;
     }
 
-    const peak = Math.max(1e-12, ...out.channels.map((c) => c.delta_mse));
-
-    this.refs.ablation.innerHTML = out.channels.map((c) => {
-      const width = Math.max(1.5, (c.delta_mse / peak) * 100).toFixed(1);
-      const rel   = out.base_power > 0 ? ` &middot; ${((c.delta_mse / out.base_power) * 100).toFixed(2)}% of power` : "";
+    window.renderAblationRows(this.refs.ablation, out.channels, out.base_power, (c) => {
       const flips = c.flips ? ` &middot; ${c.flips} slot${c.flips === 1 ? "" : "s"} flip` : "";
       const mu    = c.max_mu_shift > 0.5 ? ` &middot; &mu; moves ${c.max_mu_shift.toFixed(1)} m` : "";
-      return `
-        <div class="ms-abl__row">
-          <span class="ms-abl__label" title="${this._esc(c.label)}">${this._esc(c.label)}</span>
-          <span class="ms-abl__bar"><span class="ms-abl__track"><i style="width:${width}%"></i></span><em>curve MSE ${c.delta_mse.toExponential(2)}${rel}${flips}${mu}</em></span>
-        </div>`;
-    }).join("");
+      return `${flips}${mu}`;
+    });
   }
 
   _fmtVal(v) {
@@ -1045,42 +1023,11 @@ class MicroscopeView {
   }
 
   _renderVitals() {
-    const out = this.vitalsData;
-    if (!out) return;
+    if (!this.vitalsData) return;
 
-    const s       = out.summary;
-    const flagged = s.flagged ? `<b>${s.flagged} flagged</b> (nonfinite, mostly zero, or &gt;25% dead channels)` : "none flagged";
-    this.refs.vitalsSum.innerHTML = `${s.n_layers} live layers &middot; ${s.total_params.toLocaleString("en-US")} parameters &middot; ${flagged}`;
-
-    const head = `<thead><tr>
-      <th>#</th><th class="ms-slots__key">LAYER</th><th class="ms-vitals__type">TYPE</th><th>OUT</th><th>PARAMS</th>
-      <th>ZERO %</th><th>DEAD CH</th><th>EFF CH %</th><th>MAX |ACT|</th><th class="ms-vitals__flags">FLAGS</th>
-    </tr></thead>`;
-
-    const rows = out.entries.map((e, index) => {
-      const dead    = e.dead === null ? "&ndash;" : `${e.dead}/${e.channels}`;
-      const eff     = e.eff_frac === null ? "&ndash;" : (e.eff_frac * 100).toFixed(0);
-      const classes = [e.flags.length ? "is-flagged" : "", e.name === this.layer ? "is-current" : ""].filter(Boolean).join(" ");
-      return `
-        <tr class="${classes}" data-layer="${this._esc(e.name)}">
-          <td>${index + 1}</td>
-          <td class="ms-slots__key" title="${this._esc(e.name)}">${this._esc(e.name)}</td>
-          <td class="ms-vitals__type">${this._esc(e.type)}</td>
-          <td>${(e.shape || []).join("&times;")}</td>
-          <td>${e.params.toLocaleString("en-US")}</td>
-          <td>${(e.zero_frac * 100).toFixed(1)}</td>
-          <td>${dead}</td>
-          <td>${eff}</td>
-          <td>${this._fmtVal(e.max_abs)}</td>
-          <td class="ms-vitals__flags">${this._esc(e.flags.join(", "))}</td>
-        </tr>`;
-    });
-
-    this.refs.vitals.innerHTML = `${head}<tbody>${rows.join("")}</tbody>`;
-
-    this.refs.vitals.querySelectorAll("tr[data-layer]").forEach((row) => {
-      row.addEventListener("click", () => {
-        const name = row.dataset.layer;
+    window.renderVitalsTable(this.refs.vitalsSum, this.refs.vitals, this.vitalsData, {
+      currentLayer : this.layer,
+      onPick       : (name) => {
         if (!(name in this.layerTypes)) return;
         this.block = this._blockKey(name);
         this.layer = name;
@@ -1089,7 +1036,7 @@ class MicroscopeView {
         this._noteFeatureLayer();
         this._loadFeatures();
         this._renderVitals();
-      });
+      },
     });
   }
 
@@ -1267,6 +1214,88 @@ class MicroscopeView {
     return String(text).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
   }
 }
+
+window.msEsc = (text) =>
+  String(text).replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
+
+window.msFmt = (v) => {
+  if (v === 0) return "0";
+  const abs = Math.abs(v);
+  return abs >= 1e4 || abs < 1e-2 ? v.toExponential(1) : Number(v.toPrecision(3)).toString();
+};
+
+window.renderFamilyBars = (barsEl, legendEl, channels, families, deadNote) => {
+  const colors = MicroscopeView.FAMILY_COLORS;
+  const labels = MicroscopeView.FAMILY_LABELS;
+  const peak   = Math.max(1e-9, ...families.filter((f) => !f.dead).flatMap((f) => f.shares));
+
+  barsEl.innerHTML = channels.map((label, index) => {
+    const cols = families.map((f) => {
+      const share  = f.shares[index];
+      const height = f.dead ? 0 : Math.max(2, (share / peak) * 100);
+      const title  = `${labels[f.family]} · ${label}: ${(share * 100).toFixed(1)}%`;
+      return `<i style="height:${height.toFixed(1)}%;background:${colors[f.family]}" title="${window.msEsc(title)}"></i>`;
+    }).join("");
+    return `<div class="ms-bars__group"><div class="ms-bars__cols">${cols}</div><span class="ms-bars__label">${window.msEsc(label)}</span></div>`;
+  }).join("");
+
+  legendEl.innerHTML = families.map((f) =>
+    `<span><i style="background:${colors[f.family]}"></i>${f.family} — ${labels[f.family]}${f.dead ? ` (${deadNote})` : ""}</span>`
+  ).join("");
+};
+
+window.renderAblationRows = (container, channels, basePower, extras) => {
+  const peak = Math.max(1e-12, ...channels.map((c) => c.delta_mse));
+
+  container.innerHTML = channels.map((c) => {
+    const width = Math.max(1.5, (c.delta_mse / peak) * 100).toFixed(1);
+    const rel   = basePower > 0 ? ` &middot; ${((c.delta_mse / basePower) * 100).toFixed(2)}% of power` : "";
+    const extra = extras ? extras(c) : "";
+    return `
+      <div class="ms-abl__row">
+        <span class="ms-abl__label" title="${window.msEsc(c.label)}">${window.msEsc(c.label)}</span>
+        <span class="ms-abl__bar"><span class="ms-abl__track"><i style="width:${width}%"></i></span><em>curve MSE ${c.delta_mse.toExponential(2)}${rel}${extra}</em></span>
+      </div>`;
+  }).join("");
+};
+
+window.renderVitalsTable = (summaryEl, tableEl, out, opts = {}) => {
+  const s       = out.summary;
+  const flagged = s.flagged ? `<b>${s.flagged} flagged</b> (nonfinite, mostly zero, or &gt;25% dead channels)` : "none flagged";
+  summaryEl.innerHTML = `${s.n_layers} live layers &middot; ${s.total_params.toLocaleString("en-US")} parameters &middot; ${flagged}`;
+
+  const head = `<thead><tr>
+    <th>#</th><th class="ms-slots__key">LAYER</th><th class="ms-vitals__type">TYPE</th><th>OUT</th><th>PARAMS</th>
+    <th>ZERO %</th><th>DEAD CH</th><th>EFF CH %</th><th>MAX |ACT|</th><th class="ms-vitals__flags">FLAGS</th>
+  </tr></thead>`;
+
+  const rows = out.entries.map((e, index) => {
+    const dead    = e.dead === null ? "&ndash;" : `${e.dead}/${e.channels}`;
+    const eff     = e.eff_frac === null ? "&ndash;" : (e.eff_frac * 100).toFixed(0);
+    const classes = [e.flags.length ? "is-flagged" : "", e.name === opts.currentLayer ? "is-current" : ""].filter(Boolean).join(" ");
+    return `
+      <tr class="${classes}" data-layer="${window.msEsc(e.name)}">
+        <td>${index + 1}</td>
+        <td class="ms-slots__key" title="${window.msEsc(e.name)}">${window.msEsc(e.name)}</td>
+        <td class="ms-vitals__type">${window.msEsc(e.type)}</td>
+        <td>${(e.shape || []).join("&times;")}</td>
+        <td>${e.params.toLocaleString("en-US")}</td>
+        <td>${(e.zero_frac * 100).toFixed(1)}</td>
+        <td>${dead}</td>
+        <td>${eff}</td>
+        <td>${window.msFmt(e.max_abs)}</td>
+        <td class="ms-vitals__flags">${window.msEsc(e.flags.join(", "))}</td>
+      </tr>`;
+  });
+
+  tableEl.innerHTML = `${head}<tbody>${rows.join("")}</tbody>`;
+  tableEl.classList.toggle("is-static", !opts.onPick);
+
+  if (!opts.onPick) return;
+  tableEl.querySelectorAll("tr[data-layer]").forEach((row) => {
+    row.addEventListener("click", () => opts.onPick(row.dataset.layer));
+  });
+};
 
 window.drawLineChart = (canvas, xAxis, series, opts = {}) => {
   if (!canvas.dataset.chartW) {

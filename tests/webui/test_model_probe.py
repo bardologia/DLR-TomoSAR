@@ -13,87 +13,13 @@ from web_logger  import WebLogger
 
 from pipelines.backbone.inference.probes import PredictionCurves
 
-from tests.conftest import SilentLogger
-
-
-N_AZ, N_RG, PH, PW, N_ELEV = 20, 16, 8, 8, 12
-
-
-class _BareModel(torch.nn.Module):
-    def forward(self, x):
-        B, _, H, W = x.shape
-        out        = torch.zeros(B, 3, H, W)
-
-        out[:, 0] = x[:, 0] + 1.0
-        out[:, 1] = 5.0 * x[:, 0]
-        out[:, 2] = 3.0 + 0.0 * x[:, 0]
-
-        return out
-
-
-class _TwoSlotModel(torch.nn.Module):
-    def forward(self, x):
-        B, _, H, W = x.shape
-        out        = torch.zeros(B, 6, H, W)
-
-        out[:, 0] = x[:, 0] + 1.0
-        out[:, 1] = 5.0 * x[:, 0]
-        out[:, 2] = 3.0 + 0.0 * x[:, 0]
-        out[:, 3] = x[:, 1] + 1.0
-        out[:, 4] = 5.0 * x[:, 1]
-        out[:, 5] = 3.0 + 0.0 * x[:, 1]
-
-        return out
-
-
-class _AzShiftModel(torch.nn.Module):
-    def forward(self, x):
-        B, _, H, W = x.shape
-        out        = torch.zeros(B, 3, H, W)
-
-        out[:, 0] = x[:, 0] + 1.0
-        out[:, 1] = 5.0 * torch.roll(x[:, 0], shifts=1, dims=1)
-        out[:, 2] = 3.0 + 0.0 * x[:, 0]
-
-        return out
-
-
-class _Wrapper:
-    def __init__(self, module: torch.nn.Module) -> None:
-        self.module = module
-
-    def __call__(self, x):
-        with torch.no_grad():
-            return self.module(torch.as_tensor(np.asarray(x, dtype=np.float32))).numpy()
+from tests.conftest          import SilentLogger
+from tests.webui._probe_fakes import N_AZ, N_RG, PH, PW, N_ELEV, AzShiftModel, TinyConvModel, Wrapper, fake_run
 
 
 def _probe(n_slots: int = 1, with_gt: bool = True) -> ModelProbe:
     probe = ModelProbe(SilentLogger())
-
-    rng            = np.random.default_rng(0)
-    complex_inputs = (rng.uniform(0.5, 1.0, size=(2, N_AZ, N_RG)) + 1j * rng.uniform(0.0, 0.2, size=(2, N_AZ, N_RG))).astype(np.complex64)
-    gt_params      = np.zeros((3 * n_slots, N_AZ, N_RG), dtype=np.float32)
-
-    for k in range(n_slots):
-        gt_params[3 * k]     = 1.5
-        gt_params[3 * k + 1] = 20.0
-        gt_params[3 * k + 2] = 4.0
-
-    dataset = SimpleNamespace(
-        dem             = None,
-        gt_parameters   = gt_params if with_gt else None,
-        assemble_window = lambda window, dem: np.abs(window).astype(np.float32),
-    )
-
-    run = SimpleNamespace(
-        model          = _Wrapper(_BareModel() if n_slots == 1 else _TwoSlotModel()),
-        dataset        = dataset,
-        complex_inputs = complex_inputs,
-        full_curves    = np.ones((N_ELEV, N_AZ, N_RG), dtype=np.float32),
-        x_axis         = np.linspace(-10.0, 40.0, N_ELEV).astype(np.float32),
-        n_gaussians    = n_slots,
-        split_region   = SimpleNamespace(azimuth_size=N_AZ, range_size=N_RG, azimuth_start=0, range_start=0),
-    )
+    run   = fake_run(n_slots, with_gt)
 
     probe.loaded = {
         "run"      : run,
@@ -338,7 +264,7 @@ def test_flips_report_zero_deltas_for_a_pointwise_model():
 
 def test_flips_expose_an_azimuth_asymmetric_model():
     probe = _probe()
-    probe.loaded["run"].model = _Wrapper(_AzShiftModel())
+    probe.loaded["run"].model = Wrapper(AzShiftModel())
 
     result = probe.flips({"az": 10, "rg": 8})
 
@@ -414,21 +340,9 @@ def test_whatif_unknown_perturbation_fails():
     assert "unknown perturbation" in result["error"]
 
 
-class _TinyConvModel(torch.nn.Module):
-    def __init__(self) -> None:
-        super().__init__()
-        torch.manual_seed(0)
-        self.conv = torch.nn.Conv2d(2, 8, 3, padding=1)
-        self.act  = torch.nn.ReLU()
-        self.head = torch.nn.Conv2d(8, 3, 1)
-
-    def forward(self, x):
-        return self.head(self.act(self.conv(x)))
-
-
 def test_vitals_reports_layers_in_forward_order_with_params_and_flags():
     probe = _probe()
-    probe.loaded["run"].model = _Wrapper(_TinyConvModel())
+    probe.loaded["run"].model = Wrapper(TinyConvModel())
 
     result = probe.vitals({"az": 10, "rg": 8})
 

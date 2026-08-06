@@ -4255,6 +4255,8 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .ms-vitals__table td.ms-slots__key { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ms-vitals__table tbody tr { cursor: pointer; }
 .ms-vitals__table tbody tr:hover td { background: var(--bg-1); }
+.ms-vitals__table.is-static tbody tr { cursor: default; }
+.ms-vitals__table.is-static tbody tr:hover td { background: transparent; }
 .ms-vitals__table tr.is-flagged td.ms-vitals__flags { color: var(--danger); font-weight: 600; }
 .ms-vitals__table tr.is-current td { background: rgba(29, 79, 216, 0.07); }
 
