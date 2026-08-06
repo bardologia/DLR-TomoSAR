@@ -16,7 +16,7 @@ from routers.static_router      import StaticRouter
 from routers.system_router      import SystemRouter
 from routers.tensorboard_router import TensorboardRouter
 
-ROUTE_COUNT   = 108
+ROUTE_COUNT   = 114
 SECTION_COUNT = 34
 
 RESOLUTIONS = [
