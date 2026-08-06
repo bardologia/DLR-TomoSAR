@@ -20,6 +20,63 @@ All builds run inside this directory (images resolve via `../../results/...`).
 
 # Design log
 
+- PHYSICS SINGLE-TERM SWEEP RESULTS LANDED 2026-08-06 (user: emailed results "for the
+  physical loss terms (without the full capon version)", ingested from the physics_k2
+  zip): results/K2/physics_k2 = dual/physics runs,
+  dual_unet_skip-set_pred-hungarian-K_2-hv-A-full.full, base loss param-L1 + 0.5
+  cosine curve, ONE physics term per arm at w in {0.01,0.05,0.25,0.5,1} for
+  coherence_resyn / covariance_match / moments / total_power_relerr, plus the
+  no-physics baseline; five seeds each; NO capon_cycle arm (queued, costliest term).
+  TWO NEW FRAMES after "Swap mechanics, calibration --- and status" (whose status
+  block no longer says "training results pending"): (a) "The single-term sweep ---
+  every family helps low, two collapse high" = bullets left + family x weight
+  grouped-score table right (baseline 0.620; every family above it at w<=0.05;
+  coherence peaks 0.944 at w=0.25 = sweep best, good cell; moments robust at every
+  weight; covariance/total_power collapse past 0.25, accent cells; family best bold).
+  Caption defines grouped score as the overview's equal-weight five-group mean,
+  min-max scaled WITHIN the 21-arm comparison --- rank, not physical units --- and
+  states val losses are not comparable across arms (each optimises a different
+  composite). (b) "The verdict --- physics terms buy tail insurance, not headline
+  gains" = bullets left + best-per-family metric table right (baseline / coh 0.25 /
+  mom 0.05 / cov 0.05 / pow 0.05): headline moves are small (curve R2 0.747->0.755 at
+  the edge of combined seed noise; SSIM moves in the 4th decimal on all three axes;
+  matched recall/precision/count/mu/sigma/a/peak all inside noise --- soft bullet says
+  the terms shape the profile, not the scatterer set). The REAL effect is the
+  per-pixel R2 tail (argB block): baseline mean -1.17 / p1 -14.9 / min -13161 vs
+  covariance w0.05 +0.77 / -0.45 / -4151 (moments +0.53, total power +0.73); physics
+  arms also cut the curve-metric seed spread ~5x vs baseline. Painted blocks keyed to
+  bullets per the standing results style. LEADERBOARD CAVEAT: the overview's
+  composite scores exaggerate --- raw recall moves 0.9012->0.9034 across the whole
+  sweep --- so the verdict frame cites raw values only. SHORT DECK: both frames
+  copied verbatim after the Capon-cycle frame (pages 20-21) and the "Next steps"
+  physics bullet now reads "the five ranked terms and the first single-term K=2
+  sweep results on the next five frames; the Capon-cycle arm is still queued".
+
+- PATCH-SWEEP VERDICT REFRESHED ON THE STEP-8 THREE-SEED GRID 2026-08-06 (user:
+  emailed "a updated version of the patch sweep experiment", ingested from the
+  patch_sweep_k2_new zip): results/K2/patch_sweep_k2_new = 7x6 grid az {16..64} x
+  rg {8..48} at step 8, THREE seeds per cell, same 17sartom-traun w26_12 scene
+  (run root 20260728_093052/training); cell = mean best val loss +- seed std.
+  NUMBERS: best 56x48 = 0.14117 +- .0006; ties inside combined seed noise = 48x48 /
+  56x40 / 64x32 / 64x40 / 64x48 --- the plateau is the reach corner (az>=48,
+  rg>=32). Azimuth: flat past 48 (48->56 at rg=48 = -0.0004, 56->64 = +0.0001); the
+  step-8 grid now brackets 2w_a=52 between adjacent cells. Range: an honest ~0.003
+  drift 24->40 at the plateau azimuths (LARGER than the old 5x3 grid's <=0.002
+  claim), <=0.0008 past 40 --- the observed range knee moved 32 -> 40 on the finer
+  grid. Anomaly cells (16,40)=0.1588 and (56,8)/(56,16) sit above their neighbours
+  beyond 3-seed noise; visible on the heatmap, not discussed on the frame.
+  SCRIPT: patch_sweep_heatmap.py now points at results/K2/patch_sweep_k2_new, parses
+  the overview's Seeds column (colorbar reads "N-seed mean"), scales the per-cell
+  annotation offsets by step/16 and shrinks annotation fonts for the 8-px cells;
+  figsize 6.3x4.35. FRAME 24c: heatmap path + include width 0.56->0.52, caption says
+  three seeded replicas, registered/observed table rewritten (az "flat past 48 ---
+  the step-8 grid brackets 52"; rg "40; ~0.003 drift 24->40, <=0.0008 past 40"),
+  closing caption names the plateau corner and calls the range drift a third of the
+  azimuth climb. The old results/K2/Patch five-seed 5x3 sweep stays on disk but is no
+  longer referenced by the deck. NOT INGESTED: a second email "patch_sweep_new"
+  (sent 2 min later, identical attachment list) was never downloaded --- reconcile
+  if it turns out to be a different result set.
+
 - ENCODER-BLOCK ANATOMY FRAME 2026-08-04 (user: built for the short talk, then "copy
   this slide to the full presentation as well"): "One encoder block: UNet vs
   UNet-skip vs ResUNet" inserted in 10_benchmark_board directly after the five-seed
