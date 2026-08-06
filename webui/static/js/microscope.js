@@ -19,6 +19,7 @@ class MicroscopeView {
     this.attribToken = 0;
     this.ablToken    = 0;
     this.occlToken   = 0;
+    this.flipToken   = 0;
     this.wiToken     = 0;
     this.runs        = [];
     this.selectedId  = null;
@@ -151,6 +152,15 @@ class MicroscopeView {
 
             <section class="ms-card">
               <div class="ms-card__head">
+                <h3 class="cube-panel-title">Symmetry</h3>
+                <span class="ms-card__note">re-run the model on flipped windows and flip the outputs back &mdash; a flip-equivariant model repeats itself exactly</span>
+              </div>
+              <canvas id="probe-flips" width="640" height="240"></canvas>
+              <p class="ms-wifacts" id="probe-flips-facts"></p>
+            </section>
+
+            <section class="ms-card">
+              <div class="ms-card__head">
                 <h3 class="cube-panel-title">Feature maps</h3>
                 <span class="ms-card__note" id="probe-feat-note"></span>
               </div>
@@ -230,6 +240,8 @@ class MicroscopeView {
       ablation   : this.root.querySelector("#probe-ablation"),
       occlusion  : this.root.querySelector("#probe-occlusion"),
       occlFacts  : this.root.querySelector("#probe-occl-facts"),
+      flips      : this.root.querySelector("#probe-flips"),
+      flipsFacts : this.root.querySelector("#probe-flips-facts"),
       arch       : this.root.querySelector("#probe-arch"),
       archLayers : this.root.querySelector("#probe-arch-layers"),
       features   : this.root.querySelector("#probe-features"),
@@ -571,6 +583,7 @@ class MicroscopeView {
     this._loadAblation();
     this._loadOcclusion();
     this._loadFields();
+    this._loadFlips();
     this._loadFeatures();
     this._runWhatIf();
   }
@@ -914,6 +927,35 @@ class MicroscopeView {
     else over.push(`<p class="ms-ctlrow__na">no ground truth on this split &mdash; the local error map needs GT parameters</p>`);
 
     this.refs.fieldOver.innerHTML = over.join("");
+  }
+
+  async _loadFlips() {
+    const token = ++this.flipToken;
+
+    this.refs.flipsFacts.innerHTML = `<span class="cube-hint is-loading">re-running the model on flipped windows&hellip;</span>`;
+
+    const out = await window.apiPost("/api/probe/flips", { az: this.pixel.az, rg: this.pixel.rg });
+    if (token !== this.flipToken) return;
+
+    if (!out.ok) {
+      this.refs.flipsFacts.innerHTML = this._esc(out.error);
+      return;
+    }
+
+    const styles = {
+      none    : { color: MicroscopeView.SERIES_COLORS.pred,      width: 1.8, label: "original" },
+      azimuth : { color: "#0f766e",                              width: 1.2, label: "az flip" },
+      range   : { color: "#a16207",                              width: 1.2, label: "rg flip" },
+      both    : { color: MicroscopeView.SERIES_COLORS.perturbed, width: 1.2, label: "both" },
+    };
+
+    window.drawLineChart(this.refs.flips, out.x_axis, out.entries.map((e) => ({ values: e.curve, ...styles[e.flip] })));
+
+    const worst = Math.max(...out.entries.map((e) => e.delta_mse));
+    const parts = out.entries.filter((e) => e.flip !== "none").map((e) => `${styles[e.flip].label} &Delta; <b>${e.delta_mse.toExponential(2)}</b>`);
+    const rel   = out.base_power > 0 ? ` &mdash; worst is ${((worst / out.base_power) * 100).toFixed(2)}% of the base curve's power` : "";
+
+    this.refs.flipsFacts.innerHTML = `${parts.join(" &middot; ")}${rel}`;
   }
 
   _loadFeatures() {

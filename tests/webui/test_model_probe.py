@@ -46,6 +46,18 @@ class _TwoSlotModel(torch.nn.Module):
         return out
 
 
+class _AzShiftModel(torch.nn.Module):
+    def forward(self, x):
+        B, _, H, W = x.shape
+        out        = torch.zeros(B, 3, H, W)
+
+        out[:, 0] = x[:, 0] + 1.0
+        out[:, 1] = 5.0 * torch.roll(x[:, 0], shifts=1, dims=1)
+        out[:, 2] = 3.0 + 0.0 * x[:, 0]
+
+        return out
+
+
 class _Wrapper:
     def __init__(self, module: torch.nn.Module) -> None:
         self.module = module
@@ -295,6 +307,37 @@ def test_occlusion_peaks_on_the_cell_holding_the_probed_pixel():
 
 def test_occlusion_without_loaded_model_fails():
     assert ModelProbe(SilentLogger()).occlusion({"az": 0, "rg": 0})["ok"] is False
+
+
+def test_flips_report_zero_deltas_for_a_pointwise_model():
+    result = _probe().flips({"az": 10, "rg": 8})
+
+    assert result["ok"] is True
+    assert [e["flip"] for e in result["entries"]] == ["none", "azimuth", "range", "both"]
+    assert result["base_power"] > 0.0
+
+    for entry in result["entries"]:
+        assert entry["delta_mse"] == pytest.approx(0.0, abs=1e-10)
+        assert len(entry["curve"]) == N_ELEV
+        assert len(entry["slots"]) == 1
+
+
+def test_flips_expose_an_azimuth_asymmetric_model():
+    probe = _probe()
+    probe.loaded["run"].model = _Wrapper(_AzShiftModel())
+
+    result = probe.flips({"az": 10, "rg": 8})
+
+    deltas = {e["flip"]: e["delta_mse"] for e in result["entries"]}
+
+    assert deltas["none"]    == pytest.approx(0.0, abs=1e-12)
+    assert deltas["azimuth"] > 1e-8
+    assert deltas["range"]   == pytest.approx(0.0, abs=1e-10)
+    assert deltas["both"]    > 1e-8
+
+
+def test_flips_without_loaded_model_fails():
+    assert ModelProbe(SilentLogger()).flips({"az": 0, "rg": 0})["ok"] is False
 
 
 def test_whatif_drop_of_used_channel_shifts_the_prediction():

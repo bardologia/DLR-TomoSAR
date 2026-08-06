@@ -24,6 +24,7 @@ class ModelProbe:
     FAMILIES        = ("amp", "mu", "sigma")
     FIELD_CMAPS     = {"amp": "magma", "mu": "viridis", "sigma": "cividis"}
     PERTURBATIONS   = ("drop_channel", "scale_channel", "noise")
+    FLIPS           = (("none", ()), ("azimuth", (2,)), ("range", (3,)), ("both", (2, 3)))
     CONTAINER_TYPES = ("ModuleList", "ModuleDict", "Sequential")
     LOADER_NAME     = "model_probe"
     CHECKPOINT      = "best_model.pt"
@@ -485,6 +486,46 @@ class ModelProbe:
                 channels.sort(key=lambda entry: entry["delta_mse"], reverse=True)
 
                 return {"ok": True, "base_power": base_power, "channels": channels}
+            except (ValueError, KeyError) as error:
+                return {"ok": False, "error": str(error)}
+
+    def flips(self, body: dict) -> dict:
+        with self.lock:
+            if self.loaded is None:
+                return {"ok": False, "error": "no model loaded"}
+
+            try:
+                az, rg         = int(body["az"]), int(body["rg"])
+                window, cy, cx = self._window(az, rg)
+
+                run      = self.loaded["run"]
+                renderer = self.loaded["renderer"]
+
+                batch  = np.concatenate([np.flip(window, axes) if axes else window for _, axes in self.FLIPS], axis=0)
+                params = run.model(batch)
+
+                entries    = []
+                base_curve = None
+                for index, (name, axes) in enumerate(self.FLIPS):
+                    restored = np.flip(params[index:index + 1], axes) if axes else params[index:index + 1]
+                    curve    = renderer.render(restored)[0, :, cy, cx]
+
+                    if base_curve is None:
+                        base_curve = curve
+
+                    entries.append({
+                        "flip"      : name,
+                        "slots"     : self._slots(restored[0, :, cy, cx]),
+                        "curve"     : [float(v) for v in curve],
+                        "delta_mse" : float(((curve - base_curve) ** 2).mean()),
+                    })
+
+                return {
+                    "ok"         : True,
+                    "x_axis"     : [float(v) for v in run.x_axis],
+                    "base_power" : float((base_curve ** 2).mean()),
+                    "entries"    : entries,
+                }
             except (ValueError, KeyError) as error:
                 return {"ok": False, "error": str(error)}
 
