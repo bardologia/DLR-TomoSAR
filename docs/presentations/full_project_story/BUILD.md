@@ -92,6 +92,31 @@ All builds run inside this directory (images resolve via `../../results/...`).
   composite. LESSON (layout standard, newest wins): results frames follow the
   pair-block layout --- \centering, one dense detailed table per frame, story told
   in hlval cells + the caption, NO bullets-left column.
+  THIRD FOLLOW-UP same day (user: "I want the full results for all weights used,
+  make 2 tables per slide if needed"): the two selected-arm frames (6 columns)
+  were REPLACED by FOUR full 21-arm boards, so every physics results frame now
+  shows all weights --- the results block is five boards (full deck p141-145):
+  (1) headline board (unchanged), (2) detection by scatterer count (precision /
+  recall / count-acc-pred-k, each with all/k=1/k=2 columns), (3) component errors
+  (mu / sigma / a MAE x all/k=1/k=2), (4) curve fidelity (MAE / RMSE / PSNR, SSIM
+  elev/range/azim, peak mean; caption notes peak median 0.67 + p95 4.7 pinned in
+  every arm), (5) per-pixel tail (pixel R2 med/mean/p5/p1/min + cosine
+  med/mean/p1). Each is the board layout: baseline row + 4 family groups x
+  \quad w= rows, seedpm cells, bold best-in-COLUMN under the 5% gate. NEW
+  ALL-WEIGHTS FACTS the boards surfaced: covariance's tail control IMPROVES with
+  weight (pixel R2 mean +0.8 at w=1, bold) even while its curve fidelity
+  collapses; coherence w=0.5 has the WORST tail of the sweep (mean -9.6, min
+  -66k); moments w=0.01 owns the best min (-3.6k); amplitude MAE never moves
+  anywhere. WIDTH GOTCHA: \seedpm eqmakebox groups are per-\seedtag, so a table
+  mixing wide (-66.3k +- 77.4k) and narrow (0.966 +- .001) columns inflates EVERY
+  cell to the widest --- the tail board wraps each cell as
+  {\def\seedtag{phyEcN}\seedpm...} giving each COLUMN its own width group
+  (saved ~28pt, the difference between overflowing and fitting). Other fixes:
+  one-line frame titles (a two-line title eats ~15pt and clips the caption),
+  signed tail columns at 1 decimal. Residual vbox overfulls 5.7/0.3/5.1pt
+  verified non-clipping by rastering every page. Row generator extended
+  (scratchpad gen_physics_tables.py emits all five boards from
+  metrics_comparison.md).
 
 - PATCH-SWEEP VERDICT REFRESHED ON THE STEP-8 THREE-SEED GRID 2026-08-06 (user:
   emailed "a updated version of the patch sweep experiment", ingested from the
