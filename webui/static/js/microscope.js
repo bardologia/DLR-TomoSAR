@@ -121,7 +121,7 @@ class MicroscopeView {
               <div class="ms-fieldrow" id="probe-fields-overview"></div>
             </section>
 
-            <section class="ms-card">
+            <section class="ms-card ms-card--wide">
               <div class="ms-card__head">
                 <h3 class="cube-panel-title">Input attribution</h3>
                 <span class="ms-card__note" id="probe-attrib-note">share of |&part;output/&part;input| per input channel, all three outputs side by side</span>
@@ -171,22 +171,6 @@ class MicroscopeView {
 
             <section class="ms-card">
               <div class="ms-card__head">
-                <h3 class="cube-panel-title">Feature maps</h3>
-                <span class="ms-card__note" id="probe-feat-note"></span>
-              </div>
-              <div class="ms-arch" id="probe-arch" aria-label="Model blocks in forward order"></div>
-              <div class="ms-arch__layers" id="probe-arch-layers"></div>
-              <div class="ms-feat"><img id="probe-features" alt="Feature maps" hidden /></div>
-              <div class="ms-subhead">
-                <h4 class="cube-panel-title">Layer vitals</h4>
-                <span class="ms-card__note">one hooked forward pass at the probed window &mdash; click a row to open that layer's feature maps</span>
-              </div>
-              <p class="ms-wifacts" id="probe-vitals-summary"></p>
-              <div class="ms-vitals"><table class="ms-slots ms-vitals__table" id="probe-vitals"></table></div>
-            </section>
-
-            <section class="ms-card">
-              <div class="ms-card__head">
                 <h3 class="cube-panel-title">What-if</h3>
                 <span class="ms-card__note">perturb the input window, re-run the model, compare the predictions</span>
               </div>
@@ -224,6 +208,23 @@ class MicroscopeView {
               <canvas id="probe-sweep" width="640" height="200" hidden></canvas>
               <p class="ms-wifacts" id="probe-sweep-facts"></p>
             </section>
+
+            <section class="ms-card ms-card--wide">
+              <div class="ms-card__head">
+                <h3 class="cube-panel-title">Feature maps</h3>
+                <span class="ms-card__note" id="probe-feat-note"></span>
+              </div>
+              <div class="ms-arch" id="probe-arch" aria-label="Model blocks in forward order"></div>
+              <div class="ms-arch__layers" id="probe-arch-layers"></div>
+              <div class="ms-feat"><img id="probe-features" alt="Feature maps" hidden /></div>
+              <div class="ms-subhead">
+                <h4 class="cube-panel-title">Layer vitals</h4>
+                <span class="ms-card__note">one hooked forward pass at the probed window &mdash; click a row to open that layer's feature maps</span>
+              </div>
+              <p class="ms-wifacts" id="probe-vitals-summary"></p>
+              <div class="ms-vitals"><table class="ms-slots ms-vitals__table" id="probe-vitals"></table></div>
+            </section>
+
           </div>
         </div>
       </div>`;

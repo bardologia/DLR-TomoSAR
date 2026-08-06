@@ -4130,8 +4130,11 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .ms-scene { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 12px 28px; align-items: start; }
 .ms-scene .fl-map__wrap img { max-height: 52vh; }
 .ms-main { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-.ms-main .ms-cards { display: flex; flex-direction: column; gap: 16px; }
+.ms-main .ms-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; align-items: start; }
 .ms-main .ms-cards[hidden], .ms-idle[hidden] { display: none; }
+.ms-card--wide { grid-column: 1 / -1; }
+.ms-card canvas { max-width: 860px; }
+@media (max-width: 1240px) { .ms-main .ms-cards { grid-template-columns: minmax(0, 1fr); } }
 
 .ms-card {
   background: var(--surface); border: 1px solid var(--line); border-radius: var(--r-card);
