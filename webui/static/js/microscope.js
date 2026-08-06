@@ -254,6 +254,11 @@ class MicroscopeView {
               <div class="ms-arch__layers" id="probe-arch-layers"></div>
               <div class="ms-feat"><img id="probe-features" alt="Feature maps" hidden /></div>
               <div class="ms-subhead">
+                <h4 class="cube-panel-title">Learned kernels</h4>
+                <span class="ms-card__note" id="probe-kern-note"></span>
+              </div>
+              <div class="ms-feat"><img id="probe-kernels" alt="Learned convolution kernels" hidden /></div>
+              <div class="ms-subhead">
                 <h4 class="cube-panel-title">Layer vitals</h4>
                 <span class="ms-card__note">one hooked forward pass at the probed window &mdash; click a row to open that layer's feature maps</span>
               </div>
@@ -313,6 +318,8 @@ class MicroscopeView {
       archLayers : this.root.querySelector("#probe-arch-layers"),
       features   : this.root.querySelector("#probe-features"),
       featNote   : this.root.querySelector("#probe-feat-note"),
+      kernels    : this.root.querySelector("#probe-kernels"),
+      kernNote   : this.root.querySelector("#probe-kern-note"),
       vitalsSum  : this.root.querySelector("#probe-vitals-summary"),
       vitals     : this.root.querySelector("#probe-vitals"),
       wKind      : this.root.querySelector("#probe-whatif-kind"),
@@ -343,6 +350,11 @@ class MicroscopeView {
     this.refs.features.addEventListener("error", () => {
       this.refs.features.hidden = true;
       this.refs.featNote.textContent = `${this.layer} captured no activation at this pixel`;
+    });
+    this.refs.kernels.addEventListener("load", () => { this.refs.kernels.hidden = false; });
+    this.refs.kernels.addEventListener("error", () => {
+      this.refs.kernels.hidden = true;
+      this.refs.kernNote.textContent = `${this.layer} rendered no kernels`;
     });
 
     this.refs.wKind.querySelectorAll(".cube-space").forEach((btn) => {
@@ -1009,8 +1021,23 @@ class MicroscopeView {
   }
 
   _loadFeatures() {
+    this._loadKernels();
     if (!this.pixel || !this.layer) return;
     this.refs.features.src = `/api/probe/features?az=${this.pixel.az}&rg=${this.pixel.rg}&layer=${encodeURIComponent(this.layer)}&t=${Date.now()}`;
+  }
+
+  _loadKernels() {
+    if (!this.layer) return;
+
+    const type = this.layerTypes[this.layer] || "";
+    if (!type.toLowerCase().includes("conv")) {
+      this.refs.kernels.hidden = true;
+      this.refs.kernNote.textContent = `${this.layer} (${type}) holds no convolution kernels — pick a conv layer above`;
+      return;
+    }
+
+    this.refs.kernNote.textContent = `${this.layer} — signed weights, red positive and blue negative on a shared scale`;
+    this.refs.kernels.src = `/api/probe/kernels?layer=${encodeURIComponent(this.layer)}&t=${Date.now()}`;
   }
 
   async _loadVitals() {

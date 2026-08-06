@@ -97,3 +97,4 @@ def test_probe_loads_and_probes_a_dual_run_end_to_end(test_data_dir, params_dir,
 
     conv = next(layer["name"] for layer in layers["layers"] if layer["type"] == "Conv2d")
     assert probe.features_png(3, 4, conv)[:8] == PNG_MAGIC
+    assert probe.kernels_png(conv)[:8] == PNG_MAGIC

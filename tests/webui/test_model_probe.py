@@ -366,6 +366,34 @@ def test_vitals_without_loaded_model_fails():
     assert ModelProbe(SilentLogger()).vitals({"az": 0, "rg": 0})["ok"] is False
 
 
+def _conv_probe() -> ModelProbe:
+    probe = _probe()
+    probe.loaded["run"].model = Wrapper(TinyConvModel())
+    probe.loaded["layers"]    = ["conv", "act", "head"]
+    probe.loaded["types"]     = {"conv": "Conv2d", "act": "ReLU", "head": "Conv2d"}
+    return probe
+
+
+def test_kernels_render_conv_grids_and_one_by_one_matrices():
+    probe = _conv_probe()
+
+    grid = probe.kernels_png("conv")
+    assert grid[:8] == b"\x89PNG\r\n\x1a\n"
+
+    matrix = probe.kernels_png("head")
+    assert matrix[:8] == b"\x89PNG\r\n\x1a\n"
+
+
+def test_kernels_refuse_layers_without_conv_weights():
+    probe = _conv_probe()
+
+    with pytest.raises(ValueError, match="no 4-D convolution weight"):
+        probe.kernels_png("act")
+
+    assert probe.kernels_png("missing") is None
+    assert ModelProbe(SilentLogger()).kernels_png("conv") is None
+
+
 class _WithContainer(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()

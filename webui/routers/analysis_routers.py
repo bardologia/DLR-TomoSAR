@@ -59,6 +59,7 @@ class ProbeRouter(SubRouter):
         table.add("GET",  "/api/probe/layers",   self.layers)
         table.add("GET",  "/api/probe/map",      self.map_view)
         table.add("GET",  "/api/probe/features", self.features)
+        table.add("GET",  "/api/probe/kernels",  self.kernels)
         table.add("POST", "/api/probe/load",        self.load)
         table.add("POST", "/api/probe/predict",     self.predict)
         table.add("POST", "/api/probe/fields",      self.fields)
@@ -84,6 +85,9 @@ class ProbeRouter(SubRouter):
 
     def features(self, exchange: HttpExchange) -> None:
         exchange.send_png(self.probe.features_png(exchange.integer("az"), exchange.integer("rg"), exchange.text("layer")))
+
+    def kernels(self, exchange: HttpExchange) -> None:
+        exchange.send_png(self.probe.kernels_png(exchange.text("layer")))
 
     def load(self, exchange: HttpExchange) -> None:
         body = exchange.body

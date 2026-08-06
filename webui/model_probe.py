@@ -830,9 +830,65 @@ class ModelProbe:
         for index in range(len(order), n_rows * n_cols):
             axes[index // n_cols][index % n_cols].axis("off")
 
+        return self._figure_png(fig)
+
+    def _figure_png(self, fig) -> bytes:
         fig.tight_layout()
         buf = io.BytesIO()
         fig.savefig(buf, format="png", dpi=110)
         plt.close(fig)
-
         return buf.getvalue()
+
+    def _kernel_matrix_png(self, w: np.ndarray) -> bytes:
+        matrix = w[:, :, 0, 0]
+        peak   = float(np.abs(matrix).max()) or 1.0
+
+        fig, ax = plt.subplots(figsize=(min(10.0, 1.6 + matrix.shape[1] * 0.11), min(8.0, 1.2 + matrix.shape[0] * 0.11)))
+        ax.imshow(matrix, cmap="RdBu_r", vmin=-peak, vmax=peak, aspect="auto", interpolation="nearest")
+        ax.set_xlabel("input channel", fontsize=8)
+        ax.set_ylabel("output channel", fontsize=8)
+        ax.tick_params(labelsize=7)
+        ax.set_title(f"1×1 convolution — {matrix.shape[0]}×{matrix.shape[1]} weight matrix, ±{peak:.2g}", fontsize=8)
+
+        return self._figure_png(fig)
+
+    def kernels_png(self, layer: str, max_out: int = 12, max_in: int = 8) -> bytes | None:
+        with self.lock:
+            if self.loaded is None or layer not in self.loaded["layers"]:
+                return None
+            module = dict(self.loaded["run"].model.module.named_modules())[layer]
+
+        weight = getattr(module, "weight", None)
+        if weight is None or weight.ndim != 4:
+            raise ValueError(f"layer '{layer}' holds no 4-D convolution weight; kernels render convolution layers only")
+
+        w = weight.detach().cpu().numpy()
+        if "Transpose" in type(module).__name__:
+            w = w.transpose(1, 0, 2, 3)
+
+        out_ch, in_ch, kh, kw = w.shape
+
+        if kh == 1 and kw == 1:
+            return self._kernel_matrix_png(w)
+
+        order_out = np.argsort(np.linalg.norm(w.reshape(out_ch, -1), axis=1))[::-1][:max_out]
+        order_in  = np.argsort(np.abs(w).sum(axis=(0, 2, 3)))[::-1][:max_in]
+        peak      = float(np.abs(w[np.ix_(order_out, order_in)]).max()) or 1.0
+
+        fig, axes = plt.subplots(len(order_out), len(order_in), figsize=(len(order_in) * 1.15 + 0.9, len(order_out) * 1.15 + 0.7))
+        axes      = np.asarray(axes).reshape(len(order_out), len(order_in))
+
+        for row, out_index in enumerate(order_out):
+            for col, in_index in enumerate(order_in):
+                ax = axes[row][col]
+                ax.imshow(w[out_index, in_index], cmap="RdBu_r", vmin=-peak, vmax=peak, interpolation="nearest")
+                ax.set_xticks([])
+                ax.set_yticks([])
+                if row == 0:
+                    ax.set_title(f"in {int(in_index)}", fontsize=7)
+                if col == 0:
+                    ax.set_ylabel(f"out {int(out_index)}", fontsize=7)
+
+        fig.suptitle(f"{out_ch}×{in_ch}×{kh}×{kw} weight — strongest {len(order_out)}×{len(order_in)} kernels, ±{peak:.2g}", fontsize=8)
+
+        return self._figure_png(fig)
