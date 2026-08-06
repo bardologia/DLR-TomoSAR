@@ -39,6 +39,7 @@
     <a href="#/slices" data-route="slices">Slices</a>
     <a href="#/fitlab" data-route="fitlab">Fit Lab</a>
     <a href="#/microscope" data-route="microscope">Microscope</a>
+    <a href="#/survey" data-route="survey">Survey</a>
     <a href="#/triage" data-route="triage">Triage</a>
     <a href="#/autopsy" data-route="autopsy">Autopsy</a>
     <a href="#/leaderboard" data-route="leaderboard">Leaderboard</a>
@@ -809,6 +810,21 @@
     <div id="probe-root"></div>
   </section>
 
+  <!-- MODEL SURVEY -->
+  <section class="page page--pad" data-page="survey">
+    <div class="page__head">
+      <h2 class="page__title">Model survey</h2>
+      <p class="page__lead">
+        The microscope's diagnostics, run over every pixel of the test region instead of one.
+        Pick a trained run and the model is re-run tile by tile: prediction fit and matched
+        scatterer errors, channel attribution and ablation, flip symmetry, noise robustness,
+        occlusion evidence distance, and layer vitals, all averaged over the whole region
+        with a progress bar while it works.
+      </p>
+    </div>
+    <div id="survey-root"></div>
+  </section>
+
   <!-- FIT LAB -->
   <section class="page page--pad" data-page="fitlab">
     <div class="page__head">
@@ -1197,7 +1213,8 @@
 <script src="/static/js/globe.js?v=20260805c"></script>
 <script src="/static/js/slice_collector.js?v=20260804a"></script>
 <script src="/static/js/fit_lab.js?v=20260721a"></script>
-<script src="/static/js/microscope.js?v=20260805"></script>
+<script src="/static/js/microscope.js?v=20260806"></script>
+<script src="/static/js/survey.js?v=20260806"></script>
 <script src="/static/js/triage.js?v=20260804a"></script>
 <script src="/static/js/autopsy.js?v=20260804a"></script>
 <script src="/static/js/tensorboard.js?v=20260702r"></script>

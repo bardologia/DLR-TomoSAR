@@ -232,6 +232,7 @@ class App {
     this.leaderboardView = new window.LeaderboardView(document.getElementById("leaderboard-root"));
 
     this.microscopeView = new window.MicroscopeView(document.getElementById("probe-root"));
+    this.surveyView     = new window.SurveyView(document.getElementById("survey-root"));
     this.triageView     = new window.TriageView(document.getElementById("triage-root"));
     this.autopsyView    = new window.AutopsyView(document.getElementById("autopsy-root"));
 
@@ -495,6 +496,7 @@ class App {
     if (route === "slices") this.sliceCollectorView.enter();
     if (route === "fitlab") this.fitLabView.enter();
     if (route === "microscope") this.microscopeView.enter();
+    if (route === "survey") this.surveyView.enter();
     if (route === "triage") this.triageView.enter();
     if (route === "autopsy") this.autopsyView.enter();
     if (route === "console") this.runConsole.onShow();

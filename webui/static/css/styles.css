@@ -4257,6 +4257,10 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .ms-vitals__table tbody tr:hover td { background: var(--bg-1); }
 .ms-vitals__table.is-static tbody tr { cursor: default; }
 .ms-vitals__table.is-static tbody tr:hover td { background: transparent; }
+
+.sv-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; align-items: center; }
+.sv-progress .cube-progress__label { grid-row: 2; margin: 0; }
+.sv-progress .btn { grid-row: 1 / span 2; }
 .ms-vitals__table tr.is-flagged td.ms-vitals__flags { color: var(--danger); font-weight: 600; }
 .ms-vitals__table tr.is-current td { background: rgba(29, 79, 216, 0.07); }
 
