@@ -257,7 +257,7 @@ class ModelProbe:
             except (ValueError, KeyError) as error:
                 return {"ok": False, "error": str(error)}
 
-    def _family_gradients(self, window: np.ndarray, cy: int, cx: int) -> list[tuple[str, np.ndarray]]:
+    def _family_gradients(self, window: np.ndarray, cy: int, cx: int, slot: int) -> list[tuple[str, np.ndarray]]:
         import torch
 
         x = torch.from_numpy(window).to(self.loaded["device"]).requires_grad_(True)
@@ -265,7 +265,7 @@ class ModelProbe:
 
         gradients = []
         for offset, family in enumerate(self.FAMILIES):
-            target = y[0, offset::3, cy, cx].abs().sum()
+            target = y[0, offset::3, cy, cx].abs().sum() if slot < 0 else y[0, 3 * slot + offset, cy, cx].abs()
             keep   = offset < len(self.FAMILIES) - 1
             grad   = torch.autograd.grad(target, x, retain_graph=keep)[0].abs()[0].cpu().numpy()
             gradients.append((family, grad))
@@ -297,16 +297,23 @@ class ModelProbe:
                 return {"ok": False, "error": "no model loaded"}
 
             try:
-                az, rg         = int(body["az"]), int(body["rg"])
+                az, rg = int(body["az"]), int(body["rg"])
+                slot   = int(body.get("slot", -1))
+                n_k    = self.loaded["run"].n_gaussians
+
+                if not -1 <= slot < n_k:
+                    raise ValueError(f"slot {slot} is out of range; the model predicts {n_k} scatterer slots (use -1 to sum over all of them)")
+
                 window, cy, cx = self._window(az, rg)
 
-                families = [self._family_payload(family, grad) for family, grad in self._family_gradients(window, cy, cx)]
+                families = [self._family_payload(family, grad) for family, grad in self._family_gradients(window, cy, cx, slot)]
 
                 return {
                     "ok"       : True,
                     "channels" : self.loaded["labels"],
                     "center"   : [cy, cx],
                     "patch"    : [int(window.shape[2]), int(window.shape[3])],
+                    "slot"     : slot,
                     "families" : families,
                 }
             except (ValueError, KeyError) as error:

@@ -23,6 +23,7 @@ class MicroscopeView {
     this.runStrip    = null;
     this.lastPredict = null;
     this.attrib      = null;
+    this.attribSlot  = -1;
     this.gridChannel = -1;
     this.wi          = { kind: "drop_channel", channel: 0, factor: 0.5, sigma: 0.5, seed: 0 };
     this.wiTimer     = null;
@@ -97,18 +98,22 @@ class MicroscopeView {
             <section class="ms-card">
               <div class="ms-card__head">
                 <h3 class="cube-panel-title">Input attribution</h3>
-                <span class="ms-card__note">share of |&part;output/&part;input| per input channel, all three outputs side by side</span>
+                <span class="ms-card__note" id="probe-attrib-note">share of |&part;output/&part;input| per input channel, all three outputs side by side</span>
+              </div>
+              <div class="ms-ctlrow">
+                <span class="ms-ctlrow__label">scatterer</span>
+                <div class="ms-chiprow" id="probe-attrib-slots"></div>
               </div>
               <div class="ms-bars" id="probe-bars"></div>
               <div class="ms-legend" id="probe-bars-legend"></div>
-            </section>
-
-            <section class="ms-card">
-              <div class="ms-card__head">
-                <h3 class="cube-panel-title">Spatial gradients</h3>
+              <div class="ms-subhead">
+                <h4 class="cube-panel-title">Spatial gradients</h4>
                 <span class="ms-card__note">|&part;output/&part;input| over the input window &mdash; pick an input channel or view all</span>
               </div>
-              <div class="ms-chiprow" id="probe-grid-channels"></div>
+              <div class="ms-ctlrow">
+                <span class="ms-ctlrow__label">channel</span>
+                <div class="ms-chiprow" id="probe-grid-channels"></div>
+              </div>
               <div class="ms-gridwrap"><div class="ms-grid" id="probe-grid"></div></div>
             </section>
 
@@ -125,22 +130,34 @@ class MicroscopeView {
             <section class="ms-card">
               <div class="ms-card__head">
                 <h3 class="cube-panel-title">What-if</h3>
+                <span class="ms-card__note">perturb the input window, re-run the model, compare the predictions</span>
+              </div>
+              <div class="ms-ctlrow">
+                <span class="ms-ctlrow__label">perturb</span>
                 <div class="cube-spaces" id="probe-whatif-kind" role="group" aria-label="Perturbation">
-                  <button type="button" class="cube-space is-active" data-kind="drop_channel">zero channel</button>
-                  <button type="button" class="cube-space" data-kind="scale_channel">scale channel</button>
-                  <button type="button" class="cube-space" data-kind="noise">noise</button>
+                  <button type="button" class="cube-space is-active" data-kind="drop_channel">zero a channel</button>
+                  <button type="button" class="cube-space" data-kind="scale_channel">scale a channel</button>
+                  <button type="button" class="cube-space" data-kind="noise">add noise</button>
                 </div>
               </div>
-              <p class="ms-card__note" id="probe-whatif-desc"></p>
-              <div class="ms-chiprow" id="probe-whatif-channels"></div>
-              <div class="ms-wival" id="probe-whatif-valrow" hidden>
-                <label id="probe-whatif-value-label" for="probe-whatif-range">factor</label>
-                <input type="range" id="probe-whatif-range" min="0" max="2" step="0.05" value="0.5" />
-                <input type="number" id="probe-whatif-value" class="cube-jump__input" min="0" max="2" step="0.05" value="0.5" />
-                <button type="button" class="btn btn--mini" id="probe-whatif-reroll" hidden>re-roll</button>
+              <div class="ms-ctlrow" id="probe-whatif-chrow">
+                <span class="ms-ctlrow__label">channel</span>
+                <div class="ms-chiprow" id="probe-whatif-channels"></div>
+                <span class="ms-ctlrow__na" id="probe-whatif-chna" hidden>noise is added to every input channel at once</span>
               </div>
+              <div class="ms-ctlrow" id="probe-whatif-valrow">
+                <span class="ms-ctlrow__label" id="probe-whatif-value-label">strength</span>
+                <div class="ms-wival" id="probe-whatif-valctl" hidden>
+                  <input type="range" id="probe-whatif-range" min="0" max="2" step="0.05" value="0.5" />
+                  <input type="number" id="probe-whatif-value" class="cube-jump__input" min="0" max="2" step="0.05" value="0.5" />
+                  <button type="button" class="btn btn--mini" id="probe-whatif-reroll" hidden>re-roll noise</button>
+                </div>
+                <span class="ms-ctlrow__na" id="probe-whatif-valna">zeroing removes the channel outright; there is no strength to tune</span>
+              </div>
+              <p class="ms-wisummary" id="probe-whatif-desc"></p>
               <canvas id="probe-whatif" width="640" height="240"></canvas>
               <p class="ms-wifacts" id="probe-whatif-delta"></p>
+              <p class="ms-card__note ms-witablenote" id="probe-whatif-tablenote" hidden>scatterer parameters at the probed pixel, base &rarr; perturbed &mdash; red marks a moved value</p>
               <table class="ms-slots" id="probe-whatif-slots"></table>
             </section>
           </div>
@@ -166,6 +183,8 @@ class MicroscopeView {
       cards      : this.root.querySelector("#probe-cards"),
       profile    : this.root.querySelector("#probe-profile"),
       slots      : this.root.querySelector("#probe-slots"),
+      attribNote : this.root.querySelector("#probe-attrib-note"),
+      attribSlots: this.root.querySelector("#probe-attrib-slots"),
       bars       : this.root.querySelector("#probe-bars"),
       barsLegend : this.root.querySelector("#probe-bars-legend"),
       gridChips  : this.root.querySelector("#probe-grid-channels"),
@@ -176,14 +195,19 @@ class MicroscopeView {
       featNote   : this.root.querySelector("#probe-feat-note"),
       wKind      : this.root.querySelector("#probe-whatif-kind"),
       wDesc      : this.root.querySelector("#probe-whatif-desc"),
+      wChRow     : this.root.querySelector("#probe-whatif-chrow"),
       wChannels  : this.root.querySelector("#probe-whatif-channels"),
+      wChNa      : this.root.querySelector("#probe-whatif-chna"),
       wValRow    : this.root.querySelector("#probe-whatif-valrow"),
+      wValCtl    : this.root.querySelector("#probe-whatif-valctl"),
+      wValNa     : this.root.querySelector("#probe-whatif-valna"),
       wValueLabel: this.root.querySelector("#probe-whatif-value-label"),
       wRange     : this.root.querySelector("#probe-whatif-range"),
       wValue     : this.root.querySelector("#probe-whatif-value"),
       wReroll    : this.root.querySelector("#probe-whatif-reroll"),
       wCanvas    : this.root.querySelector("#probe-whatif"),
       wDelta     : this.root.querySelector("#probe-whatif-delta"),
+      wTableNote : this.root.querySelector("#probe-whatif-tablenote"),
       wSlots     : this.root.querySelector("#probe-whatif-slots"),
     };
 
@@ -209,15 +233,18 @@ class MicroscopeView {
     this.refs.wRange.addEventListener("input", () => {
       this.refs.wValue.value = this.refs.wRange.value;
       this._readWhatIfValue();
+      this._renderWhatIfSummary();
       this._scheduleWhatIf();
     });
     this.refs.wValue.addEventListener("change", () => {
       this.refs.wRange.value = this.refs.wValue.value;
       this._readWhatIfValue();
+      this._renderWhatIfSummary();
       this._scheduleWhatIf();
     });
     this.refs.wReroll.addEventListener("click", () => {
       this.wi.seed += 1;
+      this._renderWhatIfSummary();
       this._runWhatIf();
     });
 
@@ -315,6 +342,7 @@ class MicroscopeView {
     this.pixel       = null;
     this.lastPredict = null;
     this.attrib      = null;
+    this.attribSlot  = -1;
     this.gridChannel = -1;
     this.wi.channel  = 0;
     this.wi.seed     = 0;
@@ -341,6 +369,7 @@ class MicroscopeView {
     ].join("");
 
     this._buildWhatIfChannels(info.channels);
+    this._syncWhatIfControls();
 
     const layers = await (await fetch("/api/probe/layers")).json();
     if (layers.ok) this._buildArch(layers.layers);
@@ -361,6 +390,7 @@ class MicroscopeView {
       const chip = this._chip(label, index === this.wi.channel, () => {
         this.wi.channel = index;
         this.refs.wChannels.querySelectorAll(".ms-chipbtn").forEach((b, i) => b.classList.toggle("is-active", i === index));
+        this._renderWhatIfSummary();
         this._scheduleWhatIf();
       });
       this.refs.wChannels.appendChild(chip);
@@ -491,6 +521,7 @@ class MicroscopeView {
 
     this._renderProfile(out);
     this._renderSlots(out);
+    this._renderAttribSlotChips();
     this._loadAttribution();
     this._loadFeatures();
     this._runWhatIf();
@@ -531,6 +562,31 @@ class MicroscopeView {
     this.refs.slots.innerHTML = `${head}<tbody>${pred.join("")}${gt.join("")}</tbody>`;
   }
 
+  _renderAttribSlotChips() {
+    this.refs.attribSlots.innerHTML = "";
+
+    const pick = (slot) => () => {
+      if (slot === this.attribSlot) return;
+      this.attribSlot = slot;
+      this._renderAttribSlotChips();
+      this._loadAttribution();
+    };
+
+    this.refs.attribSlots.appendChild(this._chip("all scatterers", this.attribSlot === -1, pick(-1)));
+
+    ((this.lastPredict && this.lastPredict.slots) || []).forEach((slot) => {
+      const label = `slot ${slot.slot} · μ ${slot.mu.toFixed(1)} m${slot.active ? "" : " · off"}`;
+      const chip  = this._chip(label, this.attribSlot === slot.slot, pick(slot.slot));
+      if (!slot.active) chip.classList.add("is-off");
+      this.refs.attribSlots.appendChild(chip);
+    });
+  }
+
+  _noteAttribution(out) {
+    const scope = out.slot < 0 ? `summed over all ${this.info.n_gaussians} scatterer slots` : `scatterer slot ${out.slot} only`;
+    this.refs.attribNote.innerHTML = `share of |&part;output/&part;input| per input channel, ${scope}`;
+  }
+
   async _loadAttribution() {
     const token = ++this.attribToken;
 
@@ -539,7 +595,7 @@ class MicroscopeView {
     this.refs.gridChips.innerHTML  = "";
     this.refs.grid.innerHTML       = "";
 
-    const out = await window.apiPost("/api/probe/attribution", { az: this.pixel.az, rg: this.pixel.rg });
+    const out = await window.apiPost("/api/probe/attribution", { az: this.pixel.az, rg: this.pixel.rg, slot: this.attribSlot });
     if (token !== this.attribToken) return;
 
     if (!out.ok) {
@@ -549,6 +605,7 @@ class MicroscopeView {
     }
 
     this.attrib = out;
+    this._noteAttribution(out);
     this._renderBars(out);
     this._renderGridChips();
     this._renderGrid();
@@ -643,24 +700,45 @@ class MicroscopeView {
     this.refs.features.src = `/api/probe/features?az=${this.pixel.az}&rg=${this.pixel.rg}&layer=${encodeURIComponent(this.layer)}&t=${Date.now()}`;
   }
 
-  _whatIfDescription() {
-    if (this.wi.kind === "drop_channel") return "Zeroes the selected input channel over the whole window and re-runs the model on the result.";
-    if (this.wi.kind === "scale_channel") return "Multiplies the selected input channel by the factor and re-runs the model. Factor 1.0 leaves the input untouched.";
-    return "Adds Gaussian noise with the chosen sigma (in normalized units) to every input channel. Re-roll draws a fresh noise pattern.";
+  _renderWhatIfSummary() {
+    if (!this.info) {
+      this.refs.wDesc.innerHTML = "";
+      return;
+    }
+
+    const channel = this._esc(this.info.channels[this.wi.channel] || `ch ${this.wi.channel}`);
+    const window  = `${this.info.patch[0]}&times;${this.info.patch[1]}`;
+
+    if (this.wi.kind === "drop_channel") {
+      this.refs.wDesc.innerHTML = `Testing: zero out <b>${channel}</b> across the whole ${window} input window, then re-run the model.`;
+    } else if (this.wi.kind === "scale_channel") {
+      this.refs.wDesc.innerHTML = `Testing: multiply <b>${channel}</b> by <b>${this.wi.factor.toFixed(2)}</b> across the whole ${window} input window (1.00 leaves it untouched), then re-run the model.`;
+    } else {
+      this.refs.wDesc.innerHTML = `Testing: add Gaussian noise with &sigma; = <b>${this.wi.sigma.toFixed(2)}</b> (normalized units) to every channel of the ${window} input window, then re-run the model &mdash; noise draw #${this.wi.seed + 1}.`;
+    }
   }
 
   _syncWhatIfControls() {
     const kind = this.wi.kind;
 
-    this.refs.wDesc.textContent      = this._whatIfDescription();
-    this.refs.wChannels.hidden       = kind === "noise";
-    this.refs.wValRow.hidden         = kind === "drop_channel";
-    this.refs.wReroll.hidden         = kind !== "noise";
-    this.refs.wValueLabel.textContent = kind === "noise" ? "sigma" : "factor";
+    const noChannel = kind === "noise";
+    this.refs.wChRow.classList.toggle("is-off", noChannel);
+    this.refs.wChannels.hidden = noChannel;
+    this.refs.wChNa.hidden     = !noChannel;
+
+    const noValue = kind === "drop_channel";
+    this.refs.wValRow.classList.toggle("is-off", noValue);
+    this.refs.wValCtl.hidden = noValue;
+    this.refs.wValNa.hidden  = !noValue;
+
+    this.refs.wReroll.hidden          = kind !== "noise";
+    this.refs.wValueLabel.textContent = kind === "noise" ? "sigma" : (kind === "scale_channel" ? "factor" : "strength");
 
     const value = kind === "noise" ? this.wi.sigma : this.wi.factor;
     this.refs.wRange.value = value;
     this.refs.wValue.value = value;
+
+    this._renderWhatIfSummary();
   }
 
   _readWhatIfValue() {
@@ -693,8 +771,9 @@ class MicroscopeView {
     if (token !== this.wiToken) return;
 
     if (!out.ok) {
-      this.refs.wDelta.textContent = out.error;
-      this.refs.wSlots.innerHTML   = "";
+      this.refs.wDelta.textContent  = out.error;
+      this.refs.wSlots.innerHTML    = "";
+      this.refs.wTableNote.hidden   = true;
       return;
     }
 
@@ -708,9 +787,10 @@ class MicroscopeView {
     window.drawLineChart(this.refs.wCanvas, out.x_axis, series);
 
     const power = out.base_curve.reduce((acc, v) => acc + v * v, 0) / out.base_curve.length;
-    const rel   = power > 0 ? ` &mdash; ${((out.delta_mse / power) * 100).toFixed(2)}% of base curve power` : "";
-    this.refs.wDelta.innerHTML = `curve MSE shift <b>${out.delta_mse.toExponential(3)}</b>${rel}`;
+    const rel   = power > 0 ? ` &mdash; ${((out.delta_mse / power) * 100).toFixed(2)}% of the base curve's power` : "";
+    this.refs.wDelta.innerHTML = `prediction shift: curve MSE <b>${out.delta_mse.toExponential(3)}</b>${rel}`;
 
+    this.refs.wTableNote.hidden = false;
     this._renderWhatIfSlots(out.base_slots, out.perturbed_slots);
   }
 

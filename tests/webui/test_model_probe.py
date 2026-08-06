@@ -31,25 +31,41 @@ class _BareModel(torch.nn.Module):
         return out
 
 
+class _TwoSlotModel(torch.nn.Module):
+    def forward(self, x):
+        B, _, H, W = x.shape
+        out        = torch.zeros(B, 6, H, W)
+
+        out[:, 0] = x[:, 0] + 1.0
+        out[:, 1] = 5.0 * x[:, 0]
+        out[:, 2] = 3.0 + 0.0 * x[:, 0]
+        out[:, 3] = x[:, 1] + 1.0
+        out[:, 4] = 5.0 * x[:, 1]
+        out[:, 5] = 3.0 + 0.0 * x[:, 1]
+
+        return out
+
+
 class _Wrapper:
-    def __init__(self) -> None:
-        self.module = _BareModel()
+    def __init__(self, module: torch.nn.Module) -> None:
+        self.module = module
 
     def __call__(self, x):
         with torch.no_grad():
             return self.module(torch.as_tensor(np.asarray(x, dtype=np.float32))).numpy()
 
 
-def _probe() -> ModelProbe:
+def _probe(n_slots: int = 1) -> ModelProbe:
     probe = ModelProbe(SilentLogger())
 
     rng            = np.random.default_rng(0)
     complex_inputs = (rng.uniform(0.5, 1.0, size=(2, N_AZ, N_RG)) + 1j * rng.uniform(0.0, 0.2, size=(2, N_AZ, N_RG))).astype(np.complex64)
-    gt_params      = np.zeros((3, N_AZ, N_RG), dtype=np.float32)
+    gt_params      = np.zeros((3 * n_slots, N_AZ, N_RG), dtype=np.float32)
 
-    gt_params[0] = 1.5
-    gt_params[1] = 20.0
-    gt_params[2] = 4.0
+    for k in range(n_slots):
+        gt_params[3 * k]     = 1.5
+        gt_params[3 * k + 1] = 20.0
+        gt_params[3 * k + 2] = 4.0
 
     dataset = SimpleNamespace(
         dem             = None,
@@ -58,12 +74,12 @@ def _probe() -> ModelProbe:
     )
 
     run = SimpleNamespace(
-        model          = _Wrapper(),
+        model          = _Wrapper(_BareModel() if n_slots == 1 else _TwoSlotModel()),
         dataset        = dataset,
         complex_inputs = complex_inputs,
         full_curves    = np.ones((N_ELEV, N_AZ, N_RG), dtype=np.float32),
         x_axis         = np.linspace(-10.0, 40.0, N_ELEV).astype(np.float32),
-        n_gaussians    = 1,
+        n_gaussians    = n_slots,
         split_region   = SimpleNamespace(azimuth_size=N_AZ, range_size=N_RG, azimuth_start=0, range_start=0),
     )
 
@@ -72,7 +88,7 @@ def _probe() -> ModelProbe:
         "labels"   : ["primary", "sec PS04"],
         "layers"   : ["conv"],
         "types"    : {"conv": "Conv2d"},
-        "renderer" : PredictionCurves(1, run.x_axis),
+        "renderer" : PredictionCurves(n_slots, run.x_axis),
         "patch"    : (PH, PW),
         "device"   : "cpu",
     }
@@ -114,6 +130,7 @@ def test_attribution_concentrates_on_the_used_channel():
     assert result["channels"] == ["primary", "sec PS04"]
     assert result["center"]   == [4, 4]
     assert result["patch"]    == [PH, PW]
+    assert result["slot"]     == -1
 
     families = {payload["family"]: payload for payload in result["families"]}
 
@@ -122,6 +139,40 @@ def test_attribution_concentrates_on_the_used_channel():
     assert families["mu"]["shares"][1] == pytest.approx(0.0)
     assert base64.b64decode(families["mu"]["cells"][0])[:8] == b"\x89PNG\r\n\x1a\n"
     assert families["mu"]["cells"][1] is None
+
+
+def test_attribution_per_slot_isolates_each_scatterers_inputs():
+    probe = _probe(n_slots=2)
+
+    slot0    = probe.attribution({"az": 10, "rg": 8, "slot": 0})
+    slot1    = probe.attribution({"az": 10, "rg": 8, "slot": 1})
+    combined = probe.attribution({"az": 10, "rg": 8})
+
+    assert slot0["ok"] and slot1["ok"] and combined["ok"]
+    assert (slot0["slot"], slot1["slot"], combined["slot"]) == (0, 1, -1)
+
+    mu0  = {payload["family"]: payload for payload in slot0["families"]}["mu"]
+    mu1  = {payload["family"]: payload for payload in slot1["families"]}["mu"]
+    both = {payload["family"]: payload for payload in combined["families"]}["mu"]
+
+    assert mu0["shares"][0]  == pytest.approx(1.0)
+    assert mu0["shares"][1]  == pytest.approx(0.0)
+    assert mu1["shares"][0]  == pytest.approx(0.0)
+    assert mu1["shares"][1]  == pytest.approx(1.0)
+    assert both["shares"][0] == pytest.approx(0.5)
+    assert both["shares"][1] == pytest.approx(0.5)
+
+
+def test_attribution_rejects_out_of_range_slots():
+    probe = _probe()
+
+    high = probe.attribution({"az": 10, "rg": 8, "slot": 1})
+    low  = probe.attribution({"az": 10, "rg": 8, "slot": -2})
+
+    assert high["ok"] is False
+    assert "out of range" in high["error"]
+    assert low["ok"] is False
+    assert "out of range" in low["error"]
 
 
 def test_attribution_marks_dead_families_instead_of_failing():

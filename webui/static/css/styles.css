@@ -4258,6 +4258,7 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .ms-arch__layer[data-cat="dense"] { border-left-color: var(--accent-deep); }
 .ms-arch__layer[data-cat="aux"] { border-left-color: var(--line); }
 
+.ms-feat { display: flex; justify-content: center; }
 .ms-feat img { display: block; max-width: 100%; border: 1px solid var(--line); border-radius: var(--r-card); }
 .ms-feat img[hidden] { display: none; }
 
@@ -4270,6 +4271,24 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 }
 .ms-chipbtn:hover { color: var(--ink); border-color: var(--line-strong); }
 .ms-chipbtn.is-active { color: var(--accent-deep); background: rgba(29, 79, 216, 0.07); border-color: var(--accent); }
+.ms-chipbtn.is-off { opacity: 0.55; }
+.ms-chipbtn.is-off.is-active { opacity: 1; }
+
+.ms-ctlrow { display: flex; align-items: center; gap: 12px; margin: 10px 0; flex-wrap: wrap; }
+.ms-ctlrow__label {
+  flex: 0 0 84px; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-faint);
+}
+.ms-ctlrow .ms-chiprow { margin: 0; flex: 1 1 0; min-width: 0; }
+.ms-ctlrow .ms-wival { margin: 0; flex: 1 1 0; min-width: 0; }
+.ms-ctlrow.is-off .ms-ctlrow__label { opacity: 0.5; }
+.ms-ctlrow__na { font-family: var(--mono); font-size: 11.5px; font-style: italic; color: var(--ink-faint); }
+.ms-ctlrow__na[hidden] { display: none; }
+
+.ms-subhead {
+  display: flex; align-items: baseline; gap: 10px 14px; flex-wrap: wrap;
+  margin: 18px 0 4px; padding-top: 14px; border-top: 1px dashed var(--line);
+}
+.ms-subhead .cube-panel-title { font-size: 0.85rem; }
 
 .ms-wival { display: flex; align-items: center; gap: 12px; margin: 10px 0 12px; flex-wrap: wrap; }
 .ms-wival[hidden] { display: none; }
@@ -4280,9 +4299,16 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .ms-wival .cube-jump__input { width: 64px; }
 .ms-wival .btn--mini[hidden] { display: none; }
 
+.ms-wisummary { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); margin: 12px 0 10px; }
+.ms-wisummary:empty { display: none; }
+.ms-wisummary b { color: var(--accent-deep); }
+
 .ms-wifacts { font-family: var(--mono); font-size: 12px; color: var(--ink-dim); margin: 10px 0 0; }
 .ms-wifacts:empty { display: none; }
 .ms-wifacts b { color: var(--accent-deep); }
+
+.ms-witablenote { margin: 12px 0 0; }
+.ms-witablenote[hidden] { display: none; }
 
 @media (max-width: 980px) {
   .ms-scene { grid-template-columns: 1fr; }
