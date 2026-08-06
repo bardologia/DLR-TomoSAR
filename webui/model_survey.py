@@ -23,6 +23,7 @@ class ModelSurvey:
     NOISE_SIGMAS = tuple(float(v) for v in np.linspace(0.0, 2.0, 9))
     ERF_SAMPLES  = 24
     TILE_CAP     = 64
+    CPU_THREADS  = 64
     CHUNK_BUDGET = 4_000_000
     DISTANCE_BIN = 4.0
 
@@ -539,6 +540,11 @@ class ModelSurvey:
                 self.status = {"state": "cancelled", "path": self.loaded["path"], "progress": 0.0, "stage": "", "error": ""}
 
     def _worker(self, run_path: str, split: str, device: str) -> None:
+        import torch
+
+        previous = torch.get_num_threads()
+        torch.set_num_threads(min(self.CPU_THREADS, previous))
+
         try:
             self._load(run_path, split, device)
             self._survey()
@@ -551,4 +557,5 @@ class ModelSurvey:
             self.logger.error(f"model survey failed: {error}")
 
         finally:
+            torch.set_num_threads(previous)
             self.loaded = None

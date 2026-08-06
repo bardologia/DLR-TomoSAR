@@ -150,6 +150,31 @@ def test_survey_cancel_stops_the_run():
     assert survey.result is None
 
 
+def test_worker_caps_torch_threads_and_restores_them(monkeypatch):
+    import torch
+
+    survey = ModelSurvey(SilentLogger())
+    seen   = {}
+
+    def observing_load(run_path, split, device):
+        seen["threads"] = torch.get_num_threads()
+        raise RuntimeError("stop")
+
+    monkeypatch.setattr(ModelSurvey, "CPU_THREADS", 2)
+    monkeypatch.setattr(survey, "_load", observing_load)
+
+    previous = torch.get_num_threads()
+    torch.set_num_threads(4)
+    try:
+        survey._worker("x", "test", "cpu")
+
+        assert seen["threads"] == 2
+        assert torch.get_num_threads() == 4
+        assert survey.status["state"] == "error"
+    finally:
+        torch.set_num_threads(previous)
+
+
 def test_survey_start_refuses_non_runs(tmp_path):
     survey = ModelSurvey(SilentLogger())
 
