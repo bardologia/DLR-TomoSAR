@@ -30,7 +30,11 @@ animation and the terminal view need a network connection. `marked` is vendored 
 ## Tabs
 
 Navigation is hash-based, `#/<route>`. Each tab is one view module under `static/js/`
-talking to one group of JSON endpoints.
+talking to one group of JSON endpoints. The nav drawer groups the tabs into five
+sections, and the section holding the active tab stays expanded: Reference (Model,
+Pipelines, Architectures, Physics Loss, Repo Map), Launch (Scripts, Saved,
+Configuration, Feed Tuner), Monitor (Console, TensorBoard), Results (Results,
+Leaderboard, Cube, Slices) and Inspect (Microscope, Survey, Triage, Autopsy, Fit Lab).
 
 | Tab | Route | Backed by | What it does |
 |---|---|---|---|
@@ -53,6 +57,7 @@ talking to one group of JSON endpoints.
 | Slices | `#/slices` | `/api/slices/*` | Multi-run slice collector: tick any number of cubes, set a cut position plus an optional queue of extra points, and preview the same slice from every run side by side on a shared colour scale. Collect renders the figures into one `slice_collections/<name>/` folder with a `collection.json` manifest. |
 | Fit Lab | `#/fitlab` | `/api/fitlab/*` | Parameter-extraction playground over a preprocessing dataset: pick pixels on the SLC or tomogram-peak map, then run the real Gaussian-fit stack (`PeakInitialiser` plus `SigmaAdamKernel` on CPU) on just those pixels. Each run is a labelled overlay with a per-K mixture, a per-run K override and a penalised-MSE K sweep. |
 | Microscope | `#/microscope` | `/api/probe/*` | Model microscope over a trained run: load the checkpoint with its real dataset, click a pixel, and inspect the predicted profile against ground truth and the raw tomogram, gradient attribution of every output family to every input channel with per-pair spatial maps, feature-map grids along a clickable architecture strip, and live what-if perturbations with per-slot deltas. |
+| Survey | `#/survey` | `/api/survey/*` | The microscope's diagnostics averaged over the whole region as a background job with progress and cancel: prediction fit and matched errors, aggregate attribution with mean gradient windows, channel ablation, flip symmetry, noise robustness, occlusion distance profile and accumulated layer vitals. |
 | Triage | `#/triage` | `/api/triage/*` | Error triage over a saved inference: the worst blocks ranked by pixel MSE, tagged with dominant failure mode, label fit, seed disagreement and flip disagreement where those cubes exist. Each case opens the cube explorer at its worst pixel and takes a persisted verdict plus a note under `logs/triage/`. |
 | Autopsy | `#/autopsy` | `/api/autopsy/*` | Guided A/B comparison of two inferences over the same region: the largest relative metric gaps with an orientation-aware winner per row, plus the blocks where the runs disagree most, each rendered as both predicted profiles against the ground truth. |
 | Feed Tuner | `#/feedtuner` | `/api/scripts/tune_dataloader/config`, `/api/run` | Launch surface for the DataLoader sweep with its own result view. |

@@ -100,6 +100,13 @@ class App {
         nav.classList.add("is-dismissed");
       });
     });
+    nav.querySelectorAll(".nav__grouphead").forEach((head) => {
+      head.addEventListener("click", () => {
+        const group = head.closest(".nav__group");
+        const open  = group.classList.contains("is-open");
+        nav.querySelectorAll(".nav__group").forEach((g) => g.classList.toggle("is-open", g === group && !open));
+      });
+    });
     if (edge) edge.addEventListener("mouseenter", () => nav.classList.remove("is-dismissed"));
   }
 

@@ -25,26 +25,51 @@
     <img class="nav__logo" src="/static/img/dlr-logo.svg?v=20260624a" alt="DLR" />
   </a>
   <nav class="nav__links" aria-label="Sections">
-    <a href="#/model" data-route="model">Model</a>
-    <a href="#/pipelines" data-route="pipelines">Pipelines</a>
-    <a href="#/architectures" data-route="architectures">Architectures</a>
-    <a href="#/repomap" data-route="repomap">Repo Map</a>
-    <a href="#/physics" data-route="physics">Physics Loss</a>
-    <a href="#/scripts" data-route="scripts">Scripts</a>
-    <a href="#/saved" data-route="saved">Saved</a>
-    <a href="#/configuration" data-route="configuration">Configuration</a>
-    <a href="#/console" data-route="console">Console</a>
-    <a href="#/results" data-route="results">Results</a>
-    <a href="#/cube" data-route="cube">Cube</a>
-    <a href="#/slices" data-route="slices">Slices</a>
-    <a href="#/fitlab" data-route="fitlab">Fit Lab</a>
-    <a href="#/microscope" data-route="microscope">Microscope</a>
-    <a href="#/survey" data-route="survey">Survey</a>
-    <a href="#/triage" data-route="triage">Triage</a>
-    <a href="#/autopsy" data-route="autopsy">Autopsy</a>
-    <a href="#/leaderboard" data-route="leaderboard">Leaderboard</a>
-    <a href="#/feedtuner" data-route="feedtuner">Feed Tuner</a>
-    <a href="#/tensorboard" data-route="tensorboard">TensorBoard</a>
+    <div class="nav__group" data-group="reference">
+      <button type="button" class="nav__grouphead"><i class="nav__chev" aria-hidden="true"></i>Reference</button>
+      <div class="nav__sub">
+        <a href="#/model" data-route="model">Model</a>
+        <a href="#/pipelines" data-route="pipelines">Pipelines</a>
+        <a href="#/architectures" data-route="architectures">Architectures</a>
+        <a href="#/physics" data-route="physics">Physics Loss</a>
+        <a href="#/repomap" data-route="repomap">Repo Map</a>
+      </div>
+    </div>
+    <div class="nav__group" data-group="launch">
+      <button type="button" class="nav__grouphead"><i class="nav__chev" aria-hidden="true"></i>Launch</button>
+      <div class="nav__sub">
+        <a href="#/scripts" data-route="scripts">Scripts</a>
+        <a href="#/saved" data-route="saved">Saved</a>
+        <a href="#/configuration" data-route="configuration">Configuration</a>
+        <a href="#/feedtuner" data-route="feedtuner">Feed Tuner</a>
+      </div>
+    </div>
+    <div class="nav__group" data-group="monitor">
+      <button type="button" class="nav__grouphead"><i class="nav__chev" aria-hidden="true"></i>Monitor</button>
+      <div class="nav__sub">
+        <a href="#/console" data-route="console">Console</a>
+        <a href="#/tensorboard" data-route="tensorboard">TensorBoard</a>
+      </div>
+    </div>
+    <div class="nav__group" data-group="results">
+      <button type="button" class="nav__grouphead"><i class="nav__chev" aria-hidden="true"></i>Results</button>
+      <div class="nav__sub">
+        <a href="#/results" data-route="results">Results</a>
+        <a href="#/leaderboard" data-route="leaderboard">Leaderboard</a>
+        <a href="#/cube" data-route="cube">Cube</a>
+        <a href="#/slices" data-route="slices">Slices</a>
+      </div>
+    </div>
+    <div class="nav__group" data-group="inspect">
+      <button type="button" class="nav__grouphead"><i class="nav__chev" aria-hidden="true"></i>Inspect</button>
+      <div class="nav__sub">
+        <a href="#/microscope" data-route="microscope">Microscope</a>
+        <a href="#/survey" data-route="survey">Survey</a>
+        <a href="#/triage" data-route="triage">Triage</a>
+        <a href="#/autopsy" data-route="autopsy">Autopsy</a>
+        <a href="#/fitlab" data-route="fitlab">Fit Lab</a>
+      </div>
+    </div>
   </nav>
   <div class="nav__status" id="nav-status" title="Backend connection">
     <span class="dot" id="status-dot"></span>
