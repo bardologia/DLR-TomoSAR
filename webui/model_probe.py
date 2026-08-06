@@ -590,6 +590,71 @@ class ModelProbe:
 
         return perturbed
 
+    def _sweep_variants(self, window: np.ndarray, kind: str, channel: int | None) -> tuple[np.ndarray, list[np.ndarray], int]:
+        if kind == "scale_channel":
+            values   = np.linspace(0.0, 2.0, 9)
+            variants = [self._perturb(window, {"kind": kind, "channel": channel, "factor": float(v)}) for v in values]
+            return values, variants, 1
+
+        if kind == "noise":
+            seeds    = (0, 1, 2)
+            values   = np.linspace(0.0, 2.0, 9)
+            variants = [self._perturb(window, {"kind": kind, "sigma": float(v), "seed": seed}) for v in values for seed in seeds]
+            return values, variants, len(seeds)
+
+        raise ValueError(f"kind '{kind}' has no strength to sweep; sweep one of ('scale_channel', 'noise')")
+
+    def sweep(self, body: dict) -> dict:
+        with self.lock:
+            if self.loaded is None:
+                return {"ok": False, "error": "no model loaded"}
+
+            try:
+                az, rg         = int(body["az"]), int(body["rg"])
+                window, cy, cx = self._window(az, rg)
+
+                kind    = body.get("kind", "")
+                channel = None
+                if kind == "scale_channel":
+                    channel = int(body["channel"])
+                    if not 0 <= channel < window.shape[1]:
+                        raise ValueError(f"channel {channel} is out of range; the model reads {window.shape[1]} input channels")
+
+                values, variants, group = self._sweep_variants(window, kind, channel)
+
+                run      = self.loaded["run"]
+                renderer = self.loaded["renderer"]
+
+                params = run.model(np.concatenate([window] + variants, axis=0))
+                curves = renderer.render(params)[:, :, cy, cx]
+
+                base_curve = curves[0]
+                base_slots = self._slots(params[0, :, cy, cx])
+
+                deltas = ((curves[1:] - base_curve[None]) ** 2).mean(axis=1)
+                flips  = [self._slot_shift(base_slots, self._slots(params[index + 1, :, cy, cx]))[0] for index in range(len(variants))]
+
+                points = []
+                for index, value in enumerate(values):
+                    chunk = deltas[index * group:(index + 1) * group]
+                    points.append({
+                        "value"     : float(value),
+                        "delta_mse" : float(chunk.mean()),
+                        "spread"    : float(chunk.std()) if group > 1 else 0.0,
+                        "flips"     : int(max(flips[index * group:(index + 1) * group])),
+                    })
+
+                return {
+                    "ok"         : True,
+                    "kind"       : kind,
+                    "channel"    : channel,
+                    "label"      : self.loaded["labels"][channel] if channel is not None else None,
+                    "base_power" : float((base_curve ** 2).mean()),
+                    "points"     : points,
+                }
+            except (ValueError, KeyError) as error:
+                return {"ok": False, "error": str(error)}
+
     def whatif(self, body: dict) -> dict:
         with self.lock:
             if self.loaded is None:

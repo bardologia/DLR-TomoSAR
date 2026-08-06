@@ -351,6 +351,48 @@ def test_whatif_drop_of_used_channel_shifts_the_prediction():
     assert untouched["delta_mse"] == pytest.approx(0.0, abs=1e-12)
 
 
+def test_sweep_scale_channel_is_quiet_at_factor_one_and_loud_at_zero():
+    result = _probe().sweep({"az": 10, "rg": 8, "kind": "scale_channel", "channel": 0})
+
+    assert result["ok"]      is True
+    assert result["kind"]    == "scale_channel"
+    assert result["channel"] == 0
+    assert result["label"]   == "primary"
+
+    points = result["points"]
+    assert [p["value"] for p in points] == pytest.approx(list(np.linspace(0.0, 2.0, 9)))
+    assert points[4]["value"]     == pytest.approx(1.0)
+    assert points[4]["delta_mse"] == pytest.approx(0.0, abs=1e-12)
+    assert points[0]["delta_mse"] > 1e-6
+    assert points[8]["delta_mse"] > 1e-6
+
+
+def test_sweep_noise_averages_seeds_and_grows_with_sigma():
+    result = _probe().sweep({"az": 10, "rg": 8, "kind": "noise"})
+
+    assert result["ok"]      is True
+    assert result["channel"] is None
+    assert result["label"]   is None
+
+    points = result["points"]
+    assert points[0]["delta_mse"] == pytest.approx(0.0, abs=1e-12)
+    assert points[0]["spread"]    == pytest.approx(0.0, abs=1e-12)
+    assert points[8]["delta_mse"] > points[1]["delta_mse"]
+    assert points[8]["spread"]    >= 0.0
+
+
+def test_sweep_rejects_unsweepable_kinds_and_bad_channels():
+    probe = _probe()
+
+    drop = probe.sweep({"az": 10, "rg": 8, "kind": "drop_channel"})
+    assert drop["ok"] is False
+    assert "no strength to sweep" in drop["error"]
+
+    bad = probe.sweep({"az": 10, "rg": 8, "kind": "scale_channel", "channel": 7})
+    assert bad["ok"] is False
+    assert "out of range" in bad["error"]
+
+
 def test_whatif_unknown_perturbation_fails():
     result = _probe().whatif({"az": 10, "rg": 8, "perturbation": {"kind": "warp"}})
 

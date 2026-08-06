@@ -31,6 +31,8 @@ class MicroscopeView {
     this.fieldsData  = null;
     this.fieldsSlot  = 0;
     this.fieldsToken = 0;
+    this.sweepData   = null;
+    this.sweepToken  = 0;
     this.wi          = { kind: "drop_channel", channel: 0, factor: 0.5, sigma: 0.5, seed: 0 };
     this.wiTimer     = null;
   }
@@ -201,6 +203,12 @@ class MicroscopeView {
               <p class="ms-wifacts" id="probe-whatif-delta"></p>
               <p class="ms-card__note ms-witablenote" id="probe-whatif-tablenote" hidden>scatterer parameters at the probed pixel, base &rarr; perturbed &mdash; red marks a moved value</p>
               <table class="ms-slots" id="probe-whatif-slots"></table>
+              <div class="ms-subhead">
+                <h4 class="cube-panel-title">Response sweep</h4>
+                <span class="ms-card__note">sweep this perturbation's strength and re-run at each step &mdash; the dashed marker is the strength dialled in above</span>
+              </div>
+              <canvas id="probe-sweep" width="640" height="200" hidden></canvas>
+              <p class="ms-wifacts" id="probe-sweep-facts"></p>
             </section>
           </div>
         </div>
@@ -262,6 +270,8 @@ class MicroscopeView {
       wDelta     : this.root.querySelector("#probe-whatif-delta"),
       wTableNote : this.root.querySelector("#probe-whatif-tablenote"),
       wSlots     : this.root.querySelector("#probe-whatif-slots"),
+      sweep      : this.root.querySelector("#probe-sweep"),
+      sweepFacts : this.root.querySelector("#probe-sweep-facts"),
     };
 
     this.refs.mapImg.addEventListener("click", (ev) => this._onMapClick(ev));
@@ -287,12 +297,14 @@ class MicroscopeView {
       this.refs.wValue.value = this.refs.wRange.value;
       this._readWhatIfValue();
       this._renderWhatIfSummary();
+      this._renderSweepChart();
       this._scheduleWhatIf();
     });
     this.refs.wValue.addEventListener("change", () => {
       this.refs.wRange.value = this.refs.wValue.value;
       this._readWhatIfValue();
       this._renderWhatIfSummary();
+      this._renderSweepChart();
       this._scheduleWhatIf();
     });
     this.refs.wReroll.addEventListener("click", () => {
@@ -399,6 +411,7 @@ class MicroscopeView {
     this.gridChannel = -1;
     this.fieldsData  = null;
     this.fieldsSlot  = 0;
+    this.sweepData   = null;
     this.wi.channel  = 0;
     this.wi.seed     = 0;
 
@@ -1055,6 +1068,67 @@ class MicroscopeView {
 
     this.refs.wTableNote.hidden = false;
     this._renderWhatIfSlots(out.base_slots, out.perturbed_slots);
+    this._ensureSweep();
+  }
+
+  async _ensureSweep() {
+    if (this.wi.kind === "drop_channel") {
+      this.sweepData = null;
+      this.refs.sweep.hidden = true;
+      this.refs.sweepFacts.innerHTML = `<span class="ms-ctlrow__na">zeroing a channel is all-or-nothing &mdash; pick the scale or noise perturbation to sweep a strength</span>`;
+      return;
+    }
+
+    const key = [this.pixel.az, this.pixel.rg, this.wi.kind, this.wi.kind === "scale_channel" ? this.wi.channel : "all"].join(":");
+    if (this.sweepData && this.sweepData.key === key) {
+      this._renderSweepChart();
+      return;
+    }
+
+    const token = ++this.sweepToken;
+    this.refs.sweep.hidden = true;
+    this.refs.sweepFacts.innerHTML = `<span class="cube-hint is-loading">sweeping perturbation strengths&hellip;</span>`;
+
+    const body = { az: this.pixel.az, rg: this.pixel.rg, kind: this.wi.kind };
+    if (this.wi.kind === "scale_channel") body.channel = this.wi.channel;
+
+    const out = await window.apiPost("/api/probe/sweep", body);
+    if (token !== this.sweepToken) return;
+
+    if (!out.ok) {
+      this.refs.sweepFacts.innerHTML = this._esc(out.error);
+      return;
+    }
+
+    out.key                = key;
+    this.sweepData         = out;
+    this.refs.sweep.hidden = false;
+    this._renderSweepChart();
+    this._renderSweepFacts();
+  }
+
+  _renderSweepChart() {
+    if (!this.sweepData || this.refs.sweep.hidden) return;
+
+    const marker = this.wi.kind === "noise" ? this.wi.sigma : this.wi.factor;
+
+    window.drawLineChart(
+      this.refs.sweep,
+      this.sweepData.points.map((p) => p.value),
+      [{ values: this.sweepData.points.map((p) => p.delta_mse), color: MicroscopeView.SERIES_COLORS.perturbed, width: 1.6, label: "Δ curve MSE" }],
+      { xUnit: "", marker },
+    );
+  }
+
+  _renderSweepFacts() {
+    const points = this.sweepData.points;
+    const peak   = points.reduce((best, p) => (p.delta_mse > best.delta_mse ? p : best), points[0]);
+    const flip   = points.find((p) => p.flips > 0);
+    const sym    = this.wi.kind === "noise" ? "&sigma;" : "factor";
+    const rel    = this.sweepData.base_power > 0 ? ` (${((peak.delta_mse / this.sweepData.base_power) * 100).toFixed(2)}% of power)` : "";
+    const flips  = flip ? `slots first flip at ${sym} ${flip.value.toFixed(2)}` : "no slot flips across the sweep";
+
+    this.refs.sweepFacts.innerHTML = `peak &Delta; curve MSE <b>${peak.delta_mse.toExponential(2)}</b>${rel} at ${sym} ${peak.value.toFixed(2)} &middot; ${flips}`;
   }
 
   _renderWhatIfSlots(base, perturbed) {
@@ -1077,7 +1151,7 @@ class MicroscopeView {
   }
 }
 
-window.drawLineChart = (canvas, xAxis, series) => {
+window.drawLineChart = (canvas, xAxis, series, opts = {}) => {
   if (!canvas.dataset.chartW) {
     canvas.dataset.chartW = canvas.width;
     canvas.dataset.chartH = canvas.height;
@@ -1136,10 +1210,12 @@ window.drawLineChart = (canvas, xAxis, series) => {
     ctx.fillText(fmt(v), pad.l - 6, y + 3);
   }
 
+  const xUnit = opts.xUnit === undefined ? " m" : (opts.xUnit ? ` ${opts.xUnit}` : "");
+
   [[x0, "left"], [(x0 + x1) / 2, "center"], [x1, "right"]].forEach(([x, align]) => {
     ctx.fillStyle = "rgba(125, 133, 139, 0.95)";
     ctx.textAlign = align;
-    ctx.fillText(`${x.toFixed(0)} m`, px(x), H - 8);
+    ctx.fillText(`${fmt(x)}${xUnit}`, px(x), H - 8);
   });
 
   ctx.strokeStyle = "rgba(154, 161, 150, 0.8)";
@@ -1168,6 +1244,17 @@ window.drawLineChart = (canvas, xAxis, series) => {
     });
     ctx.stroke();
   });
+
+  if (Number.isFinite(opts.marker) && opts.marker >= Math.min(x0, x1) && opts.marker <= Math.max(x0, x1)) {
+    ctx.strokeStyle = "#e11d48";
+    ctx.lineWidth   = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.moveTo(px(opts.marker), pad.t);
+    ctx.lineTo(px(opts.marker), H - pad.b);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
 
   ctx.textAlign = "left";
   const entryWidths = series.map((s) => 16 + ctx.measureText(s.label).width + 14);
