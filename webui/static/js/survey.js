@@ -392,9 +392,12 @@ class SurveyView {
     );
 
     const first = r.occlusion.delta[0];
-    const last  = r.occlusion.delta[r.occlusion.delta.length - 1];
-    const ratio = last > 0 ? (first / last).toFixed(0) : "&infin;";
-    this.refs.occlFacts.innerHTML = `occluder ${r.occlusion.occluder[0]}&times;${r.occlusion.occluder[1]} px &middot; damage right under the occluder is ${ratio}&times; the damage at ${r.occlusion.distance[r.occlusion.distance.length - 1].toFixed(0)} px`;
+    const half  = r.occlusion.delta.findIndex((v) => v < first * 0.5);
+    const reach = half < 0 ? null : r.occlusion.distance[half];
+    const tail  = reach === null
+      ? "and stays high across the whole window"
+      : `and halves within ${reach.toFixed(0)} px of the pixel`;
+    this.refs.occlFacts.innerHTML = `occluder ${r.occlusion.occluder[0]}&times;${r.occlusion.occluder[1]} px &middot; damage peaks at <b>${first.toExponential(2)}</b> under the occluder ${tail}`;
   }
 }
 
