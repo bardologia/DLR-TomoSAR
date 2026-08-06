@@ -4230,6 +4230,17 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .ms-field figcaption { font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); text-align: center; margin-top: 5px; }
 .ms-fieldrow .ms-ctlrow__na { align-self: center; max-width: 320px; }
 
+.ms-abl { display: flex; flex-direction: column; gap: 7px; padding-top: 6px; }
+.ms-abl__row { display: grid; grid-template-columns: minmax(90px, 150px) minmax(0, 1fr); gap: 12px; align-items: center; }
+.ms-abl__label {
+  font-family: var(--mono); font-size: 11px; color: var(--ink-dim);
+  text-align: right; overflow-wrap: anywhere;
+}
+.ms-abl__bar { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.ms-abl__track { flex: 1 1 60px; min-width: 40px; }
+.ms-abl__track i { display: block; height: 13px; background: var(--accent); opacity: 0.8; min-width: 2px; }
+.ms-abl__bar em { font-style: normal; font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); white-space: nowrap; }
+
 .ms-arch { display: flex; align-items: stretch; overflow-x: auto; padding: 4px 2px 12px; }
 .ms-arch__block {
   position: relative; flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 3px;

@@ -259,6 +259,25 @@ def test_attribution_marks_dead_families_instead_of_failing():
     assert families["sigma"]["cells"]  == [None, None]
 
 
+def test_ablation_ranks_the_used_channel_first():
+    result = _probe().ablation({"az": 10, "rg": 8})
+
+    assert result["ok"] is True
+    assert result["base_power"] > 0.0
+
+    ranked = result["channels"]
+    assert [c["label"] for c in ranked] == ["primary", "sec PS04"]
+    assert ranked[0]["channel"]   == 0
+    assert ranked[0]["delta_mse"] > 1e-6
+    assert ranked[0]["max_mu_shift"] > 1.0
+    assert ranked[1]["delta_mse"] == pytest.approx(0.0, abs=1e-12)
+    assert ranked[1]["flips"]     == 0
+
+
+def test_ablation_without_loaded_model_fails():
+    assert ModelProbe(SilentLogger()).ablation({"az": 0, "rg": 0})["ok"] is False
+
+
 def test_whatif_drop_of_used_channel_shifts_the_prediction():
     probe = _probe()
 

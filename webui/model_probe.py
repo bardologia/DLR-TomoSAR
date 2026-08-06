@@ -434,6 +434,60 @@ class ModelProbe:
             except (ValueError, KeyError) as error:
                 return {"ok": False, "error": str(error)}
 
+    def _slot_shift(self, base_slots: list[dict], moved_slots: list[dict]) -> tuple[int, float]:
+        flips    = 0
+        mu_shift = 0.0
+
+        for base, moved in zip(base_slots, moved_slots):
+            if base["active"] != moved["active"]:
+                flips += 1
+            if base["active"] or moved["active"]:
+                mu_shift = max(mu_shift, abs(moved["mu"] - base["mu"]))
+
+        return flips, mu_shift
+
+    def ablation(self, body: dict) -> dict:
+        with self.lock:
+            if self.loaded is None:
+                return {"ok": False, "error": "no model loaded"}
+
+            try:
+                az, rg         = int(body["az"]), int(body["rg"])
+                window, cy, cx = self._window(az, rg)
+
+                run        = self.loaded["run"]
+                renderer   = self.loaded["renderer"]
+                n_channels = window.shape[1]
+
+                batch = np.repeat(window, n_channels + 1, axis=0)
+                for channel in range(n_channels):
+                    batch[channel + 1, channel] = 0.0
+
+                params = run.model(batch)
+                curves = renderer.render(params)[:, :, cy, cx]
+
+                base_curve = curves[0]
+                base_slots = self._slots(params[0, :, cy, cx])
+                base_power = float((base_curve ** 2).mean())
+
+                channels = []
+                for channel in range(n_channels):
+                    slots           = self._slots(params[channel + 1, :, cy, cx])
+                    flips, mu_shift = self._slot_shift(base_slots, slots)
+                    channels.append({
+                        "channel"      : channel,
+                        "label"        : self.loaded["labels"][channel],
+                        "delta_mse"    : float(((curves[channel + 1] - base_curve) ** 2).mean()),
+                        "flips"        : flips,
+                        "max_mu_shift" : mu_shift,
+                    })
+
+                channels.sort(key=lambda entry: entry["delta_mse"], reverse=True)
+
+                return {"ok": True, "base_power": base_power, "channels": channels}
+            except (ValueError, KeyError) as error:
+                return {"ok": False, "error": str(error)}
+
     def _perturb(self, window: np.ndarray, perturbation: dict) -> np.ndarray:
         kind      = perturbation.get("kind")
         perturbed = window.copy()

@@ -17,6 +17,7 @@ class MicroscopeView {
     this.built       = false;
     this.pollToken   = 0;
     this.attribToken = 0;
+    this.ablToken    = 0;
     this.wiToken     = 0;
     this.runs        = [];
     this.selectedId  = null;
@@ -134,6 +135,11 @@ class MicroscopeView {
                 <div class="ms-chiprow" id="probe-grid-channels"></div>
               </div>
               <div class="ms-gridwrap"><div class="ms-grid" id="probe-grid"></div></div>
+              <div class="ms-subhead">
+                <h4 class="cube-panel-title">Channel ablation</h4>
+                <span class="ms-card__note">zero one input channel at a time and re-run &mdash; causal damage to the prediction, unlike the local gradients above</span>
+              </div>
+              <div class="ms-abl" id="probe-ablation"></div>
             </section>
 
             <section class="ms-card">
@@ -214,6 +220,7 @@ class MicroscopeView {
       barsLegend : this.root.querySelector("#probe-bars-legend"),
       gridChips  : this.root.querySelector("#probe-grid-channels"),
       grid       : this.root.querySelector("#probe-grid"),
+      ablation   : this.root.querySelector("#probe-ablation"),
       arch       : this.root.querySelector("#probe-arch"),
       archLayers : this.root.querySelector("#probe-arch-layers"),
       features   : this.root.querySelector("#probe-features"),
@@ -552,6 +559,7 @@ class MicroscopeView {
     this._renderMatches(out);
     this._renderAttribSlotChips();
     this._loadAttribution();
+    this._loadAblation();
     this._loadFields();
     this._loadFeatures();
     this._runWhatIf();
@@ -761,6 +769,34 @@ class MicroscopeView {
     });
 
     this.refs.grid.innerHTML = cells.join("");
+  }
+
+  async _loadAblation() {
+    const token = ++this.ablToken;
+
+    this.refs.ablation.innerHTML = `<p class="cube-hint is-loading">re-running the model without each channel&hellip;</p>`;
+
+    const out = await window.apiPost("/api/probe/ablation", { az: this.pixel.az, rg: this.pixel.rg });
+    if (token !== this.ablToken) return;
+
+    if (!out.ok) {
+      this.refs.ablation.innerHTML = `<p class="cube-hint">${this._esc(out.error)}</p>`;
+      return;
+    }
+
+    const peak = Math.max(1e-12, ...out.channels.map((c) => c.delta_mse));
+
+    this.refs.ablation.innerHTML = out.channels.map((c) => {
+      const width = Math.max(1.5, (c.delta_mse / peak) * 100).toFixed(1);
+      const rel   = out.base_power > 0 ? ` &middot; ${((c.delta_mse / out.base_power) * 100).toFixed(2)}% of power` : "";
+      const flips = c.flips ? ` &middot; ${c.flips} slot${c.flips === 1 ? "" : "s"} flip` : "";
+      const mu    = c.max_mu_shift > 0.5 ? ` &middot; &mu; moves ${c.max_mu_shift.toFixed(1)} m` : "";
+      return `
+        <div class="ms-abl__row">
+          <span class="ms-abl__label" title="${this._esc(c.label)}">${this._esc(c.label)}</span>
+          <span class="ms-abl__bar"><span class="ms-abl__track"><i style="width:${width}%"></i></span><em>curve MSE ${c.delta_mse.toExponential(2)}${rel}${flips}${mu}</em></span>
+        </div>`;
+    }).join("");
   }
 
   _fmtVal(v) {
