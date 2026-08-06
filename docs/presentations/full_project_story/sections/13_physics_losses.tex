@@ -488,18 +488,17 @@
   \parbox{0.97\textwidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks $\cdot$ set-pred $\cdot$ Hungarian
    $\cdot$ $K{=}2$ $\cdot$ presence A $\cdot$ full norm ladder $\cdot$ hv flips
    $\cdot$ patch $64{\times}32$ $\cdot$ fixed routing (full stack $\to$ both
-   trunks) $\cdot$ parity twins. Row $=$ loss $(\text{param-L1}+0.5\,\text{cos}+w\,\text{phys})/(1.5+w)$,
-   one physics term per arm; param-L1 $+$ cos $=$ the no-physics reference. Five
-   seeded replicas per arm, cells mean $\pm$ seed std; held-out test, $5.0$\,M px.
-   Val losses do not compare across arms (different composites); curve MAE / PSNR /
-   SSIM stay flat outside the collapse arms (next frames); peak p95 is pinned at
-   4.7. \textbf{bold} $=$ best in column, marked only where best and worst differ
-   by more than $5\%$. \textcolor{good}{Green}: coherence
-   $w{=}0.25$ takes the best curve $R^2$; at $w{=}1$ its gate trades misses for
-   false alarms (under 0.041 $\to$ 0.032, over 0.051 $\to$ 0.083; seed lottery:
-   precision $\pm$.045, exact $\pm$.063). \textcolor{accent}{Red} $=$
-   absolute-scale collapse past $w{=}0.25$ (covariance, total power). cos med: median per-pixel cosine to GT; peak p95: 95th pct of
-   the per-pixel peak error.\par}
+   trunks) $\cdot$ parity twins. Row $=$ loss
+   $(\text{param-L1}+0.5\,\text{cos}+w\,\text{phys})/(1.5+w)$, one physics term
+   per arm; param-L1 $+$ cos $=$ the no-physics reference. Five seeded replicas
+   per arm, cells mean $\pm$ seed std; held-out test, $5.0$\,M px. Validation
+   losses are omitted --- every arm optimizes a different composite, so they do
+   not compare. \textbf{bold} $=$ best in column, marked only where best and
+   worst differ by more than $5\%$. \textcolor{good}{Green} $=$ the best curve
+   $R^2$ and the $w{=}1$ coherence under trade; \textcolor{accent}{red} $=$ its
+   over price and the covariance / total-power collapse arms. cos med: median
+   per-pixel cosine to the GT profile; peak p95: 95th percentile of the
+   per-pixel peak error.\par}
 \end{frame}
 
 % ---------------------------------------------------------------- 39c Physics detection by count
@@ -550,18 +549,15 @@
   \parbox{0.90\textwidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks $\cdot$ set-pred $\cdot$ Hungarian
    $\cdot$ $K{=}2$ $\cdot$ presence A $\cdot$ full norm ladder $\cdot$ hv flips
    $\cdot$ patch $64{\times}32$ $\cdot$ fixed routing (full stack $\to$ both
-   trunks) $\cdot$ parity twins. Row $=$ one physics term at weight $w$;
-   param-L1 $+$ cos $=$ the no-physics reference. Five seeded replicas per arm,
-   cells mean $\pm$ seed std; held-out test, $5.0$\,M px. All rows matched
-   (Hungarian pairing); $k$ $=$ true scatterer count of the pixel. \textbf{bold}
-   $=$ best in column, marked only where best and worst differ by more than $5\%$
-   --- almost nothing clears it at any weight: the physics terms shape the profile,
-   not the scatterer set. The exception is the high-weight coherence gate:
-   \textcolor{good}{$k{=}2$ recall creeps up} (0.763 $\to$ 0.768) while
-   \textcolor{accent}{the claimed pairs destabilise} ($k{=}1$ precision seed
-   lottery $\pm$.067, pred $k{=}2$ accuracy $\pm$.122). Precision rewards
-   under-prediction --- rank on recall. count acc $\mid$ pred $k$: share of pixels
-   claiming exactly $k$ scatterers whose true count is $k$.\par}
+   trunks) $\cdot$ parity twins. All rows matched
+   (Hungarian pairing); $k$ $=$ true scatterer count of the pixel. Five seeded
+   replicas per arm, cells mean $\pm$ seed std; held-out test, $5.0$\,M px.
+   \textbf{bold} $=$ best in column, marked only where best and worst differ by
+   more than $5\%$. \textcolor{good}{Green} $=$ the high-weight coherence
+   $k{=}2$ recall; \textcolor{accent}{red} $=$ its destabilised claimed pairs.
+   Precision rewards under-prediction --- rank on recall. count acc $\mid$ pred
+   $k$: share of pixels claiming exactly $k$ scatterers whose true count is
+   $k$.\par}
 \end{frame}
 
 % ---------------------------------------------------------------- 39d Physics component errors
@@ -612,15 +608,13 @@
   \parbox{0.90\textwidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks $\cdot$ set-pred $\cdot$ Hungarian
    $\cdot$ $K{=}2$ $\cdot$ presence A $\cdot$ full norm ladder $\cdot$ hv flips
    $\cdot$ patch $64{\times}32$ $\cdot$ fixed routing (full stack $\to$ both
-   trunks) $\cdot$ parity twins. Row $=$ one physics term at weight $w$;
-   param-L1 $+$ cos $=$ the no-physics reference. Five seeded replicas per arm,
-   cells mean $\pm$ seed std; held-out test, $5.0$\,M px. Component errors
+   trunks) $\cdot$ parity twins. Component errors
    over matched pairs only (Hungarian pairing); $k$ $=$ true scatterer count of
-   the pixel. \textbf{bold} $=$ best in column, marked only where best and worst
-   differ by more than $5\%$. \textcolor{good}{Covariance at $w{=}0.05$ takes the
-   best $\mu$} (1.65 vs 1.71); \textcolor{accent}{full-weight coherence pays
-   position and width} ($\mu$ 1.81, $\sigma$ 0.809) --- the wider gate matches
-   harder pairs; amplitude never moves. $\mu$, $\sigma$ in elevation units; $a$ in
+   the pixel. Five seeded replicas per arm, cells mean $\pm$ seed std; held-out
+   test, $5.0$\,M px. \textbf{bold} $=$ best in column, marked only where best
+   and worst differ by more than $5\%$. \textcolor{good}{Green} $=$ the
+   covariance $w{=}0.05$ $\mu$; \textcolor{accent}{red} $=$ the full-weight
+   coherence $\mu$/$\sigma$ price. $\mu$, $\sigma$ in elevation units; $a$ in
    linear amplitude.\par}
 \end{frame}
 
@@ -672,16 +666,12 @@
   \parbox{0.90\textwidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks $\cdot$ set-pred $\cdot$ Hungarian
    $\cdot$ $K{=}2$ $\cdot$ presence A $\cdot$ full norm ladder $\cdot$ hv flips
    $\cdot$ patch $64{\times}32$ $\cdot$ fixed routing (full stack $\to$ both
-   trunks) $\cdot$ parity twins. Row $=$ one physics term at weight $w$;
-   param-L1 $+$ cos $=$ the no-physics reference. Five seeded replicas per arm,
-   cells mean $\pm$ seed std; held-out test, $5.0$\,M px. \textbf{bold} $=$
-   best in column, marked only where best and worst differ by more than $5\%$ ---
-   no column clears it: curve fidelity and structure are flat at every gentle
-   weight, and only degrade on \textcolor{accent}{the absolute-scale collapse
-   arms} (covariance / total power at $w{\ge}0.5$: RMSE 0.217 $\to$ 0.227, SSIM
-   range 0.951 $\to$ 0.944). Peak location is pinned everywhere: median 0.67 and
-   p95 4.7 in every arm; the mean moves in the second decimal. peak in elevation
-   units.\par}
+   trunks) $\cdot$ parity twins. Five seeded
+   replicas per arm, cells mean $\pm$ seed std; held-out test, $5.0$\,M px.
+   \textbf{bold} $=$ best in column, marked only where best and worst differ by
+   more than $5\%$. \textcolor{accent}{Red} $=$ the collapse-arm RMSE. peak in
+   elevation units; peak median (0.67) and p95 (4.7) are identical in every arm
+   and are not tabulated.\par}
 \end{frame}
 
 % ---------------------------------------------------------------- 39f Physics per-pixel tail
@@ -732,16 +722,11 @@
   \parbox{0.92\textwidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks $\cdot$ set-pred $\cdot$ Hungarian
    $\cdot$ $K{=}2$ $\cdot$ presence A $\cdot$ full norm ladder $\cdot$ hv flips
    $\cdot$ patch $64{\times}32$ $\cdot$ fixed routing (full stack $\to$ both
-   trunks) $\cdot$ parity twins. Row $=$ one physics term at weight $w$;
-   param-L1 $+$ cos $=$ the no-physics reference. Five seeded replicas per arm,
-   cells mean $\pm$ seed std; held-out test, $5.0$\,M px. pixel $R^2$ min
-   and its spread in thousands (k). \textbf{bold} $=$ best in column, marked only
-   where best and worst differ by more than $5\%$. The typical pixel never moves
-   (median and cosine flat); the tail is the story: catastrophic pixels wreck the
-   no-physics mean ($-1.17$, $p_1$ $-14.9$, min $-13.2$k);
-   \textcolor{good}{covariance caps the blow-ups at every weight, improving as
-   $w$ grows} (mean $+0.8$ at $w{=}1$); moments and total power insure at low
-   weight (best min $-3.6$k). \textcolor{accent}{Coherence is NOT tail
-   insurance}: worse than the baseline at $w{\ge}0.5$ (mean $-9.6$, min $-66$k)
-   --- it shapes coherences, not pixel-domain outliers.\par}
+   trunks) $\cdot$ parity twins. Five seeded
+   replicas per arm, cells mean $\pm$ seed std; held-out test, $5.0$\,M px;
+   pixel $R^2$ min and its spread in thousands (k). \textbf{bold} $=$ best in
+   column, marked only where best and worst differ by more than $5\%$.
+   \textcolor{good}{Green} $=$ covariance capping the tail;
+   \textcolor{accent}{red} $=$ the coherence $w{=}1$ tail. cos: per-pixel cosine
+   to the GT profile.\par}
 \end{frame}

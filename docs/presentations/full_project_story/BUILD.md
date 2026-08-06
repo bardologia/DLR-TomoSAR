@@ -117,6 +117,15 @@ All builds run inside this directory (images resolve via `../../results/...`).
   verified non-clipping by rastering every page. Row generator extended
   (scratchpad gen_physics_tables.py emits all five boards from
   metrics_comparison.md).
+  FOURTH FOLLOW-UP same day (user: "there is a lot of discussion of the results
+  in the text under the tables, THATS NOT WHAT IS HAPPENING ANYWHERE IN THE
+  PROJECT"): all five captions were cut to the standard caption content ONLY ---
+  runs recipe, row/cell definitions, the val-loss non-comparability line (board
+  only), the 5% bold-gate line, a ONE-CLAUSE colour key naming what green/red
+  mark (no numbers, no argument), and metric definitions. No results narrative
+  under tables, ever --- the numbers argue for themselves. Side effect: every
+  residual vbox overfull vanished. CAPTION RULE HARDENED: analysis sentences do
+  not belong in table captions anywhere in this deck.
 
 - PATCH-SWEEP VERDICT REFRESHED ON THE STEP-8 THREE-SEED GRID 2026-08-06 (user:
   emailed "a updated version of the patch sweep experiment", ingested from the
