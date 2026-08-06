@@ -21,6 +21,8 @@ class ModelSurvey:
 
     LOADER_NAME  = "model_survey"
     NOISE_SIGMAS = tuple(float(v) for v in np.linspace(0.0, 2.0, 9))
+    SPLITS       = ("train", "val", "test")
+    DEVICES      = ("cpu", "cuda")
     ERF_SAMPLES  = 24
     TILE_CAP     = 64
     CPU_THREADS  = 64
@@ -36,6 +38,8 @@ class ModelSurvey:
         self.result      = None
         self.cancel_flag = False
         self.tile_cap    = self.TILE_CAP
+        self.erf_samples = self.ERF_SAMPLES
+        self.cpu_threads = self.CPU_THREADS
         self.total_units = 1
         self.done_units  = 0
         self.status      = {"state": "idle", "path": "", "progress": 0.0, "stage": "", "error": ""}
@@ -47,9 +51,29 @@ class ModelSurvey:
 
         return {"ok": True, "root": scanned["root"], "runs": scanned["entries"]}
 
+    def _reject_config(self, body: dict) -> str:
+        split   = body.get("split", "test")
+        device  = body.get("device", "cpu")
+        tiles   = int(body.get("tiles", self.TILE_CAP))
+        erf     = int(body.get("erf_samples", self.ERF_SAMPLES))
+        threads = int(body.get("threads", self.CPU_THREADS))
+
+        if split not in self.SPLITS:
+            return f"split '{split}' is unknown; pick one of {self.SPLITS}"
+        if device not in self.DEVICES:
+            return f"device '{device}' is unknown; pick one of {self.DEVICES}"
+        if tiles < 0:
+            return f"tile cap {tiles} is negative; use 0 to survey every tile"
+        if erf < 0:
+            return f"{erf} receptive-field samples is negative; use 0 to skip the sampling phase"
+        if threads < 1:
+            return f"{threads} CPU threads leaves nothing to compute with; use at least 1"
+
+        return ""
+
     def start(self, body: dict) -> dict:
         run_path = body.get("path", "")
-        refusal  = ModelProbe._reject_unloadable(run_path)
+        refusal  = ModelProbe._reject_unloadable(run_path) or self._reject_config(body)
         if refusal:
             return {"ok": False, "error": refusal}
 
@@ -60,6 +84,8 @@ class ModelSurvey:
             self.result      = None
             self.cancel_flag = False
             self.tile_cap    = int(body.get("tiles", self.TILE_CAP))
+            self.erf_samples = int(body.get("erf_samples", self.ERF_SAMPLES))
+            self.cpu_threads = int(body.get("threads", self.CPU_THREADS))
             self.status      = {"state": "running", "path": run_path, "progress": 0.0, "stage": "opening run", "error": ""}
 
         args = (run_path, body.get("split", "test"), body.get("device", "cpu"))
@@ -348,8 +374,8 @@ class ModelSurvey:
         live       = {family: 0 for family in ModelProbe.FAMILIES}
         radii      = None
 
-        for index in range(self.ERF_SAMPLES):
-            self._tick(f"receptive field, sample {index + 1}/{self.ERF_SAMPLES}")
+        for index in range(self.erf_samples):
+            self._tick(f"receptive field, sample {index + 1}/{self.erf_samples}")
 
             az = int(rng.integers(az_lo, max(az_lo + 1, az_hi + 1)))
             rg = int(rng.integers(rg_lo, max(rg_lo + 1, rg_hi + 1)))
@@ -383,7 +409,7 @@ class ModelSurvey:
                 "samples"    : live[family],
             })
 
-        return {"families": families, "samples": self.ERF_SAMPLES}
+        return {"families": families, "samples": self.erf_samples}
 
     def _spread(self, values: list) -> dict:
         merged = np.concatenate(values)
@@ -478,7 +504,7 @@ class ModelSurvey:
         max_bin    = int(np.hypot(*self.loaded["patch"]) / self.DISTANCE_BIN) + 2
 
         self.done_units  = 0
-        self.total_units = len(tiles) * 7 + self.ERF_SAMPLES
+        self.total_units = len(tiles) * 7 + self.erf_samples
 
         acc = {
             "power"         : [],
@@ -543,7 +569,7 @@ class ModelSurvey:
         import torch
 
         previous = torch.get_num_threads()
-        torch.set_num_threads(min(self.CPU_THREADS, previous))
+        torch.set_num_threads(min(self.cpu_threads, previous))
 
         try:
             self._load(run_path, split, device)

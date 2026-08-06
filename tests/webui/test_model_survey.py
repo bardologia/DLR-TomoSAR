@@ -160,7 +160,7 @@ def test_worker_caps_torch_threads_and_restores_them(monkeypatch):
         seen["threads"] = torch.get_num_threads()
         raise RuntimeError("stop")
 
-    monkeypatch.setattr(ModelSurvey, "CPU_THREADS", 2)
+    survey.cpu_threads = 2
     monkeypatch.setattr(survey, "_load", observing_load)
 
     previous = torch.get_num_threads()
@@ -181,6 +181,52 @@ def test_survey_start_refuses_non_runs(tmp_path):
     out = survey.start({"path": str(tmp_path / "nowhere")})
     assert out["ok"] is False
     assert "not a directory" in out["error"]
+
+
+def _loadable_run(tmp_path):
+    run_dir = tmp_path / "run_ok"
+    run_dir.mkdir()
+    (run_dir / "best_model.pt").write_bytes(b"x")
+    (run_dir / "meta").mkdir()
+    (run_dir / "meta" / "model_config.json").write_text("{}")
+    return str(run_dir)
+
+
+def test_survey_start_refuses_bad_configs(tmp_path):
+    survey = ModelSurvey(SilentLogger())
+    path   = _loadable_run(tmp_path)
+
+    bad_split = survey.start({"path": path, "split": "holdout"})
+    assert bad_split["ok"] is False
+    assert "split 'holdout'" in bad_split["error"]
+
+    bad_device = survey.start({"path": path, "device": "tpu"})
+    assert bad_device["ok"] is False
+    assert "device 'tpu'" in bad_device["error"]
+
+    bad_tiles = survey.start({"path": path, "tiles": -1})
+    assert bad_tiles["ok"] is False
+    assert "negative" in bad_tiles["error"]
+
+    bad_erf = survey.start({"path": path, "erf_samples": -3})
+    assert bad_erf["ok"] is False
+    assert "negative" in bad_erf["error"]
+
+    bad_threads = survey.start({"path": path, "threads": 0})
+    assert bad_threads["ok"] is False
+    assert "at least 1" in bad_threads["error"]
+
+
+def test_survey_with_zero_erf_samples_skips_the_phase():
+    survey             = _survey()
+    survey.erf_samples = 0
+    survey._survey()
+
+    assert survey.status["progress"] == pytest.approx(1.0)
+
+    erf = survey.result["erf"]
+    assert erf["samples"] == 0
+    assert all(f["dead"] for f in erf["families"])
 
 
 def test_survey_result_before_any_run_fails():

@@ -11,6 +11,7 @@ class SurveyView {
     this.selectedId   = null;
     this.runStrip     = null;
     this.renderedPath = null;
+    this.cfg          = { split: "test", device: "cpu", tiles: 64, erf: 24, threads: 64 };
   }
 
   enter() {
@@ -33,6 +34,47 @@ class SurveyView {
           <button type="button" class="btn btn--mini" id="survey-cancel">Cancel</button>
         </div>
       </div>
+
+      <section class="ms-card sv-setup" id="survey-setup" hidden>
+        <div class="ms-card__head">
+          <h3 class="cube-panel-title">Survey setup</h3>
+          <span class="ms-badge" id="survey-setup-run"></span>
+        </div>
+        <div class="ms-ctlrow">
+          <span class="ms-ctlrow__label">split</span>
+          <div class="cube-spaces" id="survey-split" role="group" aria-label="Split">
+            <button type="button" class="cube-space" data-value="train">train</button>
+            <button type="button" class="cube-space" data-value="val">val</button>
+            <button type="button" class="cube-space is-active" data-value="test">test</button>
+          </div>
+        </div>
+        <div class="ms-ctlrow">
+          <span class="ms-ctlrow__label">device</span>
+          <div class="cube-spaces" id="survey-device" role="group" aria-label="Device">
+            <button type="button" class="cube-space is-active" data-value="cpu">cpu</button>
+            <button type="button" class="cube-space" data-value="cuda">cuda</button>
+          </div>
+        </div>
+        <div class="ms-ctlrow">
+          <span class="ms-ctlrow__label">tile cap</span>
+          <input type="number" id="survey-tiles" class="cube-jump__input" min="0" step="1" value="64" />
+          <span class="ms-card__note">evenly strided tiles to survey &mdash; 0 surveys every tile of the region</span>
+        </div>
+        <div class="ms-ctlrow">
+          <span class="ms-ctlrow__label">ERF samples</span>
+          <input type="number" id="survey-erf-samples" class="cube-jump__input" min="0" step="1" value="24" />
+          <span class="ms-card__note">pixels sampled for the receptive-field profile &mdash; 0 skips that phase</span>
+        </div>
+        <div class="ms-ctlrow">
+          <span class="ms-ctlrow__label">CPU threads</span>
+          <input type="number" id="survey-threads" class="cube-jump__input" min="1" step="1" value="64" />
+          <span class="ms-card__note">torch thread cap while the survey runs; restored afterwards</span>
+        </div>
+        <div class="ms-ctlrow">
+          <button type="button" class="btn" id="survey-start-btn">Start survey</button>
+          <span class="ms-card__note">re-runs the model many times per tile &mdash; progress and cancel appear above</span>
+        </div>
+      </section>
 
       <div class="ms-main">
         <div class="ms-cards" id="survey-cards" hidden>
@@ -122,6 +164,14 @@ class SurveyView {
       fill       : this.root.querySelector("#survey-progress-fill"),
       label      : this.root.querySelector("#survey-progress-label"),
       cancelBtn  : this.root.querySelector("#survey-cancel"),
+      setup      : this.root.querySelector("#survey-setup"),
+      setupRun   : this.root.querySelector("#survey-setup-run"),
+      splitBtns  : this.root.querySelector("#survey-split"),
+      deviceBtns : this.root.querySelector("#survey-device"),
+      tilesInput : this.root.querySelector("#survey-tiles"),
+      erfInput   : this.root.querySelector("#survey-erf-samples"),
+      thrInput   : this.root.querySelector("#survey-threads"),
+      startBtn   : this.root.querySelector("#survey-start-btn"),
       cards      : this.root.querySelector("#survey-cards"),
       badge      : this.root.querySelector("#survey-badge"),
       meta       : this.root.querySelector("#survey-meta"),
@@ -147,6 +197,32 @@ class SurveyView {
     this.refs.cancelBtn.addEventListener("click", async () => {
       await window.apiPost("/api/survey/cancel", {});
     });
+
+    this._bindChips(this.refs.splitBtns, "split");
+    this._bindChips(this.refs.deviceBtns, "device");
+    this.refs.startBtn.addEventListener("click", () => this._startSurvey());
+  }
+
+  _bindChips(group, key) {
+    group.querySelectorAll(".cube-space").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        group.querySelectorAll(".cube-space").forEach((b) => b.classList.toggle("is-active", b === btn));
+        this.cfg[key] = btn.dataset.value;
+      });
+    });
+  }
+
+  _readNumbers() {
+    const read = (input, fallback, min) => {
+      const value = parseInt(input.value, 10);
+      const safe  = Number.isFinite(value) ? Math.max(min, value) : fallback;
+      input.value = safe;
+      return safe;
+    };
+
+    this.cfg.tiles   = read(this.refs.tilesInput, 64, 0);
+    this.cfg.erf     = read(this.refs.erfInput, 24, 0);
+    this.cfg.threads = read(this.refs.thrInput, 64, 1);
   }
 
   _runsBase() {
@@ -181,23 +257,41 @@ class SurveyView {
     if (!this.runStrip) {
       this.runStrip = new RunStrip(this.refs.strip, {
         stateFor : (run) => run.id === this.selectedId,
-        onPick   : (run) => this._start(run.id),
+        onPick   : (run) => this._pick(run),
       });
     }
     this.runStrip.render(this.runs);
   }
 
-  async _start(path) {
-    const out = await window.apiPost("/api/survey/start", { path });
+  _pick(run) {
+    this.selectedId = run.id;
+    this._renderStrip();
+
+    this.refs.setupRun.textContent = run.run || run.id;
+    this.refs.setup.hidden         = false;
+    this.refs.hint.textContent     = "Set the survey up below, then start it.";
+  }
+
+  async _startSurvey() {
+    if (!this.selectedId) return;
+    this._readNumbers();
+
+    const out = await window.apiPost("/api/survey/start", {
+      path        : this.selectedId,
+      split       : this.cfg.split,
+      device      : this.cfg.device,
+      tiles       : this.cfg.tiles,
+      erf_samples : this.cfg.erf,
+      threads     : this.cfg.threads,
+    });
     if (!out.ok) {
       this.refs.hint.textContent = out.error || "survey failed to start";
       return;
     }
 
-    this.selectedId   = path;
-    this.renderedPath = null;
+    this.renderedPath      = null;
+    this.refs.setup.hidden = true;
     this.refs.cards.hidden = true;
-    this._renderStrip();
     this._pollStatus();
   }
 
@@ -211,12 +305,10 @@ class SurveyView {
 
       if (st.state === "running") {
         this.refs.progress.hidden   = false;
+        this.refs.setup.hidden      = true;
         this.refs.fill.style.width  = `${Math.round((st.progress || 0) * 100)}%`;
         this.refs.label.textContent = `${st.stage || "running"} — ${Math.round((st.progress || 0) * 100)}%`;
-        if (st.path && st.path !== this.selectedId) {
-          this.selectedId = st.path;
-          this._renderStrip();
-        }
+        if (st.path && st.path !== this.selectedId) this._adoptPath(st.path);
         setTimeout(tick, 800);
         return;
       }
@@ -225,21 +317,26 @@ class SurveyView {
 
       if (st.state === "error") {
         this.refs.hint.textContent = st.error;
+        this.refs.setup.hidden     = this.selectedId === null;
         return;
       }
       if (st.state === "cancelled") {
         this.refs.hint.textContent = "Survey cancelled.";
+        this.refs.setup.hidden     = this.selectedId === null;
         return;
       }
       if (st.state === "done") {
-        if (st.path && st.path !== this.selectedId) {
-          this.selectedId = st.path;
-          this._renderStrip();
-        }
+        if (st.path && st.path !== this.selectedId) this._adoptPath(st.path);
         if (this.renderedPath !== st.path) await this._loadResult(st.path);
       }
     };
     tick();
+  }
+
+  _adoptPath(path) {
+    this.selectedId = path;
+    this.refs.setupRun.textContent = path.split("/").pop();
+    this._renderStrip();
   }
 
   async _loadResult(path) {
@@ -330,6 +427,11 @@ class SurveyView {
     const live = r.erf.families.filter((f) => !f.dead);
     this.refs.erfNote.innerHTML = `cumulative gradient energy vs radius, averaged over ${r.erf.samples} sampled pixels`;
 
+    if (r.erf.samples === 0) {
+      this.refs.erf.hidden = true;
+      this.refs.erfFacts.innerHTML = "receptive-field sampling was turned off for this survey";
+      return;
+    }
     if (!live.length) {
       this.refs.erf.hidden = true;
       this.refs.erfFacts.innerHTML = "no gradient energy at any sampled pixel";

@@ -4272,6 +4272,11 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .sv-progress { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 14px; align-items: center; }
 .sv-progress .cube-progress__label { grid-row: 2; margin: 0; }
 .sv-progress .btn { grid-row: 1 / span 2; }
+
+.sv-setup { margin-top: 14px; }
+.sv-setup[hidden] { display: none; }
+.sv-setup .cube-jump__input { width: 84px; }
+.sv-setup .ms-ctlrow .ms-card__note { align-self: center; }
 .ms-vitals__table tr.is-flagged td.ms-vitals__flags { color: var(--danger); font-weight: 600; }
 .ms-vitals__table tr.is-current td { background: rgba(29, 79, 216, 0.07); }
 
