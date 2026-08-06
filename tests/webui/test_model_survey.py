@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+
 import numpy as np
 import pytest
 
@@ -120,6 +122,26 @@ def test_survey_flips_noise_occlusion_and_erf_profiles():
     assert vitals["entries"][0]["type"]  == "Identity"
 
 
+def test_survey_mean_gradient_maps_follow_the_used_channel():
+    survey = _survey()
+    survey._survey()
+
+    gradients = survey.result["gradients"]
+    assert gradients["samples"] == ModelSurvey.ERF_SAMPLES
+    assert gradients["patch"]   == [PH, PW]
+    assert gradients["center"]  == [PH // 2, PW // 2]
+
+    families = {f["family"]: f for f in gradients["families"]}
+
+    assert families["mu"]["dead"] is False
+    assert families["mu"]["shares"][0] == pytest.approx(1.0)
+    assert base64.b64decode(families["mu"]["cells"][0])[:8] == b"\x89PNG\r\n\x1a\n"
+    assert families["mu"]["cells"][1] is None
+
+    assert families["sigma"]["dead"]  is True
+    assert families["sigma"]["cells"] == [None, None]
+
+
 def test_survey_without_gt_omits_fit_gt_sections():
     survey = _survey(with_gt=False)
     survey._survey()
@@ -227,6 +249,10 @@ def test_survey_with_zero_erf_samples_skips_the_phase():
     erf = survey.result["erf"]
     assert erf["samples"] == 0
     assert all(f["dead"] for f in erf["families"])
+
+    gradients = survey.result["gradients"]
+    assert gradients["samples"] == 0
+    assert all(f["dead"] for f in gradients["families"])
 
 
 def test_survey_result_before_any_run_fails():

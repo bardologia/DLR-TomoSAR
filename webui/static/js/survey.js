@@ -11,6 +11,8 @@ class SurveyView {
     this.selectedId   = null;
     this.runStrip     = null;
     this.renderedPath = null;
+    this.resultData   = null;
+    this.gridChannel  = -1;
     this.cfg          = { split: "test", device: "cpu", tiles: 64, erf: 24, threads: 64 };
   }
 
@@ -105,6 +107,15 @@ class SurveyView {
             <div class="ms-bars" id="survey-bars"></div>
             <div class="ms-legend" id="survey-bars-legend"></div>
             <div class="ms-subhead">
+              <h4 class="cube-panel-title">Mean spatial gradients</h4>
+              <span class="ms-card__note" id="survey-grid-note"></span>
+            </div>
+            <div class="ms-ctlrow" id="survey-grid-ctl">
+              <span class="ms-ctlrow__label">channel</span>
+              <div class="ms-chiprow" id="survey-grid-channels"></div>
+            </div>
+            <div class="ms-gridwrap"><div class="ms-grid" id="survey-grid"></div></div>
+            <div class="ms-subhead">
               <h4 class="cube-panel-title">Effective receptive field</h4>
               <span class="ms-card__note" id="survey-erf-note"></span>
             </div>
@@ -181,6 +192,10 @@ class SurveyView {
       match      : this.root.querySelector("#survey-match"),
       bars       : this.root.querySelector("#survey-bars"),
       barsLegend : this.root.querySelector("#survey-bars-legend"),
+      gridNote   : this.root.querySelector("#survey-grid-note"),
+      gridCtl    : this.root.querySelector("#survey-grid-ctl"),
+      gridChips  : this.root.querySelector("#survey-grid-channels"),
+      grid       : this.root.querySelector("#survey-grid"),
       erfNote    : this.root.querySelector("#survey-erf-note"),
       erf        : this.root.querySelector("#survey-erf"),
       erfFacts   : this.root.querySelector("#survey-erf-facts"),
@@ -356,6 +371,9 @@ class SurveyView {
   }
 
   _renderResult(r) {
+    this.resultData  = r;
+    this.gridChannel = -1;
+
     this.refs.hint.textContent = `Surveyed ${r.backbone} over the ${r.split} split.`;
     this.refs.cards.hidden     = false;
 
@@ -423,6 +441,7 @@ class SurveyView {
 
   _renderAttribution(r) {
     window.renderFamilyBars(this.refs.bars, this.refs.barsLegend, r.channels, r.attribution.families, "no dependence anywhere in the region");
+    this._renderGradients(r);
 
     const live = r.erf.families.filter((f) => !f.dead);
     this.refs.erfNote.innerHTML = `cumulative gradient energy vs radius, averaged over ${r.erf.samples} sampled pixels`;
@@ -450,6 +469,38 @@ class SurveyView {
       ? `${f.family} &mdash; no dependence`
       : `${f.family} r<sub>50</sub> <b>${f.r50} px</b> / r<sub>90</sub> <b>${f.r90} px</b>`
     ).join(" &middot; ");
+  }
+
+  _renderGradients(r) {
+    const g = r.gradients;
+
+    if (g.samples === 0) {
+      this.refs.gridNote.innerHTML  = "gradient sampling was turned off for this survey (0 ERF samples)";
+      this.refs.gridCtl.hidden      = true;
+      this.refs.gridChips.innerHTML = "";
+      this.refs.grid.innerHTML      = "";
+      this.refs.grid.className      = "ms-grid";
+      return;
+    }
+
+    this.refs.gridNote.innerHTML = `|&part;output/&part;input| windows averaged over ${g.samples} sampled pixels, each centred on its pixel`;
+    this.refs.gridCtl.hidden     = false;
+    this._renderGridChips();
+    window.renderGradientGrid(this.refs.grid, { channels: r.channels, families: g.families, center: g.center, patch: g.patch }, this.gridChannel);
+  }
+
+  _renderGridChips() {
+    this.refs.gridChips.innerHTML = "";
+
+    const pick = (index) => () => {
+      this.gridChannel = index;
+      this._renderGradients(this.resultData);
+    };
+
+    this.refs.gridChips.appendChild(window.msChip("all channels", this.gridChannel === -1, pick(-1)));
+    this.resultData.channels.forEach((label, index) => {
+      this.refs.gridChips.appendChild(window.msChip(label, this.gridChannel === index, pick(index)));
+    });
   }
 
   _renderAblation(r) {

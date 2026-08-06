@@ -402,7 +402,8 @@ class ModelProbe:
     def _family_gradients(self, window: np.ndarray, cy: int, cx: int, slot: int) -> list[tuple[str, np.ndarray]]:
         return self._family_gradients_at(self.loaded["run"], self.loaded["device"], window, cy, cx, slot)
 
-    def _cell_png(self, cell: np.ndarray) -> str:
+    @classmethod
+    def _cell_png(cls, cell: np.ndarray) -> str:
         buf = io.BytesIO()
         plt.imsave(buf, cell, cmap="magma", vmin=0.0, vmax=1.0, format="png")
         return base64.b64encode(buf.getvalue()).decode("ascii")

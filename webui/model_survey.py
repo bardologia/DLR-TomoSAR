@@ -362,7 +362,34 @@ class ModelSurvey:
 
         return ModelProbe._vitals_payload(model, recorder.stats())
 
-    def _erf_phase(self, coverage_az: int, coverage_rg: int) -> dict:
+    def _gradient_map_payload(self, maps: dict, live: dict, center: list | None) -> dict:
+        ph, pw     = self.loaded["patch"]
+        n_channels = len(self.loaded["labels"])
+
+        families = []
+        for family in ModelProbe.FAMILIES:
+            if maps[family] is None:
+                families.append({"family": family, "dead": True, "shares": [0.0] * n_channels, "cells": [None] * n_channels})
+                continue
+
+            mean   = maps[family] / live[family]
+            shares = mean.sum(axis=(1, 2)) / mean.sum()
+
+            cells = []
+            for channel in range(mean.shape[0]):
+                peak = float(mean[channel].max())
+                cells.append(ModelProbe._cell_png(mean[channel] / peak) if peak > 0.0 else None)
+
+            families.append({"family": family, "dead": False, "shares": [float(v) for v in shares], "cells": cells})
+
+        return {
+            "families" : families,
+            "center"   : center if center is not None else [ph // 2, pw // 2],
+            "patch"    : [ph, pw],
+            "samples"  : self.erf_samples,
+        }
+
+    def _sampling_phase(self, coverage_az: int, coverage_rg: int) -> tuple[dict, dict]:
         run    = self.loaded["run"]
         ph, pw = self.loaded["patch"]
         rng    = np.random.default_rng(0)
@@ -371,16 +398,19 @@ class ModelSurvey:
         rg_lo, rg_hi = pw // 2, coverage_rg - pw + pw // 2
 
         cumulative = {family: None for family in ModelProbe.FAMILIES}
+        maps       = {family: None for family in ModelProbe.FAMILIES}
         live       = {family: 0 for family in ModelProbe.FAMILIES}
         radii      = None
+        center     = None
 
         for index in range(self.erf_samples):
-            self._tick(f"receptive field, sample {index + 1}/{self.erf_samples}")
+            self._tick(f"sampled gradients, sample {index + 1}/{self.erf_samples}")
 
             az = int(rng.integers(az_lo, max(az_lo + 1, az_hi + 1)))
             rg = int(rng.integers(rg_lo, max(rg_lo + 1, rg_hi + 1)))
 
             window, cy, cx = ModelProbe._window_at(run, (ph, pw), az, rg)
+            center         = [cy, cx]
 
             for family, grad in ModelProbe._family_gradients_at(run, self.loaded["device"], window, cy, cx, -1):
                 if float(grad.sum()) <= 0.0:
@@ -390,6 +420,7 @@ class ModelSurvey:
                 arc     = np.asarray(profile["cumulative"])
 
                 cumulative[family] = arc if cumulative[family] is None else cumulative[family] + arc
+                maps[family]       = grad if maps[family] is None else maps[family] + grad
                 live[family]      += 1
 
         families = []
@@ -409,7 +440,7 @@ class ModelSurvey:
                 "samples"    : live[family],
             })
 
-        return {"families": families, "samples": self.erf_samples}
+        return {"families": families, "samples": self.erf_samples}, self._gradient_map_payload(maps, live, center)
 
     def _spread(self, values: list) -> dict:
         merged = np.concatenate(values)
@@ -419,7 +450,7 @@ class ModelSurvey:
             "p90"    : float(np.percentile(merged, 90.0)),
         }
 
-    def _finalize(self, acc: dict, tiles: list, total_tiles: int, vitals: dict, erf: dict, seconds: float) -> dict:
+    def _finalize(self, acc: dict, tiles: list, total_tiles: int, vitals: dict, erf: dict, gradients: dict, seconds: float) -> dict:
         run    = self.loaded["run"]
         labels = self.loaded["labels"]
         pixels = len(tiles) * self.loaded["patch"][0] * self.loaded["patch"][1]
@@ -489,6 +520,7 @@ class ModelSurvey:
             "matched"     : matched,
             "attribution" : {"families": families},
             "erf"         : erf,
+            "gradients"   : gradients,
             "ablation"    : {"channels": channels},
             "flips"       : flips,
             "noise"       : noise,
@@ -552,9 +584,9 @@ class ModelSurvey:
                 self._tick(f"occlusion, {label}")
                 self._occlusion_pass(acc, window, distances)
 
-            vitals = self._vitals_phase(tiles)
-            erf    = self._erf_phase(coverage_az, coverage_rg)
-            result = self._finalize(acc, tiles, total_tiles, vitals, erf, time.monotonic() - started)
+            vitals         = self._vitals_phase(tiles)
+            erf, gradients = self._sampling_phase(coverage_az, coverage_rg)
+            result         = self._finalize(acc, tiles, total_tiles, vitals, erf, gradients, time.monotonic() - started)
 
             with self.lock:
                 self.result = result

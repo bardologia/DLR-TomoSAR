@@ -540,12 +540,7 @@ class MicroscopeView {
   }
 
   _chip(label, active, onPick) {
-    const chip = document.createElement("button");
-    chip.type = "button";
-    chip.className = "ms-chipbtn" + (active ? " is-active" : "");
-    chip.textContent = label;
-    chip.addEventListener("click", onPick);
-    return chip;
+    return window.msChip(label, active, onPick);
   }
 
   _buildWhatIfChannels(channels) {
@@ -870,53 +865,11 @@ class MicroscopeView {
   }
 
   _dot(center, patch) {
-    const left = (((center[1] + 0.5) / patch[1]) * 100).toFixed(1);
-    const top  = (((center[0] + 0.5) / patch[0]) * 100).toFixed(1);
-    return `<i class="ms-cell__dot" style="left:${left}%;top:${top}%"></i>`;
-  }
-
-  _gridCell(family, label, cell, share, head) {
-    const cap = head
-      ? `<figcaption class="ms-cellhead"><i style="background:${MicroscopeView.FAMILY_COLORS[family]}"></i>${family} &middot; ${(share * 100).toFixed(1)}%</figcaption>`
-      : "";
-    if (!cell) {
-      return `<figure class="ms-cell">${cap}<div class="ms-cell--dead"><span>0</span></div></figure>`;
-    }
-    const img = `
-      <span class="ms-cell__frame">
-        <img src="data:image/png;base64,${cell}" alt="${this._esc(`${family} sensitivity to ${label}`)}" />
-        ${this._dot(this.attrib.center, this.attrib.patch)}
-      </span>`;
-    return head
-      ? `<figure class="ms-cell">${cap}${img}</figure>`
-      : `<figure class="ms-cell">${img}<figcaption>${(share * 100).toFixed(1)}%</figcaption></figure>`;
+    return window.msDot(center, patch);
   }
 
   _renderGrid() {
-    const out = this.attrib;
-
-    if (this.gridChannel >= 0) {
-      const index = this.gridChannel;
-      const label = out.channels[index];
-
-      this.refs.grid.className = "ms-gridone";
-      this.refs.grid.style.gridTemplateColumns = "";
-      this.refs.grid.innerHTML = out.families.map((f) => this._gridCell(f.family, label, f.cells[index], f.shares[index], true)).join("");
-      return;
-    }
-
-    this.refs.grid.className = "ms-grid";
-    this.refs.grid.style.gridTemplateColumns = `92px repeat(${out.channels.length}, minmax(58px, 150px))`;
-
-    const cells = [`<span class="ms-grid__corner"></span>`];
-    out.channels.forEach((label) => cells.push(`<span class="ms-grid__col">${this._esc(label)}</span>`));
-
-    out.families.forEach((f) => {
-      cells.push(`<span class="ms-grid__row"><i style="background:${MicroscopeView.FAMILY_COLORS[f.family]}"></i>${f.family}</span>`);
-      out.channels.forEach((label, index) => cells.push(this._gridCell(f.family, label, f.cells[index], f.shares[index], false)));
-    });
-
-    this.refs.grid.innerHTML = cells.join("");
+    window.renderGradientGrid(this.refs.grid, this.attrib, this.gridChannel);
   }
 
   async _loadAblation() {
@@ -1305,6 +1258,62 @@ window.msFmt = (v) => {
   if (v === 0) return "0";
   const abs = Math.abs(v);
   return abs >= 1e4 || abs < 1e-2 ? v.toExponential(1) : Number(v.toPrecision(3)).toString();
+};
+
+window.msDot = (center, patch) => {
+  const left = (((center[1] + 0.5) / patch[1]) * 100).toFixed(1);
+  const top  = (((center[0] + 0.5) / patch[0]) * 100).toFixed(1);
+  return `<i class="ms-cell__dot" style="left:${left}%;top:${top}%"></i>`;
+};
+
+window.msChip = (label, active, onPick) => {
+  const chip = document.createElement("button");
+  chip.type = "button";
+  chip.className = "ms-chipbtn" + (active ? " is-active" : "");
+  chip.textContent = label;
+  chip.addEventListener("click", onPick);
+  return chip;
+};
+
+window.renderGradientGrid = (container, data, selectedChannel) => {
+  const cellHtml = (family, label, cell, share, head) => {
+    const cap = head
+      ? `<figcaption class="ms-cellhead"><i style="background:${MicroscopeView.FAMILY_COLORS[family]}"></i>${family} &middot; ${(share * 100).toFixed(1)}%</figcaption>`
+      : "";
+    if (!cell) {
+      return `<figure class="ms-cell">${cap}<div class="ms-cell--dead"><span>0</span></div></figure>`;
+    }
+    const img = `
+      <span class="ms-cell__frame">
+        <img src="data:image/png;base64,${cell}" alt="${window.msEsc(`${family} sensitivity to ${label}`)}" />
+        ${window.msDot(data.center, data.patch)}
+      </span>`;
+    return head
+      ? `<figure class="ms-cell">${cap}${img}</figure>`
+      : `<figure class="ms-cell">${img}<figcaption>${(share * 100).toFixed(1)}%</figcaption></figure>`;
+  };
+
+  if (selectedChannel >= 0) {
+    const label = data.channels[selectedChannel];
+
+    container.className = "ms-gridone";
+    container.style.gridTemplateColumns = "";
+    container.innerHTML = data.families.map((f) => cellHtml(f.family, label, f.cells[selectedChannel], f.shares[selectedChannel], true)).join("");
+    return;
+  }
+
+  container.className = "ms-grid";
+  container.style.gridTemplateColumns = `92px repeat(${data.channels.length}, minmax(58px, 150px))`;
+
+  const cells = [`<span class="ms-grid__corner"></span>`];
+  data.channels.forEach((label) => cells.push(`<span class="ms-grid__col">${window.msEsc(label)}</span>`));
+
+  data.families.forEach((f) => {
+    cells.push(`<span class="ms-grid__row"><i style="background:${MicroscopeView.FAMILY_COLORS[f.family]}"></i>${f.family}</span>`);
+    data.channels.forEach((label, index) => cells.push(cellHtml(f.family, label, f.cells[index], f.shares[index], false)));
+  });
+
+  container.innerHTML = cells.join("");
 };
 
 window.renderFamilyBars = (barsEl, legendEl, channels, families, deadNote) => {
