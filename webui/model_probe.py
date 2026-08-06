@@ -223,6 +223,10 @@ class ModelProbe:
 
         return self._slots(center), [float(v) for v in curve], center
 
+    def _center_curves(self, params: np.ndarray, cy: int, cx: int) -> np.ndarray:
+        center = params[:, :, cy, cx][:, :, None, None]
+        return self.loaded["renderer"].render(center)[:, :, 0, 0]
+
     def _match_gt(self, pred_center: np.ndarray, gt_center: np.ndarray) -> list[dict]:
         import torch
 
@@ -477,7 +481,6 @@ class ModelProbe:
                 window, cy, cx = self._window(az, rg)
 
                 run        = self.loaded["run"]
-                renderer   = self.loaded["renderer"]
                 n_channels = window.shape[1]
 
                 batch = np.repeat(window, n_channels + 1, axis=0)
@@ -485,7 +488,7 @@ class ModelProbe:
                     batch[channel + 1, channel] = 0.0
 
                 params = run.model(batch)
-                curves = renderer.render(params)[:, :, cy, cx]
+                curves = self._center_curves(params, cy, cx)
 
                 base_curve = curves[0]
                 base_slots = self._slots(params[0, :, cy, cx])
@@ -518,8 +521,7 @@ class ModelProbe:
                 az, rg         = int(body["az"]), int(body["rg"])
                 window, cy, cx = self._window(az, rg)
 
-                run      = self.loaded["run"]
-                renderer = self.loaded["renderer"]
+                run = self.loaded["run"]
 
                 batch  = np.concatenate([np.flip(window, axes) if axes else window for _, axes in self.FLIPS], axis=0)
                 params = run.model(batch)
@@ -528,7 +530,7 @@ class ModelProbe:
                 base_curve = None
                 for index, (name, axes) in enumerate(self.FLIPS):
                     restored = np.flip(params[index:index + 1], axes) if axes else params[index:index + 1]
-                    curve    = renderer.render(restored)[0, :, cy, cx]
+                    curve    = self._center_curves(restored, cy, cx)[0]
 
                     if base_curve is None:
                         base_curve = curve
@@ -558,12 +560,11 @@ class ModelProbe:
                 az, rg         = int(body["az"]), int(body["rg"])
                 window, cy, cx = self._window(az, rg)
 
-                run      = self.loaded["run"]
-                renderer = self.loaded["renderer"]
-                ph, pw   = window.shape[2], window.shape[3]
-                oh, ow   = max(2, ph // 8), max(2, pw // 8)
-                rows     = int(np.ceil(ph / oh))
-                cols     = int(np.ceil(pw / ow))
+                run    = self.loaded["run"]
+                ph, pw = window.shape[2], window.shape[3]
+                oh, ow = max(2, ph // 8), max(2, pw // 8)
+                rows   = int(np.ceil(ph / oh))
+                cols   = int(np.ceil(pw / ow))
 
                 batch = np.repeat(window, rows * cols + 1, axis=0)
                 for row in range(rows):
@@ -571,7 +572,7 @@ class ModelProbe:
                         cell = 1 + row * cols + col
                         batch[cell, :, row * oh:min(ph, (row + 1) * oh), col * ow:min(pw, (col + 1) * ow)] = 0.0
 
-                curves     = renderer.render(run.model(batch))[:, :, cy, cx]
+                curves     = self._center_curves(run.model(batch), cy, cx)
                 base_curve = curves[0]
                 deltas     = ((curves[1:] - base_curve[None]) ** 2).mean(axis=1).reshape(rows, cols)
 
@@ -642,11 +643,10 @@ class ModelProbe:
 
                 values, variants, group = self._sweep_variants(window, kind, channel)
 
-                run      = self.loaded["run"]
-                renderer = self.loaded["renderer"]
+                run = self.loaded["run"]
 
                 params = run.model(np.concatenate([window] + variants, axis=0))
-                curves = renderer.render(params)[:, :, cy, cx]
+                curves = self._center_curves(params, cy, cx)
 
                 base_curve = curves[0]
                 base_slots = self._slots(params[0, :, cy, cx])
