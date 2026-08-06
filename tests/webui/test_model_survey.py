@@ -40,7 +40,7 @@ def test_survey_covers_the_region_and_finishes():
 
     result = survey.result
     assert result["region"]   == [N_AZ, N_RG]
-    assert result["coverage"] == {"tiles": 4, "azimuth": 16, "range": 16, "pixels": 256}
+    assert result["coverage"] == {"tiles": 4, "total_tiles": 4, "pixels": 256}
     assert result["channels"] == ["primary", "sec PS04"]
     assert result["seconds"]  > 0.0
 
@@ -128,6 +128,17 @@ def test_survey_without_gt_omits_fit_gt_sections():
     assert result["fit"]["curve_mse_gt"] is None
     assert result["detection"] is None
     assert result["matched"]   is None
+
+
+def test_survey_tile_cap_strides_evenly_and_reports_totals():
+    survey          = _survey()
+    survey.tile_cap = 2
+    survey._survey()
+
+    coverage = survey.result["coverage"]
+    assert coverage["tiles"]       == 2
+    assert coverage["total_tiles"] == 4
+    assert coverage["pixels"]      == 128
 
 
 def test_survey_cancel_stops_the_run():

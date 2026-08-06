@@ -22,6 +22,7 @@ class ModelSurvey:
     LOADER_NAME  = "model_survey"
     NOISE_SIGMAS = tuple(float(v) for v in np.linspace(0.0, 2.0, 9))
     ERF_SAMPLES  = 24
+    TILE_CAP     = 64
     CHUNK_BUDGET = 4_000_000
     DISTANCE_BIN = 4.0
 
@@ -33,6 +34,7 @@ class ModelSurvey:
         self.loaded      = None
         self.result      = None
         self.cancel_flag = False
+        self.tile_cap    = self.TILE_CAP
         self.total_units = 1
         self.done_units  = 0
         self.status      = {"state": "idle", "path": "", "progress": 0.0, "stage": "", "error": ""}
@@ -56,6 +58,7 @@ class ModelSurvey:
 
             self.result      = None
             self.cancel_flag = False
+            self.tile_cap    = int(body.get("tiles", self.TILE_CAP))
             self.status      = {"state": "running", "path": run_path, "progress": 0.0, "stage": "opening run", "error": ""}
 
         args = (run_path, body.get("split", "test"), body.get("device", "cpu"))
@@ -130,8 +133,14 @@ class ModelSurvey:
 
         az_starts = list(range(0, n_az - ph + 1, ph))
         rg_starts = list(range(0, n_rg - pw + 1, pw))
+        origins   = [(top, left) for top in az_starts for left in rg_starts]
 
-        return [(top, left) for top in az_starts for left in rg_starts], len(az_starts) * ph, len(rg_starts) * pw
+        selected = origins
+        if 0 < self.tile_cap < len(origins):
+            indices  = np.unique(np.linspace(0, len(origins) - 1, self.tile_cap).round().astype(int))
+            selected = [origins[index] for index in indices]
+
+        return selected, len(origins), len(az_starts) * ph, len(rg_starts) * pw
 
     def _tile_window(self, top: int, left: int) -> np.ndarray:
         run    = self.loaded["run"]
@@ -383,7 +392,7 @@ class ModelSurvey:
             "p90"    : float(np.percentile(merged, 90.0)),
         }
 
-    def _finalize(self, acc: dict, tiles: list, coverage_az: int, coverage_rg: int, vitals: dict, erf: dict, seconds: float) -> dict:
+    def _finalize(self, acc: dict, tiles: list, total_tiles: int, vitals: dict, erf: dict, seconds: float) -> dict:
         run    = self.loaded["run"]
         labels = self.loaded["labels"]
         pixels = len(tiles) * self.loaded["patch"][0] * self.loaded["patch"][1]
@@ -446,7 +455,7 @@ class ModelSurvey:
             "patch"       : list(self.loaded["patch"]),
             "channels"    : labels,
             "region"      : [run.split_region.azimuth_size, run.split_region.range_size],
-            "coverage"    : {"tiles": len(tiles), "azimuth": coverage_az, "range": coverage_rg, "pixels": pixels},
+            "coverage"    : {"tiles": len(tiles), "total_tiles": total_tiles, "pixels": pixels},
             "seconds"     : seconds,
             "fit"         : fit,
             "detection"   : detection,
@@ -461,8 +470,8 @@ class ModelSurvey:
         }
 
     def _survey(self) -> None:
-        started                          = time.monotonic()
-        tiles, coverage_az, coverage_rg  = self._tile_origins()
+        started                                       = time.monotonic()
+        tiles, total_tiles, coverage_az, coverage_rg  = self._tile_origins()
 
         n_channels = int(self.loaded["run"].in_channels)
         max_bin    = int(np.hypot(*self.loaded["patch"]) / self.DISTANCE_BIN) + 2
@@ -518,7 +527,7 @@ class ModelSurvey:
 
             vitals = self._vitals_phase(tiles)
             erf    = self._erf_phase(coverage_az, coverage_rg)
-            result = self._finalize(acc, tiles, coverage_az, coverage_rg, vitals, erf, time.monotonic() - started)
+            result = self._finalize(acc, tiles, total_tiles, vitals, erf, time.monotonic() - started)
 
             with self.lock:
                 self.result = result

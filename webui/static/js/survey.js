@@ -266,7 +266,7 @@ class SurveyView {
     this.refs.meta.innerHTML = [
       `<span class="ms-chip"><b>split</b> ${window.msEsc(r.split)}</span>`,
       `<span class="ms-chip"><b>region</b> ${r.region[0]}&times;${r.region[1]} px</span>`,
-      `<span class="ms-chip"><b>surveyed</b> ${r.coverage.azimuth}&times;${r.coverage.range} px in ${r.coverage.tiles} tiles</span>`,
+      `<span class="ms-chip"><b>surveyed</b> ${r.coverage.tiles} of ${r.coverage.total_tiles} tiles</span>`,
       `<span class="ms-chip"><b>pixels</b> ${r.coverage.pixels.toLocaleString("en-US")}</span>`,
       `<span class="ms-chip"><b>window</b> ${r.patch[0]}&times;${r.patch[1]} px</span>`,
       `<span class="ms-chip"><b>K</b> ${r.n_gaussians}</span>`,
