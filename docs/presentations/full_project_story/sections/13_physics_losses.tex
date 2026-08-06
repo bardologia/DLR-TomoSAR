@@ -483,14 +483,17 @@
       \par\vspace{6pt}
       \parbox{0.95\linewidth}{\scriptsize\color{soft} \textbf{runs}: dual UNet-skip
       trunks $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}2$ $\cdot$ presence A
-      $\cdot$ hv flips $\cdot$ full stack $\to$ both trunks; loss $=$ param-L1
-      $+\,0.5\,$cosine curve $+$ one physics term at weight $w$; five seeded replicas
-      per arm, held-out test. Cell $=$ grouped score: equal-weight mean of the five
-      metric-group scores (curve error / variance explained / structural similarity /
-      shape / peak location), min-max scaled \emph{within this 21-arm comparison} ---
-      rank, not physical units. \cellcolor{accent!18}\ $=$ below baseline;
-      \textbf{bold} $=$ family best; \cellcolor{good!25}\ $=$ sweep best. Val losses
-      are not comparable across arms (each optimises a different composite).\par}
+      $\cdot$ full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$ $\cdot$
+      full stack $\to$ both trunks; loss $=$ param-L1 $+\,0.5\,$cosine curve $+$ one
+      physics term at weight $w$; five seeded replicas per arm, held-out test. Cell
+      $=$ grouped score: equal-weight mean of the five metric-group scores (curve
+      error / variance explained / structural similarity / shape / peak location),
+      min-max scaled \emph{within this 21-arm comparison} --- a rank statistic, no
+      seed spread. \textbf{bold} $=$ best in row, marked only where best and worst
+      differ by more than $5\%$ (every row clears it);
+      \colorbox{accent!18}{\strut below baseline}; \colorbox{good!25}{\strut sweep
+      best}. Val losses are not comparable across arms (each optimises a different
+      composite).\par}
     \end{column}
   \end{columns}
 \end{frame}
@@ -499,7 +502,7 @@
 \begin{frame}{The verdict --- physics terms buy tail insurance, not headline gains}
   \small
   \begin{columns}[T]
-    \begin{column}{0.40\textwidth}
+    \begin{column}{0.33\textwidth}
       \begin{itemize}\setlength{\itemsep}{6pt}
         \item[\textcolor{argA}{$\blacksquare$}] \textbf{Headline gains are small}:
               curve $R^2$ $0.747 \to 0.755$ at the best arm --- at the edge of
@@ -507,8 +510,7 @@
         \item[\textcolor{argB}{$\blacksquare$}] \textbf{The real effect is the
               per-pixel tail}: the baseline's mean pixel $R^2$ is $-1.17$, wrecked by
               catastrophic pixels ($p_1 = -14.9$). The descriptor and covariance terms
-              cap the blow-ups and pull the mean positive ($+0.77$ at covariance
-              $w{=}0.05$, $p_1 = -0.45$).
+              cap the blow-ups and pull the mean positive.
         \item[\textcolor{argB}{$\blacksquare$}] Physics arms also \textbf{stabilise
               seeds}: covariance $w{=}0.05$ runs at a fifth of the baseline's
               curve-metric seed spread.
@@ -517,45 +519,49 @@
               not the scatterer set.
       \end{itemize}
     \end{column}
-    \begin{column}{0.58\textwidth}
+    \begin{column}{0.65\textwidth}
       \centering
-      {\tiny
-      \setlength{\tabcolsep}{3.5pt}
-      \renewcommand{\arraystretch}{1.12}
-      \begin{tabular}{@{}lccccc@{}}
+      \scriptsize
+      \renewcommand{\arraystretch}{0.92}
+      \setlength{\tabcolsep}{2pt}
+      \renewcommand{\seedtag}{phyV}
+      \begin{tabular}{@{}l ccccc@{}}
         \toprule
-        & baseline & coh.\ 0.25 & mom.\ 0.05 & cov.\ 0.05 & pow.\ 0.05 \\
+        metric & baseline & coh.\ 0.25 & mom.\ 0.05 & cov.\ 0.05 & pow.\ 0.05 \\
         \midrule
-        \rowcolor{argA!14} curve $R^2$        & 0.747 & \textbf{0.755} & 0.755 & 0.748 & 0.751 \\
-        \rowcolor{argA!14} curve MAE          & 0.0370 & 0.0366 & 0.0365 & \textbf{0.0365} & 0.0366 \\
-        \rowcolor{argA!14} PSNR [dB]          & 52.63 & \textbf{52.78} & 52.76 & 52.65 & 52.70 \\
-        \rowcolor{argA!14} SSIM elev          & 0.9671 & 0.9674 & 0.9674 & \textbf{0.9675} & 0.9674 \\
-        \rowcolor{argA!14} SSIM range         & 0.9510 & 0.9516 & 0.9519 & \textbf{0.9521} & 0.9520 \\
-        \rowcolor{argA!14} SSIM azim          & 0.9610 & 0.9615 & 0.9615 & \textbf{0.9616} & 0.9615 \\
+        \rowcolor{argA!14} curve $R^2$ $\uparrow$ & \seedpm{0.747}{.006} & \seedpm{0.755}{.007} & \seedpm{0.755}{.002} & \seedpm{0.748}{.001} & \seedpm{0.751}{.005} \\
+        \rowcolor{argA!14} PSNR [dB] $\uparrow$   & \seedpm{52.63}{.10} & \seedpm{52.78}{.13} & \seedpm{52.76}{.04} & \seedpm{52.65}{.02} & \seedpm{52.70}{.08} \\
         \addlinespace[2pt]
-        \rowcolor{argB!16} pixel $R^2$ mean   & $-1.17$ & $-0.88$ & $+0.53$ & $\mathbf{+0.77}$ & $+0.73$ \\
-        \rowcolor{argB!16} pixel $R^2$ $p_1$  & $-14.9$ & $-12.4$ & $-2.16$ & $\mathbf{-0.45}$ & $-0.87$ \\
-        \rowcolor{argB!16} pixel $R^2$ min    & $-13\,161$ & $-12\,209$ & $-4\,407$ & $-4\,151$ & $\mathbf{-4\,065}$ \\
-        \rowcolor{argB!16} profile cos med    & 0.9646 & \textbf{0.9663} & 0.9661 & 0.9658 & 0.9655 \\
+        \rowcolor{argB!16} pixel $R^2$ mean $\uparrow$ & \seedpm{$-1.17$}{.79} & \seedpm{$-0.88$}{.53} & \seedpm{$+0.53$}{.19} & \seedpm{$\mathbf{+0.77}$}{.01} & \seedpm{$+0.73$}{.05} \\
+        \rowcolor{argB!16} pixel $R^2$ $p_1$ $\uparrow$ & \seedpm{$-14.9$}{11.4} & \seedpm{$-12.4$}{4.0} & \seedpm{$-2.2$}{1.1} & \seedpm{$\mathbf{-0.5}$}{0.1} & \seedpm{$-0.9$}{0.4} \\
+        \rowcolor{argB!16} pixel $R^2$ min $\uparrow$ & \seedpm{$-13.2$k}{3.3k} & \seedpm{$-12.2$k}{4.8k} & \seedpm{$-4.4$k}{1.2k} & \seedpm{$-4.2$k}{0.2k} & \seedpm{$\mathbf{-4.1}$k}{0.1k} \\
+        \rowcolor{argB!16} cos med $\uparrow$ & \seedpm{0.965}{.004} & \seedpm{0.966}{.002} & \seedpm{0.966}{.002} & \seedpm{0.966}{.002} & \seedpm{0.966}{.001} \\
         \addlinespace[2pt]
-        matched recall     & 0.901 & \textbf{0.903} & 0.902 & 0.902 & 0.900 \\
-        matched precision  & 0.895 & 0.892 & 0.896 & \textbf{0.899} & 0.898 \\
-        count exact        & 0.908 & 0.909 & \textbf{0.910} & 0.909 & 0.908 \\
-        $\mu$ MAE          & 1.71 & 1.72 & 1.69 & \textbf{1.65} & 1.67 \\
-        $\sigma$ MAE       & 0.774 & 0.778 & 0.771 & \textbf{0.754} & 0.761 \\
-        $a$ MAE            & \textbf{0.182} & 0.182 & 0.182 & 0.187 & 0.184 \\
-        peak err mean      & 1.231 & 1.216 & 1.221 & \textbf{1.213} & 1.221 \\
+        recall $\uparrow$      & \seedpm{0.901}{.001} & \seedpm{0.903}{.002} & \seedpm{0.902}{.001} & \seedpm{0.902}{.001} & \seedpm{0.900}{.001} \\
+        precision $\uparrow$   & \seedpm{0.895}{.008} & \seedpm{0.892}{.009} & \seedpm{0.896}{.005} & \seedpm{0.899}{.005} & \seedpm{0.898}{.003} \\
+        count exact $\uparrow$ & \seedpm{0.908}{.007} & \seedpm{0.909}{.005} & \seedpm{0.910}{.004} & \seedpm{0.909}{.004} & \seedpm{0.908}{.002} \\
+        \addlinespace[2pt]
+        $\mu$ MAE $\downarrow$    & \seedpm{1.71}{.07} & \seedpm{1.72}{.06} & \seedpm{1.69}{.04} & \seedpm{1.65}{.02} & \seedpm{1.67}{.03} \\
+        $\sigma$ MAE $\downarrow$ & \seedpm{0.774}{.011} & \seedpm{0.778}{.011} & \seedpm{0.771}{.018} & \seedpm{0.754}{.007} & \seedpm{0.761}{.005} \\
+        $a$ MAE $\downarrow$      & \seedpm{0.182}{.004} & \seedpm{0.182}{.005} & \seedpm{0.182}{.003} & \seedpm{0.187}{.005} & \seedpm{0.184}{.004} \\
+        peak err mean $\downarrow$ & \seedpm{1.231}{.016} & \seedpm{1.216}{.008} & \seedpm{1.221}{.010} & \seedpm{1.213}{.007} & \seedpm{1.221}{.010} \\
         \bottomrule
-      \end{tabular}}
-      \par\vspace{4pt}
+      \end{tabular}
+      \par\vspace{3pt}
       \parbox{0.97\linewidth}{\tiny\color{soft} \textbf{runs}: dual UNet-skip trunks
       $\cdot$ set-pred $\cdot$ Hungarian $\cdot$ $K{=}2$ $\cdot$ presence A $\cdot$
-      hv flips; loss $=$ param-L1 $+\,0.5\,$cosine curve $+$ term at $w$ (column
-      $=$ each family's best-scoring weight); five seeded replicas, held-out test,
-      cells seed means. \textbf{bold} $=$ best in row; shading keys each block to its
-      like-coloured bullet. Detection / localisation rows all sit inside combined seed
-      noise. matched $=$ Hungarian pairing; $\mu$, $\sigma$ in elevation units, $a$ in
-      linear amplitude; peak err in elevation units.\par}
+      full norm ladder $\cdot$ hv flips $\cdot$ patch $64{\times}32$; loss $=$
+      param-L1 $+\,0.5\,$cosine curve $+$ term at $w$ (column $=$ each family's
+      best-scoring weight); five seeded replicas per arm, cells mean $\pm$ seed std;
+      held-out test, $5.0$\,M px. Curve MAE and three-axis SSIM are flat across the
+      five arms (MAE 0.0365--0.0370; SSIM elev/range/azim 0.9671--0.9675 /
+      0.9510--0.9521 / 0.9610--0.9616). \textbf{bold} $=$ best in row, marked only
+      where best and worst differ by more than $5\%$ --- only the pixel-$R^2$ tail
+      rows clear it; every other row sits inside combined seed noise. Shading keys
+      each block to its like-coloured bullet. recall / precision / count matched
+      (Hungarian pairing); pixel $R^2$ min in thousands (k); $\mu$, $\sigma$ and peak
+      err in elevation units, $a$ in linear amplitude; cos med: median per-pixel
+      cosine to the GT profile.\par}
     \end{column}
   \end{columns}
 \end{frame}

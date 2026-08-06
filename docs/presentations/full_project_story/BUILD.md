@@ -51,6 +51,18 @@ All builds run inside this directory (images resolve via `../../results/...`).
   copied verbatim after the Capon-cycle frame (pages 20-21) and the "Next steps"
   physics bullet now reads "the five ranked terms and the first single-term K=2
   sweep results on the next five frames; the Capon-cycle arm is still queued".
+  FOLLOW-UP same day (user: "you did not follow the table standards of the rest of
+  the presentation"): the verdict table was rebuilt to the standing standard --- 
+  \seedpm mean +- seed-std cells (\seedtag phyV), \scriptsize (never \tiny), metric
+  arrows, and the 5% bold gate: bold best-in-row only where best and worst differ by
+  more than 5%, which ONLY the three pixel-R2 tail rows clear (stated in the caption
+  --- it strengthens the tail-insurance story). Curve MAE + three-axis SSIM moved into
+  the caption as flat ranges (the 25aa pair-board precedent for flat metrics; keeps
+  the three-axis SSIM rule satisfied), cos med rounded to 3 decimals per 25aa.
+  Overfull fixes: columns 0.36/0.62 -> 0.33/0.65, tabcolsep 3pt -> 2pt. The sweep-grid
+  frame caption now uses the standard 5%-gate bold wording (its cells are grouped
+  scores --- a rank statistic with no seed spread, said explicitly). Short deck
+  re-synced with the corrected frames.
 
 - PATCH-SWEEP VERDICT REFRESHED ON THE STEP-8 THREE-SEED GRID 2026-08-06 (user:
   emailed "a updated version of the patch sweep experiment", ingested from the
