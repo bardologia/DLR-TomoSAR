@@ -38,11 +38,12 @@ class PatchSweepLossHeatmap:
         text  = (self.results_dir / "overview.md").read_text()
         cells = {}
 
-        for match in re.finditer(r"-p(\d{3})x(\d{3})`[^|]*\|\s*\d+\s*\|[^|]*\|[^|]*\|\s*([0-9.]+)\s*±\s*([0-9.e-]+)", text):
-            az, rg, mean, std = int(match.group(1)), int(match.group(2)), float(match.group(3)), float(match.group(4))
-            cells[(az, rg)]   = (mean, std)
+        for match in re.finditer(r"-p(\d{3})x(\d{3})`[^|]*\|\s*(\d+)\s*\|[^|]*\|[^|]*\|\s*([0-9.]+)\s*±\s*([0-9.e-]+)", text):
+            az, rg, seeds, mean, std = int(match.group(1)), int(match.group(2)), int(match.group(3)), float(match.group(4)), float(match.group(5))
+            cells[(az, rg)]          = (mean, std)
+            self.seed_count          = seeds
 
-        self.logger.info(f"parsed {len(cells)} cells: {sorted(cells)}")
+        self.logger.info(f"parsed {len(cells)} cells ({self.seed_count} seeds): {sorted(cells)}")
         return cells
 
     def tie_set(self, cells: dict) -> set:
@@ -64,12 +65,13 @@ class PatchSweepLossHeatmap:
         az_edges = np.array([az - step / 2 for az in az_values] + [az_values[-1] + step / 2])
         rg_edges = np.array([rg - step / 2 for rg in rg_values] + [rg_values[-1] + step / 2])
 
-        figure, axes = plt.subplots(figsize=(5.9, 3.55))
+        figure, axes = plt.subplots(figsize=(6.3, 4.35))
         mesh         = axes.pcolormesh(az_edges, rg_edges, grid, cmap=self.ramp, shading="flat", rasterized=True)
 
         threshold = grid.min() + 0.55 * (grid.max() - grid.min())
         ties      = self.tie_set(cells)
         best_key  = min(cells, key=lambda k: cells[k][0])
+        scale     = step / 16.0
 
         for (az, rg), (mean, std) in cells.items():
             color    = "white" if mean > threshold else self.ink
@@ -77,10 +79,10 @@ class PatchSweepLossHeatmap:
             coverage = 100.0 * shared / (self.reach_az * self.reach_rg)
             outside  = 100.0 * (1.0 - shared / (az * rg))
 
-            axes.annotate(f"{mean:.4f}", xy=(az, rg + 5.2), ha="center", va="center", color=color, fontsize=8.5)
-            axes.annotate(rf"$\pm${f'{std:.4f}'.lstrip('0')}", xy=(az, rg + 1.9), ha="center", va="center", color=color, fontsize=6.0, alpha=0.85)
-            axes.annotate(f"{coverage:.0f} % of reach", xy=(az, rg - 1.8), ha="center", va="center", color=color, fontsize=6.2, alpha=0.95)
-            axes.annotate(f"{outside:.0f} % outside", xy=(az, rg - 5.2), ha="center", va="center", color=color, fontsize=6.2, alpha=0.95)
+            axes.annotate(f"{mean:.4f}", xy=(az, rg + 5.2 * scale), ha="center", va="center", color=color, fontsize=6.4)
+            axes.annotate(rf"$\pm${f'{std:.4f}'.lstrip('0')}", xy=(az, rg + 1.9 * scale), ha="center", va="center", color=color, fontsize=4.6, alpha=0.85)
+            axes.annotate(f"{coverage:.0f} % of reach", xy=(az, rg - 1.8 * scale), ha="center", va="center", color=color, fontsize=4.8, alpha=0.95)
+            axes.annotate(f"{outside:.0f} % outside", xy=(az, rg - 5.2 * scale), ha="center", va="center", color=color, fontsize=4.8, alpha=0.95)
 
         for az, rg in ties:
             style = dict(fill=False, edgecolor=self.good, zorder=5)
@@ -89,7 +91,7 @@ class PatchSweepLossHeatmap:
             axes.add_patch(plt.Rectangle((az - step / 2, rg - step / 2), step, step, linewidth=width, linestyle=dash, **style))
 
         colorbar = figure.colorbar(mesh, ax=axes, pad=0.02)
-        colorbar.set_label("best validation loss (five-seed mean)", fontsize=9)
+        colorbar.set_label(f"best validation loss ({self.seed_count}-seed mean)", fontsize=9)
         colorbar.outline.set_linewidth(0.6)
         colorbar.ax.tick_params(width=0.6, labelsize=8)
 
@@ -121,4 +123,4 @@ class PatchSweepLossHeatmap:
 
 
 if __name__ == "__main__":
-    PatchSweepLossHeatmap(_repo / "results" / "Patch").build()
+    PatchSweepLossHeatmap(_repo / "results" / "K2" / "patch_sweep_k2_new").build()

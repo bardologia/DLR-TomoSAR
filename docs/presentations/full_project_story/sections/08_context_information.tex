@@ -432,7 +432,7 @@
 % ---------------------------------------------------------------- 24c Sweep verdict
 \begin{frame}{The verdict --- saturation at the reach, axis by axis}
   \centering
-  \includegraphics[width=0.56\linewidth]{../figures/K2/Patch/patch_sweep_loss_heatmap.png}
+  \includegraphics[width=0.52\linewidth]{../figures/K2/patch_sweep_k2_new/patch_sweep_loss_heatmap.png}
   \par\vspace{4pt}
   {\scriptsize
   \setlength{\tabcolsep}{6pt}
@@ -440,13 +440,13 @@
     \toprule
                  & registered  & observed \\
     \midrule
-    azimuth knee & $2w_a = 52$ & $\mathbf{48}$--$\mathbf{64}$, flat past $48$ \\
+    azimuth knee & $2w_a = 52$ & flat past $\mathbf{48}$ --- the step-8 grid brackets $52$ \\
     \addlinespace[2pt]
-    range knee   & $2w_r = 24$ & $\mathbf{32}$; $\le 0.002$ left to $48$ \\
+    range knee   & $2w_r = 24$ & $\mathbf{40}$; $\sim 0.003$ drift $24{\to}40$, $\le 0.0008$ past $40$ \\
     \bottomrule
   \end{tabular}}
   \par\vspace{4pt}
-  \parbox{0.82\textwidth}{\scriptsize\color{soft} \textbf{runs}: patch $W_a{\times}W_r$ $=$ cell, all else fixed (full input stack, $26{\times}12$ boxcar labels); five seeded replicas per cell, cell $=$ mean best val loss $\pm$ seed std. \textcolor{good}{Green} $=$ best cell, dashed $=$ inside its combined seed noise. \% of reach $=$ share of the centred $2w_a{\times}2w_r$ box ($52{\times}24$) the patch covers; \% outside $=$ share of the patch beyond that box. The residual range drift past its reach clears seed noise at some $W_a$ --- an order below the azimuth climb.\par}
+  \parbox{0.82\textwidth}{\scriptsize\color{soft} \textbf{runs}: patch $W_a{\times}W_r$ $=$ cell, all else fixed (full input stack, $26{\times}12$ boxcar labels); three seeded replicas per cell, cell $=$ mean best val loss $\pm$ seed std. \textcolor{good}{Green} $=$ best cell, dashed $=$ inside its combined seed noise. \% of reach $=$ share of the centred $2w_a{\times}2w_r$ box ($52{\times}24$) the patch covers; \% outside $=$ share of the patch beyond that box. The plateau is the reach corner ($W_a \ge 48$, $W_r \ge 32$); the residual range drift past $2w_r$ clears seed noise at $W_a \ge 48$ --- a third of the azimuth climb.\par}
 \end{frame}
 
 % ---------------------------------------------------------------- 24d The price of reach
