@@ -638,6 +638,7 @@ class NormalizationTrialPlanner:
         ("pass_mag",  ("pass_mag",)),
         ("ifg_phase", ("ifg_phase",)),
         ("out_amp",   ("out_amp",)),
+        ("out_mu",    ("out_mu",)),
         ("out_sigma", ("out_sigma",)),
     )
 

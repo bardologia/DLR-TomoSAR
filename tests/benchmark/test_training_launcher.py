@@ -281,13 +281,15 @@ def test_normalization_scheduler_plans_the_cumulative_ladder(tmp_path):
 
     plans = dict(scheduler.planner().plan())
 
-    assert list(plans) == ["nrm-0-initial", "nrm-1-pass_mag", "nrm-2-ifg_phase", "nrm-3-out_amp", "nrm-4-out_sigma"]
-    assert plans["nrm-0-initial"]["normalization.pass_mag"]    == "zscore_log1p"
+    assert list(plans) == ["nrm-0-initial", "nrm-1-pass_mag", "nrm-2-ifg_phase", "nrm-3-out_amp", "nrm-4-out_mu", "nrm-5-out_sigma"]
+    assert plans["nrm-0-initial"]["normalization.pass_mag"]    == "fixed_log1p"
+    assert plans["nrm-0-initial"]["normalization.ifg_phase"]   == "fixed_angle_01"
+    assert plans["nrm-0-initial"]["normalization.out_mu"]      == "fixed_bounds"
     assert plans["nrm-1-pass_mag"]["normalization.pass_mag"]   == "robust_iqr_log1p"
     assert plans["nrm-3-out_amp"]["normalization.out_amp"]     == "robust_iqr_log1p"
-    assert plans["nrm-3-out_amp"]["normalization.out_sigma"]   == "zscore"
-    assert plans["nrm-4-out_sigma"]["normalization.out_sigma"] == "robust_iqr_log1p"
-    assert all("normalization.out_mu" not in overrides for overrides in plans.values())
+    assert plans["nrm-3-out_amp"]["normalization.out_sigma"]   == "fixed_bounds"
+    assert plans["nrm-4-out_mu"]["normalization.out_mu"]       == "zscore"
+    assert plans["nrm-5-out_sigma"]["normalization.out_sigma"] == "robust_iqr_log1p"
 
 
 def test_scheduler_fans_out_one_gpu_job_per_trial_seed(tmp_path):

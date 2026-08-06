@@ -870,14 +870,14 @@ class ExperimentBuilder {
       },
       names     : (b, model) => b._augCells().map((cell) => `${model}_aug-${cell}`) },
 
-    { key: "normalization", label: "normalization", hint: "cumulative normalization ladder: pass amp, then ifg phase, then output amp, then output sigma switch from initial to final strategy",
+    { key: "normalization", label: "normalization", hint: "cumulative normalization ladder: pass amp, then ifg phase, then output amp, then output mu, then output sigma switch from the legacy-mode initial to the final strategy",
       at        : 10,
       el        : "normEl",
       available : (b) => b.normTrials.size > 0,
       make      : (b) => b._normalizationPanel(),
       paint     : (b) => b._paintNormalization(),
-      summary   : (b, gpus) => `baseline + 4 ladder rungs = 5 trials${b._seedsSuffix(5)}${gpus}`,
-      names     : (b, model) => ["nrm-0-initial", "nrm-1-pass_mag", "nrm-2-ifg_phase", "nrm-3-out_amp", "nrm-4-out_sigma"].map((rung) => `${model}_${rung}`) },
+      summary   : (b, gpus) => `baseline + 5 ladder rungs = 6 trials${b._seedsSuffix(6)}${gpus}`,
+      names     : (b, model) => ["nrm-0-initial", "nrm-1-pass_mag", "nrm-2-ifg_phase", "nrm-3-out_amp", "nrm-4-out_mu", "nrm-5-out_sigma"].map((rung) => `${model}_${rung}`) },
 
     { key: "routing", label: "trunk routing", hint: "one trial per params/existence channel-group assignment, both trunks fixed at the shared parity feature ladders",
       at        : 11,
@@ -904,13 +904,14 @@ class ExperimentBuilder {
       names     : (b, model) => Object.keys(b._ratioTrialsDict()).map((label) => `${model}_dr-${label}`) },
   ];
 
-  static NORM_PRESETS = ["min_max", "min_max_log1p", "robust_iqr", "robust_iqr_log1p", "fixed_div_pi", "zscore", "zscore_log1p"];
+  static NORM_PRESETS = ["min_max", "min_max_log1p", "robust_iqr", "robust_iqr_log1p", "fixed_div_pi", "zscore", "zscore_log1p", "fixed_log1p", "fixed_angle_01", "fixed_bounds"];
 
   static NORM_GROUPS = [
     { key: "pass_mag",  label: "pass amplitude",   step: 1 },
     { key: "ifg_phase", label: "ifg phase",        step: 2 },
     { key: "out_amp",   label: "output amplitude", step: 3 },
-    { key: "out_sigma", label: "output sigma",     step: 4 },
+    { key: "out_mu",    label: "output mu",        step: 4 },
+    { key: "out_sigma", label: "output sigma",     step: 5 },
   ];
 
   static HEAD_OPTIONS = [
@@ -2179,7 +2180,7 @@ class ExperimentBuilder {
 
     const note       = document.createElement("p");
     note.className   = "exp-secondary__note";
-    note.textContent = "Cumulative ladder from the all-initial baseline to the final strategies: rung 1 switches pass amplitude, rung 2 adds ifg phase, rung 3 adds output amplitude, rung 4 adds output sigma (out_mu keeps the base config throughout). Every rung sets all four channel strategies explicitly and repeats across the seeds list.";
+    note.textContent = "Cumulative ladder from the legacy-mode baseline to the final strategies: rung 1 switches pass amplitude, rung 2 adds ifg phase, rung 3 adds output amplitude, rung 4 adds output mu, rung 5 adds output sigma. Every rung sets all five channel strategies explicitly and repeats across the seeds list.";
 
     const grid     = document.createElement("div");
     grid.className = "exp-secondary__grid";

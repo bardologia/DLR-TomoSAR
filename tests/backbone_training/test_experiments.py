@@ -542,24 +542,25 @@ def test_normalization_planner_default_walks_the_ladder():
 
     plans = dict(planner.plan())
 
-    assert list(plans) == ["nrm-0-initial", "nrm-1-pass_mag", "nrm-2-ifg_phase", "nrm-3-out_amp", "nrm-4-out_sigma"]
-    assert planner.summary()["Total runs"] == 5
+    assert list(plans) == ["nrm-0-initial", "nrm-1-pass_mag", "nrm-2-ifg_phase", "nrm-3-out_amp", "nrm-4-out_mu", "nrm-5-out_sigma"]
+    assert planner.summary()["Total runs"] == 6
 
     expected = {
-        "nrm-0-initial"   : ("zscore_log1p",     "min_max",      "zscore",           "zscore"),
-        "nrm-1-pass_mag"  : ("robust_iqr_log1p", "min_max",      "zscore",           "zscore"),
-        "nrm-2-ifg_phase" : ("robust_iqr_log1p", "fixed_div_pi", "zscore",           "zscore"),
-        "nrm-3-out_amp"   : ("robust_iqr_log1p", "fixed_div_pi", "robust_iqr_log1p", "zscore"),
-        "nrm-4-out_sigma" : ("robust_iqr_log1p", "fixed_div_pi", "robust_iqr_log1p", "robust_iqr_log1p"),
+        "nrm-0-initial"   : ("fixed_log1p",      "fixed_angle_01", "fixed_bounds",     "fixed_bounds", "fixed_bounds"),
+        "nrm-1-pass_mag"  : ("robust_iqr_log1p", "fixed_angle_01", "fixed_bounds",     "fixed_bounds", "fixed_bounds"),
+        "nrm-2-ifg_phase" : ("robust_iqr_log1p", "fixed_div_pi",   "fixed_bounds",     "fixed_bounds", "fixed_bounds"),
+        "nrm-3-out_amp"   : ("robust_iqr_log1p", "fixed_div_pi",   "robust_iqr_log1p", "fixed_bounds", "fixed_bounds"),
+        "nrm-4-out_mu"    : ("robust_iqr_log1p", "fixed_div_pi",   "robust_iqr_log1p", "zscore",       "fixed_bounds"),
+        "nrm-5-out_sigma" : ("robust_iqr_log1p", "fixed_div_pi",   "robust_iqr_log1p", "zscore",       "robust_iqr_log1p"),
     }
-    for name, (pass_mag, ifg_phase, out_amp, out_sigma) in expected.items():
+    for name, (pass_mag, ifg_phase, out_amp, out_mu, out_sigma) in expected.items():
         assert plans[name] == {
             "normalization.pass_mag"  : pass_mag,
             "normalization.ifg_phase" : ifg_phase,
             "normalization.out_amp"   : out_amp,
+            "normalization.out_mu"    : out_mu,
             "normalization.out_sigma" : out_sigma,
         }
-        assert "normalization.out_mu" not in plans[name]
 
 
 def test_normalization_planner_paths_are_entry_config_leaves():
@@ -581,13 +582,16 @@ def test_normalization_planner_rejects_unknown_preset():
 
 def test_normalization_planner_rejects_noop_rung():
     with pytest.raises(ValueError, match="same configuration twice"):
-        NormalizationTrialPlanner(NormalizationTrialsConfig(final_pass_mag="zscore_log1p"), PRESET_NAMES)
+        NormalizationTrialPlanner(NormalizationTrialsConfig(final_pass_mag="fixed_log1p"), PRESET_NAMES)
 
     with pytest.raises(ValueError, match="same configuration twice"):
-        NormalizationTrialPlanner(NormalizationTrialsConfig(final_out_amp="zscore"), PRESET_NAMES)
+        NormalizationTrialPlanner(NormalizationTrialsConfig(final_out_amp="fixed_bounds"), PRESET_NAMES)
 
     with pytest.raises(ValueError, match="same configuration twice"):
-        NormalizationTrialPlanner(NormalizationTrialsConfig(final_out_sigma="zscore"), PRESET_NAMES)
+        NormalizationTrialPlanner(NormalizationTrialsConfig(final_out_mu="fixed_bounds"), PRESET_NAMES)
+
+    with pytest.raises(ValueError, match="same configuration twice"):
+        NormalizationTrialPlanner(NormalizationTrialsConfig(final_out_sigma="fixed_bounds"), PRESET_NAMES)
 
 
 def test_input_planner_rejects_empty_trials():

@@ -148,6 +148,14 @@ def test_legacy_mode_preset_pins_the_legacy_architecture():
     assert overrides["conv_bias"]         is True
 
 
+def test_normalization_ladder_starts_at_the_legacy_mode_preset():
+    preset = LaunchLayout.LEGACY_MODE["preset"]
+    trials = BackboneEntryConfig().normalization_trials
+
+    for norm_field in ("pass_mag", "ifg_phase", "out_amp", "out_mu", "out_sigma"):
+        assert getattr(trials, f"initial_{norm_field}") == preset[f"normalization.{norm_field}"]
+
+
 def test_legacy_mode_ships_with_the_backbone_training_layout():
     leaves = [{"path": path} for path, _value in ConfigCli._leaves(BackboneEntryConfig())]
     layout = LaunchLayout().build("train_backbone", leaves)
