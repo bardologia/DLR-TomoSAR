@@ -211,14 +211,55 @@ class ModelProbe:
             })
         return slots
 
-    def _predict_window(self, window: np.ndarray, cy: int, cx: int) -> tuple[list[dict], list[float]]:
+    def _predict_window(self, window: np.ndarray, cy: int, cx: int) -> tuple[list[dict], list[float], np.ndarray]:
         run      = self.loaded["run"]
         renderer = self.loaded["renderer"]
 
         params = run.model(window)
         curve  = renderer.render(params)[0, :, cy, cx]
+        center = np.asarray(params[0, :, cy, cx], dtype=np.float64)
 
-        return self._slots(params[0, :, cy, cx]), [float(v) for v in curve]
+        return self._slots(center), [float(v) for v in curve], center
+
+    def _match_gt(self, pred_center: np.ndarray, gt_center: np.ndarray) -> list[dict]:
+        import torch
+
+        from tools.loss.param_loss import ParamMatcher
+
+        n_k    = self.loaded["run"].n_gaussians
+        pred_t = torch.from_numpy(np.asarray(pred_center, dtype=np.float32)).reshape(1, n_k, 3, 1, 1)
+        gt_t   = torch.from_numpy(np.asarray(gt_center, dtype=np.float32)).reshape(1, n_k, 3, 1, 1)
+        idx_t  = torch.arange(n_k, dtype=torch.float32).reshape(1, n_k, 1, 1, 1).expand_as(pred_t)
+
+        matched_pred, matched_idx, sorted_gt, _ = ParamMatcher.match(pred_t, idx_t, gt_t, gt_t, method=ParamMatcher.HUNGARIAN)
+
+        amps  = np.asarray(gt_center[0::3], dtype=np.float64)
+        mus   = np.asarray(gt_center[1::3], dtype=np.float64)
+        order = np.argsort(np.where(amps > ParamMatcher.ACTIVE_AMP_THR, mus, np.inf), kind="stable")
+
+        matches = []
+        for j in range(n_k):
+            if float(sorted_gt[0, j, 0, 0, 0]) <= ParamMatcher.ACTIVE_AMP_THR:
+                continue
+            matches.append({
+                "gt_slot"   : int(order[j]),
+                "pred_slot" : int(matched_idx[0, j, 0, 0, 0]),
+                "d_amp"     : float(matched_pred[0, j, 0, 0, 0] - sorted_gt[0, j, 0, 0, 0]),
+                "d_mu"      : float(matched_pred[0, j, 1, 0, 0] - sorted_gt[0, j, 1, 0, 0]),
+                "d_sigma"   : float(matched_pred[0, j, 2, 0, 0] - sorted_gt[0, j, 2, 0, 0]),
+            })
+
+        return matches
+
+    def _fit_facts(self, curve: list, gt_curve: list | None, raw_curve: list, slots: list, gt_slots: list | None) -> dict:
+        pred = np.asarray(curve, dtype=np.float64)
+
+        return {
+            "curve_mse_raw" : float(((pred - np.asarray(raw_curve)) ** 2).mean()),
+            "curve_mse_gt"  : float(((pred - np.asarray(gt_curve)) ** 2).mean()) if gt_curve is not None else None,
+            "pred_active"   : sum(1 for slot in slots if slot["active"]),
+            "gt_active"     : sum(1 for slot in gt_slots if slot["active"]) if gt_slots is not None else None,
+        }
 
     def predict(self, body: dict) -> dict:
         with self.lock:
@@ -226,20 +267,22 @@ class ModelProbe:
                 return {"ok": False, "error": "no model loaded"}
 
             try:
-                az, rg           = int(body["az"]), int(body["rg"])
-                window, cy, cx   = self._window(az, rg)
-                slots, curve     = self._predict_window(window, cy, cx)
+                az, rg                = int(body["az"]), int(body["rg"])
+                window, cy, cx        = self._window(az, rg)
+                slots, curve, center  = self._predict_window(window, cy, cx)
 
                 run      = self.loaded["run"]
                 renderer = self.loaded["renderer"]
 
                 gt_curve  = None
                 gt_slots  = None
+                matches   = None
                 gt_params = run.dataset.gt_parameters
                 if gt_params is not None:
-                    center    = np.asarray(gt_params[:, az, rg], dtype=np.float64)
-                    gt_slots  = self._slots(center)
-                    gt_curve  = [float(v) for v in renderer.render(center.reshape(1, -1, 1, 1))[0, :, 0, 0]]
+                    gt_center = np.asarray(gt_params[:, az, rg], dtype=np.float64)
+                    gt_slots  = self._slots(gt_center)
+                    gt_curve  = [float(v) for v in renderer.render(gt_center.reshape(1, -1, 1, 1))[0, :, 0, 0]]
+                    matches   = self._match_gt(center, gt_center)
 
                 raw_curve = [float(v) for v in run.full_curves[:, az, rg]]
 
@@ -253,6 +296,8 @@ class ModelProbe:
                     "gt_slots"  : gt_slots,
                     "gt_curve"  : gt_curve,
                     "raw_curve" : raw_curve,
+                    "matches"   : matches,
+                    "fit"       : self._fit_facts(curve, gt_curve, raw_curve, slots, gt_slots),
                 }
             except (ValueError, KeyError) as error:
                 return {"ok": False, "error": str(error)}
@@ -347,10 +392,10 @@ class ModelProbe:
                 az, rg         = int(body["az"]), int(body["rg"])
                 window, cy, cx = self._window(az, rg)
 
-                base_slots, base_curve = self._predict_window(window, cy, cx)
+                base_slots, base_curve, _ = self._predict_window(window, cy, cx)
 
-                perturbed                          = self._perturb(window, body.get("perturbation", {}))
-                perturbed_slots, perturbed_curve   = self._predict_window(perturbed, cy, cx)
+                perturbed                             = self._perturb(window, body.get("perturbation", {}))
+                perturbed_slots, perturbed_curve, _   = self._predict_window(perturbed, cy, cx)
 
                 base      = np.asarray(base_curve)
                 shifted   = np.asarray(perturbed_curve)

@@ -93,6 +93,9 @@ class MicroscopeView {
               </div>
               <canvas id="probe-profile" width="640" height="240"></canvas>
               <table class="ms-slots" id="probe-slots"></table>
+              <p class="ms-wifacts" id="probe-fit"></p>
+              <p class="ms-card__note ms-witablenote" id="probe-match-note" hidden>ground-truth scatterers and their hungarian-matched predictions &mdash; red marks a miss beyond 0.1 amp or 0.5 m</p>
+              <table class="ms-slots" id="probe-match"></table>
             </section>
 
             <section class="ms-card">
@@ -183,6 +186,9 @@ class MicroscopeView {
       cards      : this.root.querySelector("#probe-cards"),
       profile    : this.root.querySelector("#probe-profile"),
       slots      : this.root.querySelector("#probe-slots"),
+      fit        : this.root.querySelector("#probe-fit"),
+      matchNote  : this.root.querySelector("#probe-match-note"),
+      match      : this.root.querySelector("#probe-match"),
       attribNote : this.root.querySelector("#probe-attrib-note"),
       attribSlots: this.root.querySelector("#probe-attrib-slots"),
       bars       : this.root.querySelector("#probe-bars"),
@@ -521,6 +527,8 @@ class MicroscopeView {
 
     this._renderProfile(out);
     this._renderSlots(out);
+    this._renderFit(out);
+    this._renderMatches(out);
     this._renderAttribSlotChips();
     this._loadAttribution();
     this._loadFeatures();
@@ -560,6 +568,45 @@ class MicroscopeView {
     const gt   = (out.gt_slots || []).filter((s) => s.active).map((s) => this._slotRow(s, `GT ${s.slot}`, "ms-slots__gt", "truth"));
 
     this.refs.slots.innerHTML = `${head}<tbody>${pred.join("")}${gt.join("")}</tbody>`;
+  }
+
+  _renderFit(out) {
+    if (!out.fit) {
+      this.refs.fit.innerHTML = "";
+      return;
+    }
+
+    const parts = [];
+    if (out.fit.curve_mse_gt !== null) parts.push(`curve MSE vs GT <b>${out.fit.curve_mse_gt.toExponential(3)}</b>`);
+    parts.push(`curve MSE vs raw tomogram <b>${out.fit.curve_mse_raw.toExponential(3)}</b>`);
+
+    const active = out.fit.gt_active === null
+      ? `${out.fit.pred_active}/${this.info.n_gaussians} predicted slots active (no ground truth on this split)`
+      : `${out.fit.pred_active}/${this.info.n_gaussians} predicted slots active vs ${out.fit.gt_active} in the ground truth`;
+
+    this.refs.fit.innerHTML = `${parts.join(" &middot; ")} &middot; ${active}`;
+  }
+
+  _renderMatches(out) {
+    const rows = out.matches || [];
+    this.refs.matchNote.hidden = !rows.length;
+
+    if (!rows.length) {
+      this.refs.match.innerHTML = "";
+      return;
+    }
+
+    const head = `<thead><tr><th class="ms-slots__key">GT SLOT</th><th>PRED SLOT</th><th>&Delta; AMP</th><th>&Delta; &mu; [m]</th><th>&Delta; &sigma; [m]</th></tr></thead>`;
+    const body = rows.map((m) => {
+      const cells = [["d_amp", 3, 0.1], ["d_mu", 2, 0.5], ["d_sigma", 2, 0.5]].map(([key, digits, eps]) => {
+        const missed = Math.abs(m[key]) > eps;
+        const signed = `${m[key] >= 0 ? "+" : ""}${m[key].toFixed(digits)}`;
+        return `<td><span class="ms-shift${missed ? " is-moved" : ""}">${signed}</span></td>`;
+      }).join("");
+      return `<tr><td class="ms-slots__key">GT ${m.gt_slot}</td><td>${m.pred_slot}</td>${cells}</tr>`;
+    });
+
+    this.refs.match.innerHTML = `${head}<tbody>${body.join("")}</tbody>`;
   }
 
   _renderAttribSlotChips() {

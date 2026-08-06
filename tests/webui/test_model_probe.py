@@ -55,7 +55,7 @@ class _Wrapper:
             return self.module(torch.as_tensor(np.asarray(x, dtype=np.float32))).numpy()
 
 
-def _probe(n_slots: int = 1) -> ModelProbe:
+def _probe(n_slots: int = 1, with_gt: bool = True) -> ModelProbe:
     probe = ModelProbe(SilentLogger())
 
     rng            = np.random.default_rng(0)
@@ -69,7 +69,7 @@ def _probe(n_slots: int = 1) -> ModelProbe:
 
     dataset = SimpleNamespace(
         dem             = None,
-        gt_parameters   = gt_params,
+        gt_parameters   = gt_params if with_gt else None,
         assemble_window = lambda window, dem: np.abs(window).astype(np.float32),
     )
 
@@ -107,6 +107,43 @@ def test_predict_returns_slots_curves_and_references():
     assert len(result["gt_curve"])  == N_ELEV
     assert result["gt_slots"][0]["mu"] == pytest.approx(20.0)
     assert len(result["raw_curve"]) == N_ELEV
+
+
+def test_predict_reports_fit_and_hungarian_matches():
+    result = _probe().predict({"az": 10, "rg": 8})
+
+    fit = result["fit"]
+    assert fit["curve_mse_gt"]  > 0.0
+    assert fit["curve_mse_raw"] > 0.0
+    assert fit["pred_active"] == 1
+    assert fit["gt_active"]   == 1
+
+    match = result["matches"]
+    assert len(match) == 1
+    assert match[0]["gt_slot"]   == 0
+    assert match[0]["pred_slot"] == 0
+    assert match[0]["d_amp"]   == pytest.approx(result["slots"][0]["amp"] - 1.5, abs=1e-5)
+    assert match[0]["d_mu"]    == pytest.approx(result["slots"][0]["mu"] - 20.0, abs=1e-4)
+    assert match[0]["d_sigma"] == pytest.approx(-1.0, abs=1e-5)
+
+
+def test_predict_matches_cover_every_active_gt_slot():
+    result = _probe(n_slots=2).predict({"az": 10, "rg": 8})
+
+    match = result["matches"]
+    assert [m["gt_slot"] for m in match]        == [0, 1]
+    assert sorted(m["pred_slot"] for m in match) == [0, 1]
+
+
+def test_predict_without_gt_omits_matches_and_gt_fit():
+    result = _probe(with_gt=False).predict({"az": 10, "rg": 8})
+
+    assert result["ok"] is True
+    assert result["gt_curve"] is None
+    assert result["gt_slots"] is None
+    assert result["matches"]  is None
+    assert result["fit"]["curve_mse_gt"] is None
+    assert result["fit"]["gt_active"]    is None
 
 
 def test_predict_outside_region_fails():
