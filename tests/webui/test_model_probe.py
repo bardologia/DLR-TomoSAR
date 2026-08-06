@@ -160,6 +160,43 @@ def test_predict_without_loaded_model_fails():
     assert probe.attribution({"az": 0, "rg": 0})["ok"] is False
 
 
+def test_fields_returns_per_slot_maps_and_overviews():
+    result = _probe().fields({"az": 10, "rg": 8})
+
+    assert result["ok"]     is True
+    assert result["center"] == [4, 4]
+    assert result["patch"]  == [PH, PW]
+    assert len(result["slots"]) == 1
+
+    slot = result["slots"][0]
+    assert slot["active"] is True
+    assert [f["family"] for f in slot["families"]] == ["amp", "mu", "sigma"]
+
+    amp = slot["families"][0]
+    assert base64.b64decode(amp["png"])[:8] == b"\x89PNG\r\n\x1a\n"
+    assert amp["min"] >= 1.5
+    assert amp["max"] <= 2.5
+
+    sigma = slot["families"][2]
+    assert sigma["min"] == pytest.approx(3.0)
+    assert sigma["max"] == pytest.approx(3.0)
+
+    assert result["activity"]["min"] == pytest.approx(1.0)
+    assert result["activity"]["max"] == pytest.approx(1.0)
+    assert result["error"]["max"] > 0.0
+
+
+def test_fields_without_gt_has_no_error_map():
+    result = _probe(with_gt=False).fields({"az": 10, "rg": 8})
+
+    assert result["ok"]    is True
+    assert result["error"] is None
+
+
+def test_fields_without_loaded_model_fails():
+    assert ModelProbe(SilentLogger()).fields({"az": 0, "rg": 0})["ok"] is False
+
+
 def test_attribution_concentrates_on_the_used_channel():
     result = _probe().attribution({"az": 10, "rg": 8})
 

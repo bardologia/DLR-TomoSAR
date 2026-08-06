@@ -25,6 +25,9 @@ class MicroscopeView {
     this.attrib      = null;
     this.attribSlot  = -1;
     this.gridChannel = -1;
+    this.fieldsData  = null;
+    this.fieldsSlot  = 0;
+    this.fieldsToken = 0;
     this.wi          = { kind: "drop_channel", channel: 0, factor: 0.5, sigma: 0.5, seed: 0 };
     this.wiTimer     = null;
   }
@@ -96,6 +99,19 @@ class MicroscopeView {
               <p class="ms-wifacts" id="probe-fit"></p>
               <p class="ms-card__note ms-witablenote" id="probe-match-note" hidden>ground-truth scatterers and their hungarian-matched predictions &mdash; red marks a miss beyond 0.1 amp or 0.5 m</p>
               <table class="ms-slots" id="probe-match"></table>
+            </section>
+
+            <section class="ms-card">
+              <div class="ms-card__head">
+                <h3 class="cube-panel-title">Local parameter fields</h3>
+                <span class="ms-card__note">one forward pass over the input window &mdash; how each parameter behaves in the pixel's neighbourhood</span>
+              </div>
+              <div class="ms-ctlrow">
+                <span class="ms-ctlrow__label">scatterer</span>
+                <div class="ms-chiprow" id="probe-fields-slots"></div>
+              </div>
+              <div class="ms-fieldrow" id="probe-fields-maps"></div>
+              <div class="ms-fieldrow" id="probe-fields-overview"></div>
             </section>
 
             <section class="ms-card">
@@ -189,6 +205,9 @@ class MicroscopeView {
       fit        : this.root.querySelector("#probe-fit"),
       matchNote  : this.root.querySelector("#probe-match-note"),
       match      : this.root.querySelector("#probe-match"),
+      fieldSlots : this.root.querySelector("#probe-fields-slots"),
+      fieldMaps  : this.root.querySelector("#probe-fields-maps"),
+      fieldOver  : this.root.querySelector("#probe-fields-overview"),
       attribNote : this.root.querySelector("#probe-attrib-note"),
       attribSlots: this.root.querySelector("#probe-attrib-slots"),
       bars       : this.root.querySelector("#probe-bars"),
@@ -350,6 +369,8 @@ class MicroscopeView {
     this.attrib      = null;
     this.attribSlot  = -1;
     this.gridChannel = -1;
+    this.fieldsData  = null;
+    this.fieldsSlot  = 0;
     this.wi.channel  = 0;
     this.wi.seed     = 0;
 
@@ -531,6 +552,7 @@ class MicroscopeView {
     this._renderMatches(out);
     this._renderAttribSlotChips();
     this._loadAttribution();
+    this._loadFields();
     this._loadFeatures();
     this._runWhatIf();
   }
@@ -691,10 +713,9 @@ class MicroscopeView {
     });
   }
 
-  _cellDot() {
-    const [ph, pw] = this.attrib.patch;
-    const left     = (((this.attrib.center[1] + 0.5) / pw) * 100).toFixed(1);
-    const top      = (((this.attrib.center[0] + 0.5) / ph) * 100).toFixed(1);
+  _dot(center, patch) {
+    const left = (((center[1] + 0.5) / patch[1]) * 100).toFixed(1);
+    const top  = (((center[0] + 0.5) / patch[0]) * 100).toFixed(1);
     return `<i class="ms-cell__dot" style="left:${left}%;top:${top}%"></i>`;
   }
 
@@ -708,7 +729,7 @@ class MicroscopeView {
     const img = `
       <span class="ms-cell__frame">
         <img src="data:image/png;base64,${cell}" alt="${this._esc(`${family} sensitivity to ${label}`)}" />
-        ${this._cellDot()}
+        ${this._dot(this.attrib.center, this.attrib.patch)}
       </span>`;
     return head
       ? `<figure class="ms-cell">${cap}${img}</figure>`
@@ -740,6 +761,82 @@ class MicroscopeView {
     });
 
     this.refs.grid.innerHTML = cells.join("");
+  }
+
+  _fmtVal(v) {
+    if (v === 0) return "0";
+    const abs = Math.abs(v);
+    return abs >= 1e4 || abs < 1e-2 ? v.toExponential(1) : Number(v.toPrecision(3)).toString();
+  }
+
+  async _loadFields() {
+    const token = ++this.fieldsToken;
+
+    this.refs.fieldSlots.innerHTML = "";
+    this.refs.fieldOver.innerHTML  = "";
+    this.refs.fieldMaps.innerHTML  = `<p class="cube-hint is-loading">computing parameter fields&hellip;</p>`;
+
+    const out = await window.apiPost("/api/probe/fields", { az: this.pixel.az, rg: this.pixel.rg });
+    if (token !== this.fieldsToken) return;
+
+    if (!out.ok) {
+      this.fieldsData = null;
+      this.refs.fieldMaps.innerHTML = `<p class="cube-hint">${this._esc(out.error)}</p>`;
+      return;
+    }
+
+    this.fieldsData   = out;
+    const firstActive = out.slots.find((s) => s.active);
+    this.fieldsSlot   = firstActive ? firstActive.slot : 0;
+
+    this._renderFieldsChips();
+    this._renderFieldsMaps();
+  }
+
+  _renderFieldsChips() {
+    this.refs.fieldSlots.innerHTML = "";
+
+    const pick = (slot) => () => {
+      if (slot === this.fieldsSlot) return;
+      this.fieldsSlot = slot;
+      this._renderFieldsChips();
+      this._renderFieldsMaps();
+    };
+
+    this.fieldsData.slots.forEach((slot) => {
+      const predicted = (this.lastPredict && this.lastPredict.slots[slot.slot]) || null;
+      const mu        = predicted ? ` · μ ${predicted.mu.toFixed(1)} m` : "";
+      const chip      = this._chip(`slot ${slot.slot}${mu}${slot.active ? "" : " · off"}`, this.fieldsSlot === slot.slot, pick(slot.slot));
+      if (!slot.active) chip.classList.add("is-off");
+      this.refs.fieldSlots.appendChild(chip);
+    });
+  }
+
+  _fieldFigure(payload, title, rangeText) {
+    const range = rangeText || `${this._fmtVal(payload.min)} &rarr; ${this._fmtVal(payload.max)}`;
+    return `
+      <figure class="ms-field">
+        <span class="ms-cell__frame">
+          <img src="data:image/png;base64,${payload.png}" alt="${this._esc(title)}" />
+          ${this._dot(this.fieldsData.center, this.fieldsData.patch)}
+        </span>
+        <figcaption>${title} &middot; ${range}</figcaption>
+      </figure>`;
+  }
+
+  _renderFieldsMaps() {
+    const out  = this.fieldsData;
+    const slot = out.slots.find((s) => s.slot === this.fieldsSlot) || out.slots[0];
+
+    this.refs.fieldMaps.innerHTML = slot.families.map((f) =>
+      this._fieldFigure(f, `${MicroscopeView.FAMILY_LABELS[f.family]}${f.family === "amp" ? "" : " [m]"}`)
+    ).join("");
+
+    const over = [this._fieldFigure(out.activity, "active scatterers", `${this._fmtVal(out.activity.min)} &rarr; ${this._fmtVal(out.activity.max)} of ${this.info.n_gaussians}`)];
+    if (out.error) over.push(this._fieldFigure(out.error, "curve MSE vs GT"));
+    else over.push(`<p class="ms-ctlrow__na">no ground truth on this split &mdash; the local error map needs GT parameters</p>`);
+
+    this.refs.fieldOver.innerHTML = over.join("");
   }
 
   _loadFeatures() {

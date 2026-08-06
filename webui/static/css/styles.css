@@ -4224,6 +4224,12 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 }
 .ms-cellhead i { flex: 0 0 auto; width: 10px; height: 10px; }
 
+.ms-fieldrow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 20px; padding-top: 6px; }
+.ms-fieldrow:empty { display: none; }
+.ms-field { margin: 0; flex: 0 1 220px; min-width: 150px; }
+.ms-field figcaption { font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); text-align: center; margin-top: 5px; }
+.ms-fieldrow .ms-ctlrow__na { align-self: center; max-width: 320px; }
+
 .ms-arch { display: flex; align-items: stretch; overflow-x: auto; padding: 4px 2px 12px; }
 .ms-arch__block {
   position: relative; flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 3px;

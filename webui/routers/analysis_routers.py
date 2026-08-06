@@ -60,6 +60,7 @@ class ProbeRouter(SubRouter):
         table.add("GET",  "/api/probe/features", self.features)
         table.add("POST", "/api/probe/load",        self.load)
         table.add("POST", "/api/probe/predict",     self.predict)
+        table.add("POST", "/api/probe/fields",      self.fields)
         table.add("POST", "/api/probe/attribution", self.attribution)
         table.add("POST", "/api/probe/whatif",      self.whatif)
 
@@ -84,6 +85,9 @@ class ProbeRouter(SubRouter):
 
     def predict(self, exchange: HttpExchange) -> None:
         exchange.send_result(self.probe.predict(exchange.body))
+
+    def fields(self, exchange: HttpExchange) -> None:
+        exchange.send_result(self.probe.fields(exchange.body))
 
     def attribution(self, exchange: HttpExchange) -> None:
         exchange.send_result(self.probe.attribution(exchange.body))

@@ -22,6 +22,7 @@ from pipelines.shared.inference.run_classifier import RunArtifacts
 class ModelProbe:
 
     FAMILIES        = ("amp", "mu", "sigma")
+    FIELD_CMAPS     = {"amp": "magma", "mu": "viridis", "sigma": "cividis"}
     PERTURBATIONS   = ("drop_channel", "scale_channel", "noise")
     CONTAINER_TYPES = ("ModuleList", "ModuleDict", "Sequential")
     LOADER_NAME     = "model_probe"
@@ -298,6 +299,75 @@ class ModelProbe:
                     "raw_curve" : raw_curve,
                     "matches"   : matches,
                     "fit"       : self._fit_facts(curve, gt_curve, raw_curve, slots, gt_slots),
+                }
+            except (ValueError, KeyError) as error:
+                return {"ok": False, "error": str(error)}
+
+    def _field_png(self, cell: np.ndarray, cmap: str, vmin: float, vmax: float) -> str:
+        buf = io.BytesIO()
+        plt.imsave(buf, np.asarray(cell, dtype=np.float32), cmap=cmap, vmin=vmin, vmax=vmax, format="png")
+        return base64.b64encode(buf.getvalue()).decode("ascii")
+
+    def _field_payload(self, cell: np.ndarray, cmap: str, vmin: float | None = None, vmax: float | None = None) -> dict:
+        lo = float(cell.min()) if vmin is None else float(vmin)
+        hi = float(cell.max()) if vmax is None else float(vmax)
+        hi = hi if hi > lo else lo + 1.0
+
+        return {"png": self._field_png(cell, cmap, lo, hi), "min": float(cell.min()), "max": float(cell.max())}
+
+    def _error_map(self, params: np.ndarray, az: int, rg: int, cy: int, cx: int) -> np.ndarray | None:
+        run = self.loaded["run"]
+        gt  = run.dataset.gt_parameters
+        if gt is None:
+            return None
+
+        ph, pw    = params.shape[2], params.shape[3]
+        top, left = az - cy, rg - cx
+        gt_window = np.asarray(gt[:, top:top + ph, left:left + pw], dtype=np.float32)[None]
+
+        renderer    = self.loaded["renderer"]
+        pred_curves = renderer.render(params)
+        gt_curves   = renderer.render(gt_window)
+
+        return ((pred_curves - gt_curves) ** 2).mean(axis=1)[0]
+
+    def fields(self, body: dict) -> dict:
+        from tools.loss.param_loss import ParamMatcher
+
+        with self.lock:
+            if self.loaded is None:
+                return {"ok": False, "error": "no model loaded"}
+
+            try:
+                az, rg         = int(body["az"]), int(body["rg"])
+                window, cy, cx = self._window(az, rg)
+
+                run    = self.loaded["run"]
+                params = run.model(window)
+                n_k    = run.n_gaussians
+
+                slots = []
+                for k in range(n_k):
+                    families = [
+                        {"family": family, **self._field_payload(params[0, 3 * k + offset], self.FIELD_CMAPS[family])}
+                        for offset, family in enumerate(self.FAMILIES)
+                    ]
+                    slots.append({
+                        "slot"     : k,
+                        "active"   : bool(ParamMatcher.is_active(float(params[0, 3 * k, cy, cx]))),
+                        "families" : families,
+                    })
+
+                activity  = ParamMatcher.is_active(params[0, 0::3]).sum(axis=0).astype(np.float32)
+                error_map = self._error_map(params, az, rg, cy, cx)
+
+                return {
+                    "ok"       : True,
+                    "center"   : [cy, cx],
+                    "patch"    : [int(params.shape[2]), int(params.shape[3])],
+                    "slots"    : slots,
+                    "activity" : self._field_payload(activity, "viridis", vmin=0.0, vmax=float(n_k)),
+                    "error"    : self._field_payload(error_map, "inferno") if error_map is not None else None,
                 }
             except (ValueError, KeyError) as error:
                 return {"ok": False, "error": str(error)}
