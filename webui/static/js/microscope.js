@@ -33,6 +33,8 @@ class MicroscopeView {
     this.fieldsToken = 0;
     this.sweepData   = null;
     this.sweepToken  = 0;
+    this.vitalsData  = null;
+    this.vitalsToken = 0;
     this.wi          = { kind: "drop_channel", channel: 0, factor: 0.5, sigma: 0.5, seed: 0 };
     this.wiTimer     = null;
   }
@@ -169,6 +171,12 @@ class MicroscopeView {
               <div class="ms-arch" id="probe-arch" aria-label="Model blocks in forward order"></div>
               <div class="ms-arch__layers" id="probe-arch-layers"></div>
               <div class="ms-feat"><img id="probe-features" alt="Feature maps" hidden /></div>
+              <div class="ms-subhead">
+                <h4 class="cube-panel-title">Layer vitals</h4>
+                <span class="ms-card__note">one hooked forward pass at the probed window &mdash; click a row to open that layer's feature maps</span>
+              </div>
+              <p class="ms-wifacts" id="probe-vitals-summary"></p>
+              <div class="ms-vitals"><table class="ms-slots ms-vitals__table" id="probe-vitals"></table></div>
             </section>
 
             <section class="ms-card">
@@ -254,6 +262,8 @@ class MicroscopeView {
       archLayers : this.root.querySelector("#probe-arch-layers"),
       features   : this.root.querySelector("#probe-features"),
       featNote   : this.root.querySelector("#probe-feat-note"),
+      vitalsSum  : this.root.querySelector("#probe-vitals-summary"),
+      vitals     : this.root.querySelector("#probe-vitals"),
       wKind      : this.root.querySelector("#probe-whatif-kind"),
       wDesc      : this.root.querySelector("#probe-whatif-desc"),
       wChRow     : this.root.querySelector("#probe-whatif-chrow"),
@@ -412,6 +422,7 @@ class MicroscopeView {
     this.fieldsData  = null;
     this.fieldsSlot  = 0;
     this.sweepData   = null;
+    this.vitalsData  = null;
     this.wi.channel  = 0;
     this.wi.seed     = 0;
 
@@ -516,6 +527,7 @@ class MicroscopeView {
         this._renderArchLayers();
         this._noteFeatureLayer();
         this._loadFeatures();
+        this._renderVitals();
       });
       this.refs.arch.appendChild(btn);
     });
@@ -539,6 +551,7 @@ class MicroscopeView {
         this._renderArchLayers();
         this._noteFeatureLayer();
         this._loadFeatures();
+        this._renderVitals();
       });
       this.refs.archLayers.appendChild(chip);
     });
@@ -598,6 +611,7 @@ class MicroscopeView {
     this._loadFields();
     this._loadFlips();
     this._loadFeatures();
+    this._loadVitals();
     this._runWhatIf();
   }
 
@@ -974,6 +988,73 @@ class MicroscopeView {
   _loadFeatures() {
     if (!this.pixel || !this.layer) return;
     this.refs.features.src = `/api/probe/features?az=${this.pixel.az}&rg=${this.pixel.rg}&layer=${encodeURIComponent(this.layer)}&t=${Date.now()}`;
+  }
+
+  async _loadVitals() {
+    const token = ++this.vitalsToken;
+
+    this.refs.vitalsSum.innerHTML = `<span class="cube-hint is-loading">recording activation statistics&hellip;</span>`;
+    this.refs.vitals.innerHTML    = "";
+
+    const out = await window.apiPost("/api/probe/vitals", { az: this.pixel.az, rg: this.pixel.rg });
+    if (token !== this.vitalsToken) return;
+
+    if (!out.ok) {
+      this.refs.vitalsSum.innerHTML = this._esc(out.error);
+      return;
+    }
+
+    this.vitalsData = out;
+    this._renderVitals();
+  }
+
+  _renderVitals() {
+    const out = this.vitalsData;
+    if (!out) return;
+
+    const s       = out.summary;
+    const flagged = s.flagged ? `<b>${s.flagged} flagged</b> (nonfinite, mostly zero, or &gt;25% dead channels)` : "none flagged";
+    this.refs.vitalsSum.innerHTML = `${s.n_layers} live layers &middot; ${s.total_params.toLocaleString("en-US")} parameters &middot; ${flagged}`;
+
+    const head = `<thead><tr>
+      <th>#</th><th class="ms-slots__key">LAYER</th><th class="ms-vitals__type">TYPE</th><th>OUT</th><th>PARAMS</th>
+      <th>ZERO %</th><th>DEAD CH</th><th>EFF CH %</th><th>MAX |ACT|</th><th class="ms-vitals__flags">FLAGS</th>
+    </tr></thead>`;
+
+    const rows = out.entries.map((e, index) => {
+      const dead    = e.dead === null ? "&ndash;" : `${e.dead}/${e.channels}`;
+      const eff     = e.eff_frac === null ? "&ndash;" : (e.eff_frac * 100).toFixed(0);
+      const classes = [e.flags.length ? "is-flagged" : "", e.name === this.layer ? "is-current" : ""].filter(Boolean).join(" ");
+      return `
+        <tr class="${classes}" data-layer="${this._esc(e.name)}">
+          <td>${index + 1}</td>
+          <td class="ms-slots__key" title="${this._esc(e.name)}">${this._esc(e.name)}</td>
+          <td class="ms-vitals__type">${this._esc(e.type)}</td>
+          <td>${(e.shape || []).join("&times;")}</td>
+          <td>${e.params.toLocaleString("en-US")}</td>
+          <td>${(e.zero_frac * 100).toFixed(1)}</td>
+          <td>${dead}</td>
+          <td>${eff}</td>
+          <td>${this._fmtVal(e.max_abs)}</td>
+          <td class="ms-vitals__flags">${this._esc(e.flags.join(", "))}</td>
+        </tr>`;
+    });
+
+    this.refs.vitals.innerHTML = `${head}<tbody>${rows.join("")}</tbody>`;
+
+    this.refs.vitals.querySelectorAll("tr[data-layer]").forEach((row) => {
+      row.addEventListener("click", () => {
+        const name = row.dataset.layer;
+        if (!(name in this.layerTypes)) return;
+        this.block = this._blockKey(name);
+        this.layer = name;
+        this._renderArch();
+        this._renderArchLayers();
+        this._noteFeatureLayer();
+        this._loadFeatures();
+        this._renderVitals();
+      });
+    });
   }
 
   _renderWhatIfSummary() {

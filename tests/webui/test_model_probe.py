@@ -400,6 +400,44 @@ def test_whatif_unknown_perturbation_fails():
     assert "unknown perturbation" in result["error"]
 
 
+class _TinyConvModel(torch.nn.Module):
+    def __init__(self) -> None:
+        super().__init__()
+        torch.manual_seed(0)
+        self.conv = torch.nn.Conv2d(2, 8, 3, padding=1)
+        self.act  = torch.nn.ReLU()
+        self.head = torch.nn.Conv2d(8, 3, 1)
+
+    def forward(self, x):
+        return self.head(self.act(self.conv(x)))
+
+
+def test_vitals_reports_layers_in_forward_order_with_params_and_flags():
+    probe = _probe()
+    probe.loaded["run"].model = _Wrapper(_TinyConvModel())
+
+    result = probe.vitals({"az": 10, "rg": 8})
+
+    assert result["ok"] is True
+    assert [e["name"] for e in result["entries"]] == ["conv", "act", "head"]
+    assert [e["type"] for e in result["entries"]] == ["Conv2d", "ReLU", "Conv2d"]
+    assert [e["params"] for e in result["entries"]] == [152, 0, 27]
+    assert result["entries"][0]["shape"] == [8, PH, PW]
+
+    summary = result["summary"]
+    assert summary["n_layers"]     == 3
+    assert summary["total_params"] == 179
+    assert 0 <= summary["flagged"] <= 3
+
+    for entry in result["entries"]:
+        assert 0.0 <= entry["zero_frac"] <= 1.0
+        assert isinstance(entry["flags"], list)
+
+
+def test_vitals_without_loaded_model_fails():
+    assert ModelProbe(SilentLogger()).vitals({"az": 0, "rg": 0})["ok"] is False
+
+
 class _WithContainer(torch.nn.Module):
     def __init__(self) -> None:
         super().__init__()

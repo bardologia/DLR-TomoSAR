@@ -67,6 +67,7 @@ class ProbeRouter(SubRouter):
         table.add("POST", "/api/probe/flips",       self.flips)
         table.add("POST", "/api/probe/whatif",      self.whatif)
         table.add("POST", "/api/probe/sweep",       self.sweep)
+        table.add("POST", "/api/probe/vitals",      self.vitals)
 
     def runs(self, exchange: HttpExchange) -> None:
         exchange.send_result(self.probe.runs(exchange.text("base")))
@@ -110,6 +111,9 @@ class ProbeRouter(SubRouter):
 
     def sweep(self, exchange: HttpExchange) -> None:
         exchange.send_result(self.probe.sweep(exchange.body))
+
+    def vitals(self, exchange: HttpExchange) -> None:
+        exchange.send_result(self.probe.vitals(exchange.body))
 
 
 class TriageRouter(SubRouter):

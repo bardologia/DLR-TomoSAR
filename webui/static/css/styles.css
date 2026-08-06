@@ -4242,6 +4242,19 @@ table.rm-led tbody tr:hover { background: var(--surface-2); }
 .ms-abl__track i { display: block; height: 13px; background: var(--accent); opacity: 0.8; min-width: 2px; }
 .ms-abl__bar em { font-style: normal; font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); white-space: nowrap; }
 
+.ms-vitals { max-height: 340px; overflow: auto; margin-top: 8px; border: 1px solid var(--line); }
+.ms-vitals:has(.ms-vitals__table:empty) { display: none; }
+.ms-vitals__table { margin-top: 0; font-size: 11px; }
+.ms-vitals__table th { position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.ms-vitals__table th.ms-vitals__type, .ms-vitals__table td.ms-vitals__type,
+.ms-vitals__table th.ms-vitals__flags, .ms-vitals__table td.ms-vitals__flags { text-align: left; }
+.ms-vitals__table td.ms-vitals__type { color: var(--ink-faint); font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+.ms-vitals__table td.ms-slots__key { max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-vitals__table tbody tr { cursor: pointer; }
+.ms-vitals__table tbody tr:hover td { background: var(--bg-1); }
+.ms-vitals__table tr.is-flagged td.ms-vitals__flags { color: var(--danger); font-weight: 600; }
+.ms-vitals__table tr.is-current td { background: rgba(29, 79, 216, 0.07); }
+
 .ms-arch { display: flex; align-items: stretch; overflow-x: auto; padding: 4px 2px 12px; }
 .ms-arch__block {
   position: relative; flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 3px;

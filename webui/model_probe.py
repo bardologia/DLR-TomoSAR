@@ -687,6 +687,65 @@ class ModelProbe:
             except (ValueError, KeyError) as error:
                 return {"ok": False, "error": str(error)}
 
+    def _vital_flags(self, stat: dict) -> list[str]:
+        flags = []
+        if stat["nonfinite_frac"] > 0.0:
+            flags.append("nonfinite")
+        if stat["zero_frac"] > 0.9:
+            flags.append("mostly zero")
+        if stat["dead_channel_frac"] is not None and stat["dead_channel_frac"] > 0.25:
+            flags.append("dead channels")
+        return flags
+
+    def vitals(self, body: dict) -> dict:
+        import torch
+
+        from tools.diagnostics.activation_recorder import ActivationRecorder
+
+        with self.lock:
+            if self.loaded is None:
+                return {"ok": False, "error": "no model loaded"}
+
+            try:
+                az, rg           = int(body["az"]), int(body["rg"])
+                window, _cy, _cx = self._window(az, rg)
+
+                model    = self.loaded["run"].model.module
+                recorder = ActivationRecorder(model)
+                recorder.attach_stats()
+
+                try:
+                    with torch.no_grad():
+                        model(torch.from_numpy(window).to(self.loaded["device"]))
+                finally:
+                    recorder.detach()
+
+                modules = dict(model.named_modules())
+                entries = []
+                for name, stat in sorted(recorder.stats().items(), key=lambda kv: kv[1]["first_seen"]):
+                    entries.append({
+                        "name"      : name,
+                        "type"      : stat["module_type"],
+                        "shape"     : stat["shape"],
+                        "params"    : int(sum(p.numel() for p in modules[name].parameters())),
+                        "zero_frac" : stat["zero_frac"],
+                        "dead"      : stat["dead_channels"],
+                        "channels"  : stat["n_channels"],
+                        "eff_frac"  : stat["effective_channel_frac"],
+                        "max_abs"   : stat["max_abs"],
+                        "flags"     : self._vital_flags(stat),
+                    })
+
+                summary = {
+                    "n_layers"     : len(entries),
+                    "total_params" : int(sum(p.numel() for p in model.parameters())),
+                    "flagged"      : sum(1 for entry in entries if entry["flags"]),
+                }
+
+                return {"ok": True, "entries": entries, "summary": summary}
+            except (ValueError, KeyError) as error:
+                return {"ok": False, "error": str(error)}
+
     def features_png(self, az: int, rg: int, layer: str, max_channels: int = 16) -> bytes | None:
         import torch
 
