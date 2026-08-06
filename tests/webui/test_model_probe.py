@@ -269,6 +269,20 @@ def test_attribution_marks_dead_families_instead_of_failing():
     assert families["sigma"]["dead"]   is True
     assert families["sigma"]["shares"] == [0.0, 0.0]
     assert families["sigma"]["cells"]  == [None, None]
+    assert families["sigma"]["radial"] is None
+
+
+def test_attribution_radial_profile_collapses_to_the_center_for_a_pointwise_model():
+    result = _probe().attribution({"az": 10, "rg": 8})
+
+    radial = {payload["family"]: payload for payload in result["families"]}["mu"]["radial"]
+
+    assert radial["radii"][0]         == 0
+    assert radial["r50"]              == 0
+    assert radial["r90"]              == 0
+    assert radial["cumulative"][0]    == pytest.approx(1.0)
+    assert radial["cumulative"][-1]   == pytest.approx(1.0)
+    assert len(radial["radii"])       == len(radial["cumulative"])
 
 
 def test_ablation_ranks_the_used_channel_first():

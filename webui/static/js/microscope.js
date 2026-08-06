@@ -142,6 +142,12 @@ class MicroscopeView {
               </div>
               <div class="ms-gridwrap"><div class="ms-grid" id="probe-grid"></div></div>
               <div class="ms-subhead">
+                <h4 class="cube-panel-title">Effective receptive field</h4>
+                <span class="ms-card__note">share of each output's gradient energy within a radius of the probed pixel</span>
+              </div>
+              <canvas id="probe-erf" width="640" height="180" hidden></canvas>
+              <p class="ms-wifacts" id="probe-erf-facts"></p>
+              <div class="ms-subhead">
                 <h4 class="cube-panel-title">Channel ablation</h4>
                 <span class="ms-card__note">zero one input channel at a time and re-run &mdash; causal damage to the prediction, unlike the local gradients above</span>
               </div>
@@ -253,6 +259,8 @@ class MicroscopeView {
       barsLegend : this.root.querySelector("#probe-bars-legend"),
       gridChips  : this.root.querySelector("#probe-grid-channels"),
       grid       : this.root.querySelector("#probe-grid"),
+      erf        : this.root.querySelector("#probe-erf"),
+      erfFacts   : this.root.querySelector("#probe-erf-facts"),
       ablation   : this.root.querySelector("#probe-ablation"),
       occlusion  : this.root.querySelector("#probe-occlusion"),
       occlFacts  : this.root.querySelector("#probe-occl-facts"),
@@ -721,6 +729,8 @@ class MicroscopeView {
     this.refs.barsLegend.innerHTML = "";
     this.refs.gridChips.innerHTML  = "";
     this.refs.grid.innerHTML       = "";
+    this.refs.erf.hidden           = true;
+    this.refs.erfFacts.innerHTML   = "";
 
     const out = await window.apiPost("/api/probe/attribution", { az: this.pixel.az, rg: this.pixel.rg, slot: this.attribSlot });
     if (token !== this.attribToken) return;
@@ -736,6 +746,31 @@ class MicroscopeView {
     this._renderBars(out);
     this._renderGridChips();
     this._renderGrid();
+    this._renderErf(out);
+  }
+
+  _renderErf(out) {
+    const live = out.families.filter((f) => f.radial);
+
+    if (!live.length) {
+      this.refs.erf.hidden = true;
+      this.refs.erfFacts.innerHTML = "no gradient energy at this pixel &mdash; every output family is flat here";
+      return;
+    }
+
+    this.refs.erf.hidden = false;
+    window.drawLineChart(
+      this.refs.erf,
+      live[0].radial.radii,
+      live.map((f) => ({ values: f.radial.cumulative, color: MicroscopeView.FAMILY_COLORS[f.family], width: 1.5, label: f.family })),
+      { xUnit: "px" },
+    );
+
+    const parts = out.families.map((f) => f.radial
+      ? `${f.family} r<sub>50</sub> <b>${f.radial.r50} px</b> / r<sub>90</sub> <b>${f.radial.r90} px</b>`
+      : `${f.family} &mdash; no dependence`);
+
+    this.refs.erfFacts.innerHTML = parts.join(" &middot; ");
   }
 
   _renderBars(out) {

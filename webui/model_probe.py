@@ -393,10 +393,24 @@ class ModelProbe:
         plt.imsave(buf, cell, cmap="magma", vmin=0.0, vmax=1.0, format="png")
         return base64.b64encode(buf.getvalue()).decode("ascii")
 
-    def _family_payload(self, family: str, grad: np.ndarray) -> dict:
+    def _radial_profile(self, grad: np.ndarray, cy: int, cx: int) -> dict:
+        total_map = grad.sum(axis=0)
+        total     = float(total_map.sum())
+
+        yy, xx = np.mgrid[0:total_map.shape[0], 0:total_map.shape[1]]
+        r      = np.hypot(yy - cy, xx - cx)
+        radii  = np.arange(int(np.ceil(r.max())) + 1)
+
+        cumulative = np.asarray([float(total_map[r <= radius].sum()) / total for radius in radii])
+        r50        = int(radii[np.argmax(cumulative >= 0.5)])
+        r90        = int(radii[np.argmax(cumulative >= 0.9)])
+
+        return {"radii": [int(v) for v in radii], "cumulative": [float(v) for v in cumulative], "r50": r50, "r90": r90}
+
+    def _family_payload(self, family: str, grad: np.ndarray, cy: int, cx: int) -> dict:
         total = float(grad.sum())
         if total <= 0.0:
-            return {"family": family, "dead": True, "shares": [0.0] * grad.shape[0], "cells": [None] * grad.shape[0]}
+            return {"family": family, "dead": True, "shares": [0.0] * grad.shape[0], "cells": [None] * grad.shape[0], "radial": None}
 
         shares = grad.sum(axis=(1, 2)) / total
 
@@ -405,7 +419,13 @@ class ModelProbe:
             peak = float(grad[channel].max())
             cells.append(self._cell_png(grad[channel] / peak) if peak > 0.0 else None)
 
-        return {"family": family, "dead": False, "shares": [float(v) for v in shares], "cells": cells}
+        return {
+            "family" : family,
+            "dead"   : False,
+            "shares" : [float(v) for v in shares],
+            "cells"  : cells,
+            "radial" : self._radial_profile(grad, cy, cx),
+        }
 
     def attribution(self, body: dict) -> dict:
         with self.lock:
@@ -422,7 +442,7 @@ class ModelProbe:
 
                 window, cy, cx = self._window(az, rg)
 
-                families = [self._family_payload(family, grad) for family, grad in self._family_gradients(window, cy, cx, slot)]
+                families = [self._family_payload(family, grad, cy, cx) for family, grad in self._family_gradients(window, cy, cx, slot)]
 
                 return {
                     "ok"       : True,
