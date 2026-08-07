@@ -106,7 +106,9 @@ class ProfileDataset(Dataset):
         if self.normalizer is not None:
             curve = self.normalizer.normalize(curve)
 
+        target = curve
+
         if self.augmenter is not None and self.split_name == "train":
             curve = self.augmenter.add_noise(curve)
 
-        return curve
+        return curve, target

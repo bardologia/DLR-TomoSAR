@@ -5,7 +5,7 @@ import copy
 import numpy as np
 import pytest
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
 from configuration.training.general.runtime         import ResourceConfig, TrainingLoopConfig
 from configuration.training.profile_autoencoder     import ProfileAeLossConfig, ProfileAeTrainerConfig
@@ -41,7 +41,7 @@ def _trainer_config(cfg, epochs=2):
 def _loader(n=8, batch_size=4, seed=0):
     g = torch.Generator().manual_seed(seed)
     x = torch.randn(n, PROFILE_LENGTH, generator=g)
-    return DataLoader(x, batch_size=batch_size)
+    return DataLoader(TensorDataset(x, x), batch_size=batch_size)
 
 
 def _build_trainer(tmp_path, epochs=2):
@@ -68,6 +68,24 @@ def test_compute_loss_reshapes_and_finite(tmp_path):
 
     assert torch.isfinite(out["total_loss"])
     assert "curve_recon" in out["components"]
+
+
+def test_compute_loss_reconstructs_against_the_clean_target(tmp_path, monkeypatch):
+    trainer, _   = _build_trainer(tmp_path)
+    noisy, clean = next(iter(_loader()))
+    noisy        = noisy + 100.0
+
+    captured  = {}
+    criterion = trainer.criterion
+
+    def spy(prediction, target):
+        captured["target"] = target
+        return criterion(prediction, target)
+
+    monkeypatch.setattr(trainer, "criterion", spy)
+    trainer._compute_loss((noisy, clean))
+
+    assert torch.equal(captured["target"], clean.unsqueeze(-1).unsqueeze(-1))
 
 
 def test_single_train_epoch_updates_params(tmp_path):

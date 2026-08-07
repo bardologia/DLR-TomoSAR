@@ -162,8 +162,9 @@ def test_profile_pipeline_runs_and_returns_normalizer(test_data_dir, params_dir,
     assert np.isfinite(normalizer.loc)
     assert normalizer.scale >= normalizer.SCALE_FLOOR
 
-    batch = next(iter(train_loader))
-    assert batch.shape[1] == 150
+    noisy, clean = next(iter(train_loader))
+    assert noisy.shape[1] == 150
+    assert clean.shape[1] == 150
     assert len(val_loader)  >= 1
     assert len(test_loader) >= 1
 
@@ -188,7 +189,7 @@ def test_profile_pipeline_train_order_reproducible(test_data_dir, params_dir, tm
         )
         pipeline = ProfileDatasetPipeline(config, run_dir, logger=_logger(run_dir, "prof_repro"), seed=3)
         loaders  = pipeline.run()[0]
-        return next(iter(loaders[0])).numpy()
+        return next(iter(loaders[0]))[0].numpy()
 
     a = _first_batch(tmp_path / "a")
     b = _first_batch(tmp_path / "b")

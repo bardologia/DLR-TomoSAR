@@ -21,6 +21,9 @@ class Trainer(AutoencoderTrainer):
         return Loss(cfg)
 
     def _compute_loss(self, batch):
-        curve        = batch.to(self.device).unsqueeze(-1).unsqueeze(-1)
-        curve_hat, _ = self.model.reconstruct(curve)
-        return self.criterion(curve_hat, curve)
+        noisy, clean = batch
+        noisy        = noisy.to(self.device).unsqueeze(-1).unsqueeze(-1)
+        clean        = clean.to(self.device).unsqueeze(-1).unsqueeze(-1)
+
+        curve_hat, _ = self.model.reconstruct(noisy)
+        return self.criterion(curve_hat, clean)

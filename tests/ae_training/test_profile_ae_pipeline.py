@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, TensorDataset
 
 from configuration.architectures.profile_autoencoder import MlpAutoencoderConfig
 from configuration.dataset                           import ProfileDatasetConfig, SplitRegions
@@ -55,7 +55,7 @@ def _build_cfg():
 def _loader(n=8, batch_size=4, seed=0):
     g = torch.Generator().manual_seed(seed)
     x = torch.randn(n, PROFILE_LENGTH, generator=g)
-    return DataLoader(x, batch_size=batch_size)
+    return DataLoader(TensorDataset(x, x), batch_size=batch_size)
 
 
 def _profile_config(tmp_path):
@@ -154,7 +154,7 @@ class _CurveDataset(torch.utils.data.Dataset):
         return len(self.curves)
 
     def __getitem__(self, idx):
-        return self.curves[idx]
+        return self.curves[idx], self.curves[idx]
 
 
 def test_overfit_check_gate_trains_and_reports(tmp_path):

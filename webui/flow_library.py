@@ -814,7 +814,7 @@ class FlowLibrary:
             },
             {
                 "id": "pae_genesis", "title": "Gaussian curve genesis", "phase": "A - Curve genesis",
-                "note": "For each kept pixel the elevation profile is synthesised on the fly by summing the K Gaussians over the axis; the width is floored at 1e-6 and the exponent clipped to [-100, 0] before exponentiation. This curve is both the autoencoder input and its reconstruction target.",
+                "note": "For each kept pixel the elevation profile is synthesised on the fly by summing the K Gaussians over the axis; the width is floored at 1e-6 and the exponent clipped to [-100, 0] before exponentiation. Once normalised, this curve is the reconstruction target; the encoder input additionally carries the optional noise.",
                 "inputs": ["gp", "idx"], "outputs": ["curve"],
                 "lines": [
                     [{"id": "curve", "tex": r"c_h", "role": "calculated"}, {"tex": "="}, {"tex": r"\sum_{k}"}, {"id": "gp", "tex": r"a_k", "role": "intermediate"}, {"tex": r"\exp\!\Big(\mathrm{clip}\big(-\tfrac{(x_h-\mu_k)^2}{2\max(\sigma_k,10^{-6})^2},\ -100,\ 0\big)\Big)"}],
@@ -840,7 +840,7 @@ class FlowLibrary:
             },
             {
                 "id": "pae_normalise", "title": "Normalise and jitter", "phase": "B - Normalization",
-                "note": "The fitted statistics standardise every split identically; on the train split only, Gaussian noise of std noise_std (default 0.01, in normalised units) is added after normalisation with probability p_noise. Input and target are this same normalised curve.",
+                "note": "The fitted statistics standardise every split identically; on the train split only, Gaussian noise of std noise_std (default 0.01, in normalised units) is added after normalisation with probability p_noise. The noise perturbs only the encoder input; the reconstruction target stays the clean normalised curve, making the objective a denoising one whenever p_noise > 0.",
                 "inputs": ["caug", "stats"], "outputs": ["cn"],
                 "lines": [
                     [{"id": "cn", "tex": r"\hat{\mathbf{c}}", "role": "calculated"}, {"tex": "="}, {"tex": r"\dfrac{f("}, {"id": "caug", "tex": r"\mathbf{c}'", "role": "intermediate"}, {"tex": r") - "}, {"id": "stats", "tex": r"\ell", "role": "calculated"}, {"tex": r"}{"}, {"id": "stats", "tex": r"s", "role": "calculated"}, {"tex": r"}"}],

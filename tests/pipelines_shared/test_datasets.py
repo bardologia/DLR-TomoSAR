@@ -3,14 +3,15 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from configuration.dataset                          import InputConfig, OutputConfig, Representation
-from configuration.normalization                    import ChannelStats, ChannelStrategy, NormMethod
-from pipelines.backbone.dataset.datasets            import MultiRegionDataset, PatchDataset
-from pipelines.backbone.dataset.normalizer          import Normalizer
-from pipelines.backbone.dataset.spatial             import Patcher
-from pipelines.backbone.dataset.stats               import Stats
-from pipelines.profile_autoencoder.dataset.datasets import ProfileDataset
-from tools.monitoring.logger                        import Logger
+from configuration.dataset                              import InputConfig, OutputConfig, ProfileAugmentationConfig, Representation
+from configuration.normalization                        import ChannelStats, ChannelStrategy, NormMethod
+from pipelines.backbone.dataset.datasets                import MultiRegionDataset, PatchDataset
+from pipelines.backbone.dataset.normalizer              import Normalizer
+from pipelines.backbone.dataset.spatial                 import Patcher
+from pipelines.backbone.dataset.stats                   import Stats
+from pipelines.profile_autoencoder.dataset.augmentation import ProfileAugmenter
+from pipelines.profile_autoencoder.dataset.datasets     import ProfileDataset
+from tools.monitoring.logger                            import Logger
 
 
 def _identity_channel_stats(n: int) -> ChannelStats:
@@ -203,11 +204,12 @@ def _profile_dataset(parameters, tmp_path, **kw):
 
 @pytest.mark.real_data
 def test_profiledataset_sample_shape_and_dtype(parameters, tmp_path):
-    ds    = _profile_dataset(parameters, tmp_path)
-    curve = ds[0]
+    ds            = _profile_dataset(parameters, tmp_path)
+    curve, target = ds[0]
 
     assert curve.shape == (150,)
     assert curve.dtype == np.float32
+    np.testing.assert_array_equal(curve, target)
 
 
 @pytest.mark.real_data
@@ -215,9 +217,33 @@ def test_profiledataset_no_nan_and_nonnegative(parameters, tmp_path):
     ds = _profile_dataset(parameters, tmp_path)
 
     for i in range(min(len(ds), 50)):
-        curve = ds[i]
+        curve, _ = ds[i]
         assert np.all(np.isfinite(curve))
         assert np.all(curve >= 0.0)
+
+
+@pytest.mark.real_data
+def test_profiledataset_noise_touches_only_the_input(parameters, tmp_path):
+    config    = ProfileAugmentationConfig(p_flip=0.0, p_noise=1.0, noise_std=0.05)
+    augmenter = ProfileAugmenter(config, logger=Logger(log_dir=str(tmp_path / "aug"), name="aug", level="ERROR"), seed=0)
+    ds        = _profile_dataset(parameters, tmp_path, augmenter=augmenter)
+
+    noisy, clean = ds[0]
+
+    assert not np.array_equal(noisy, clean)
+    assert np.all(clean >= 0.0)
+    assert np.std(noisy - clean) == pytest.approx(0.05, rel=0.5)
+
+
+@pytest.mark.real_data
+def test_profiledataset_eval_split_ignores_the_augmenter(parameters, tmp_path):
+    config    = ProfileAugmentationConfig(p_flip=1.0, p_noise=1.0, noise_std=0.05)
+    augmenter = ProfileAugmenter(config, logger=Logger(log_dir=str(tmp_path / "aug"), name="aug", level="ERROR"), seed=0)
+    ds        = _profile_dataset(parameters, tmp_path, augmenter=augmenter, split_name="val")
+
+    noisy, clean = ds[0]
+
+    np.testing.assert_array_equal(noisy, clean)
 
 
 @pytest.mark.real_data

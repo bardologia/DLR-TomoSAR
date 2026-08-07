@@ -14,7 +14,7 @@ class ProfileAePredictor(AeReconstructionPredictor):
     RESULT_CLASS = ProfileAeResult
 
     def _batch_input(self, batch):
-        return batch
+        return batch[0]
 
     def _reconstruct_batch(self, curve_n: torch.Tensor) -> BatchReconstruction:
         x = curve_n.to(self.device).unsqueeze(-1).unsqueeze(-1)

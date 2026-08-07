@@ -52,7 +52,7 @@ def test_image_predictor_run_inference():
 
 def test_profile_predictor_run_inference():
     x   = torch.rand(2, 20)
-    run = SimpleNamespace(model=_ProfileModel(), normalizer=_Scaled(), loader=[x])
+    run = SimpleNamespace(model=_ProfileModel(), normalizer=_Scaled(), loader=[(x, x)])
 
     res = ProfileAePredictor(run, "cpu", _logger()).run_inference()
 
@@ -63,7 +63,7 @@ def test_profile_predictor_run_inference():
 
 def test_normalized_errors_are_measured_before_denormalization():
     x   = torch.rand(2, 20)
-    run = SimpleNamespace(model=_ProfileModel(), normalizer=_Scaled(), loader=[x])
+    run = SimpleNamespace(model=_ProfileModel(), normalizer=_Scaled(), loader=[(x, x)])
 
     res = ProfileAePredictor(run, "cpu", _logger()).run_inference()
 

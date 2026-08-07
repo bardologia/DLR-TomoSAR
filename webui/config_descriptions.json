@@ -336,8 +336,8 @@
         "p_shift": "probability of circularly rolling the profile along the height axis by a random offset, 0.0 disables it",
         "max_shift": "maximum absolute roll offset in height-axis bins, sampled uniformly in -max_shift..max_shift when p_shift triggers",
         "p_flip": "probability of reversing the profile along the height axis, default 0.5",
-        "p_noise": "probability of adding zero-mean Gaussian noise to the normalized curve, 0.0 disables it",
-        "noise_std": "standard deviation of the additive Gaussian noise, applied to the profile after normalization"
+        "p_noise": "probability of adding zero-mean Gaussian noise to the normalized curve fed to the encoder, 0.0 disables it; the reconstruction target stays the clean curve, so a positive value trains a denoising autoencoder",
+        "noise_std": "standard deviation of the additive Gaussian noise, applied after normalization to the encoder input only"
       }
     },
     "dataset/profile_autoencoder::ProfileDatasetConfig": {

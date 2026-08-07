@@ -77,7 +77,7 @@ class ProfileFeedAdapter:
 
     @staticmethod
     def to_model_input(batch, device: torch.device) -> torch.Tensor:
-        return batch.to(device, non_blocking=True).unsqueeze(-1).unsqueeze(-1)
+        return batch[0].to(device, non_blocking=True).unsqueeze(-1).unsqueeze(-1)
 
     def _training_pipeline(self):
         from configuration.training import ProfileAeEntryConfig
