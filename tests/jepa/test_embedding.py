@@ -165,6 +165,7 @@ def test_offset_prediction_separates_chain_from_decoder_error():
     metrics = JepaEmbeddingEvaluator(run, SilentLogger()).run()
 
     assert metrics["jepa_embedding_mse"] == pytest.approx(0.25, rel=1e-5)
+    assert metrics["jepa_embedding_rmse"] == pytest.approx(0.5, rel=1e-5)
     assert metrics["jepa_chain_mse_norm"] > metrics["jepa_decode_mse_norm"]
 
 

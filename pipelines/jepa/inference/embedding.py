@@ -76,6 +76,7 @@ class JepaEmbeddingEvaluator:
         self.logger.section("[Inference: JEPA Embedding Diagnostics]")
         self.logger.kv_table({
             "Embedding MSE"           : f"{metrics['jepa_embedding_mse']:.6g}",
+            "Embedding RMSE"          : f"{metrics['jepa_embedding_rmse']:.6g} (per-component spread; calibrates the profile-AE latent_noise_std)",
             "Embedding cosine"        : f"{metrics['jepa_embedding_cosine']:.4f}",
             "Decoder-only MSE (norm)" : f"{metrics['jepa_decode_mse_norm']:.6g}",
             "Full-chain MSE (norm)"   : f"{metrics['jepa_chain_mse_norm']:.6g}",
@@ -86,6 +87,7 @@ class JepaEmbeddingEvaluator:
 
         metrics = {
             "jepa_embedding_mse"    : sums["embedding_sq"] / sums["embedding_n"],
+            "jepa_embedding_rmse"   : (sums["embedding_sq"] / sums["embedding_n"]) ** 0.5,
             "jepa_embedding_cosine" : sums["cosine_sum"]   / sums["cosine_n"],
             "jepa_decode_mse_norm"  : sums["decode_sq"]    / sums["curve_n"],
             "jepa_chain_mse_norm"   : sums["chain_sq"]     / sums["curve_n"],
