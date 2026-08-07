@@ -19,6 +19,9 @@ class ProfileAeLossConfig:
     huber_delta     : float = 1.0
     charbonnier_eps : float = 1e-3
 
+    use_sobolev    : bool  = False
+    weight_sobolev : float = 1.0
+
 
 @dataclass
 class ProfileAeTrainerConfig(SharedSubConfigInheritance):

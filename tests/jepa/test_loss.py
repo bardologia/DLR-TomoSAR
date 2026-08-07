@@ -193,3 +193,45 @@ def test_loss_unknown_curve_kind_raises(x_axis, norm_stats, profile_normalizer):
 
     with pytest.raises(ValueError):
         loss(z_hat, gt)
+
+
+def test_loss_curve_sobolev_works_without_curve_recon(x_axis, norm_stats, profile_normalizer):
+    autoencoder = make_autoencoder("none")
+    emb_cfg     = EmbeddingLossConfig(use_embedding_mse=False, use_curve_recon=False, use_curve_sobolev=True, weight_curve_sobolev=1.0)
+    loss        = build_loss(autoencoder, x_axis, norm_stats, profile_normalizer, emb_cfg, target_kind="stopgrad")
+    z_hat, gt   = random_inputs()
+
+    out = loss(z_hat, gt)
+
+    assert "curve_sobolev" in out["components"]
+    assert "curve_recon" not in out["components"]
+    assert torch.isfinite(out["total_loss"])
+
+    out["total_loss"].backward()
+    assert z_hat.grad is not None
+    assert torch.isfinite(z_hat.grad).all()
+
+
+def test_loss_curve_sobolev_scales_with_weight(x_axis, norm_stats, profile_normalizer):
+    autoencoder = make_autoencoder("none")
+    z_hat, gt   = random_inputs(requires_grad=False)
+
+    outs = {}
+    for weight in (1.0, 3.0):
+        emb_cfg      = EmbeddingLossConfig(use_embedding_mse=False, use_curve_recon=False, use_curve_sobolev=True, weight_curve_sobolev=weight)
+        loss         = build_loss(autoencoder, x_axis, norm_stats, profile_normalizer, emb_cfg, target_kind="stopgrad")
+        outs[weight] = loss(z_hat, gt)["total_loss"].item()
+
+    assert outs[3.0] == pytest.approx(3.0 * outs[1.0], rel=1e-6)
+
+
+def test_loss_curve_sobolev_joins_curve_recon(x_axis, norm_stats, profile_normalizer):
+    autoencoder = make_autoencoder("none")
+    emb_cfg     = EmbeddingLossConfig(use_embedding_mse=False, use_curve_recon=True, weight_curve_recon=1.0, use_curve_sobolev=True, weight_curve_sobolev=2.0)
+    loss        = build_loss(autoencoder, x_axis, norm_stats, profile_normalizer, emb_cfg, target_kind="stopgrad")
+    z_hat, gt   = random_inputs(requires_grad=False)
+
+    out      = loss(z_hat, gt)
+    expected = out["components"]["curve_recon"] + 2.0 * out["components"]["curve_sobolev"]
+
+    assert out["total_loss"].item() == pytest.approx(expected.item(), rel=1e-6)

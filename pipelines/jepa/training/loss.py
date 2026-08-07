@@ -54,18 +54,25 @@ class Loss:
 
         total, components = self._embedding_terms(z_hat_n, z_star_n)
 
-        if self.emb_cfg.use_curve_recon:
+        if self.emb_cfg.use_curve_recon or self.emb_cfg.use_curve_sobolev:
             cfg       = self.emb_cfg
             curve_hat = self.autoencoder.decode(z_hat_n)
             diff      = curve_hat - gt_curve_n
 
-            if   cfg.curve_kind == "mse":         c_val = CurveLoss.mse_diff(diff)
-            elif cfg.curve_kind == "l1":          c_val = CurveLoss.l1_diff(diff)
-            elif cfg.curve_kind == "huber":       c_val = CurveLoss.huber_diff(diff, cfg.huber_delta)
-            elif cfg.curve_kind == "charbonnier": c_val = CurveLoss.charbonnier_diff(diff, cfg.charbonnier_eps)
-            else:                                 raise ValueError(f"Unknown curve loss kind '{cfg.curve_kind}'. Available: mse, l1, huber, charbonnier")
+            if cfg.use_curve_recon:
+                if   cfg.curve_kind == "mse":         c_val = CurveLoss.mse_diff(diff)
+                elif cfg.curve_kind == "l1":          c_val = CurveLoss.l1_diff(diff)
+                elif cfg.curve_kind == "huber":       c_val = CurveLoss.huber_diff(diff, cfg.huber_delta)
+                elif cfg.curve_kind == "charbonnier": c_val = CurveLoss.charbonnier_diff(diff, cfg.charbonnier_eps)
+                else:                                 raise ValueError(f"Unknown curve loss kind '{cfg.curve_kind}'. Available: mse, l1, huber, charbonnier")
 
-            components["curve_recon"] = c_val
-            total = total + cfg.weight_curve_recon * c_val
+                components["curve_recon"] = c_val
+                total = total + cfg.weight_curve_recon * c_val
+
+            if cfg.use_curve_sobolev:
+                s_val = CurveLoss.mse_diff(CurveLoss.second_difference(diff))
+
+                components["curve_sobolev"] = s_val
+                total = total + cfg.weight_curve_sobolev * s_val
 
         return {"total_loss": total, "components": components, "monitor": {}, "occupancy": {}, "physical": {}}

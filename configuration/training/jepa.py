@@ -45,6 +45,9 @@ class EmbeddingLossConfig:
     huber_delta        : float = 1.0
     charbonnier_eps    : float = 1e-3
 
+    use_curve_sobolev    : bool  = False
+    weight_curve_sobolev : float = 1.0
+
 
 @dataclass
 class JepaTrainerConfig(SharedSubConfigInheritance):

@@ -874,7 +874,7 @@ class FlowLibrary:
             },
             {
                 "id": "pae_recon", "title": "Reconstruction loss", "phase": "D - Loss",
-                "note": "The residual is reduced by the configured curve_kind (default MSE): MSE squares it, L1 takes magnitude, Huber bends at delta = 1.0, Charbonnier smooths with eps = 1e-3. It is the sole loss term of this single-objective autoencoder.",
+                "note": "The residual is reduced by the configured curve_kind (default MSE): MSE squares it, L1 takes magnitude, Huber bends at delta = 1.0, Charbonnier smooths with eps = 1e-3. It is the sole loss term by default; use_sobolev adds the MSE of the residual's second height-difference (weight weight_sobolev).",
                 "inputs": ["crec", "cn"], "outputs": ["err", "loss"],
                 "lines": [
                     [{"id": "err", "tex": r"e", "role": "intermediate"}, {"tex": "="}, {"id": "crec", "tex": r"\tilde{\mathbf{c}}", "role": "calculated"}, {"tex": r"\ -\ "}, {"id": "cn", "tex": r"\hat{\mathbf{c}}", "role": "calculated"}],
@@ -1104,7 +1104,7 @@ class FlowLibrary:
             },
             {
                 "id": "jep_recon", "title": "Curve-reconstruction anchor", "phase": "C - Match",
-                "note": "The anchor decodes the normalised prediction and compares it to the normalised GT curve, keeping the embedding grounded in real profile shape and preventing collapse (mandatory when the target is live). The default reduction is MSE; l1, Huber (delta 1) and Charbonnier (eps 1e-3) are alternatives; weight 1.",
+                "note": "The anchor decodes the normalised prediction and compares it to the normalised GT curve, keeping the embedding grounded in real profile shape and preventing collapse (mandatory when the target is live). The default reduction is MSE; l1, Huber (delta 1) and Charbonnier (eps 1e-3) are alternatives; weight 1. use_curve_sobolev adds a weighted MSE of the residual's second height-difference, penalising high-frequency jitter in the decoded curve.",
                 "inputs": ["zhn", "gtcn"], "outputs": ["chat", "Lrec"],
                 "lines": [
                     [{"id": "chat", "tex": r"\hat{\gamma}", "role": "intermediate"}, {"tex": "="}, {"tex": r"D_\phi\big("}, {"id": "zhn", "tex": r"\hat{\mathbf{z}}_{n}", "role": "intermediate"}, {"tex": r"\big)"}],

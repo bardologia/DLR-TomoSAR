@@ -138,3 +138,23 @@ def test_curve_losses_on_real_tomogram(tomogram_full):
     assert CurveLoss.mse_diff(pred - cur).item() >= 0.0
     assert CurveLoss.cosine(pred, cur, axis=1).item() >= 0.0
     assert CurveLoss.mse_diff(cur - cur).item() == 0.0
+
+
+def test_second_difference_zero_on_linear_profile():
+    ramp  = torch.linspace(0.0, 1.0, 8, dtype=torch.float64)
+    curve = ramp.view(1, 8, 1, 1).expand(2, 8, 4, 4)
+
+    assert CurveLoss.second_difference(curve).abs().max().item() == pytest.approx(0.0, abs=1e-12)
+
+
+def test_second_difference_matches_manual():
+    curve  = _curves(4)
+    manual = curve[:, 2:] - 2.0 * curve[:, 1:-1] + curve[:, :-2]
+
+    assert torch.equal(CurveLoss.second_difference(curve), manual)
+    assert CurveLoss.second_difference(curve).shape == (2, 6, 4, 4)
+
+
+def test_second_difference_short_profile_raises():
+    with pytest.raises(ValueError, match="at least 3"):
+        CurveLoss.second_difference(torch.zeros(1, 2, 1, 1))

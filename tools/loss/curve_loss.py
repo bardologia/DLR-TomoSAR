@@ -24,6 +24,13 @@ class CurveLoss:
         return torch.sqrt((diff * diff + eps * eps).clamp(min=eps * eps)).mean()
 
     @staticmethod
+    def second_difference(curve: torch.Tensor) -> torch.Tensor:
+        if curve.shape[1] < 3:
+            raise ValueError(f"Second difference needs at least 3 samples along dim 1, got {curve.shape[1]}.")
+
+        return curve[:, 2:] - 2.0 * curve[:, 1:-1] + curve[:, :-2]
+
+    @staticmethod
     def smooth_l1_diff(diff: torch.Tensor, beta: float) -> torch.Tensor:
         abs_diff = diff.abs()
         val      = torch.where(abs_diff < beta, 0.5 * diff * diff / beta, abs_diff - 0.5 * beta)

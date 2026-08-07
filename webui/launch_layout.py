@@ -431,10 +431,13 @@ class LaunchLayout:
             ]},
             {"title": "Curve reconstruction", "fields": [
                 {"gate": "use_curve_recon", "fields": [{"path": "weight_curve_recon", "widget": NUM_WEIGHT}, "curve_kind", "huber_delta", "charbonnier_eps"]},
+                {"gate": "use_curve_sobolev", "fields": [{"path": "weight_curve_sobolev", "widget": NUM_WEIGHT}]},
             ]},
         ],
         "ae_loss_profile": [
-            {"title": "Reconstruction loss", "fields": ["curve_kind", "huber_delta", "charbonnier_eps"]},
+            {"title": "Reconstruction loss", "fields": ["curve_kind", "huber_delta", "charbonnier_eps",
+                {"gate": "use_sobolev", "fields": [{"path": "weight_sobolev", "widget": NUM_WEIGHT}]},
+            ]},
         ],
         "ae_loss_image": [
             {"title": "Reconstruction loss", "fields": ["recon_kind", "huber_delta", "charbonnier_eps"]},

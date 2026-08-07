@@ -108,3 +108,41 @@ def test_charbonnier_eps_floor_on_identical():
 def test_unknown_kind_raises():
     with pytest.raises(ValueError):
         _loss("nope")(*_curve_pair())
+
+
+def test_sobolev_off_by_default():
+    out = _loss("mse")(*_curve_pair())
+
+    assert set(out["components"]) == {"curve_recon"}
+
+
+def test_sobolev_adds_component_and_weighted_total():
+    recon, curve = _curve_pair()
+    out          = Loss(ProfileAeLossConfig(curve_kind="mse", use_sobolev=True, weight_sobolev=2.0))(recon, curve)
+
+    assert set(out["components"]) == {"curve_recon", "curve_sobolev"}
+
+    expected = out["components"]["curve_recon"] + 2.0 * out["components"]["curve_sobolev"]
+    assert out["total_loss"].item() == pytest.approx(expected.item(), rel=1e-6)
+
+
+def test_sobolev_zero_for_linear_residual():
+    curve = _curve_pair()[1]
+    ramp  = torch.linspace(0.0, 1.0, curve.shape[1]).view(1, -1, 1, 1)
+    out   = Loss(ProfileAeLossConfig(curve_kind="mse", use_sobolev=True, weight_sobolev=1.0))(curve + ramp, curve)
+
+    assert out["components"]["curve_recon"].item() > 0.0
+    assert out["components"]["curve_sobolev"].item() == pytest.approx(0.0, abs=1e-10)
+
+
+def test_sobolev_penalizes_jitter_over_smooth_error_at_equal_mse():
+    target = torch.zeros(1, 16, 1, 1)
+    offset = torch.full((1, 16, 1, 1), 0.5)
+    jitter = 0.5 * torch.tensor([1.0, -1.0]).repeat(8).view(1, 16, 1, 1)
+    loss   = Loss(ProfileAeLossConfig(curve_kind="mse", use_sobolev=True, weight_sobolev=1.0))
+
+    smooth_out = loss(target + offset, target)
+    jitter_out = loss(target + jitter, target)
+
+    assert smooth_out["components"]["curve_recon"].item() == pytest.approx(jitter_out["components"]["curve_recon"].item(), rel=1e-6)
+    assert jitter_out["total_loss"].item() > smooth_out["total_loss"].item()

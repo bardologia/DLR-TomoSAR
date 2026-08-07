@@ -164,3 +164,9 @@ def test_jepa_tag_image_only_carries_the_param_loss_it_trains_on():
 def test_jepa_tag_rejects_a_spec_without_any_autoencoder():
     with pytest.raises(ValueError):
         RunNaming.jepa_tag("resunet", "conv", _jepa(profile_ae=None, image_ae=None), 5, _aug())
+
+
+def test_embedding_loss_tag_appends_the_sobolev_term():
+    embedding = EmbeddingLossConfig(use_curve_sobolev=True, weight_curve_sobolev=0.5)
+
+    assert RunNaming.embedding_loss_tag(embedding) == "emb_mse_1-curve_mse_1-curve_sobolev_0.5"

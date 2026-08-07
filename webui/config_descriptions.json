@@ -1516,7 +1516,9 @@
         "weight_curve_recon": "Scalar weight applied to the curve reconstruction term; must be positive whenever use_curve_recon is relied on to anchor the embedding (target_provider live or finetuned LayerNorm embedding)",
         "curve_kind": "Curve reconstruction loss metric: mse, l1, huber, or charbonnier",
         "huber_delta": "Transition threshold of the Huber curve loss between quadratic and linear regimes, used when curve_kind is huber",
-        "charbonnier_eps": "Epsilon smoothing constant of the Charbonnier curve loss near zero residual, used when curve_kind is charbonnier"
+        "charbonnier_eps": "Epsilon smoothing constant of the Charbonnier curve loss near zero residual, used when curve_kind is charbonnier",
+        "use_curve_sobolev": "Enable the Sobolev smoothness term: MSE of the second height-axis difference of the decoded-curve residual, penalizing bin-to-bin jitter that the pointwise curve loss treats the same as smooth error",
+        "weight_curve_sobolev": "Scalar weight applied to the curve Sobolev term"
       }
     },
     "training/jepa::JepaTrainerConfig": {
@@ -1593,7 +1595,9 @@
       "fields": {
         "curve_kind": "Reconstruction loss comparing predicted vs target profile curve: mse, l1, huber, or charbonnier",
         "huber_delta": "Huber-loss transition threshold between quadratic and linear regimes, used only when curve_kind is huber",
-        "charbonnier_eps": "Epsilon smoothing constant of the Charbonnier loss near zero residual, used only when curve_kind is charbonnier"
+        "charbonnier_eps": "Epsilon smoothing constant of the Charbonnier loss near zero residual, used only when curve_kind is charbonnier",
+        "use_sobolev": "Enable the Sobolev smoothness term: MSE of the second height-axis difference of the reconstruction residual, penalizing bin-to-bin jitter that the pointwise curve loss treats the same as smooth error",
+        "weight_sobolev": "Scalar weight applied to the Sobolev second-difference term"
       }
     },
     "training/profile_autoencoder::ProfileAeTrainerConfig": {

@@ -67,6 +67,9 @@ class RunNaming:
         if embedding.use_curve_recon:
             parts.append(f"curve_{embedding.curve_kind}_{embedding.weight_curve_recon:g}")
 
+        if embedding.use_curve_sobolev:
+            parts.append(f"curve_sobolev_{embedding.weight_curve_sobolev:g}")
+
         if not parts:
             raise ValueError("Cannot name a JEPA run from an embedding loss config with no enabled loss terms")
 
