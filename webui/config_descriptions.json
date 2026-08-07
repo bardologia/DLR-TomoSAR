@@ -1597,7 +1597,10 @@
         "huber_delta": "Huber-loss transition threshold between quadratic and linear regimes, used only when curve_kind is huber",
         "charbonnier_eps": "Epsilon smoothing constant of the Charbonnier loss near zero residual, used only when curve_kind is charbonnier",
         "use_sobolev": "Enable the Sobolev smoothness term: MSE of the second height-axis difference of the reconstruction residual, penalizing bin-to-bin jitter that the pointwise curve loss treats the same as smooth error",
-        "weight_sobolev": "Scalar weight applied to the Sobolev second-difference term"
+        "weight_sobolev": "Scalar weight applied to the Sobolev second-difference term",
+        "use_latent_noise": "Enable the latent-noise reconstruction term: the decoder additionally reconstructs the clean curve from the embedding perturbed with Gaussian noise, training it to map a neighborhood of each embedding onto the same smooth curve so small embedding errors at JEPA inference stop producing jagged output",
+        "latent_noise_std": "Standard deviation of the Gaussian perturbation added to the normalized embedding before the extra decode; calibrate it to the embedding-error spread of the coupled JEPA runs",
+        "weight_latent_noise": "Scalar weight applied to the latent-noise reconstruction term"
       }
     },
     "training/profile_autoencoder::ProfileAeTrainerConfig": {

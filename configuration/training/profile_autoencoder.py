@@ -22,6 +22,10 @@ class ProfileAeLossConfig:
     use_sobolev    : bool  = False
     weight_sobolev : float = 1.0
 
+    use_latent_noise    : bool  = False
+    latent_noise_std    : float = 0.05
+    weight_latent_noise : float = 1.0
+
 
 @dataclass
 class ProfileAeTrainerConfig(SharedSubConfigInheritance):

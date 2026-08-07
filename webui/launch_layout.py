@@ -437,6 +437,7 @@ class LaunchLayout:
         "ae_loss_profile": [
             {"title": "Reconstruction loss", "fields": ["curve_kind", "huber_delta", "charbonnier_eps",
                 {"gate": "use_sobolev", "fields": [{"path": "weight_sobolev", "widget": NUM_WEIGHT}]},
+                {"gate": "use_latent_noise", "fields": ["latent_noise_std", {"path": "weight_latent_noise", "widget": NUM_WEIGHT}]},
             ]},
         ],
         "ae_loss_image": [

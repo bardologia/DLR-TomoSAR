@@ -29,8 +29,8 @@ def _tiny_model():
     return model, cfg
 
 
-def _trainer_config(cfg, epochs=2):
-    tc                         = ProfileAeTrainerConfig(gaussian=None, autoencoder=cfg, ae_loss=ProfileAeLossConfig(curve_kind="mse"))
+def _trainer_config(cfg, epochs=2, ae_loss=None):
+    tc                         = ProfileAeTrainerConfig(gaussian=None, autoencoder=cfg, ae_loss=ae_loss or ProfileAeLossConfig(curve_kind="mse"))
     tc.training                = TrainingLoopConfig(epochs=epochs, validation_frequency=1, use_amp=False)
     tc.resources               = ResourceConfig(enabled=False)
     tc.early_stopping.patience = 1000
@@ -44,9 +44,9 @@ def _loader(n=8, batch_size=4, seed=0):
     return DataLoader(TensorDataset(x, x), batch_size=batch_size)
 
 
-def _build_trainer(tmp_path, epochs=2):
+def _build_trainer(tmp_path, epochs=2, ae_loss=None):
     model, cfg = _tiny_model()
-    tc         = _trainer_config(cfg, epochs=epochs)
+    tc         = _trainer_config(cfg, epochs=epochs, ae_loss=ae_loss)
     logger     = Logger(log_dir=str(tmp_path), name="profile_ae_trainer_test")
     x_axis     = np.arange(PROFILE_LENGTH, dtype=np.float32)
     return Trainer(model, cfg, x_axis, tc, str(tmp_path), logger), cfg
@@ -86,6 +86,30 @@ def test_compute_loss_reconstructs_against_the_clean_target(tmp_path, monkeypatc
     trainer._compute_loss((noisy, clean))
 
     assert torch.equal(captured["target"], clean.unsqueeze(-1).unsqueeze(-1))
+
+
+def test_compute_loss_latent_noise_adds_weighted_term(tmp_path):
+    ae_loss    = ProfileAeLossConfig(curve_kind="mse", use_latent_noise=True, latent_noise_std=0.1, weight_latent_noise=2.0)
+    trainer, _ = _build_trainer(tmp_path, ae_loss=ae_loss)
+    batch      = next(iter(_loader()))
+
+    out = trainer._compute_loss(batch)
+
+    assert set(out["components"]) == {"curve_recon", "latent_curve_recon"}
+    assert torch.isfinite(out["total_loss"])
+
+    expected = out["components"]["curve_recon"] + 2.0 * out["components"]["latent_curve_recon"]
+    assert out["total_loss"].item() == pytest.approx(expected.item(), rel=1e-6)
+
+
+def test_compute_loss_latent_noise_carries_the_sobolev_term(tmp_path):
+    ae_loss    = ProfileAeLossConfig(curve_kind="mse", use_sobolev=True, weight_sobolev=1.0, use_latent_noise=True, latent_noise_std=0.1, weight_latent_noise=1.0)
+    trainer, _ = _build_trainer(tmp_path, ae_loss=ae_loss)
+    batch      = next(iter(_loader()))
+
+    out = trainer._compute_loss(batch)
+
+    assert set(out["components"]) == {"curve_recon", "curve_sobolev", "latent_curve_recon", "latent_curve_sobolev"}
 
 
 def test_single_train_epoch_updates_params(tmp_path):

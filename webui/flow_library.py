@@ -874,7 +874,7 @@ class FlowLibrary:
             },
             {
                 "id": "pae_recon", "title": "Reconstruction loss", "phase": "D - Loss",
-                "note": "The residual is reduced by the configured curve_kind (default MSE): MSE squares it, L1 takes magnitude, Huber bends at delta = 1.0, Charbonnier smooths with eps = 1e-3. It is the sole loss term by default; use_sobolev adds the MSE of the residual's second height-difference (weight weight_sobolev).",
+                "note": "The residual is reduced by the configured curve_kind (default MSE): MSE squares it, L1 takes magnitude, Huber bends at delta = 1.0, Charbonnier smooths with eps = 1e-3. It is the sole loss term by default; use_sobolev adds the MSE of the residual's second height-difference (weight weight_sobolev), and use_latent_noise decodes the embedding perturbed with N(0, latent_noise_std^2) noise against the same clean target (weight weight_latent_noise), training the decoder to stay smooth off the encoder manifold.",
                 "inputs": ["crec", "cn"], "outputs": ["err", "loss"],
                 "lines": [
                     [{"id": "err", "tex": r"e", "role": "intermediate"}, {"tex": "="}, {"id": "crec", "tex": r"\tilde{\mathbf{c}}", "role": "calculated"}, {"tex": r"\ -\ "}, {"id": "cn", "tex": r"\hat{\mathbf{c}}", "role": "calculated"}],
