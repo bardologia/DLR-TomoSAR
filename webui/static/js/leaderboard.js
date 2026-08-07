@@ -3,13 +3,15 @@
 class LeaderboardView {
   static DIFF_TAGS = ["A", "B", "C", "D", "E", "F"];
   static AXIS_COLS = [
-    { key: "model",    label: "model" },
-    { key: "head",     label: "head" },
-    { key: "matching", label: "matching" },
-    { key: "k",        label: "K" },
-    { key: "aug",      label: "aug" },
-    { key: "presence", label: "presence" },
-    { key: "loss",     label: "loss" },
+    { key: "model",      label: "model" },
+    { key: "head",       label: "head" },
+    { key: "matching",   label: "matching" },
+    { key: "k",          label: "K" },
+    { key: "aug",        label: "aug" },
+    { key: "presence",   label: "presence" },
+    { key: "profile_ae", label: "profile AE" },
+    { key: "image_ae",   label: "image AE" },
+    { key: "loss",       label: "loss" },
   ];
 
   constructor(root) {
@@ -289,7 +291,7 @@ class LeaderboardView {
 
     LeaderboardView.AXIS_COLS.forEach((col) => {
       if (col.key === "loss") return;
-      const values = [...new Set(this.data.rows.filter((r) => r.axes).map((r) => String(r.axes[col.key])))].sort();
+      const values = [...new Set(this.data.rows.filter((r) => r.axes).map((r) => String(r.axes[col.key])))].filter((v) => v !== "").sort();
       if (values.length < 2) return;
       const active = this.axisSel[col.key] || "";
       html += `<select class="lb-select" data-axis="${col.key}" aria-label="Filter by ${col.label}">`;

@@ -10,7 +10,8 @@ from pipelines.backbone.training.loss_terms        import LossComponentCatalog
 from pipelines.benchmark.results                   import BenchmarkSeedCollector
 from pipelines.shared.comparison.comparison_report import ComparisonReport
 from pipelines.benchmark.sizing                    import SizeMatcher, SizeMatchResult
-from pipelines.shared.training.run_naming          import RunNaming
+from pipelines.shared.model.model_builder          import ModelBuilder
+from pipelines.shared.training.run_naming          import JepaNamingSpec, RunNaming
 from pipelines.shared.training.seed_sweep          import SeedSet
 from tools.orchestration                           import ExperimentStage, GpuJob, QueuedInferenceStage, QueuedTrainingStage
 from tools.data.io                                 import FileIO
@@ -44,7 +45,8 @@ class SeedExpandedStage:
         if config.training_type == "backbone":
             return RunNaming.benchmark_unit(model, component, config.loss, cls.n_gaussians(config), config.augmentation)
         if config.training_type == "jepa":
-            return RunNaming.benchmark_unit(model, None, config.jepa.param_loss, cls.n_gaussians(config), config.augmentation)
+            name, head = ModelBuilder.split_key(model)
+            return RunNaming.jepa_tag(name, head, JepaNamingSpec.resolve(config.jepa), cls.n_gaussians(config), config.augmentation)
 
         return model if component is None else f"{model}__{component}"
 

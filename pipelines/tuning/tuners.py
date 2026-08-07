@@ -7,7 +7,7 @@ import optuna
 
 from pipelines.shared.config.config_factory import ConfigFactory
 from pipelines.shared.model.model_builder   import ModelBuilder
-from pipelines.shared.training.run_naming   import RunNaming
+from pipelines.shared.training.run_naming   import JepaNamingSpec, RunNaming
 from tools.data.io                          import FileIO
 
 
@@ -235,7 +235,7 @@ class JepaTuner:
 
         sampled     = self.sampler.sample(trial, self.space)
         n_gaussians = ConfigFactory(self.entry_template).gaussian_config().n_default_gaussians
-        run_tag     = RunNaming.tag(self.backbone_name, self.head, self.entry_template.param_loss, n_gaussians, self.entry_template.augmentation)
+        run_tag     = RunNaming.jepa_tag(self.backbone_name, self.head, JepaNamingSpec.resolve(self.entry_template), n_gaussians, self.entry_template.augmentation)
 
         entry                 = copy.deepcopy(self.entry_template)
         entry.backbone_name   = self.backbone_name

@@ -12,13 +12,14 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from configuration.dataset                import AugmentationConfig
-from configuration.training               import LossConfig, ParamMatching
-from models                               import BACKBONE_MODEL_REGISTRY
-from models.dual                          import DUAL_CONFIG_REGISTRY
-from pipelines.dual.training.pipeline     import TrunkChannelMap
-from pipelines.shared.training.run_naming import RunNaming
-from tools.monitoring.logger              import Logger
+from configuration.dataset                     import AugmentationConfig
+from configuration.training                    import EmbeddingLossConfig, LossConfig, ParamMatching
+from models                                    import BACKBONE_MODEL_REGISTRY
+from models.dual                               import DUAL_CONFIG_REGISTRY
+from pipelines.dual.training.pipeline          import TrunkChannelMap
+from pipelines.shared.inference.run_classifier import RunArtifacts
+from pipelines.shared.training.run_naming      import JepaNamingSpec, RunNaming
+from tools.monitoring.logger                   import Logger
 
 
 class LegacyNaming:
@@ -165,6 +166,9 @@ class RunRenamer:
             self.logger.warning(f"skip {run_dir.name}: missing model_config/trainer_config/dataset_creation_config metadata")
             return None
 
+        if "embedding_loss" in trainer:
+            return self._plan_jepa_run(run_dir, metadata_dir, summary, model_config, trainer, dataset)
+
         payload = self._loss_payload(trainer)
         if payload is None:
             self.logger.warning(f"skip {run_dir.name}: trainer config has neither a loss curriculum nor a param_loss")
@@ -258,6 +262,66 @@ class RunRenamer:
         self.logger.warning(f"skip {name}: matches no known dual naming generation {old_tags}")
         return None
 
+    def _plan_jepa_run(self, run_dir: Path, metadata_dir: Path, summary: dict, model_config: dict, trainer: dict, dataset: dict) -> str | None:
+        payload = trainer.get("param_loss")
+        if payload is None:
+            self.logger.warning(f"skip {run_dir.name}: JEPA trainer config has no param_loss")
+            return None
+
+        matching = self._matching(payload, summary)
+        if matching is None:
+            self.logger.warning(f"skip {run_dir.name}: no recognizable matching strategy in trainer config or run summary")
+            return None
+
+        profile = self._read_json(metadata_dir / "meta" / RunArtifacts.PROFILE_AE_CONFIG)
+        image   = self._read_json(metadata_dir / "meta" / RunArtifacts.IMAGE_AE_CONFIG)
+
+        if trainer.get("autoencoder") is not None and profile is None:
+            self.logger.warning(f"skip {run_dir.name}: a profile autoencoder was coupled but meta/profile_autoencoder_config.json is missing; the AE architecture name cannot be recovered")
+            return None
+
+        if trainer.get("image_autoencoder") is not None and image is None:
+            self.logger.warning(f"skip {run_dir.name}: an image autoencoder was coupled but meta/image_autoencoder_config.json is missing; the AE architecture name cannot be recovered")
+            return None
+
+        if profile is None and image is None:
+            self.logger.warning(f"skip {run_dir.name}: JEPA run persists neither a profile nor an image autoencoder config")
+            return None
+
+        model        = summary["model_name"]
+        head         = model_config["config"].get("head", "conv")
+        loss         = self._loss_config(payload, matching)
+        augmentation = self._augmentation(dataset["augmentation"])
+        n_gaussians  = trainer["gaussian"]["n_default_gaussians"]
+
+        naming = JepaNamingSpec(
+            profile_ae      = profile["model_name"] if profile else None,
+            profile_mode    = trainer["profile_autoencoder_mode"],
+            target_provider = trainer["target_provider"],
+            image_ae        = image["model_name"] if image else None,
+            image_mode      = trainer["image_autoencoder_mode"],
+            embedding_loss  = self._embedding_loss(trainer["embedding_loss"]),
+            param_loss      = loss,
+        )
+
+        new_tag = RunNaming.jepa_tag(model, head, naming, n_gaussians, augmentation)
+
+        name = run_dir.name
+        if name == new_tag or name.startswith(f"{new_tag}_"):
+            self.logger.info(f"skip {name}: already in the new naming")
+            return None
+
+        old_tags = (RunNaming.tag(model, head, loss, n_gaussians, augmentation), LegacyNaming.flagless_tag(model, head, loss, n_gaussians, augmentation), LegacyNaming.presence_tag(model, head, loss, n_gaussians, augmentation), LegacyNaming.underscore_tag(model, head, matching, loss), LegacyNaming.run_prefix(model))
+        for old_tag in old_tags:
+            if name == old_tag:
+                return new_tag
+
+            if name.startswith(f"{old_tag}_"):
+                return f"{new_tag}{name[len(old_tag):]}"
+
+        self.logger.warning(f"skip {name}: matches no known JEPA naming generation {old_tags}")
+        return None
+
     def _metadata_dir(self, run_dir: Path) -> Path:
         if (run_dir / "meta" / "run_summary.json").is_file():
             return run_dir
@@ -294,6 +358,10 @@ class RunRenamer:
     def _augmentation(self, payload: dict) -> AugmentationConfig:
         known = {spec.name for spec in fields(AugmentationConfig)}
         return AugmentationConfig(**{key: value for key, value in payload.items() if key in known})
+
+    def _embedding_loss(self, payload: dict) -> EmbeddingLossConfig:
+        known = {spec.name for spec in fields(EmbeddingLossConfig)}
+        return EmbeddingLossConfig(**{key: value for key, value in payload.items() if key in known})
 
     def _check_targets(self, parent: Path, mapping: dict[str, str]) -> None:
         sources = {}
@@ -363,7 +431,7 @@ class RunRenamer:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Rename existing runs to the model-head-matching-K_N-aug-presence-loss_weight naming (dual runs gain the dual_<trunks> tag and the params.existence routing tag), rebuilding each name from the run's persisted metadata (run_summary, model_config or dual_model_config, trainer_config, dataset_creation_config)")
+    parser = argparse.ArgumentParser(description="Rename existing runs to the model-head-matching-K_N-aug-presence-loss_weight naming (dual runs gain the dual_<trunks> tag and the params.existence routing tag; JEPA runs gain pae_/iae_ autoencoder tags and carry the loss they actually train on), rebuilding each name from the run's persisted metadata (run_summary, model_config or dual_model_config, trainer_config, dataset_creation_config, profile/image autoencoder configs)")
     parser.add_argument("roots", nargs="+", type=Path, help="any mix of run directories and roots holding them at any depth: training/trial roots, benchmark or cross-validation run tags (training/ or folds/), tuning trial trees, or whole runs roots")
     parser.add_argument("--apply", action="store_true", help="perform the renames; without it the script only prints the plan")
     args = parser.parse_args()

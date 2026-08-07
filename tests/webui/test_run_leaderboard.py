@@ -69,6 +69,36 @@ def test_axes_parse_scientific_weight():
     assert axes["losses"] == [{"name": "covariance_match", "weight": 1e-05}]
 
 
+def test_axes_parse_jepa_profile_coupled_name():
+    axes = RunAxes.parse("resunet-conv-stopgrad-K_5-hv-none-pae_gru.frozen-emb_mse_1-curve_mse_1_20260807_120000")
+
+    assert axes["matching"]   == "stopgrad"
+    assert axes["presence"]   == "none"
+    assert axes["profile_ae"] == "gru.frozen"
+    assert axes["image_ae"]   == ""
+    assert axes["loss"]       == "emb_mse_1-curve_mse_1"
+    assert axes["losses"]     == [{"name": "emb_mse", "weight": 1.0}, {"name": "curve_mse", "weight": 1.0}]
+
+
+def test_axes_parse_jepa_name_with_both_autoencoders():
+    axes = RunAxes.parse("resunet-conv-live-K_5-hv-none-pae_gru.finetune-iae_conv2d.finetune-emb_mse_1-curve_mse_1_20260807_120000")
+
+    assert axes["matching"]   == "live"
+    assert axes["profile_ae"] == "gru.finetune"
+    assert axes["image_ae"]   == "conv2d.finetune"
+    assert axes["losses"]     == [{"name": "emb_mse", "weight": 1.0}, {"name": "curve_mse", "weight": 1.0}]
+
+
+def test_axes_parse_jepa_image_only_name_keeps_the_param_loss():
+    axes = RunAxes.parse("resunet-set_pred-sorted_gt-K_5-hv-A-iae_conv2d.frozen-param_l1_1_20260807_120000")
+
+    assert axes["matching"]   == "sorted_gt"
+    assert axes["presence"]   == "A"
+    assert axes["profile_ae"] == ""
+    assert axes["image_ae"]   == "conv2d.frozen"
+    assert axes["losses"]     == [{"name": "param_l1", "weight": 1.0}]
+
+
 def test_axes_reject_non_standard_names():
     assert RunAxes.parse("smoke_image_ae") is None
     assert RunAxes.parse("resunet-conv-sorted_gt-banana-hvn-none-param_l1_1_20260617_210314") is None

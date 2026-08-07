@@ -185,7 +185,10 @@ def test_training_worker_passes_planned_split_regions(test_data_dir, monkeypatch
 
 
 @pytest.mark.real_data
-def test_training_worker_dispatch_routes_by_type(test_data_dir, monkeypatch):
+def test_training_worker_dispatch_routes_by_type(test_data_dir, tmp_path, monkeypatch):
+    from configuration.architectures                import GruAutoencoderConfig
+    from pipelines.shared.config.config_persistence import ProfileAutoencoderConfigIO
+
     seen = {}
 
     monkeypatch.setattr(FoldTrainingWorker, "_run_backbone",            lambda self, i, seed, sr: seen.update(kind="backbone"), raising=True)
@@ -195,7 +198,12 @@ def test_training_worker_dispatch_routes_by_type(test_data_dir, monkeypatch):
     FoldTrainingWorker(worker_config(test_data_dir, "backbone"), run_tag="rt").run(0)
     assert seen["kind"] == "backbone"
 
-    FoldTrainingWorker(worker_config(test_data_dir, "jepa"), run_tag="rt").run(0)
+    ProfileAutoencoderConfigIO.save(GruAutoencoderConfig(), "gru_ae", tmp_path / "gru_run" / "meta")
+    jepa_config                                 = worker_config(test_data_dir, "jepa")
+    jepa_config.jepa.profile_autoencoder_logdir = tmp_path
+    jepa_config.jepa.profile_autoencoder_run    = "gru_run"
+
+    FoldTrainingWorker(jepa_config, run_tag="rt").run(0)
     assert seen["kind"] == "jepa"
 
     FoldTrainingWorker(worker_config(test_data_dir, "profile_autoencoder"), run_tag="rt").run(0)

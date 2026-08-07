@@ -144,7 +144,7 @@ class FoldRunNaming:
         return GaussianConfig.from_dataset(self.config.paths.dataset_path, self.config.paths.parameters_path).n_default_gaussians
 
     def _training_tag(self) -> str | None:
-        from pipelines.shared.training.run_naming import RunNaming
+        from pipelines.shared.training.run_naming import JepaNamingSpec, RunNaming
 
         config = self.config
 
@@ -152,7 +152,7 @@ class FoldRunNaming:
             return RunNaming.training_tag(config.backbone_name, config.backbone_head, config.curriculum, self._n_gaussians(), config.augmentation)
 
         if config.training_type == "jepa":
-            return RunNaming.tag(config.backbone_name, config.backbone_head, config.jepa.param_loss, self._n_gaussians(), config.augmentation)
+            return RunNaming.jepa_tag(config.backbone_name, config.backbone_head, JepaNamingSpec.resolve(config.jepa), self._n_gaussians(), config.augmentation)
 
         return None
 

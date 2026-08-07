@@ -15,10 +15,12 @@ from web_logger                                import WebLogger
 
 class RunAxes:
 
-    TIMESTAMP = re.compile(r"_(\d{8}_\d{6})")
-    K_TAG     = re.compile(r"^K_(\d+)$")
-    INPUT_TAG = re.compile(r"^([a-z]+\.[a-z]+)-")
-    LOSS_TAG  = re.compile(r"([a-z0-9_]+?)_(\d+(?:\.\d+)?(?:e-?\d+)?)(?:-|$)")
+    TIMESTAMP      = re.compile(r"_(\d{8}_\d{6})")
+    K_TAG          = re.compile(r"^K_(\d+)$")
+    INPUT_TAG      = re.compile(r"^([a-z]+\.[a-z]+)-")
+    PROFILE_AE_TAG = re.compile(r"^pae_([a-z0-9_]+\.[a-z]+)-")
+    IMAGE_AE_TAG   = re.compile(r"^iae_([a-z0-9_]+\.[a-z]+)-")
+    LOSS_TAG       = re.compile(r"([a-z0-9_]+?)_(\d+(?:\.\d+)?(?:e-?\d+)?)(?:-|$)")
 
     @classmethod
     def parse(cls, name: str) -> dict | None:
@@ -40,6 +42,14 @@ class RunAxes:
         inputs      = input_match.group(1) if input_match else ""
         loss_tag    = loss_tag[input_match.end():] if input_match else loss_tag
 
+        profile_match = cls.PROFILE_AE_TAG.match(loss_tag)
+        profile_ae    = profile_match.group(1) if profile_match else ""
+        loss_tag      = loss_tag[profile_match.end():] if profile_match else loss_tag
+
+        image_match = cls.IMAGE_AE_TAG.match(loss_tag)
+        image_ae    = image_match.group(1) if image_match else ""
+        loss_tag    = loss_tag[image_match.end():] if image_match else loss_tag
+
         losses   = []
         position = 0
         while position < len(loss_tag):
@@ -53,17 +63,19 @@ class RunAxes:
             return None
 
         return {
-            "model"     : parts[0],
-            "head"      : parts[1],
-            "matching"  : parts[2],
-            "k"         : int(k_match.group(1)),
-            "aug"       : parts[4],
-            "presence"  : parts[5],
-            "inputs"    : inputs,
-            "loss"      : loss_tag,
-            "losses"    : losses,
-            "timestamp" : timestamp,
-            "suffix"    : suffix,
+            "model"      : parts[0],
+            "head"       : parts[1],
+            "matching"   : parts[2],
+            "k"          : int(k_match.group(1)),
+            "aug"        : parts[4],
+            "presence"   : parts[5],
+            "inputs"     : inputs,
+            "profile_ae" : profile_ae,
+            "image_ae"   : image_ae,
+            "loss"       : loss_tag,
+            "losses"     : losses,
+            "timestamp"  : timestamp,
+            "suffix"     : suffix,
         }
 
 

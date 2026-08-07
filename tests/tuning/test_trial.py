@@ -251,15 +251,24 @@ class FakeJepaTraining:
 
 
 class FakeJepaEntry:
-    def __init__(self, test_data_dir: Path):
+    def __init__(self, test_data_dir: Path, ae_logdir: Path | None = None):
         from configuration.dataset               import AugmentationConfig
-        from configuration.training              import LossConfig
+        from configuration.training              import EmbeddingLossConfig, LossConfig
         from configuration.training.general.run  import TrainingPathsConfig
 
         self.training     = FakeJepaTraining()
         self.param_loss   = LossConfig(use_param_l1=True)
         self.paths        = TrainingPathsConfig(dataset_path=test_data_dir, parameters_path=test_data_dir / "params" / "params_k5_lam0.01_sig4_sigma" / "parameters.npy")
         self.augmentation = AugmentationConfig()
+
+        self.profile_autoencoder_logdir = ae_logdir
+        self.profile_autoencoder_run    = "gru_run" if ae_logdir else None
+        self.profile_autoencoder_mode   = "frozen"
+        self.target_provider            = "stopgrad"
+        self.image_autoencoder_logdir   = ae_logdir
+        self.image_autoencoder_run      = None
+        self.image_autoencoder_mode     = "frozen"
+        self.embedding_loss             = EmbeddingLossConfig()
 
 
 @pytest.mark.real_data
@@ -275,10 +284,15 @@ def test_jepa_tuner_objective_sets_model_overrides(fake_logger, tune_cfg, tmp_pa
 
     monkeypatch.setattr(trial_mod, "TrialJepaPipeline", CaptureJepaPipeline)
 
+    from configuration.architectures                import GruAutoencoderConfig
+    from pipelines.shared.config.config_persistence import ProfileAutoencoderConfigIO
+
+    ProfileAutoencoderConfigIO.save(GruAutoencoderConfig(), "gru_ae", tmp_path / "gru_run" / "meta")
+
     tuner = JepaTuner(
         model_name       = "vit",
         model_config_cls = FakeJepaConfig,
-        entry_template   = FakeJepaEntry(test_data_dir),
+        entry_template   = FakeJepaEntry(test_data_dir, ae_logdir=tmp_path),
         tune_cfg         = tune_cfg,
         log_dir          = str(tmp_path),
         logger           = fake_logger,
@@ -289,7 +303,7 @@ def test_jepa_tuner_objective_sets_model_overrides(fake_logger, tune_cfg, tmp_pa
 
     entry = captured["entry"]
     assert entry.backbone_name == "vit"
-    assert entry.run_name      == "vit-conv-hungarian-K_5-hv-none-param_l1_0.1_trial_0000"
+    assert entry.run_name      == "vit-conv-stopgrad-K_5-hv-none-pae_gru.frozen-emb_mse_1-curve_mse_1_trial_0000"
     assert set(entry.model_overrides.keys()) == {"depth", "hidden_dim"}
     assert entry.model_overrides["depth"]      in [2, 4, 8]
     assert entry.model_overrides["hidden_dim"] in [64, 128]

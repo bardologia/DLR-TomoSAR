@@ -16,7 +16,7 @@ from pipelines.shared.config.run_metadata                import TrainingRunMetad
 from pipelines.backbone.dataset.pipeline                 import BackboneDatasetPreparation
 from pipelines.shared.model.model_builder                import ModelBuilder
 from pipelines.shared.training.overfit_check             import OverfitCheck
-from pipelines.shared.training.run_naming                import RunNaming
+from pipelines.shared.training.run_naming                import JepaNamingSpec, RunNaming
 from pipelines.shared.training.training_runner           import EntryConfigTrainRunner
 from pipelines.jepa.training.trainer                     import JepaModule, Trainer
 from pipelines.shared.config.config_persistence          import ProfileAutoencoderConfigIO, ImageAutoencoderConfigIO
@@ -181,7 +181,7 @@ class TrainingPipeline:
         if self.autoencoder_cfg is not None:
             info["Target Provider"] = self.trainer_config.target_provider
             info["Embedding Loss"]  = self._embedding_loss_label(self.trainer_config.embedding_loss)
-            info["Param Loss"]      = "inactive (profile AE coupled; the run-name loss tokens still describe param_loss)"
+            info["Param Loss"]      = "inactive (profile AE coupled; the run name carries the embedding loss tokens)"
         else:
             info["Target Provider"] = "inactive (no profile AE)"
             info["Embedding Loss"]  = "inactive (no profile AE; the backbone trains on param_loss, banner below)"
@@ -328,7 +328,7 @@ class SingleTrainRunner(EntryConfigTrainRunner):
     @property
     def label(self) -> str:
         n_gaussians = ConfigFactory(self.config).gaussian_config().n_default_gaussians
-        return RunNaming.tag(self.config.backbone_name, self.config.backbone_head, self.config.param_loss, n_gaussians, self.config.augmentation)
+        return RunNaming.jepa_tag(self.config.backbone_name, self.config.backbone_head, JepaNamingSpec.resolve(self.config), n_gaussians, self.config.augmentation)
 
     def _resolve_run_name(self) -> str:
         return RunNaming.compose(self.label, self.config.run_name or RunTag.now())
