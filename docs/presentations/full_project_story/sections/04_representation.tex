@@ -81,22 +81,22 @@
         \toprule
         channel & old & & new & why \\
         \midrule
-        pass / mag     & \textcolor{soft}{z-score (log1p)}        & $\to$ & \textbf{\textcolor{accent}{robust IQR (log1p)}} & tail sets $\mu$, $\sigma$ \\
-        ifg / phase    & \textcolor{soft}{min--max ($p_{99.9}$)}  & $\to$ & \textbf{\textcolor{good}{fixed $\div\,\pi$}}    & bounded by physics \\
+        pass / mag     & \textcolor{soft}{log1p, unscaled}            & $\to$ & \textbf{\textcolor{accent}{robust IQR (log1p)}} & heavy-tailed input \\
+        ifg / phase    & \textcolor{soft}{fixed $[-\pi,\pi]\to[0,1]$} & $\to$ & \textbf{\textcolor{good}{fixed $\div\,\pi$}}    & bounded by physics \\
         \addlinespace
-        out / $a$      & \textcolor{soft}{z-score}                & $\to$ & \textbf{\textcolor{accent}{robust IQR (log1p)}} & heavy-tailed target \\
-        out / $\sigma$ & \textcolor{soft}{z-score}                & $\to$ & \textbf{\textcolor{accent}{robust IQR (log1p)}} & heavy-tailed target \\
-        out / $\mu$    & \textcolor{soft}{z-score}                & $=$   & \textcolor{soft}{z-score \emph{(kept)}}         & bounded to sampling range \\
+        out / $a$      & \textcolor{soft}{hand-set min--max}          & $\to$ & \textbf{\textcolor{accent}{robust IQR (log1p)}} & heavy-tailed target \\
+        out / $\sigma$ & \textcolor{soft}{hand-set min--max}          & $\to$ & \textbf{\textcolor{accent}{robust IQR (log1p)}} & heavy-tailed target \\
+        out / $\mu$    & \textcolor{soft}{hand-set min--max}          & $\to$ & \textbf{z-score}                                & bounded to sampling range \\
         \bottomrule
       \end{tabular}
       \\[19pt]
       \begin{minipage}[c]{0.36\linewidth}
         \centering
-        \mbox{\small\color{soft} $\tilde x = \dfrac{x - \mu}{\sigma}$}
+        \mbox{\small\color{soft} $\tilde x = \dfrac{x - b_{\min}}{b_{\max} - b_{\min}}$}
       \end{minipage}\hfill
       \begin{minipage}[c]{0.60\linewidth}
         \scriptsize\color{soft}
-        \textbf{old --- moments fit the tail.} Rare bright pixels drag $\mu$ and inflate $\sigma$; the bulk compresses into a narrow band.\par
+        \textbf{old --- fixed maps, nothing fitted.} One hand-set range serves every scene; the tail owns the range and the bulk compresses toward zero.\par
       \end{minipage}
       \\[9pt]
       \begin{minipage}[c]{0.36\linewidth}
@@ -114,17 +114,17 @@
         \draw[->,soft] (0,0) -- (3.4,0);
         \draw[soft!80,thick,domain=0.03:3.3,samples=90,smooth]
           plot (\x,{6*\x*exp(-\x/0.55)*0.55});
-        \draw[soft,dashed] (1.05,0) -- (1.05,1.28);
-        \node[font=\tiny,soft,anchor=south] at (1.05,1.3) {mean (dragged)};
+        \draw[soft,dashed] (3.30,0) -- (3.30,1.28);
+        \node[font=\tiny,soft,anchor=south east] at (3.34,1.30) {$b_{\max}$ (hand-set)};
         \draw[{Stealth[length=1.4mm]}-{Stealth[length=1.4mm]},soft]
-          (0.15,0.16) -- (1.95,0.16);
-        \node[font=\tiny,soft,anchor=south] at (0.60,0.2) {$\sigma$};
+          (0.02,0.16) -- (3.30,0.16);
+        \node[font=\tiny,soft,anchor=south] at (1.66,0.20) {one fixed range};
         \fill[accent] (2.55,0.045) circle (1.3pt);
         \fill[accent] (2.9,0.035)  circle (1.3pt);
         \fill[accent] (3.2,0.03)   circle (1.3pt);
-        \node[font=\tiny,accent,anchor=south] at (2.85,0.12) {outliers};
+        \node[font=\tiny,accent,anchor=south] at (2.85,0.30) {tail};
         \draw[soft!70, rounded corners=3pt, thin] (-0.15,-0.28) rectangle (3.72,1.88);
-        \node[font=\tiny, text=soft, anchor=north east] at (3.62,1.80) {$\sigma$ inflated, over-compressed};
+        \node[font=\tiny, text=soft, anchor=north east] at (3.62,1.80) {range fixed a priori, bulk over-compressed};
       \end{tikzpicture}
       \\[18pt]
       \begin{tikzpicture}[scale=1.42]
@@ -149,42 +149,42 @@
 \end{frame}
 
 % ---------------------------------------------------------------- 12b Normalization ablation ladder
-\begin{frame}{Normalization ablation --- every rung improves, the output channels most}
+\begin{frame}{Normalization ablation --- the inputs are flat, the output channels carry the gain}
     \centering
   \scriptsize
   \renewcommand{\arraystretch}{1.08}
   \setlength{\tabcolsep}{4pt}
   \renewcommand{\seedtag}{repA}
-  \begin{tabular}{@{}l c c c !{\hspace{4pt}} c c@{}}
+  \begin{tabular}{@{}l c c c !{\hspace{4pt}} c c c@{}}
     \toprule
-    metric & base & $+$pass mag & $+$ifg $\varphi$ & \textcolor{accent}{$+$out amp} & \textcolor{accent}{$+$out $\sigma$} \\
-           &      & IQR\,log1p  & $\div\pi$        & \textcolor{accent}{IQR\,log1p}  & \textcolor{accent}{IQR\,log1p}    \\
+    metric & base & $+$pass mag & $+$ifg $\varphi$ & \textcolor{accent}{$+$out amp} & \textcolor{accent}{$+$out $\mu$} & \textcolor{accent}{$+$out $\sigma$} \\
+           & legacy fixed & IQR\,log1p  & $\div\pi$   & \textcolor{accent}{IQR\,log1p} & \textcolor{accent}{z-score} & \textcolor{accent}{IQR\,log1p} \\
     \midrule
-    curve $R^2$ $\uparrow$            & \seedpm{0.51}{.04}   & \seedpm{0.53}{.01}   & \seedpm{0.54}{.01}   & \seedpm{\textbf{0.58}}{.03}   & \seedpm{0.57}{.02}           \\
-    curve MAE $\downarrow$           & \seedpm{0.0572}{.003} & \seedpm{0.0544}{.001} & \seedpm{0.0531}{.001} & \seedpm{0.0504}{.002} & \seedpm{\textbf{0.0501}}{.001} \\
-    PSNR [dB] $\uparrow$             & \seedpm{49.8}{.3}    & \seedpm{49.9}{.1}    & \seedpm{50.1}{.1}    & \seedpm{50.5}{.3}    & \seedpm{50.4}{.2}            \\
-    per-pixel $R^2$ $\uparrow$        & \seedpm{0.070}{.015} & \seedpm{0.084}{.005} & \seedpm{0.091}{.004} & \seedpm{0.323}{.031}          & \seedpm{\hlval{good}{\textbf{0.359}}}{.050} \\
-    profile cos med $\uparrow$        & \seedpm{0.000}{.000} & \seedpm{0.000}{.000} & \seedpm{0.000}{.000} & \seedpm{0.847}{.027}          & \seedpm{\hlval{good}{\textbf{0.851}}}{.020} \\
+    curve $R^2$ $\uparrow$            & \seedpm{0.58}{.01}   & \seedpm{0.55}{.02}   & \seedpm{0.56}{.01}   & \seedpm{\textbf{0.59}}{.02}   & \seedpm{\textbf{0.59}}{.01} & \seedpm{0.57}{.02} \\
+    curve MAE $\downarrow$           & \seedpm{0.0537}{.002} & \seedpm{0.0556}{.001} & \seedpm{0.0539}{.0004} & \seedpm{0.0504}{.001} & \seedpm{0.0508}{.001} & \seedpm{\textbf{0.0501}}{.001} \\
+    PSNR [dB] $\uparrow$             & \seedpm{50.4}{.1}    & \seedpm{50.1}{.2}    & \seedpm{50.3}{.1}    & \seedpm{50.5}{.2}    & \seedpm{50.6}{.1} & \seedpm{50.4}{.2} \\
+    per-pixel $R^2$ $\uparrow$        & \seedpm{0.057}{.015} & \seedpm{0.045}{.014} & \seedpm{0.052}{.011} & \seedpm{\hlval{good}{\textbf{0.426}}}{.026} & \seedpm{0.367}{.020} & \seedpm{0.359}{.050} \\
+    profile cos med $\uparrow$        & \seedpm{0.000}{.000} & \seedpm{0.000}{.000} & \seedpm{0.000}{.000} & \seedpm{\hlval{good}{\textbf{0.890}}}{.012} & \seedpm{0.872}{.021} & \seedpm{0.851}{.020} \\
     \addlinespace
-    SSIM elevation $\uparrow$        & \seedpm{0.953}{.002} & \seedpm{0.955}{.001} & \seedpm{0.956}{.001} & \seedpm{0.958}{.002}          & \seedpm{0.958}{.001} \\
-    SSIM range $\uparrow$            & \seedpm{0.905}{.003} & \seedpm{0.907}{.001} & \seedpm{0.909}{.001} & \seedpm{0.923}{.001}          & \seedpm{0.926}{.003} \\
-    SSIM azimuth $\uparrow$          & \seedpm{0.933}{.003} & \seedpm{0.935}{.001} & \seedpm{0.937}{.001} & \seedpm{0.944}{.002}          & \seedpm{0.946}{.001} \\
+    SSIM elevation $\uparrow$        & \seedpm{0.954}{.001} & \seedpm{0.953}{.001} & \seedpm{0.954}{.000} & \seedpm{0.958}{.001} & \seedpm{0.957}{.001} & \seedpm{0.958}{.001} \\
+    SSIM range $\uparrow$            & \seedpm{0.907}{.002} & \seedpm{0.906}{.001} & \seedpm{0.907}{.001} & \seedpm{0.927}{.002} & \seedpm{0.924}{.001} & \seedpm{0.926}{.003} \\
+    SSIM azimuth $\uparrow$          & \seedpm{0.935}{.002} & \seedpm{0.934}{.001} & \seedpm{0.935}{.001} & \seedpm{0.945}{.001} & \seedpm{0.944}{.001} & \seedpm{0.946}{.001} \\
     \addlinespace
-    matched F1 $\uparrow$            & \seedpm{0.467}{.009} & \seedpm{0.472}{.004} & \seedpm{0.476}{.003} & \seedpm{0.688}{.025}          & \seedpm{\hlval{good}{\textbf{0.727}}}{.040} \\
-    matched recall $\uparrow$        & \seedpm{0.351}{.006} & \seedpm{0.354}{.004} & \seedpm{0.356}{.003} & \seedpm{0.604}{.036}          & \seedpm{\hlval{good}{\textbf{0.656}}}{.056} \\
-    count exact $\uparrow$           & \seedpm{0.246}{.005} & \seedpm{0.246}{.005} & \seedpm{0.252}{.002} & \seedpm{0.547}{.050}          & \seedpm{\hlval{good}{\textbf{0.611}}}{.066} \\
+    matched F1 $\uparrow$            & \seedpm{0.455}{.005} & \seedpm{0.458}{.002} & \seedpm{0.458}{.008} & \seedpm{\hlval{good}{\textbf{0.746}}}{.019} & \seedpm{0.721}{.017} & \seedpm{0.728}{.040} \\
+    matched recall $\uparrow$        & \seedpm{0.334}{.004} & \seedpm{0.340}{.002} & \seedpm{0.338}{.008} & \seedpm{\hlval{good}{\textbf{0.690}}}{.025} & \seedpm{0.651}{.024} & \seedpm{0.657}{.056} \\
+    count exact $\uparrow$           & \seedpm{0.228}{.007} & \seedpm{0.231}{.005} & \seedpm{0.232}{.008} & \seedpm{\hlval{good}{\textbf{0.655}}}{.033} & \seedpm{0.599}{.030} & \seedpm{0.613}{.066} \\
     \addlinespace
-    peak err mean $\downarrow$       & \seedpm{10.7}{.1}  & \seedpm{10.7}{.1}  & \seedpm{10.7}{.1}  & \seedpm{5.2}{.8}              & \seedpm{\hlval{good}{\textbf{4.5}}}{.9}   \\
-    \quad median $\downarrow$        & \seedpm{13.7}{.4}  & \seedpm{13.8}{.4}  & \seedpm{13.7}{.4}  & \seedpm{1.2}{.6}              & \seedpm{\hlval{good}{\textbf{0.9}}}{.4}   \\
-    \quad p95 $\downarrow$           & \seedpm{16.8}{.0}  & \seedpm{16.8}{.0}  & \seedpm{16.8}{.0}  & \seedpm{15.8}{.6}             & \seedpm{\textbf{15.4}}{.7}  \\
-    matched $\mu$ MAE $\downarrow$   & \seedpm{3.44}{.09}   & \seedpm{3.37}{.05}   & \seedpm{3.30}{.02}   & \seedpm{2.47}{.10}            & \seedpm{\textbf{2.30}}{.12}  \\
-    matched $\sigma$ MAE $\downarrow$ & \seedpm{1.39}{.03}  & \seedpm{1.36}{.02}   & \seedpm{1.34}{.01}   & \seedpm{0.96}{.04}            & \seedpm{\textbf{0.86}}{.05}  \\
-    matched $a$ MAE $\downarrow$     & \seedpm{0.503}{.014} & \seedpm{0.503}{.008} & \seedpm{0.503}{.013} & \seedpm{0.383}{.020}          & \seedpm{\textbf{0.364}}{.034} \\
+    peak err mean $\downarrow$       & \seedpm{11.2}{.1}  & \seedpm{11.0}{.1}  & \seedpm{11.1}{.1}  & \seedpm{\hlval{good}{\textbf{4.0}}}{.2} & \seedpm{4.6}{.3} & \seedpm{4.5}{.9} \\
+    \quad median $\downarrow$        & \seedpm{14.1}{.0}  & \seedpm{14.1}{.0}  & \seedpm{14.1}{.0}  & \seedpm{\hlval{good}{\textbf{0.7}}}{.0} & \seedpm{\textbf{0.7}}{.0} & \seedpm{0.9}{.4} \\
+    \quad p95 $\downarrow$           & \seedpm{16.8}{.0}  & \seedpm{16.8}{.0}  & \seedpm{16.8}{.0}  & \seedpm{\textbf{14.9}}{.3} & \seedpm{15.6}{.3} & \seedpm{15.4}{.7} \\
+    matched $\mu$ MAE $\downarrow$   & \seedpm{3.33}{.05}   & \seedpm{3.39}{.04}   & \seedpm{3.36}{.04}   & \seedpm{\textbf{2.24}}{.08} & \seedpm{2.29}{.07} & \seedpm{2.30}{.12} \\
+    matched $\sigma$ MAE $\downarrow$ & \seedpm{1.35}{.02}  & \seedpm{1.36}{.01}   & \seedpm{1.35}{.02}   & \seedpm{0.87}{.04} & \seedpm{0.92}{.04} & \seedpm{\textbf{0.86}}{.05} \\
+    matched $a$ MAE $\downarrow$     & \seedpm{0.547}{.015} & \seedpm{0.542}{.023} & \seedpm{0.534}{.015} & \seedpm{\textbf{0.321}}{.011} & \seedpm{0.364}{.024} & \seedpm{0.363}{.034} \\
     \bottomrule
   \end{tabular}
   \par\vspace{3pt}
-  \parbox{0.82\textwidth}{\tiny\color{soft} UNet $\cdot$ sorted-GT $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ no aug $\cdot$ per-slot $\cdot$ patch $64{\times}32$; held-out validation band. Cells: mean $\pm$ seed std over five seeded replicas per rung. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; \textcolor{accent}{red heads} $=$ the output rungs; \textcolor{good}{green} $=$ the metrics those rungs unlock. Base $=$ z-score outputs, zscore-log1p pass, minmax-$p99$ ifg (out $\mu$ stays z-score). $\mu$, $\sigma$, peak in elevation units; $a$ in linear amplitude. Peak median/p95: per-pixel peak-error distribution; profile cos med: median per-pixel cosine to the GT profile.\par}
-    
+  \parbox{0.86\textwidth}{\tiny\color{soft} UNet $\cdot$ sorted-GT $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ no aug $\cdot$ per-slot $\cdot$ patch $64{\times}32$; held-out validation band. Cells: mean $\pm$ seed std over five seeded replicas per rung. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; \textcolor{accent}{red heads} $=$ the output rungs; \textcolor{good}{green} $=$ the metrics the out-amp rung unlocks. Base $=$ the legacy fixed maps: unscaled log1p pass mag, angle${\to}[0,1]$ ifg $\varphi$, hand-set min--max outputs; each rung switches one channel group to its final strategy and keeps it. The three output arms differ within seed noise (paired $p \geq 0.31$). $\mu$, $\sigma$, peak in elevation units; $a$ in linear amplitude. Peak median/p95: per-pixel peak-error distribution; profile cos med: median per-pixel cosine to the GT profile.\par}
+
 
 \end{frame}
 
@@ -195,37 +195,37 @@
   \renewcommand{\arraystretch}{1.00}
   \setlength{\tabcolsep}{4pt}
   \renewcommand{\seedtag}{repB}
-  \begin{tabular}{@{}l c c c !{\hspace{4pt}} c c@{}}
+  \begin{tabular}{@{}l c c c !{\hspace{4pt}} c c c@{}}
     \toprule
-    metric & base & $+$pass mag & $+$ifg $\varphi$ & \textcolor{accent}{$+$out amp} & \textcolor{accent}{$+$out $\sigma$} \\
-           &      & IQR\,log1p  & $\div\pi$        & \textcolor{accent}{IQR\,log1p}  & \textcolor{accent}{IQR\,log1p}    \\
+    metric & base & $+$pass mag & $+$ifg $\varphi$ & \textcolor{accent}{$+$out amp} & \textcolor{accent}{$+$out $\mu$} & \textcolor{accent}{$+$out $\sigma$} \\
+           & legacy fixed & IQR\,log1p  & $\div\pi$   & \textcolor{accent}{IQR\,log1p} & \textcolor{accent}{z-score} & \textcolor{accent}{IQR\,log1p} \\
     \midrule
-    matched precision $\uparrow$ & \seedpm{0.699}{.015} & \seedpm{0.709}{.005} & \seedpm{0.720}{.005} & \seedpm{0.800}{.008} & \seedpm{\textbf{0.816}}{.015} \\
-    \quad $k{=}1$                & \seedpm{0.602}{.015} & \seedpm{0.604}{.014} & \seedpm{0.624}{.005} & \seedpm{0.827}{.020} & \seedpm{\hlval{good}{\textbf{0.848}}}{.019} \\
-    \quad $k{=}2$                & \seedpm{0.752}{.016} & \seedpm{0.765}{.007} & \seedpm{0.771}{.005} & \seedpm{0.767}{.017} & \seedpm{0.776}{.013} \\
+    matched precision $\uparrow$ & \seedpm{0.711}{.013} & \seedpm{0.704}{.003} & \seedpm{0.710}{.006} & \seedpm{0.814}{.011} & \seedpm{0.808}{.010} & \seedpm{\textbf{0.816}}{.015} \\
+    \quad $k{=}1$                & \seedpm{0.588}{.023} & \seedpm{0.585}{.013} & \seedpm{0.592}{.018} & \seedpm{\hlval{good}{\textbf{0.853}}}{.016} & \seedpm{0.835}{.013} & \seedpm{0.848}{.019} \\
+    \quad $k{=}2$                & \seedpm{0.772}{.009} & \seedpm{0.765}{.005} & \seedpm{0.769}{.003} & \seedpm{0.761}{.009} & \seedpm{0.774}{.007} & \seedpm{0.776}{.013} \\
     \addlinespace
-    matched recall $\uparrow$    & \seedpm{0.351}{.006} & \seedpm{0.354}{.004} & \seedpm{0.356}{.003} & \seedpm{0.604}{.036} & \seedpm{\textbf{0.656}}{.056} \\
-    \quad $k{=}1$                & \seedpm{0.182}{.006} & \seedpm{0.180}{.006} & \seedpm{0.182}{.004} & \seedpm{0.562}{.068} & \seedpm{\hlval{good}{\textbf{0.647}}}{.088} \\
-    \quad $k{=}2$                & \seedpm{0.591}{.013} & \seedpm{0.602}{.007} & \seedpm{0.604}{.006} & \seedpm{0.663}{.014} & \seedpm{\textbf{0.670}}{.016} \\
+    matched recall $\uparrow$    & \seedpm{0.334}{.004} & \seedpm{0.340}{.002} & \seedpm{0.338}{.008} & \seedpm{\textbf{0.690}}{.025} & \seedpm{0.651}{.024} & \seedpm{0.657}{.056} \\
+    \quad $k{=}1$                & \seedpm{0.156}{.005} & \seedpm{0.163}{.006} & \seedpm{0.161}{.007} & \seedpm{\hlval{good}{\textbf{0.707}}}{.041} & \seedpm{0.641}{.042} & \seedpm{0.650}{.088} \\
+    \quad $k{=}2$                & \seedpm{0.586}{.007} & \seedpm{0.590}{.004} & \seedpm{0.590}{.009} & \seedpm{0.664}{.009} & \seedpm{0.666}{.006} & \seedpm{\textbf{0.668}}{.016} \\
     \addlinespace
-    count acc $\mid$ pred $k{=}1$ $\uparrow$ & \seedpm{0.763}{.021} & \seedpm{0.781}{.015} & \seedpm{0.796}{.013} & \seedpm{0.942}{.009} & \seedpm{\hlval{good}{\textbf{0.952}}}{.009} \\
-    count acc $\mid$ pred $k{=}2$ $\uparrow$ & \seedpm{0.694}{.008} & \seedpm{0.698}{.006} & \seedpm{0.711}{.007} & \seedpm{0.717}{.012} & \seedpm{0.720}{.013} \\
+    count acc $\mid$ pred $k{=}1$ $\uparrow$ & \seedpm{0.752}{.015} & \seedpm{0.716}{.018} & \seedpm{0.730}{.024} & \seedpm{\hlval{good}{\textbf{0.961}}}{.003} & \seedpm{0.955}{.003} & \seedpm{0.952}{.009} \\
+    count acc $\mid$ pred $k{=}2$ $\uparrow$ & \seedpm{0.705}{.017} & \seedpm{0.697}{.008} & \seedpm{0.704}{.012} & \seedpm{0.712}{.017} & \seedpm{0.702}{.014} & \seedpm{0.720}{.013} \\
     \addlinespace
-    matched $\mu$ MAE $\downarrow$ & \seedpm{3.44}{.09} & \seedpm{3.37}{.05} & \seedpm{3.30}{.02} & \seedpm{2.47}{.10} & \seedpm{\textbf{2.30}}{.12} \\
-    \quad $k{=}1$                & \seedpm{1.25}{.06} & \seedpm{1.15}{.05} & \seedpm{1.10}{.03} & \seedpm{\textbf{0.63}}{.05} & \seedpm{\hlval{good}{\textbf{0.63}}}{.06} \\
-    \quad $k{=}2$                & \seedpm{4.18}{.11} & \seedpm{4.10}{.04} & \seedpm{4.03}{.03} & \seedpm{4.17}{.10} & \seedpm{4.07}{.05} \\
+    matched $\mu$ MAE $\downarrow$ & \seedpm{3.33}{.05} & \seedpm{3.39}{.04} & \seedpm{3.36}{.04} & \seedpm{\textbf{2.24}}{.08} & \seedpm{2.29}{.07} & \seedpm{2.30}{.12} \\
+    \quad $k{=}1$                & \seedpm{1.03}{.08} & \seedpm{1.11}{.04} & \seedpm{1.05}{.02} & \seedpm{\hlval{good}{\textbf{0.55}}}{.03} & \seedpm{0.59}{.07} & \seedpm{0.63}{.06} \\
+    \quad $k{=}2$                & \seedpm{4.01}{.06} & \seedpm{4.07}{.04} & \seedpm{4.05}{.04} & \seedpm{\hlval{accent}{4.18}}{.07} & \seedpm{4.09}{.06} & \seedpm{4.07}{.05} \\
     \addlinespace
-    matched $\sigma$ MAE $\downarrow$ & \seedpm{1.39}{.03} & \seedpm{1.36}{.02} & \seedpm{1.34}{.01} & \seedpm{0.96}{.04} & \seedpm{\textbf{0.86}}{.05} \\
-    \quad $k{=}1$                & \seedpm{0.61}{.02} & \seedpm{0.59}{.02} & \seedpm{0.59}{.01} & \seedpm{0.30}{.02} & \seedpm{\hlval{good}{\textbf{0.25}}}{.02} \\
-    \quad $k{=}2$                & \seedpm{1.65}{.03} & \seedpm{1.61}{.01} & \seedpm{1.58}{.01} & \seedpm{1.58}{.04} & \seedpm{\textbf{1.51}}{.01} \\
+    matched $\sigma$ MAE $\downarrow$ & \seedpm{1.35}{.02} & \seedpm{1.36}{.01} & \seedpm{1.35}{.02} & \seedpm{0.87}{.04} & \seedpm{0.92}{.04} & \seedpm{\textbf{0.86}}{.05} \\
+    \quad $k{=}1$                & \seedpm{0.60}{.01} & \seedpm{0.60}{.01} & \seedpm{0.60}{.01} & \seedpm{\hlval{good}{\textbf{0.24}}}{.02} & \seedpm{0.27}{.02} & \seedpm{0.25}{.02} \\
+    \quad $k{=}2$                & \seedpm{1.57}{.02} & \seedpm{1.59}{.01} & \seedpm{1.58}{.02} & \seedpm{1.59}{.01} & \seedpm{1.62}{.03} & \seedpm{\textbf{1.51}}{.01} \\
     \addlinespace
-    matched $a$ MAE $\downarrow$ & \seedpm{0.503}{.014} & \seedpm{0.503}{.008} & \seedpm{0.503}{.013} & \seedpm{0.383}{.020} & \seedpm{\textbf{0.364}}{.034} \\
-    \quad $k{=}1$                & \seedpm{0.356}{.020} & \seedpm{0.359}{.016} & \seedpm{0.351}{.018} & \seedpm{0.169}{.018} & \seedpm{\hlval{good}{\textbf{0.155}}}{.029} \\
-    \quad $k{=}2$                & \seedpm{0.552}{.012} & \seedpm{\textbf{0.550}}{.005} & \seedpm{0.554}{.011} & \seedpm{0.581}{.021} & \seedpm{\hlval{accent}{0.586}}{.035} \\
+    matched $a$ MAE $\downarrow$ & \seedpm{0.547}{.015} & \seedpm{0.542}{.023} & \seedpm{0.534}{.015} & \seedpm{\textbf{0.321}}{.011} & \seedpm{0.364}{.024} & \seedpm{0.363}{.034} \\
+    \quad $k{=}1$                & \seedpm{0.433}{.029} & \seedpm{0.413}{.035} & \seedpm{0.404}{.032} & \seedpm{\hlval{good}{\textbf{0.126}}}{.009} & \seedpm{0.153}{.023} & \seedpm{0.155}{.029} \\
+    \quad $k{=}2$                & \seedpm{0.580}{.011} & \seedpm{0.581}{.019} & \seedpm{0.574}{.011} & \seedpm{\textbf{0.545}}{.016} & \seedpm{0.588}{.016} & \seedpm{0.586}{.035} \\
     \bottomrule
   \end{tabular}
   \par\vspace{3pt}
-  \parbox{0.82\textwidth}{\tiny\color{soft} UNet $\cdot$ sorted-GT $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ no aug $\cdot$ per-slot $\cdot$ patch $64{\times}32$; held-out validation band. Cells: mean $\pm$ seed std over five seeded replicas; $k$ $=$ true scatterer count of the pixel. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; \textcolor{accent}{red heads} $=$ the output rungs; \textcolor{good}{green} $=$ the $k{=}1$ collapse they buy, \textcolor{accent}{red} $=$ the one drift up. Precision rewards under-prediction --- rank on recall. count acc $\mid$ pred $k$: share of pixels claiming exactly $k$ scatterers whose true count is $k$. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
+  \parbox{0.86\textwidth}{\tiny\color{soft} UNet $\cdot$ sorted-GT $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ no aug $\cdot$ per-slot $\cdot$ patch $64{\times}32$; held-out validation band. Cells: mean $\pm$ seed std over five seeded replicas; $k$ $=$ true scatterer count of the pixel. \textbf{bold} $=$ best in row, marked only where best and worst differ by more than $5\%$; \textcolor{accent}{red heads} $=$ the output rungs; \textcolor{good}{green} $=$ the $k{=}1$ collapse they buy, \textcolor{accent}{red} $=$ the one cost, second-scatterer $\mu$. Precision rewards under-prediction --- rank on recall. count acc $\mid$ pred $k$: share of pixels claiming exactly $k$ scatterers whose true count is $k$. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
     
 
 \end{frame}
@@ -235,39 +235,39 @@
     \centering
   \scriptsize
   \renewcommand{\arraystretch}{1.02}
-  \setlength{\tabcolsep}{2.5pt}
+  \setlength{\tabcolsep}{2.2pt}
   \renewcommand{\seedtag}{repC}
-  \begin{tabular}{@{}l c !{\color{white}\vrule width 1.6pt} c c c !{\hspace{2pt}} c c@{}}
+  \begin{tabular}{@{}l c !{\color{white}\vrule width 1.6pt} c c c !{\hspace{2pt}} c c c@{}}
     \toprule
-    prediction mean & \textcolor{good}{GT} & base & $+$pass mag & $+$ifg $\varphi$ & \textcolor{accent}{$+$out amp} & \textcolor{accent}{$+$out $\sigma$} \\
-                    &                      &      & IQR\,log1p  & $\div\pi$        & \textcolor{accent}{IQR\,log1p}  & \textcolor{accent}{IQR\,log1p}    \\
+    prediction mean & \textcolor{good}{GT} & base & $+$pass mag & $+$ifg $\varphi$ & \textcolor{accent}{$+$out amp} & \textcolor{accent}{$+$out $\mu$} & \textcolor{accent}{$+$out $\sigma$} \\
+                    &                      & legacy fixed & IQR\,log1p  & $\div\pi$   & \textcolor{accent}{IQR\,log1p} & \textcolor{accent}{z-score} & \textcolor{accent}{IQR\,log1p} \\
     \midrule
-    \multicolumn{7}{@{}l}{\textcolor{soft}{\emph{slot 0 --- strongest scatterer; GT-active on every pixel}}} \\
-    \quad active frac            & 1.00    & \seedpm{0.344}{.004} & \seedpm{0.342}{.004} & \seedpm{0.342}{.003} & \seedpm{0.644}{.051} & \seedpm{\hlval{good}{\textbf{0.706}}}{.066} \\
-    \quad $a$ --- active      & 0.77    & \seedpm{1.87}{.03}   & \seedpm{1.88}{.03}   & \seedpm{1.87}{.01}   & \seedpm{0.98}{.08}   & \seedpm{\hlval{good}{\textbf{0.89}}}{.07}   \\
-    \quad $\mu$ --- active    & $-4.89$ & \seedpm{$-3.73$}{.10} & \seedpm{$-3.58$}{.07} & \seedpm{$-3.59$}{.02} & \seedpm{$-4.00$}{.09} & \seedpm{\textbf{$-4.03$}}{.15} \\
-    \quad $\sigma$ --- active & 1.76    & \seedpm{2.36}{.05}   & \seedpm{2.31}{.05}   & \seedpm{2.36}{.03}   & \seedpm{\textbf{1.73}}{.04} & \seedpm{\hlval{accent}{1.52}}{.08} \\
+    \multicolumn{8}{@{}l}{\textcolor{soft}{\emph{slot 0 --- strongest scatterer; GT-active on every pixel}}} \\
+    \quad active frac            & 1.00    & \seedpm{0.317}{.006} & \seedpm{0.326}{.004} & \seedpm{0.323}{.009} & \seedpm{\hlval{good}{\textbf{0.754}}}{.030} & \seedpm{0.702}{.030} & \seedpm{0.708}{.066} \\
+    \quad $a$ --- active      & 0.77    & \seedpm{2.01}{.06}   & \seedpm{2.01}{.06}   & \seedpm{2.03}{.03}   & \seedpm{\hlval{good}{\textbf{0.86}}}{.04}   & \seedpm{0.89}{.04} & \seedpm{0.89}{.07} \\
+    \quad $\mu$ --- active    & $-4.89$ & \seedpm{$-3.47$}{.12} & \seedpm{$-3.60$}{.12} & \seedpm{$-3.46$}{.10} & \seedpm{\textbf{$-4.28$}}{.09} & \seedpm{$-4.16$}{.11} & \seedpm{$-4.03$}{.15} \\
+    \quad $\sigma$ --- active & 1.76    & \seedpm{2.46}{.04}   & \seedpm{2.41}{.07}   & \seedpm{2.42}{.06}   & \seedpm{1.61}{.06} & \seedpm{\textbf{1.69}}{.09} & \seedpm{\hlval{accent}{1.52}}{.07} \\
     \addlinespace
-    \multicolumn{7}{@{}l}{\textcolor{soft}{\emph{slot 1 --- second scatterer; GT-active on 26\% of pixels}}} \\
-    \quad active frac            & 0.260 & \seedpm{0.289}{.005} & \seedpm{0.288}{.004} & \seedpm{\textbf{0.281}}{.003} & \seedpm{0.308}{.007} & \seedpm{0.306}{.008} \\
-    \quad $a$ --- active      & 1.43  & \seedpm{1.33}{.04} & \seedpm{1.33}{.03} & \seedpm{\textbf{1.34}}{.03} & \seedpm{1.04}{.04} & \seedpm{1.06}{.05} \\
-    \quad $a$ --- inact.    & 0.00  & \seedpm{0.74}{.03} & \seedpm{0.70}{.03} & \seedpm{0.68}{.01} & \seedpm{\hlval{good}{\textbf{0.44}}}{.02} & \seedpm{0.45}{.04} \\
-    \quad $\mu$ --- active    & 11.34 & \seedpm{10.39}{.39} & \seedpm{10.20}{.38} & \seedpm{\textbf{10.56}}{.32} & \seedpm{10.23}{.48} & \seedpm{9.97}{.40} \\
-    \quad $\mu$ --- inact.  & ---   & \seedpm{3.66}{.31} & \seedpm{3.65}{.26} & \seedpm{3.98}{.24} & \seedpm{3.73}{.72} & \seedpm{3.39}{.57} \\
-    \quad $\sigma$ --- active & 3.53  & \seedpm{3.59}{.10} & \seedpm{\textbf{3.52}}{.09} & \seedpm{3.58}{.06} & \seedpm{3.41}{.11} & \seedpm{3.02}{.04} \\
-    \quad $\sigma$ --- inact. & --- & \seedpm{2.36}{.10} & \seedpm{2.27}{.05} & \seedpm{2.21}{.02} & \seedpm{2.06}{.06} & \seedpm{1.90}{.04} \\
+    \multicolumn{8}{@{}l}{\textcolor{soft}{\emph{slot 1 --- second scatterer; GT-active on 26\% of pixels}}} \\
+    \quad active frac            & 0.261 & \seedpm{\textbf{0.276}}{.009} & \seedpm{0.282}{.003} & \seedpm{0.279}{.008} & \seedpm{0.315}{.009} & \seedpm{0.314}{.007} & \seedpm{0.307}{.008} \\
+    \quad $a$ --- active      & 1.42  & \seedpm{1.43}{.03} & \seedpm{1.40}{.04} & \seedpm{\textbf{1.42}}{.02} & \seedpm{1.07}{.03} & \seedpm{1.04}{.01} & \seedpm{1.06}{.05} \\
+    \quad $a$ --- inact.    & 0.00  & \seedpm{0.74}{.03} & \seedpm{0.80}{.02} & \seedpm{0.76}{.05} & \seedpm{\hlval{good}{\textbf{0.44}}}{.02} & \seedpm{0.45}{.03} & \seedpm{0.45}{.04} \\
+    \quad $\mu$ --- active    & 11.39 & \seedpm{\textbf{10.95}}{.26} & \seedpm{10.39}{.42} & \seedpm{10.79}{.29} & \seedpm{9.95}{.33} & \seedpm{10.18}{.24} & \seedpm{9.97}{.40} \\
+    \quad $\mu$ --- inact.  & ---   & \seedpm{4.29}{.17} & \seedpm{3.76}{.37} & \seedpm{4.26}{.22} & \seedpm{3.46}{.69} & \seedpm{3.17}{.21} & \seedpm{3.39}{.57} \\
+    \quad $\sigma$ --- active & 3.55  & \seedpm{3.70}{.09} & \seedpm{3.65}{.08} & \seedpm{3.66}{.06} & \seedpm{3.38}{.11} & \seedpm{\textbf{3.55}}{.08} & \seedpm{3.02}{.04} \\
+    \quad $\sigma$ --- inact. & --- & \seedpm{2.30}{.09} & \seedpm{2.36}{.07} & \seedpm{2.30}{.04} & \seedpm{1.99}{.09} & \seedpm{2.19}{.09} & \seedpm{1.90}{.04} \\
     \addlinespace
-    \multicolumn{7}{@{}l}{\textcolor{soft}{\emph{distribution width --- std over GT-active pixels}}} \\
-    \quad $a$ --- slot 0      & 1.48  & \seedpm{1.43}{.04} & \seedpm{\textbf{1.44}}{.04} & \seedpm{1.42}{.04} & \seedpm{1.24}{.07} & \seedpm{1.17}{.06} \\
-    \quad $\mu$ --- slot 0    & 3.30  & \seedpm{2.27}{.10} & \seedpm{2.31}{.08} & \seedpm{\textbf{2.38}}{.05} & \seedpm{2.07}{.08} & \seedpm{2.03}{.12} \\
-    \quad $\sigma$ --- slot 0 & 2.84  & \seedpm{0.95}{.05} & \seedpm{0.95}{.05} & \seedpm{1.07}{.06} & \seedpm{\textbf{1.30}}{.05} & \seedpm{1.01}{.03} \\
-    \quad $a$ --- slot 1      & 1.45  & \seedpm{0.92}{.03} & \seedpm{0.94}{.04} & \seedpm{\textbf{0.95}}{.03} & \seedpm{0.83}{.04} & \seedpm{0.84}{.05} \\
-    \quad $\mu$ --- slot 1    & 16.24 & \seedpm{7.28}{.23} & \seedpm{7.26}{.21} & \seedpm{7.55}{.23} & \seedpm{8.65}{.29} & \seedpm{\textbf{8.76}}{.27} \\
-    \quad $\sigma$ --- slot 1 & 4.01  & \seedpm{1.11}{.05} & \seedpm{1.11}{.03} & \seedpm{1.19}{.04} & \seedpm{\textbf{1.35}}{.08} & \seedpm{1.14}{.04} \\
+    \multicolumn{8}{@{}l}{\textcolor{soft}{\emph{distribution width --- std over GT-active pixels}}} \\
+    \quad $a$ --- slot 0      & 1.48  & \seedpm{1.43}{.07} & \seedpm{1.45}{.07} & \seedpm{\textbf{1.48}}{.04} & \seedpm{1.23}{.04} & \seedpm{1.18}{.05} & \seedpm{1.17}{.06} \\
+    \quad $\mu$ --- slot 0    & 3.30  & \seedpm{\textbf{2.58}}{.11} & \seedpm{2.46}{.08} & \seedpm{2.54}{.10} & \seedpm{1.99}{.08} & \seedpm{2.08}{.14} & \seedpm{2.03}{.12} \\
+    \quad $\sigma$ --- slot 0 & 2.84  & \seedpm{1.22}{.05} & \seedpm{1.08}{.07} & \seedpm{1.17}{.06} & \seedpm{1.26}{.06} & \seedpm{\textbf{1.29}}{.06} & \seedpm{1.01}{.03} \\
+    \quad $a$ --- slot 1      & 1.45  & \seedpm{0.97}{.05} & \seedpm{0.94}{.04} & \seedpm{\textbf{0.98}}{.01} & \seedpm{0.87}{.05} & \seedpm{0.80}{.03} & \seedpm{0.84}{.05} \\
+    \quad $\mu$ --- slot 1    & 16.30 & \seedpm{7.57}{.22} & \seedpm{7.29}{.25} & \seedpm{7.45}{.09} & \seedpm{8.09}{.20} & \seedpm{\textbf{8.87}}{.27} & \seedpm{8.76}{.27} \\
+    \quad $\sigma$ --- slot 1 & 4.11  & \seedpm{1.17}{.07} & \seedpm{1.12}{.05} & \seedpm{1.17}{.03} & \seedpm{\textbf{1.28}}{.03} & \seedpm{\textbf{1.28}}{.04} & \seedpm{1.14}{.04} \\
     \bottomrule
   \end{tabular}
   \par\vspace{3pt}
-  \parbox{0.82\textwidth}{\tiny\color{soft} UNet $\cdot$ sorted-GT $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ no aug $\cdot$ per-slot $\cdot$ patch $64{\times}32$; held-out validation band. Cells: mean $\pm$ seed std over five seeded replicas; means conditioned on the slot's GT activity mask. \textbf{bold} $=$ closest to the \textcolor{good}{GT} column, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the calibration shifts that matter, \textcolor{accent}{red} $=$ the one overshoot past the GT. Inactive GT slots define no $\mu$/$\sigma$ reference (---). Width rows: std of the prediction over GT-active pixels vs the GT's own std. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
+  \parbox{0.86\textwidth}{\tiny\color{soft} UNet $\cdot$ sorted-GT $\cdot$ $K{=}2$ $\cdot$ param-MSE $\cdot$ no aug $\cdot$ per-slot $\cdot$ patch $64{\times}32$; held-out validation band. Cells: mean $\pm$ seed std over five seeded replicas; means conditioned on the slot's GT activity mask. \textbf{bold} $=$ closest to the \textcolor{good}{GT} column, marked only where best and worst differ by more than $5\%$; \textcolor{good}{green} $=$ the calibration shifts the out-amp rung buys, \textcolor{accent}{red} $=$ the one overshoot past the GT. Inactive GT slots define no $\mu$/$\sigma$ reference (---). Width rows: std of the prediction over GT-active pixels vs the GT's own std. $\mu$, $\sigma$ in elevation units; $a$ in linear amplitude.\par}
     
 
 \end{frame}

@@ -3963,7 +3963,11 @@ All builds run inside this directory (images resolve via `../../results/...`).
 Frames carrying a dashed PENDING box need results or figures before the talk
 (listed by frame title, since numbering shifts as frames are added):
 
-- "Normalization ablation --- every rung improves, the output channels most" — NEW 2026-07-09:
+- "Normalization ablation --- every rung improves, the output channels most" — [SUPERSEDED
+  2026-08-07: the experiment was rebased onto the legacy fixed presets as base, gained a
+  sixth +out mu rung, and the every-rung-improves story died with the new data; the frame
+  is retitled "Normalization ablation --- the inputs are flat, the output channels carry
+  the gain" — see the file-end design-log entry "NORMALIZATION LADDER REBASED".] NEW 2026-07-09:
   added as the last Act II frame, right after "Per-channel normalization --- old -> new,
   channel by channel" (the former "one source of truth" frame, since redesigned — see
   Design log), from results/normalization_exp/ (overview.md + metrics_comparison(1).md,
@@ -4530,3 +4534,33 @@ Frames carrying a dashed PENDING box need results or figures before the talk
   reconstructed" (standard DSP collocation), "stability keystone" (single
   authorial metaphor). Verified: tectonic full (122pp) + sub_03, only the
   pre-existing overfull at 04_representation:149.
+- NORMALIZATION LADDER REBASED TO THE LEGACY SCHEME 2026-08-07 (user: "the experiment
+  was updated, these are the new results, update the presentation"; data =
+  ~/Downloads/newnormk2results.zip -> results/K2/Normalization, replacing the old
+  five-rung set wholesale; reports generated 2026-08-07 09:39, five seeds per rung):
+  the ablation now starts from the TRUE legacy fixed presets (NormalizationTrialsConfig
+  in configuration/training/backbone.py: pass mag fixed_log1p, ifg phase fixed_angle_01,
+  all three outputs fixed_bounds) and climbs SIX rungs -- +pass mag IQR-log1p, +ifg phi
+  div-pi, +out amp IQR-log1p, +out mu z-score (NEW RUNG, fixed_bounds -> zscore),
+  +out sigma IQR-log1p. Story change: the old "every rung improves" framing is DEAD --
+  the input rungs are flat to slightly negative (pass mag curve MAE 0.0537->0.0556,
+  R2 0.576->0.548, all at ~1x combined seed noise) and the +out amp rung carries nearly
+  the whole gain (recall 0.334->0.690, count exact 0.228->0.655, per-pixel R2
+  0.057->0.426, cos med 0->0.890, peak median 14.1->0.7); the mu/sigma rungs shuffle
+  within seed noise (all paired p >= 0.31 vs the composite leader; caption states it).
+  Frames touched, layout preserved: 12b retitled "the inputs are flat, the output
+  channels carry the gain", 12b/12c/12d tables widened to six data columns (+out mu
+  column, header z-score; base column header "legacy fixed"; 12d tabcolsep 2.5->2.2pt,
+  captions 0.82->0.86 textwidth); green now marks the out-amp unlock cells (was the
+  endpoint), 12c's red cost moved from a-MAE k=2 (drift gone in the new data -- out amp
+  IMPROVES it to 0.545, mu/sigma give it back) to mu-MAE k=2 4.01->4.18 at +out amp;
+  12d GT refs updated from the new reports (slot-1 mu 11.34->11.39, sigma 3.53->3.55,
+  widths 16.24->16.30 / 4.01->4.11, a 1.43->1.42, frac 0.260->0.261). The migration
+  frame "Per-channel normalization --- old -> new" was reconciled to the same base:
+  old column now the legacy fixed maps (log1p unscaled / fixed angle->[0,1] / hand-set
+  min-max, matching the 01b legacy-deltas table), out/mu row changed from "= kept" to
+  "-> z-score", old-side equation swapped to the fixed-bounds min-max form with caption
+  "fixed maps, nothing fitted", old tikz panel relabeled (b_max hand-set dashed line,
+  one-fixed-range arrow, tail dots). Verified: tectonic full (161pp) + sub_03 (7pp),
+  only the pre-existing overfulls at 04_representation:48/:149; pages 4-7 of sub_03
+  render-inspected.
