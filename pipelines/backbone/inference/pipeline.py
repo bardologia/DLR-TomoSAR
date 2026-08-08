@@ -216,7 +216,7 @@ class InferencePipeline:
 
         logger.section("[Inference: Flip Consistency]")
 
-        evaluator = FlipConsistencyEvaluator(run, logger, window_kind=cfg.stitch_window, render_amp_floor=cfg.render_amp_floor)
+        evaluator = FlipConsistencyEvaluator(run, logger, window_kind=cfg.stitch_window, render_amp_floor=cfg.render_amp_floor, render_params=self.components.param_space)
         flip_map  = evaluator.run()
 
         result.flip_consistency = flip_map

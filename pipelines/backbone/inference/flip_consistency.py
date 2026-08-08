@@ -11,27 +11,31 @@ class FlipConsistencyEvaluator:
 
     FLIP_AXES = {"azimuth": 2, "range": 3}
 
-    def __init__(self, run, logger, *, window_kind: str, render_amp_floor: float = 0.0) -> None:
-        self.loaded      = run
-        self.logger      = logger
-        self.window_kind = window_kind
-        self.renderer    = PredictionCurves(run.n_gaussians, run.x_axis, render_amp_floor)
+    def __init__(self, run, logger, *, window_kind: str, render_amp_floor: float = 0.0, render_params: bool = True) -> None:
+        self.loaded        = run
+        self.logger        = logger
+        self.window_kind   = window_kind
+        self.render_params = render_params
+        self.renderer      = PredictionCurves(run.n_gaussians, run.x_axis, render_amp_floor) if render_params else None
 
-    def _curves(self, params: np.ndarray) -> np.ndarray:
-        return self.renderer.render(params)
+    def _curves(self, output: np.ndarray) -> np.ndarray:
+        if not self.render_params:
+            return np.asarray(output, dtype=np.float32)
 
-    def _flipped_params(self, images: torch.Tensor, axis: int) -> np.ndarray:
+        return self.renderer.render(output)
+
+    def _flipped_output(self, images: torch.Tensor, axis: int) -> np.ndarray:
         flipped = torch.flip(images, dims=[axis])
-        params  = self.loaded.model(flipped)
+        output  = self.loaded.model(flipped)
 
-        return np.flip(params, axis=axis)
+        return np.flip(output, axis=axis)
 
     def _batch_disagreement(self, images: torch.Tensor) -> np.ndarray:
         base_curves = self._curves(self.loaded.model(images))
 
         disagreement = np.zeros(base_curves.shape[0:1] + base_curves.shape[2:], dtype=np.float64)
         for axis in self.FLIP_AXES.values():
-            flip_curves   = self._curves(self._flipped_params(images, axis))
+            flip_curves   = self._curves(self._flipped_output(images, axis))
             disagreement += ((base_curves - flip_curves) ** 2).mean(axis=1)
 
         return (disagreement / len(self.FLIP_AXES)).astype(np.float32)
