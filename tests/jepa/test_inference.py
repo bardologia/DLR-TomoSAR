@@ -313,3 +313,43 @@ def test_jepa_curve_predictor_zero_error_on_identical_output(tmp_path):
     result = predictor.run_inference()
 
     assert result.pixel_mse.max() == pytest.approx(0.0, abs=1e-8)
+
+
+def test_jepa_curve_predictor_stitches_exact_gt_parameters(tmp_path):
+    n_gaussians = 2
+    n_elev      = 6
+    spatial     = 4
+
+    def model_fn(images):
+        return np.random.rand(images.shape[0], n_elev, spatial, spatial).astype(np.float32)
+
+    run  = build_fake_run(model_fn, n_gaussians, n_elev, spatial)
+    meta = types.SimpleNamespace(cube_dir=tmp_path)
+
+    predictor = JepaCurvePredictor(run, SilentLogger(), window_kind="uniform", cube_dtype="float32", save_cubes=False, meta=meta)
+    result    = predictor.run_inference()
+
+    assert result.params_gt.shape == (n_gaussians * 3, spatial, spatial)
+    assert result.params_pred is None
+
+    expected = run.loader[0][1][0].numpy()
+    np.testing.assert_allclose(result.params_gt[0], expected[0], rtol=1e-5)
+
+
+def test_jepa_curve_predictor_masks_inactive_gt_slots(tmp_path):
+    n_gaussians = 2
+    n_elev      = 6
+    spatial     = 4
+
+    def model_fn(images):
+        return np.zeros((images.shape[0], n_elev, spatial, spatial), dtype=np.float32)
+
+    run = build_fake_run(model_fn, n_gaussians, n_elev, spatial)
+    run.loader[0][1][:, 3] = 0.0
+
+    predictor = JepaCurvePredictor(run, SilentLogger(), window_kind="uniform", cube_dtype="float32", save_cubes=False, meta=types.SimpleNamespace(cube_dir=tmp_path))
+    result    = predictor.run_inference()
+
+    assert np.all(np.isnan(result.params_gt[4]))
+    assert np.all(np.isnan(result.params_gt[5]))
+    assert not np.any(np.isnan(result.params_gt[1]))

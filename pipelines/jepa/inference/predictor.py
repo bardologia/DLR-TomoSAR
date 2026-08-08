@@ -6,6 +6,7 @@ import torch
 from pipelines.backbone.inference.metrics   import Metrics, Result
 from pipelines.backbone.inference.predictor import Predictor
 from tools.data.gaussians                   import GaussianReconstructor
+from tools.loss.param_loss                  import ParamMatcher
 
 
 class JepaCurvePredictor(Predictor):
@@ -14,9 +15,10 @@ class JepaCurvePredictor(Predictor):
         n_K = run.n_gaussians
         x   = np.asarray(run.x_axis, dtype=np.float32).reshape(1, 1, -1, 1, 1)
 
-        all_indices : list = []
-        all_pred    : list = []
-        all_gt      : list = []
+        all_indices   : list = []
+        all_pred      : list = []
+        all_gt        : list = []
+        all_gt_params : list = []
         sample_count = 0
 
         with self.logger.track(transient=True) as prog:
@@ -37,24 +39,35 @@ class JepaCurvePredictor(Predictor):
                 all_indices.append(list(range(sample_count, sample_count + B)))
                 all_pred.append(pred_curves.astype(np.float32))
                 all_gt.append(gt_curves.astype(np.float32))
+                all_gt_params.append(gt_params)
                 sample_count += B
                 prog.advance(task)
 
-        return all_indices, all_pred, all_gt
+        return all_indices, all_pred, all_gt, all_gt_params
 
-    def _stitch_curves(self, all_indices, all_pred, all_gt):
-        n_elev  = self.run.x_axis_length
-        pred_st = self._create_stitcher(n_elev, "pred_curves")
-        gt_st   = self._create_stitcher(n_elev, "gt_curves")
+    def _stitch_curves(self, all_indices, all_pred, all_gt, all_gt_params):
+        n_elev    = self.run.x_axis_length
+        pred_st   = self._create_stitcher(n_elev, "pred_curves")
+        gt_st     = self._create_stitcher(n_elev, "gt_curves")
+        gt_par_st = self._create_param_stitcher(self.run.n_gaussians * 3, "params_gt")
 
-        for batch_indices, pc, gc in zip(all_indices, all_pred, all_gt):
+        for batch_indices, pc, gc, gp in zip(all_indices, all_pred, all_gt, all_gt_params):
             for b, idx in enumerate(batch_indices):
-                pred_st.add_patch(idx, pc[b].astype(self.cube_dtype))
-                gt_st.add_patch(  idx, gc[b].astype(self.cube_dtype))
+                pred_st.add_patch(  idx, pc[b].astype(self.cube_dtype))
+                gt_st.add_patch(    idx, gc[b].astype(self.cube_dtype))
+                gt_par_st.add_patch(idx, gp[b].astype(self.cube_dtype))
 
-        return pred_st.finalize_cube(), gt_st.finalize_cube()
+        return pred_st.finalize_cube(), gt_st.finalize_cube(), gt_par_st.finalize_cube()
 
-    def _finalize(self, pred_cube: np.ndarray, gt_cube: np.ndarray) -> Result:
+    def _mask_inactive_gt(self, params_gt: np.ndarray) -> np.ndarray:
+        for k in range(self.run.n_gaussians):
+            inactive = ~ParamMatcher.is_active(params_gt[3 * k])
+            params_gt[3 * k + 1][inactive] = np.nan
+            params_gt[3 * k + 2][inactive] = np.nan
+
+        return params_gt
+
+    def _finalize(self, pred_cube: np.ndarray, gt_cube: np.ndarray, params_gt: np.ndarray) -> Result:
         pixel_maps     = Metrics.curve_pixel_metrics(pred_cube, gt_cube)
         pixel_mse      = pixel_maps["mse"]
         pixel_mae      = pixel_maps["mae"]
@@ -65,6 +78,7 @@ class JepaCurvePredictor(Predictor):
         if self.save_cubes:
             np.save(self.cube_dir / "pred_curves.npy", pred_cube)
             np.save(self.cube_dir / "gt_curves.npy",   gt_cube)
+            np.save(self.cube_dir / "params_gt.npy",   params_gt)
             np.save(self.cube_dir / "pixel_mse.npy",   pixel_mse)
             np.save(self.cube_dir / "pixel_mae.npy",   pixel_mae)
             np.save(self.cube_dir / "pixel_r2.npy",    pixel_r2)
@@ -76,6 +90,7 @@ class JepaCurvePredictor(Predictor):
         self.logger.section("[Inference: Results]")
         self.logger.kv_table({
             "Curves cube    (denorm)": pred_cube.shape,
+            "GT params cube (denorm)": params_gt.shape,
             "Mean pixel MSE (denorm)": f"{pixel_mse.mean():.4g}  (pred vs gt)",
             "Mean pixel R²  (denorm)": f"{pixel_r2.mean():.4g}  (pred vs gt)",
         })
@@ -83,6 +98,7 @@ class JepaCurvePredictor(Predictor):
         return Result(
             pred_curves        = pred_cube,
             gt_curves          = gt_cube,
+            params_gt          = params_gt,
             pixel_mse          = pixel_mse,
             pixel_mae          = pixel_mae,
             pixel_r2           = pixel_r2,
@@ -103,6 +119,7 @@ class JepaCurvePredictor(Predictor):
             "Cube dtype" : self.cube_dtype,
         })
 
-        all_indices, all_pred, all_gt = self._forward_pass()
-        pred_cube, gt_cube            = self._stitch_curves(all_indices, all_pred, all_gt)
-        return self._finalize(pred_cube, gt_cube)
+        all_indices, all_pred, all_gt, all_gt_params = self._forward_pass()
+
+        pred_cube, gt_cube, params_gt = self._stitch_curves(all_indices, all_pred, all_gt, all_gt_params)
+        return self._finalize(pred_cube, gt_cube, self._mask_inactive_gt(params_gt))
