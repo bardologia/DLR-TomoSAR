@@ -48,6 +48,18 @@ def _curves_from_params(params, x_axis, n_gaussians) -> np.ndarray:
     return curve.astype(np.float32)
 
 
+def _gaussian_params(seed: int, height: int = 4, width: int = 3) -> np.ndarray:
+    rng    = np.random.default_rng(seed)
+    params = np.zeros((N_GAUSSIANS * 3, height, width), dtype=np.float32)
+
+    for k in range(2):
+        params[3 * k]     = rng.uniform(0.5, 2.0, (height, width))
+        params[3 * k + 1] = rng.uniform(-10.0, 60.0, (height, width))
+        params[3 * k + 2] = rng.uniform(4.0, 9.0, (height, width))
+
+    return params
+
+
 def test_curve_pixel_metrics_identical_is_perfect():
     rng   = np.random.default_rng(0)
     curve = rng.random((N_ELEV, 6, 7)).astype(np.float32) + 0.1
@@ -521,3 +533,42 @@ def test_label_quality_shape_mismatch_raises():
 
     with pytest.raises(ValueError):
         Metrics(result, _x_axis(), N_GAUSSIANS).label_quality(np.ones((N_ELEV, 5, 3), dtype=np.float32))
+
+
+def test_roughness_map_is_zero_for_a_linear_ramp():
+    ramp = np.linspace(0.0, 1.0, N_ELEV, dtype=np.float32).reshape(-1, 1, 1) * np.ones((1, 3, 2), dtype=np.float32)
+
+    assert Metrics.roughness_map(ramp).shape == (3, 2)
+    assert np.allclose(Metrics.roughness_map(ramp), 0.0, atol=1e-10)
+
+
+def test_roughness_map_grows_with_bin_to_bin_jitter():
+    smooth = np.zeros((N_ELEV, 2, 2), dtype=np.float32)
+    jitter = np.tile(np.array([1.0, -1.0], dtype=np.float32), N_ELEV // 2).reshape(-1, 1, 1) * np.ones((1, 2, 2), dtype=np.float32)
+
+    assert Metrics.roughness_map(jitter).mean() > Metrics.roughness_map(smooth).mean()
+
+
+def test_roughness_metrics_report_unit_ratio_for_identical_curves():
+    x_axis = _x_axis()
+    params = _gaussian_params(seed=1)
+    curves = _curves_from_params(params, x_axis, N_GAUSSIANS)
+
+    metrics = Metrics(_make_result(curves.copy(), curves), x_axis, N_GAUSSIANS).compute(param_space=False)
+
+    assert metrics["roughness_ratio"]       == pytest.approx(1.0, rel=1e-6)
+    assert metrics["roughness_excess_frac"] == pytest.approx(0.0)
+
+
+def test_roughness_ratio_exceeds_one_when_the_prediction_carries_jitter():
+    x_axis = _x_axis()
+    params = _gaussian_params(seed=2)
+    gt     = _curves_from_params(params, x_axis, N_GAUSSIANS)
+
+    jitter = np.tile(np.array([1.0, -1.0], dtype=np.float32), N_ELEV // 2).reshape(-1, 1, 1)
+    pred   = gt + 0.2 * jitter
+
+    metrics = Metrics(_make_result(pred, gt), x_axis, N_GAUSSIANS).compute(param_space=False)
+
+    assert metrics["roughness_ratio"] > 2.0
+    assert metrics["roughness_excess_frac"] > 0.5

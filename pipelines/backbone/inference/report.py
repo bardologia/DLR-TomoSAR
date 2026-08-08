@@ -274,6 +274,7 @@ class Report:
         out += self._build_tracks_table()
         out += self._build_track_positions_table()
         out += self._build_jepa_headline()
+        out += self._build_roughness_headline()
         out += self._build_reduced_headline()
         out += self._build_data_consistency_headline()
 
@@ -522,6 +523,29 @@ class Report:
 
         return out
 
+    def _build_roughness_headline(self) -> List[str]:
+        gm = self.global_metrics
+        if "roughness_ratio" not in gm:
+            return []
+
+        out = [f"\n### {self._next_subsection()} Curve smoothness\n"]
+        out.append(
+            "Mean squared second difference along elevation, which measures bin-to-bin jitter rather than "
+            "the size of the error. GT profiles are Gaussian mixtures and therefore smooth by construction, "
+            "so a ratio far above 1 means the prediction carries high-frequency structure the labels never had, "
+            "even when its MSE looks acceptable.\n"
+        )
+        out.append(self._three_col_table([
+            ("Roughness (pred)",  gm["roughness_pred_mean"],   "Mean squared second difference of the predicted curves"),
+            ("Roughness (GT)",    gm["roughness_gt_mean"],     "Same statistic on the GT curves"),
+            ("Roughness ratio",   gm["roughness_ratio"],       "Pred over GT; 1 means the prediction is exactly as smooth as the labels"),
+            ("Excess fraction",   gm["roughness_excess_frac"], "Fraction of pixels whose prediction is over twice as rough as its GT"),
+        ], header=("Metric", "Value", "Description")))
+        out.append("")
+
+        return out
+
+
     def _build_reduced_headline(self) -> List[str]:
         gm = self.global_metrics
         if "improvement_pixel_mse_mean" not in gm:
@@ -602,6 +626,7 @@ class Report:
         ("3.1 Dataset statistics",                               lambda k: k in Report._DATASET_KEYS or k.endswith("_status")),
         ("3.11 Interferometric data consistency",                lambda k: k.startswith(("physics_", "phase_agreement_"))),
         ("3.12 JEPA embedding diagnostics",                      lambda k: k.startswith("jepa_")),
+        ("3.12c Curve roughness",                                lambda k: k.startswith("roughness_")),
         ("3.13 Label quality (GT fit vs raw tomogram)",          lambda k: k.startswith("label_")),
         ("3.14 Normalization & clamp health",                    lambda k: k.startswith(("norm_in_", "clamp_"))),
         ("3.15 Flip-equivariance consistency",                   lambda k: k.startswith("flip_")),

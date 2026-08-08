@@ -294,6 +294,26 @@ class Metrics:
             f"elev_ce_{suffix}"   : ce_gt,
         }
 
+    @staticmethod
+    def roughness_map(curves: np.ndarray) -> np.ndarray:
+        second = np.diff(curves, n=2, axis=0)
+        return (second * second).mean(axis=0, dtype=np.float64).astype(np.float32)
+
+    def _roughness_stats(self, pred: np.ndarray, gt: np.ndarray) -> Dict[str, float]:
+        rough_pred = self.roughness_map(pred)
+        rough_gt   = self.roughness_map(gt)
+
+        pred_mean = float(rough_pred.mean(dtype=np.float64))
+        gt_mean   = float(rough_gt.mean(dtype=np.float64))
+        excess    = rough_pred > (2.0 * rough_gt)
+
+        return {
+            "roughness_pred_mean"   : pred_mean,
+            "roughness_gt_mean"     : gt_mean,
+            "roughness_ratio"       : pred_mean / gt_mean if gt_mean > 0.0 else float("nan"),
+            "roughness_excess_frac" : float(excess.mean()),
+        }
+
     def _param_assignment(self) -> np.ndarray:
         return self.result.assignment(self.n_gaussians)
 
@@ -539,6 +559,7 @@ class Metrics:
         metrics.update(self._slice_ssim(pred_norm, gt_norm, elev_indices, range_indices, az_indices, prefix="norm"))
 
         metrics.update(self._expand_elev(pred, gt, suffix="gt"))
+        metrics.update(self._roughness_stats(pred, gt))
 
         if param_space:
             metrics.update(self._active_count_stats())

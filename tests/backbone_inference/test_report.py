@@ -281,3 +281,27 @@ def test_report_full_metrics_excludes_per_slice(tmp_path):
 
     assert "ssim_gt_elev_0`" not in joined
     assert "3.1 Dataset statistics" in joined
+
+
+def _report_with(gm, tmp_path, figure_paths=None):
+    return Report(
+        output_dir       = tmp_path,
+        run_summary      = ReportPayloadBuilder.run_summary(_run_stub(), np.linspace(-20.0, 80.0, N_ELEV)),
+        inference_config = ReportPayloadBuilder.inference_config(_cfg_stub(), _run_stub()),
+        checkpoint_meta  = {"epoch": 3, "best_epoch": 2, "best_val_loss": 0.1},
+        global_metrics   = gm,
+        figure_paths     = figure_paths or {},
+        gif_paths        = {},
+        report_path      = tmp_path / "report.md",
+    )
+
+
+def test_report_renders_the_roughness_section(tmp_path):
+    text = _report_with(_global_metrics(), tmp_path).assemble().read_text(encoding="utf-8")
+
+    assert "Curve smoothness" in text
+    assert "Roughness ratio"  in text
+
+
+def test_report_taxonomy_routes_curve_roughness():
+    assert _metric_group("roughness_ratio") == "3.12c Curve roughness"
