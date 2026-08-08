@@ -374,6 +374,9 @@ class LaunchLayout:
             ]},
             {"title": "Flip consistency", "fields": ["compute_flip_consistency"]},
             {"title": "Stratified errors", "fields": ["compute_stratified"]},
+            {"title": "Curve parameter extraction", "fields": [
+                {"gate": "extract_curve_params", "fields": ["extract_prominence_frac"]},
+            ]},
             {"title": "Profile picks", "fields": ["n_best_profiles", "n_worst_profiles", "n_random_profiles", {"path": "profile_seed", "widget": NUM_SEED}]},
             {"title": "Slices", "fields": ["n_range_slices", "n_azimuth_slices", "n_elevation_slices"]},
             {"title": "GIFs", "fields": ["gif_axes", "gif_fps", "gif_max_frames", {"path": "gif_dpi", "widget": NUM_DPI}]},

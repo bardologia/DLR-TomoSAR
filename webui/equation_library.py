@@ -1482,7 +1482,7 @@ class EquationLibrary:
                 {
                     "title" : "Matched Gaussian parameter metrics",
                     "tex"   : r"\mathrm{MAE}_\mu = \frac{1}{|\mathcal{M}|}\sum_{(i,j)\in\mathcal{M}} \left|\hat{\mu}_i - \mu^{\mathrm{GT}}_j\right|, \qquad F_1 = \frac{2\,\mathrm{Prec}\cdot\mathrm{Rec}}{\mathrm{Prec}+\mathrm{Rec}}, \qquad \mathrm{TP} = \left\{(i,j)\in\mathcal{M} : |\Delta\mu| \le \tau\right\}",
-                    "note"  : "On active pixels the matched pairs from the optimal assignment give mu and sigma MAE/RMSE; detection precision, recall, and F1 count a true positive when the matched mean error is within the tolerance. Also bucketed by GT active count (metrics.py _matched_gaussian_metrics).",
+                    "note"  : "On active pixels the matched pairs from the optimal assignment give mu and sigma MAE/RMSE; detection precision, recall, and F1 count a true positive when the matched mean error is within the tolerance. Also bucketed by GT active count (metrics.py matched_gaussian_metrics).",
                     "vars"  : [
                         {"sym": r"\mathcal{M}",                 "desc": "set of matched mutually-active pred-GT pairs"},
                         {"sym": r"\mathrm{MAE}_\mu",            "desc": "mean absolute mean-elevation error over matched pairs (m)"},

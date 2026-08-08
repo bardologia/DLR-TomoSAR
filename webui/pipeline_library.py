@@ -72,8 +72,8 @@ class PipelineLibrary:
                 "key"    : "inference",
                 "name"   : "Inference",
                 "script" : "infer_backbone",
-                "blurb"  : "Sliding-window prediction, overlap-add curve stitching and centrality-selected parameter stitching, then the full metric suite, reduced-Capon and interferometric-consistency baselines, and report generation.",
-                "stages" : ["Windowed predict", "Cube stitch", "Metrics", "Reduced & consistency", "Report and figures"],
+                "blurb"  : "Sliding-window prediction, overlap-add curve stitching and centrality-selected parameter stitching. Runs that predict curves instead of parameters have K Gaussians refit to each predicted curve, scored against the extraction floor measured on the GT curves, so they reach the same parameter analysis. Then the full metric suite, reduced-Capon and interferometric-consistency baselines, and report generation.",
+                "stages" : ["Windowed predict", "Cube stitch", "Curve param extraction", "Metrics", "Reduced & consistency", "Report and figures"],
             },
             {
                 "key"    : "profile_ae_infer",

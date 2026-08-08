@@ -228,3 +228,34 @@ def test_figure_composer_compose_with_reduced(tmp_path):
 
     for p in figure_paths["ssim_range_reduced"]:
         assert p.is_file() and p.stat().st_size > 0
+
+
+@pytest.mark.slow
+def test_figure_composer_skips_slot_organization_for_extracted_parameters(tmp_path):
+    res, gm, indices, x_axis = _result_and_metrics()
+    res.params_source        = "extracted"
+    res.extract_r2           = np.random.default_rng(4).uniform(0.8, 1.0, (H, W)).astype(np.float32)
+
+    composer, _meta = _composer(tmp_path)
+
+    figure_paths = composer.compose(
+        result=res, run=_run_stub(), global_metrics=gm, x_axis_np=x_axis, indices=indices, param_space=True,
+    )
+
+    assert "param_distributions" in figure_paths
+    assert "extract_r2_map"      in figure_paths
+    assert "slot_usage"      not in figure_paths
+    assert "slot_mu_rank"    not in figure_paths
+
+
+@pytest.mark.slow
+def test_figure_composer_keeps_slot_organization_for_model_parameters(tmp_path):
+    res, gm, indices, x_axis = _result_and_metrics()
+
+    composer, _meta = _composer(tmp_path)
+
+    figure_paths = composer.compose(
+        result=res, run=_run_stub(), global_metrics=gm, x_axis_np=x_axis, indices=indices, param_space=True,
+    )
+
+    assert "slot_usage" in figure_paths

@@ -10,9 +10,12 @@ from scipy.signal import find_peaks
 
 class PeakInitialiser:
     def __init__(self, n_workers : int = 1) -> None:
-        self.n_workers = n_workers
-        self._pool     = ProcessPoolExecutor(max_workers=n_workers)
-        list(self._pool.map(abs, range(n_workers)))
+        self.n_workers = max(1, int(n_workers))
+        self._pool     = None
+
+        if self.n_workers > 1:
+            self._pool = ProcessPoolExecutor(max_workers=self.n_workers)
+            list(self._pool.map(abs, range(self.n_workers)))
 
     @staticmethod
     def _prominence_worker(raw_chunk : np.ndarray, height_axis : np.ndarray, K : int, sigma_guess : float, min_dist : int, prominence_frac : float) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -83,7 +86,7 @@ class PeakInitialiser:
             prominence_frac = prominence_frac,
         )
 
-        chunk_results = list(self._pool.map(worker_fn, chunks))
+        chunk_results = list(self._pool.map(worker_fn, chunks)) if self._pool is not None else [worker_fn(chunk) for chunk in chunks]
 
         amps = np.concatenate([r[0] for r in chunk_results], axis=0)
         mus  = np.concatenate([r[1] for r in chunk_results], axis=0)
@@ -92,4 +95,5 @@ class PeakInitialiser:
         return amps, mus, sigs
 
     def close(self) -> None:
-        self._pool.shutdown(wait=True, cancel_futures=True)
+        if self._pool is not None:
+            self._pool.shutdown(wait=True, cancel_futures=True)

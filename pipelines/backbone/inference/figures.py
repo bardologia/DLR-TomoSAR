@@ -127,6 +127,9 @@ class FigureComposer:
         if result.label_r2 is not None:
             pixel_map_specs.append(("label_r2_map", "label_r2", result.label_r2, "Label fit R² (GT curves vs raw tomogram)", "R²", {"cmap": "RdYlGn", "q_low": 2.0, "q_high": 98.0}))
 
+        if result.extract_r2 is not None:
+            pixel_map_specs.append(("extract_r2_map", "extract_r2", result.extract_r2, "Extraction fit R² (refit Gaussians vs predicted curve)", "R²", {"cmap": "RdYlGn", "q_low": 2.0, "q_high": 98.0}))
+
         if result.flip_consistency is not None:
             pixel_map_specs.append(("flip_consistency_map", "flip_consistency", result.flip_consistency, "Flip-equivariance disagreement (curve MSE)", "MSE", {"cmap": cfg.cmap_error, "log": True}))
 
@@ -611,7 +614,11 @@ class FigureComposer:
 
         if param_space:
             self._compose_param_plots(result, run, figure_paths)
-            self._compose_slot_organization(result, run, figure_paths)
+
+            if result.params_source == "model":
+                self._compose_slot_organization(result, run, figure_paths)
+            else:
+                self.logger.subsection("Slot-organization figures skipped: the parameters were extracted from the predicted curves and sorted by position, so slot index carries no model-side meaning.")
 
         self._compose_slices(result, run, global_metrics, x_axis_np, indices, figure_paths)
         self._compose_ssim(result, global_metrics, x_axis_np, indices, figure_paths)

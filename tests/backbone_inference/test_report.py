@@ -305,3 +305,38 @@ def test_report_renders_the_roughness_section(tmp_path):
 
 def test_report_taxonomy_routes_curve_roughness():
     assert _metric_group("roughness_ratio") == "3.12c Curve roughness"
+
+
+def _extraction_metrics():
+    gm = _global_metrics()
+
+    gm["params_source"]                  = "extracted"
+    gm["extract_fit_r2_mean"]            = 0.98
+    gm["extract_fit_r2_median"]          = 0.99
+    gm["extract_fit_r2_p5"]              = 0.91
+    gm["extract_floor_matched_mu_mae"]   = 0.12
+    gm["extract_floor_matched_sig_mae"]  = 0.08
+    gm["extract_floor_matched_amp_mae"]  = 0.03
+    gm["extract_floor_matched_recall"]   = 0.97
+
+    return gm
+
+
+def test_report_includes_the_extraction_floor_section(tmp_path):
+    text = _report_with(_extraction_metrics(), tmp_path).assemble().read_text(encoding="utf-8")
+
+    assert "Curve-parameter extraction and its measurement floor" in text
+    assert "measurement floor" in text
+    assert "Floor μ MAE" in text
+
+
+def test_report_omits_the_extraction_section_for_parameter_models(tmp_path):
+    text = _report_with(_global_metrics(), tmp_path).assemble().read_text(encoding="utf-8")
+
+    assert "Curve-parameter extraction" not in text
+
+
+def test_report_taxonomy_routes_curve_parameter_extraction():
+    assert _metric_group("extract_fit_r2_mean")          == "3.12b Curve-parameter extraction"
+    assert _metric_group("extract_floor_matched_mu_mae") == "3.12b Curve-parameter extraction"
+    assert _metric_group("params_source")                == "3.12b Curve-parameter extraction"

@@ -370,7 +370,7 @@ def test_param_population_stats_pred_is_permutation_invariant():
 
 def _matched(pred, gt, n_gaussians=N_GAUSSIANS, tol=5.0):
     res = _make_result(np.zeros((N_ELEV, *pred.shape[1:]), np.float32), np.zeros((N_ELEV, *pred.shape[1:]), np.float32), params_pred=pred, params_gt=gt)
-    return Metrics(res, _x_axis(), n_gaussians)._matched_gaussian_metrics(match_tol=tol)
+    return Metrics(res, _x_axis(), n_gaussians).matched_gaussian_metrics(match_tol=tol)
 
 
 def test_matched_identical_is_perfect():
@@ -572,3 +572,17 @@ def test_roughness_ratio_exceeds_one_when_the_prediction_carries_jitter():
 
     assert metrics["roughness_ratio"] > 2.0
     assert metrics["roughness_excess_frac"] > 0.5
+
+
+def test_slot_organization_can_be_switched_off():
+    x_axis = _x_axis()
+    params = _gaussian_params(seed=4)
+    curves = _curves_from_params(params, x_axis, N_GAUSSIANS)
+    result = _make_result(curves.copy(), curves, params_pred=params.copy(), params_gt=params)
+
+    with_slots    = Metrics(result, x_axis, N_GAUSSIANS).compute(param_space=True, slot_organization=True)
+    without_slots = Metrics(result, x_axis, N_GAUSSIANS).compute(param_space=True, slot_organization=False)
+
+    assert "slot_usage_entropy" in with_slots
+    assert "slot_usage_entropy" not in without_slots
+    assert "matched_mu_mae"     in without_slots

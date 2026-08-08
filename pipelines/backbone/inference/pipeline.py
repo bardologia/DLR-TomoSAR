@@ -7,13 +7,14 @@ from typing      import Dict, List, Type
 import numpy as np
 
 from configuration.inference                         import InferenceConfig
+from pipelines.backbone.inference.curve_params       import CurveParamExtractor
 from pipelines.backbone.inference.data_consistency   import DataConsistencyEvaluator
 from pipelines.backbone.inference.figures            import FigureComposer
 from pipelines.backbone.inference.flip_consistency   import FlipConsistencyEvaluator
 from pipelines.backbone.inference.normalization_audit import NormalizationAudit
 from pipelines.backbone.inference.loader             import RunLoader
 from pipelines.backbone.inference.run_metadata_paths import InferenceMetadata
-from pipelines.backbone.inference.metrics            import Metrics
+from pipelines.backbone.inference.metrics            import Metrics, Result
 from pipelines.backbone.inference.plots              import Plotter
 from pipelines.backbone.inference.predictor          import Predictor
 from pipelines.backbone.inference.reduced            import ReducedTomogramSynthesizer
@@ -110,13 +111,82 @@ class InferencePipeline:
             "all_az_idx"      : np.arange(n_az),
         }
 
-    def _evaluate_metrics(self, result, x_axis_np: np.ndarray, run, meta: InferenceMetadata, indices: dict) -> dict:
-        global_metrics = Metrics(result, x_axis_np, run.n_gaussians).compute(
-            elev_indices  = indices["all_elev_idx"],
-            range_indices = indices["all_range_idx"],
-            az_indices    = indices["all_az_idx"],
-            param_space   = self.components.param_space,
+    def _extract_curve_params(self, cfg: InferenceConfig, meta: InferenceMetadata, run, result, x_axis_np: np.ndarray, logger: Logger) -> None:
+        if self.components.param_space:
+            return
+
+        if not cfg.extract_curve_params:
+            logger.section("[Inference: Curve Parameter Extraction skipped]")
+            logger.subsection("extract_curve_params is disabled; this run predicts curves directly, so every Gaussian-parameter analysis stays absent from metrics, figures, and report.")
+            return
+
+        if result.params_gt is None:
+            raise ValueError("Curve-parameter extraction needs the exact GT parameters to measure its own floor, but the predictor produced no params_gt cube; a curve-space predictor must stitch the GT parameters alongside the curves.")
+
+        logger.section("[Inference: Curve Parameter Extraction]")
+
+        extractor = CurveParamExtractor(
+            x_axis          = x_axis_np,
+            n_gaussians     = run.n_gaussians,
+            prominence_frac = cfg.extract_prominence_frac,
         )
+
+        predicted = extractor.run(result.pred_curves)
+        reference = extractor.run(result.gt_curves)
+
+        result.params_pred   = predicted.params
+        result.params_source = "extracted"
+        result.extract_r2    = predicted.fit_r2
+        result.extract_floor = self._extraction_floor(result, reference.params, x_axis_np, run.n_gaussians)
+
+        if cfg.save_cubes:
+            np.save(meta.cube_dir / "params_pred.npy", predicted.params)
+            np.save(meta.cube_dir / "extract_r2.npy",  predicted.fit_r2)
+
+        logger.subsection(f"Extracted {run.n_gaussians} Gaussians per pixel from the predicted curves : median fit R² = {float(np.median(predicted.fit_r2)):.4f}")
+        logger.subsection(f"Extraction floor (same extractor on GT curves vs exact GT parameters) : μ MAE = {result.extract_floor['matched_mu_mae']:.4g}, σ MAE = {result.extract_floor['matched_sig_mae']:.4g}")
+
+    @staticmethod
+    def _extraction_floor(result, reference_params: np.ndarray, x_axis_np: np.ndarray, n_gaussians: int) -> dict:
+        floor = Result(
+            pred_curves        = result.gt_curves,
+            gt_curves          = result.gt_curves,
+            pixel_mse          = result.pixel_mse,
+            pixel_mae          = result.pixel_mae,
+            pixel_r2           = result.pixel_r2,
+            pixel_cosine       = result.pixel_cosine,
+            pixel_peak_err_idx = result.pixel_peak_err_idx,
+            cube_directory     = result.cube_directory,
+            azimuth_offset     = result.azimuth_offset,
+            range_offset       = result.range_offset,
+            params_pred        = reference_params,
+            params_gt          = result.params_gt,
+        )
+
+        return Metrics(floor, x_axis_np, n_gaussians).matched_gaussian_metrics()
+
+    def _evaluate_metrics(self, result, x_axis_np: np.ndarray, run, meta: InferenceMetadata, indices: dict) -> dict:
+        param_space = result.params_pred is not None and result.params_gt is not None
+
+        global_metrics = Metrics(result, x_axis_np, run.n_gaussians).compute(
+            elev_indices      = indices["all_elev_idx"],
+            range_indices     = indices["all_range_idx"],
+            az_indices        = indices["all_az_idx"],
+            param_space       = param_space,
+            slot_organization = result.params_source == "model",
+        )
+
+        global_metrics["params_source"] = result.params_source
+
+        if result.extract_r2 is not None:
+            finite = result.extract_r2[np.isfinite(result.extract_r2)]
+            global_metrics["extract_fit_r2_mean"]   = float(finite.mean())
+            global_metrics["extract_fit_r2_median"] = float(np.median(finite))
+            global_metrics["extract_fit_r2_p5"]     = float(np.percentile(finite, 5.0))
+
+        if result.extract_floor is not None:
+            for key, value in result.extract_floor.items():
+                global_metrics[f"extract_floor_{key}"] = value
 
         global_metrics["split"]        = run.split_name
         global_metrics["split_region"] = list(run.split_region.as_tuple())
@@ -327,7 +397,7 @@ class InferencePipeline:
             global_metrics = global_metrics,
             x_axis_np      = x_axis_np,
             indices        = indices,
-            param_space    = self.components.param_space,
+            param_space    = result.params_pred is not None and result.params_gt is not None,
         )
 
     def _build_report(
@@ -361,6 +431,8 @@ class InferencePipeline:
 
         x_axis_np         = np.asarray(run.x_axis, dtype=np.float64)
         _N_elev, _az, _rg = result.pred_curves.shape
+
+        self._extract_curve_params(cfg, meta, run, result, x_axis_np, logger)
 
         logger.section("[Inference: Metrics]")
         indices        = self._compute_slice_indices(cfg, _N_elev, _az, _rg)

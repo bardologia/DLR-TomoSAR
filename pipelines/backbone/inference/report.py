@@ -267,6 +267,7 @@ class Report:
 
         self._subsection_index = 3
 
+        out += self._build_extraction_headline()
         out += self._build_active_count_headline()
         out += self._build_param_population_headline()
         out += self._build_matched_headline()
@@ -283,6 +284,33 @@ class Report:
     def _next_subsection(self) -> str:
         self._subsection_index += 1
         return f"2.{self._subsection_index}"
+
+    def _build_extraction_headline(self) -> List[str]:
+        gm = self.global_metrics
+        if gm.get("params_source") != "extracted":
+            return []
+
+        out = [f"\n### {self._next_subsection()} Curve-parameter extraction and its measurement floor\n"]
+        out.append(
+            "This run predicts elevation curves, not Gaussian parameters, so every parameter-space number in "
+            "this report comes from refitting K Gaussians to the predicted curve. The same extractor was run on "
+            "the GT curves and scored against the exact GT parameters: that is the measurement floor, the error "
+            "the extraction alone produces when the curve is perfect. Read the matched errors in the parameter "
+            "sections against this floor, not against zero; a parameter error at the floor means the extraction "
+            "is the limit, not the model.\n"
+        )
+        out.append(self._three_col_table([
+            ("Fit R² mean",      gm["extract_fit_r2_mean"],           "Refit Gaussians vs the predicted curve they were fit to"),
+            ("Fit R² median",    gm["extract_fit_r2_median"],         "Median over pixels"),
+            ("Fit R² p5",        gm["extract_fit_r2_p5"],             "5th percentile (worst tail)"),
+            ("Floor μ MAE",      gm["extract_floor_matched_mu_mae"],  "Extractor on GT curves vs exact GT parameters"),
+            ("Floor σ MAE",      gm["extract_floor_matched_sig_mae"], "Extractor on GT curves vs exact GT parameters"),
+            ("Floor amp MAE",         gm["extract_floor_matched_amp_mae"], "Extractor on GT curves vs exact GT parameters"),
+            ("Floor recall",          gm["extract_floor_matched_recall"],  "Detection recall achievable by the extractor alone"),
+        ], header=("Metric", "Value", "Description")))
+        out.append("")
+
+        return out
 
     def _build_active_count_headline(self) -> List[str]:
         gm = self.global_metrics
@@ -626,6 +654,7 @@ class Report:
         ("3.1 Dataset statistics",                               lambda k: k in Report._DATASET_KEYS or k.endswith("_status")),
         ("3.11 Interferometric data consistency",                lambda k: k.startswith(("physics_", "phase_agreement_"))),
         ("3.12 JEPA embedding diagnostics",                      lambda k: k.startswith("jepa_")),
+        ("3.12b Curve-parameter extraction",                     lambda k: k.startswith(("extract_", "params_source"))),
         ("3.12c Curve roughness",                                lambda k: k.startswith("roughness_")),
         ("3.13 Label quality (GT fit vs raw tomogram)",          lambda k: k.startswith("label_")),
         ("3.14 Normalization & clamp health",                    lambda k: k.startswith(("norm_in_", "clamp_"))),
@@ -740,7 +769,8 @@ class Report:
             ("stratified_errors",     "5.6 Error stratified by scene covariates"),
             ("failure_mode_map",      "5.7 Dominant failure mode per pixel"),
             ("miss_by_separation",    "5.8 Miss rate by GT scatterer separation"),
-            ("metric_histograms",     "5.9 Metric distributions"),
+            ("extract_r2_map",        "5.9 Extraction fit R² map (refit Gaussians vs predicted curve)"),
+            ("metric_histograms",     "5.10 Metric distributions"),
         )
         if any(fp.get(key) for key, _title in pixel_groups):
             out.append("\n## 5. Per-pixel metric maps\n")

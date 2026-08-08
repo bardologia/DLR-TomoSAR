@@ -1270,6 +1270,11 @@ class FlowLibrary:
             {"id": "mf1",      "tex": r"F_1",                        "role": "calculated",   "kind": "scalar", "shape": "1",                 "desc": "matched detection F1 within mu tolerance",                                                               "sample": "0.86"},
             {"id": "redc",     "tex": r"\mathbf{r}",                 "role": "calculated",   "kind": "tensor", "shape": "N x Az x Rg",       "desc": "reduced-subset Capon tomogram (re-synthesised)",                                                         "sample": [["0.3", "0.8"], ["0.2", "0.6"]]},
             {"id": "dimp",     "tex": r"\Delta_{a,r}",               "role": "final",        "kind": "matrix", "shape": "Az x Rg",           "desc": "improvement map: reduced minus prediction MSE (unit-area)",                                              "sample": [["0.01", "-0.00"], ["0.02", "0.01"]]},
+            {"id": "xpk",      "tex": r"\hat{\mu}^{\mathrm{ex}}",     "role": "intermediate", "kind": "matrix", "shape": "K x Az x Rg",       "desc": "extracted peak positions (prominence-ranked local maxima of the predicted curve)",                       "sample": [["-8.4", "3.1"], ["-7.9", "2.6"]]},
+            {"id": "xsig",     "tex": r"\hat{\sigma}^{\mathrm{ex}}",  "role": "intermediate", "kind": "matrix", "shape": "K x Az x Rg",       "desc": "extracted widths from the half-maximum crossing around each peak",                                       "sample": [["2.1", "1.8"], ["2.4", "1.7"]]},
+            {"id": "xamp",     "tex": r"\hat{a}^{\mathrm{ex}}",       "role": "calculated",   "kind": "matrix", "shape": "K x Az x Rg",       "desc": "extracted amplitudes from the ridge-regularised non-negative least squares fit",                         "sample": [["1.2", "0.7"], ["1.4", "0.6"]]},
+            {"id": "xr2",      "tex": r"R^2_{\mathrm{ex}}",            "role": "calculated",   "kind": "matrix", "shape": "Az x Rg",           "desc": "extraction fit quality: refit mixture against the curve it was fit to",                                   "sample": [["0.99", "0.97"], ["0.98", "0.99"]]},
+            {"id": "xfloor",   "tex": r"\epsilon_{\mathrm{floor}}",   "role": "final",        "kind": "scalar", "shape": "1",                 "desc": "measurement floor: same extractor on GT curves scored against the exact GT parameters",                  "sample": "0.12"},
             {"id": "kz",       "tex": r"k_z",                        "role": "measured",     "kind": "tensor", "shape": "T x Az x Rg",       "desc": "per-pixel interferometric wavenumber field (rad/m), T=1+N_s",                                            "sample": [["0.05", "0.06"], ["0.04", "0.05"]]},
             {"id": "meas",     "tex": r"\tilde{\gamma}",             "role": "intermediate", "kind": "tensor", "shape": "N_s x Az x Rg",     "desc": "multilooked measured interferogram unit phasors",                                                        "sample": [["1+0j", "0.7+0.7j"], ["0+1j", "0.9-0.1j"]]},
             {"id": "coh",      "tex": r"E_{\gamma}",                 "role": "final",        "kind": "matrix", "shape": "Az x Rg",           "desc": "per-pixel coherence-resynthesis error map (pred vs GT)",                                                 "sample": [["0.02", "0.05"], ["0.01", "0.03"]]},
@@ -1354,6 +1359,17 @@ class FlowLibrary:
                 ],
             },
             {
+                "id": "curveparams", "title": "Curve parameter extraction", "phase": "Curve param extraction",
+                "note": "Only for runs whose model predicts elevation curves rather than Gaussian parameters (JEPA coupled to a profile autoencoder), and only while extract_curve_params is on. K Gaussians are refit to every stitched predicted curve so the entire parameter analysis below becomes reachable: peaks are ranked by prominence, each width comes from the half-maximum crossing around its peak, and the amplitudes solve a ridge-regularised non-negative least squares against the curve with those centres and widths held fixed. Components are then sorted by position, which is why slot-organisation statistics are suppressed for extracted parameters: the slot index is imposed by the sort, not learned. The identical extractor is run on the GT curves and scored against the exact GT parameters, and that error is the measurement floor every extracted parameter error must be read against.",
+                "inputs": ["cube"], "outputs": ["xpk", "xsig", "xamp", "xr2", "xfloor"],
+                "lines": [
+                    [{"id": "xpk", "tex": r"\hat{\mu}^{\mathrm{ex}}_k", "role": "intermediate"}, {"tex": r"= x_{n_k},\qquad n_k \in \operatorname{top-}K\ \text{prominence peaks of}\ "}, {"id": "cube", "tex": r"\hat{C}_{:,a,r}", "role": "final"}],
+                    [{"id": "xsig", "tex": r"\hat{\sigma}^{\mathrm{ex}}_k", "role": "intermediate"}, {"tex": r"= \dfrac{\mathrm{FWHM}_k}{2\sqrt{2\ln 2}},\qquad \mathrm{FWHM}_k = \Delta x\,\big|\{n : \hat{C}_n \ge \tfrac12 \hat{C}_{n_k}\ \text{contiguous with}\ n_k\}\big|"}],
+                    [{"id": "xamp", "tex": r"\hat{\mathbf{a}}^{\mathrm{ex}}", "role": "calculated"}, {"tex": r"= \max\!\big((G^{\top}G + \lambda I)^{-1} G^{\top}"}, {"id": "cube", "tex": r"\hat{C}", "role": "final"}, {"tex": r",\ 0\big),\qquad G_{nk} = \exp\!\Big(-\tfrac{(x_n - \hat{\mu}^{\mathrm{ex}}_k)^2}{2(\hat{\sigma}^{\mathrm{ex}}_k)^2}\Big)"}],
+                    [{"id": "xfloor", "tex": r"\epsilon_{\mathrm{floor}}", "role": "final"}, {"tex": r"= \mathrm{MAE}_{\mu}\big(\mathcal{E}(C^{\mathrm{GT}}),\ \Theta^{\mathrm{GT}}\big),\qquad \mathcal{E} = \text{the same extractor}"}],
+                ],
+            },
+            {
                 "id": "pixelmaps", "title": "Per-pixel metric maps", "phase": "Pixel metrics",
                 "note": "Five per-pixel maps are reduced over the N elevation bins of the stitched curve cubes: MSE, MAE, R-squared (denominator floored at 1e-12), cosine similarity (norms floored at 1e-8), and absolute peak-bin index error.",
                 "inputs": ["cube", "cubegt"], "outputs": ["pr2"],
@@ -1410,7 +1426,7 @@ class FlowLibrary:
         ]
         return {
             "key": "inference", "name": "Inference (Stitching)",
-            "blurb": "The trained run is rebuilt strictly from its saved config, then every sliding-window patch is predicted, denormalised and hard-clamped, reconstructed to an elevation spectrum, blended into dense pred and GT cubes by weighted overlap-add for curves and highest-centrality selection for parameters, and scored by the full per-pixel, curve, per-elevation, matched-parameter, reduced-Capon-baseline and interferometric-consistency suite.",
+            "blurb": "The trained run is rebuilt strictly from its saved config, then every sliding-window patch is predicted, denormalised and hard-clamped, reconstructed to an elevation spectrum, blended into dense pred and GT cubes by weighted overlap-add for curves and highest-centrality selection for parameters. Runs that predict curves directly have K Gaussians refit to each stitched curve, against a measurement floor obtained by running the same extractor on the GT curves, so they reach the same parameter analysis. Everything is then scored by the full per-pixel, curve, per-elevation, matched-parameter, reduced-Capon-baseline and interferometric-consistency suite.",
             "nodes": nodes, "steps": steps,
         }
 
