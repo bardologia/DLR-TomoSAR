@@ -186,6 +186,40 @@ class FigureComposer:
             meta.figures_dir / "histograms",
         )
 
+    def _compose_embedding_maps(self, result: Result, figure_paths: Dict[str, List[Path]]) -> None:
+        if result.embedding_maps is None:
+            return
+
+        maps          = result.embedding_maps
+        slice_plotter = self.plotter.slice
+        cfg           = self.cfg
+        out_dir       = self.meta.figures_dir / "embedding"
+
+        specs = (
+            ("embedding_error_map",  "embedding_error",  maps.embedding_error,  "Per-pixel embedding MSE (predicted vs target embedding)", "MSE",    {"cmap": cfg.cmap_error, "log": True}),
+            ("embedding_cosine_map", "embedding_cosine", maps.embedding_cosine, "Per-pixel embedding cosine similarity",                   "cosine", {"cmap": "RdYlGn", "q_low": 2.0, "q_high": 98.0}),
+            ("embedding_decode_map", "decode_floor",     maps.decode_mse,       "Decoder-only MSE (decode(encode(GT)) vs GT, normalised)", "MSE",    {"cmap": cfg.cmap_error, "log": True}),
+            ("embedding_chain_map",  "chain_error",      maps.chain_mse,        "Full-chain MSE (decode(prediction) vs GT, normalised)",   "MSE",    {"cmap": cfg.cmap_error, "log": True}),
+        )
+
+        for key, fname, data, title, label, extra in specs:
+            figure_paths[key] = [slice_plotter.plot_pixel_metric_map(
+                metric_map = data,
+                title      = title,
+                label      = label,
+                out_path   = out_dir / f"{fname}.png",
+                az_offset  = result.azimuth_offset,
+                rg_offset  = result.range_offset,
+                **extra,
+            )]
+
+        figure_paths["embedding_histograms"] = slice_plotter.plot_metric_histograms(
+            {"embedding_error": maps.embedding_error, "embedding_cosine": maps.embedding_cosine},
+            out_dir / "histograms",
+        )
+
+        self.logger.subsection(f"Embedding maps : error, cosine, decoder floor, full chain written to {out_dir}")
+
     def _compose_param_plots(self, result: Result, run, figure_paths: Dict[str, List[Path]]) -> None:
         param_plotter = self.plotter.param
         slot_plotter  = self.plotter.slot
@@ -611,6 +645,7 @@ class FigureComposer:
         self._compose_input_channels(result, run, figure_paths)
         self._compose_profiles(result, run, x_axis_np, param_space, figure_paths)
         self._compose_pixel_maps(result, figure_paths)
+        self._compose_embedding_maps(result, figure_paths)
 
         if param_space:
             self._compose_param_plots(result, run, figure_paths)

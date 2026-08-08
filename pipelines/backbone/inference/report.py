@@ -541,12 +541,27 @@ class Report:
             "reconstruction floor; the full-chain error is the decoded prediction against the GT curve in "
             "normalised curve space, so chain − decoder gauges how much error the predictor itself adds.\n"
         )
-        out.append(self._three_col_table([
-            ("Embedding MSE",           gm["jepa_embedding_mse"],    "Predicted vs target embedding, normalised space"),
-            ("Embedding cosine",        gm["jepa_embedding_cosine"], "Mean cosine similarity along the embedding dimension"),
-            ("Decoder-only MSE (norm)", gm["jepa_decode_mse_norm"],  "decode(encode(GT)) vs GT, normalised curves"),
-            ("Full-chain MSE (norm)",   gm["jepa_chain_mse_norm"],   "decode(predicted embedding) vs GT, normalised curves"),
-        ], header=("Metric", "Value", "Description")))
+        rows = [
+            ("Embedding MSE",           gm["jepa_embedding_mse"],          "Predicted vs target embedding, normalised space"),
+            ("Embedding RMSE",          gm["jepa_embedding_rmse"],         "Per-component error spread; the scale a decoder must tolerate"),
+            ("Embedding NMSE",          gm["jepa_embedding_nmse"],         "Error power divided by target power, so scale-free across autoencoders"),
+            ("Embedding cosine",        gm["jepa_embedding_cosine"],       "Mean cosine similarity along the embedding dimension"),
+            ("Per-dim RMSE min",        gm["jepa_embedding_dim_rmse_min"], "Best-predicted embedding component"),
+            ("Per-dim RMSE max",        gm["jepa_embedding_dim_rmse_max"], "Worst-predicted embedding component"),
+            ("Per-dim RMSE std",        gm["jepa_embedding_dim_rmse_std"], "Spread across components; a large value means the error concentrates in a few directions"),
+            ("Decoder-only MSE (norm)", gm["jepa_decode_mse_norm"],        "decode(encode(GT)) vs GT, normalised curves"),
+            ("Full-chain MSE (norm)",   gm["jepa_chain_mse_norm"],         "decode(predicted embedding) vs GT, normalised curves"),
+            ("Predictor excess MSE",    gm["jepa_predictor_excess_mse"],   "Full chain minus decoder floor: the error the predictor itself adds"),
+            ("Decoder floor fraction",  gm["jepa_decoder_floor_frac"],     "Share of the chain error already present with a perfect embedding"),
+            ("Decode amplification",    gm["jepa_decode_amplification"],   "Curve MSE added per unit of embedding MSE; how harshly the decoder magnifies latent error"),
+            ("Embedding err p95",       gm["jepa_embedding_err_p95"],      "95th percentile of the per-pixel embedding MSE"),
+            ("Embedding cosine p5",     gm["jepa_embedding_cosine_p5"],    "5th percentile of the per-pixel cosine (worst tail)"),
+        ]
+
+        if "jepa_embedding_error_corr" in gm:
+            rows.append(("Embedding-error corr", gm["jepa_embedding_error_corr"], "Correlation of the per-pixel embedding error with the per-pixel curve MSE"))
+
+        out.append(self._three_col_table(rows, header=("Metric", "Value", "Description")))
         out.append("")
 
         return out
@@ -572,7 +587,6 @@ class Report:
         out.append("")
 
         return out
-
 
     def _build_reduced_headline(self) -> List[str]:
         gm = self.global_metrics
@@ -769,7 +783,7 @@ class Report:
             ("stratified_errors",     "5.6 Error stratified by scene covariates"),
             ("failure_mode_map",      "5.7 Dominant failure mode per pixel"),
             ("miss_by_separation",    "5.8 Miss rate by GT scatterer separation"),
-            ("extract_r2_map",        "5.9 Extraction fit R² map (refit Gaussians vs predicted curve)"),
+            ("extract_r2_map",        "5.9 Extraction fit R\u00b2 map (refit Gaussians vs predicted curve)"),
             ("metric_histograms",     "5.10 Metric distributions"),
         )
         if any(fp.get(key) for key, _title in pixel_groups):
@@ -800,6 +814,25 @@ class Report:
                 "as parameter bias. For aggregate ordering-independent accuracy see §2.6.\n"
             )
             self._section(out, param_groups)
+
+        embedding_groups = (
+            ("embedding_error_map",  "6c.1 Per-pixel embedding error"),
+            ("embedding_cosine_map", "6c.2 Per-pixel embedding cosine similarity"),
+            ("embedding_decode_map", "6c.3 Decoder-only error (autoencoder floor)"),
+            ("embedding_chain_map",  "6c.4 Full-chain error (decoded prediction vs GT)"),
+            ("embedding_histograms", "6c.5 Embedding metric distributions"),
+        )
+        if any(fp.get(key) for key, _title in embedding_groups):
+            out.append("\n## 6c. Embedding-space diagnostics\n")
+            out.append(
+                "Where the JEPA prediction lives before it becomes a curve. The error map (6c.1) is the "
+                "per-pixel distance between the predicted embedding and the encoder's embedding of the GT "
+                "curve. Comparing the decoder-only map (6c.3) against the full-chain map (6c.4) separates the "
+                "autoencoder's own reconstruction floor from the error the predictor adds: pixels that are "
+                "bright in both are limited by the autoencoder, pixels bright only in 6c.4 are prediction "
+                "failures.\n"
+            )
+            self._section(out, embedding_groups)
 
         org_groups = [(key, title) for key, title in (
             ("slot_usage",      "Per-slot activation frequency"),

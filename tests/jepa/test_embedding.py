@@ -6,9 +6,11 @@ import numpy as np
 import pytest
 import torch
 
-from pipelines.jepa.inference.embedding import JepaEmbeddingEvaluator
-from pipelines.jepa.inference.pipeline  import JEPA_INFERENCE_COMPONENTS
-from tools.data.gaussians               import GaussianReconstructor
+from pipelines.backbone.inference.loader import GridInfo
+from pipelines.jepa.inference.embedding   import JepaEmbeddingEvaluator
+from pipelines.jepa.inference.pipeline    import JEPA_INFERENCE_COMPONENTS
+from tools.data.gaussians                 import GaussianReconstructor
+
 
 from tests.conftest      import SilentLogger
 from tests.jepa.conftest import PROFILE_LENGTH, make_autoencoder
@@ -39,6 +41,20 @@ class _FakeJepa:
 
     def __call__(self, images):
         return self.z_out
+
+
+def _grid(spatial: int, n_patches: int) -> GridInfo:
+    return GridInfo(
+        n_v          = 1,
+        n_h          = n_patches,
+        pad_top      = 0,
+        pad_bot      = 0,
+        pad_left     = 0,
+        pad_right    = 0,
+        patch_size   = (spatial, spatial),
+        stride       = (spatial, spatial),
+        spatial_size = (spatial, spatial * n_patches),
+    )
 
 
 class _IdentityNormalizer:
@@ -81,6 +97,7 @@ def _build_case(z_offset: float = 0.0, flip: bool = False):
         dataset     = types.SimpleNamespace(normalizer=_IdentityNormalizer()),
         n_gaussians = n_gaussians,
         x_axis      = x_axis,
+        grid        = _grid(spatial, n_patches=2),
     )
 
     return run, gt_curves, autoencoder
@@ -119,6 +136,7 @@ def _build_layernorm_case():
         dataset     = types.SimpleNamespace(normalizer=_IdentityNormalizer()),
         n_gaussians = n_gaussians,
         x_axis      = x_axis,
+        grid        = _grid(spatial, n_patches=2),
     )
 
     return run
@@ -131,7 +149,7 @@ def test_components_carry_embedding_evaluator():
 def test_perfect_prediction_scores_zero_embedding_error():
     run, gt_curves, autoencoder = _build_case()
 
-    metrics = JepaEmbeddingEvaluator(run, SilentLogger()).run()
+    metrics, maps = JepaEmbeddingEvaluator(run, SilentLogger()).run()
 
     assert metrics["jepa_embedding_mse"]    == pytest.approx(0.0, abs=1e-10)
     assert metrics["jepa_embedding_cosine"] == pytest.approx(1.0, abs=1e-6)
@@ -141,7 +159,7 @@ def test_perfect_prediction_scores_zero_embedding_error():
 def test_decoder_floor_matches_reconstruction_tail():
     run, gt_curves, autoencoder = _build_case()
 
-    metrics = JepaEmbeddingEvaluator(run, SilentLogger()).run()
+    metrics, maps = JepaEmbeddingEvaluator(run, SilentLogger()).run()
 
     tail     = gt_curves[:, autoencoder.embedding_dim:]
     expected = float((tail ** 2).sum()) / gt_curves.numel()
@@ -152,7 +170,7 @@ def test_decoder_floor_matches_reconstruction_tail():
 def test_flipped_prediction_scores_negative_cosine():
     run, _, _ = _build_case(flip=True)
 
-    metrics = JepaEmbeddingEvaluator(run, SilentLogger()).run()
+    metrics, maps = JepaEmbeddingEvaluator(run, SilentLogger()).run()
 
     assert metrics["jepa_embedding_cosine"] == pytest.approx(-1.0, abs=1e-6)
     assert metrics["jepa_embedding_mse"] > 0.0
@@ -162,7 +180,7 @@ def test_flipped_prediction_scores_negative_cosine():
 def test_offset_prediction_separates_chain_from_decoder_error():
     run, _, _ = _build_case(z_offset=0.5)
 
-    metrics = JepaEmbeddingEvaluator(run, SilentLogger()).run()
+    metrics, maps = JepaEmbeddingEvaluator(run, SilentLogger()).run()
 
     assert metrics["jepa_embedding_mse"] == pytest.approx(0.25, rel=1e-5)
     assert metrics["jepa_embedding_rmse"] == pytest.approx(0.5, rel=1e-5)
@@ -172,7 +190,7 @@ def test_offset_prediction_separates_chain_from_decoder_error():
 def test_layernorm_target_is_normalized_exactly_once():
     run = _build_layernorm_case()
 
-    metrics = JepaEmbeddingEvaluator(run, SilentLogger()).run()
+    metrics, maps = JepaEmbeddingEvaluator(run, SilentLogger()).run()
 
     assert metrics["jepa_embedding_mse"]    == pytest.approx(0.0, abs=1e-10)
     assert metrics["jepa_embedding_cosine"] == pytest.approx(1.0, abs=1e-6)
@@ -184,3 +202,53 @@ def test_empty_loader_raises():
 
     with pytest.raises(ValueError, match="no samples"):
         JepaEmbeddingEvaluator(run, SilentLogger()).run()
+
+
+def test_embedding_maps_are_stitched_to_the_scene_grid():
+    run, _, _ = _build_case(z_offset=0.5)
+
+    _metrics, maps = JepaEmbeddingEvaluator(run, SilentLogger()).run()
+
+    assert maps.embedding_error.shape  == run.grid.spatial_size
+    assert maps.embedding_cosine.shape == run.grid.spatial_size
+    assert maps.decode_mse.shape       == run.grid.spatial_size
+    assert maps.chain_mse.shape        == run.grid.spatial_size
+
+    assert np.isfinite(maps.embedding_error).all()
+    assert maps.embedding_error.mean() == pytest.approx(0.25, rel=1e-4)
+
+
+def test_predictor_excess_isolates_the_decoder_floor():
+    run, _, _ = _build_case(z_offset=0.5)
+
+    metrics, _maps = JepaEmbeddingEvaluator(run, SilentLogger()).run()
+
+    assert metrics["jepa_predictor_excess_mse"] == pytest.approx(metrics["jepa_chain_mse_norm"] - metrics["jepa_decode_mse_norm"], rel=1e-9)
+    assert 0.0 < metrics["jepa_decoder_floor_frac"] < 1.0
+    assert metrics["jepa_decode_amplification"] > 0.0
+
+
+def test_perfect_prediction_leaves_no_predictor_excess():
+    run, _, _ = _build_case()
+
+    metrics, _maps = JepaEmbeddingEvaluator(run, SilentLogger()).run()
+
+    assert metrics["jepa_predictor_excess_mse"] == pytest.approx(0.0, abs=1e-10)
+    assert metrics["jepa_decoder_floor_frac"]   == pytest.approx(1.0, rel=1e-6)
+
+
+def test_embedding_error_correlates_with_a_supplied_curve_error():
+    run, _, _ = _build_case(z_offset=0.5)
+
+    pixel_mse      = np.linspace(0.0, 1.0, int(np.prod(run.grid.spatial_size)), dtype=np.float32).reshape(run.grid.spatial_size)
+    metrics, _maps = JepaEmbeddingEvaluator(run, SilentLogger()).run(pixel_mse=pixel_mse)
+
+    assert "jepa_embedding_error_corr" in metrics
+    assert np.isfinite(metrics["jepa_embedding_error_corr"])
+
+
+def test_mismatched_curve_error_map_raises():
+    run, _, _ = _build_case()
+
+    with pytest.raises(ValueError, match="stitched on different grids"):
+        JepaEmbeddingEvaluator(run, SilentLogger()).run(pixel_mse=np.zeros((2, 2), dtype=np.float32))

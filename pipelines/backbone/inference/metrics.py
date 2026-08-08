@@ -49,6 +49,7 @@ class Result:
     params_source    : str                         = "model"
     extract_r2       : Optional[np.ndarray]        = None
     extract_floor    : Optional[Dict[str, float]]  = None
+    embedding_maps   : Optional[object]            = None
     reduced          : Optional[ReducedComparison] = None
     data_consistency : Optional[object]            = None
     label_r2         : Optional[np.ndarray]        = None

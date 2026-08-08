@@ -200,14 +200,23 @@ class InferencePipeline:
         Metrics.write_json(global_metrics, meta.metrics_path)
         return global_metrics
 
-    def _evaluate_embeddings(self, meta: InferenceMetadata, run, global_metrics: dict, logger: Logger) -> None:
+    def _evaluate_embeddings(self, cfg: InferenceConfig, meta: InferenceMetadata, run, result, global_metrics: dict, logger: Logger) -> None:
         if self.components.embedding_evaluator_cls is None:
             return
 
-        evaluator = self.components.embedding_evaluator_cls(run, logger)
+        evaluator       = self.components.embedding_evaluator_cls(run, logger, window_kind=cfg.stitch_window)
+        metrics, maps   = evaluator.run(pixel_mse=result.pixel_mse)
 
-        global_metrics.update(evaluator.run())
+        result.embedding_maps = maps
+
+        global_metrics.update(metrics)
         Metrics.write_json(global_metrics, meta.metrics_path)
+
+        if cfg.save_cubes:
+            np.save(meta.cube_dir / "embedding_error.npy",  maps.embedding_error)
+            np.save(meta.cube_dir / "embedding_cosine.npy", maps.embedding_cosine)
+            np.save(meta.cube_dir / "decode_mse.npy",       maps.decode_mse)
+            np.save(meta.cube_dir / "chain_mse.npy",        maps.chain_mse)
 
     def _synthesize_reduced(self, cfg: InferenceConfig, meta: InferenceMetadata, run, result, x_axis_np: np.ndarray, global_metrics: dict, indices: dict, logger: Logger) -> None:
         if not cfg.compute_reduced:
@@ -439,7 +448,7 @@ class InferencePipeline:
         global_metrics = self._evaluate_metrics(result, x_axis_np, run, meta, indices)
         logger.subsection(f"Global metrics written : {meta.metrics_path}")
 
-        self._evaluate_embeddings(meta, run, global_metrics, logger)
+        self._evaluate_embeddings(cfg, meta, run, result, global_metrics, logger)
         self._synthesize_reduced(cfg, meta, run, result, x_axis_np, global_metrics, indices, logger)
         self._evaluate_data_consistency(cfg, meta, run, result, x_axis_np, global_metrics, logger)
         self._evaluate_label_quality(cfg, meta, run, result, x_axis_np, global_metrics, logger)

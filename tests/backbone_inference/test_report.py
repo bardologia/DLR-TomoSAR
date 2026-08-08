@@ -283,30 +283,6 @@ def test_report_full_metrics_excludes_per_slice(tmp_path):
     assert "3.1 Dataset statistics" in joined
 
 
-def _report_with(gm, tmp_path, figure_paths=None):
-    return Report(
-        output_dir       = tmp_path,
-        run_summary      = ReportPayloadBuilder.run_summary(_run_stub(), np.linspace(-20.0, 80.0, N_ELEV)),
-        inference_config = ReportPayloadBuilder.inference_config(_cfg_stub(), _run_stub()),
-        checkpoint_meta  = {"epoch": 3, "best_epoch": 2, "best_val_loss": 0.1},
-        global_metrics   = gm,
-        figure_paths     = figure_paths or {},
-        gif_paths        = {},
-        report_path      = tmp_path / "report.md",
-    )
-
-
-def test_report_renders_the_roughness_section(tmp_path):
-    text = _report_with(_global_metrics(), tmp_path).assemble().read_text(encoding="utf-8")
-
-    assert "Curve smoothness" in text
-    assert "Roughness ratio"  in text
-
-
-def test_report_taxonomy_routes_curve_roughness():
-    assert _metric_group("roughness_ratio") == "3.12c Curve roughness"
-
-
 def _extraction_metrics():
     gm = _global_metrics()
 
@@ -320,6 +296,43 @@ def _extraction_metrics():
     gm["extract_floor_matched_recall"]   = 0.97
 
     return gm
+
+
+def _jepa_metrics():
+    gm = _global_metrics()
+
+    gm.update({
+        "jepa_embedding_mse"          : 0.02,
+        "jepa_embedding_rmse"         : 0.1414,
+        "jepa_embedding_nmse"         : 0.05,
+        "jepa_embedding_cosine"       : 0.97,
+        "jepa_embedding_dim_rmse_min" : 0.05,
+        "jepa_embedding_dim_rmse_max" : 0.30,
+        "jepa_embedding_dim_rmse_std" : 0.07,
+        "jepa_decode_mse_norm"        : 0.010,
+        "jepa_chain_mse_norm"         : 0.025,
+        "jepa_predictor_excess_mse"   : 0.015,
+        "jepa_decoder_floor_frac"     : 0.4,
+        "jepa_decode_amplification"   : 0.75,
+        "jepa_embedding_err_p95"      : 0.06,
+        "jepa_embedding_cosine_p5"    : 0.90,
+        "jepa_embedding_error_corr"   : 0.42,
+    })
+
+    return gm
+
+
+def _report_with(gm, tmp_path, figure_paths=None):
+    return Report(
+        output_dir       = tmp_path,
+        run_summary      = ReportPayloadBuilder.run_summary(_run_stub(), np.linspace(-20.0, 80.0, N_ELEV)),
+        inference_config = ReportPayloadBuilder.inference_config(_cfg_stub(), _run_stub()),
+        checkpoint_meta  = {"epoch": 3, "best_epoch": 2, "best_val_loss": 0.1},
+        global_metrics   = gm,
+        figure_paths     = figure_paths or {},
+        gif_paths        = {},
+        report_path      = tmp_path / "report.md",
+    )
 
 
 def test_report_includes_the_extraction_floor_section(tmp_path):
@@ -336,7 +349,36 @@ def test_report_omits_the_extraction_section_for_parameter_models(tmp_path):
     assert "Curve-parameter extraction" not in text
 
 
-def test_report_taxonomy_routes_curve_parameter_extraction():
+def test_report_renders_the_deepened_jepa_headline(tmp_path):
+    text = _report_with(_jepa_metrics(), tmp_path).assemble().read_text(encoding="utf-8")
+
+    assert "Predictor excess MSE"   in text
+    assert "Decoder floor fraction" in text
+    assert "Decode amplification"   in text
+    assert "Embedding-error corr"   in text
+
+
+def test_report_renders_the_roughness_section(tmp_path):
+    text = _report_with(_global_metrics(), tmp_path).assemble().read_text(encoding="utf-8")
+
+    assert "Curve smoothness" in text
+    assert "Roughness ratio"  in text
+
+
+def test_report_lists_the_embedding_figure_section(tmp_path):
+    figures = {"embedding_error_map": [tmp_path / "err.png"], "embedding_chain_map": [tmp_path / "chain.png"]}
+
+    for path in (tmp_path / "err.png", tmp_path / "chain.png"):
+        path.write_bytes(b"")
+
+    text = _report_with(_jepa_metrics(), tmp_path, figures).assemble().read_text(encoding="utf-8")
+
+    assert "6c. Embedding-space diagnostics" in text
+    assert "6c.1 Per-pixel embedding error"  in text
+
+
+def test_report_taxonomy_routes_the_new_metric_families():
     assert _metric_group("extract_fit_r2_mean")          == "3.12b Curve-parameter extraction"
     assert _metric_group("extract_floor_matched_mu_mae") == "3.12b Curve-parameter extraction"
     assert _metric_group("params_source")                == "3.12b Curve-parameter extraction"
+    assert _metric_group("roughness_ratio")              == "3.12c Curve roughness"

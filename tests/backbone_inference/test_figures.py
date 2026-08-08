@@ -230,6 +230,33 @@ def test_figure_composer_compose_with_reduced(tmp_path):
         assert p.is_file() and p.stat().st_size > 0
 
 
+class _EmbeddingMaps:
+    def __init__(self):
+        rng = np.random.default_rng(3)
+
+        self.embedding_error  = rng.random((H, W)).astype(np.float32)
+        self.embedding_cosine = rng.uniform(0.5, 1.0, (H, W)).astype(np.float32)
+        self.decode_mse       = rng.random((H, W)).astype(np.float32)
+        self.chain_mse        = rng.random((H, W)).astype(np.float32)
+
+
+@pytest.mark.slow
+def test_figure_composer_writes_embedding_maps(tmp_path):
+    res, gm, indices, x_axis = _result_and_metrics()
+    res.embedding_maps       = _EmbeddingMaps()
+
+    composer, _meta = _composer(tmp_path)
+
+    figure_paths = composer.compose(
+        result=res, run=_run_stub(), global_metrics=gm, x_axis_np=x_axis, indices=indices, param_space=True,
+    )
+
+    for key in ("embedding_error_map", "embedding_cosine_map", "embedding_decode_map", "embedding_chain_map", "embedding_histograms"):
+        assert key in figure_paths
+        for path in figure_paths[key]:
+            assert path.is_file() and path.stat().st_size > 0
+
+
 @pytest.mark.slow
 def test_figure_composer_skips_slot_organization_for_extracted_parameters(tmp_path):
     res, gm, indices, x_axis = _result_and_metrics()
